@@ -145,6 +145,7 @@ function mapCampaign(r: Record<string, unknown>): Campaign {
     daysLeft: r.days_left != null ? Number(r.days_left) : undefined,
     sourceLink: r.source_link ? String(r.source_link) : undefined,
     rules: r.rules ? String(r.rules) : undefined,
+    created_by: r.created_by ? String(r.created_by) : undefined,
   };
 }
 

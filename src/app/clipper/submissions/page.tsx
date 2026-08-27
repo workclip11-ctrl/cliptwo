@@ -18,7 +18,7 @@ function clipEarnings(clip: Clip, campaigns: Campaign[]) {
 export default function ClipperSubmissionsPage() {
   const { campaigns, clips } = useStore();
   const { user } = useAuth();
-  const myClips = clips.filter((k) => k.userId === user?.id);
+  const myClips = clips.filter((k) => k.userId === user?.id || !k.userId);
   const campaignTitle = (id: string) =>
     campaigns.find((c) => c.id === id)?.title ?? id;
 

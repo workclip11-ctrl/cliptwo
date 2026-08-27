@@ -18,7 +18,7 @@ function clipEarnings(clip: Clip, campaigns: Campaign[]) {
 export default function ClipperWalletPage() {
   const { campaigns, clips } = useStore();
   const { user } = useAuth();
-  const myClips = clips.filter((k) => k.userId === user?.id);
+  const myClips = clips.filter((k) => k.userId === user?.id || !k.userId);
   const total = myClips.reduce((s, k) => s + clipEarnings(k, campaigns), 0);
 
   const byCampaign = new Map<string, number>();

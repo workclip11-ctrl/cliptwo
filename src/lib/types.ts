@@ -8,7 +8,7 @@ export interface Campaign {
   creator: string;
   brief: string;
   platform: Platform;
-  payout: number; // CPM — ₹ per 1,000 verified views
+  payout: number;
   status: CampaignStatus;
   createdAt: number;
   niche?: string;
@@ -17,6 +17,7 @@ export interface Campaign {
   daysLeft?: number;
   sourceLink?: string;
   rules?: string;
+  created_by?: string;
 }
 
 export type ClipStatus = "pending" | "approved" | "rejected";

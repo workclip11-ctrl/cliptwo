@@ -20,9 +20,9 @@ import { StatCard } from "@/components/StatCard";
 import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { useStore } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
 import type { Campaign, Clip, Platform } from "@/lib/types";
 
-const CREATOR_NAME = "Northwind Labs";
 const PLATFORMS: Platform[] = ["TikTok", "YouTube", "Instagram", "Reels"];
 const NICHES = ["Tech", "Gaming", "Finance", "Comedy", "Fitness", "Podcast"];
 
@@ -43,9 +43,14 @@ function clipEarnings(clip: Clip, campaigns: Campaign[]) {
 export default function CreatorPage() {
   const { campaigns, clips, addCampaign, setClipStatus, closeCampaign } =
     useStore();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
 
-  const received = clips;
+  const myCampaigns = campaigns.filter(
+    (c) => !c.created_by || c.created_by === user?.id,
+  );
+  const myCampaignIds = new Set(myCampaigns.map((c) => c.id));
+  const received = clips.filter((k) => myCampaignIds.has(k.campaignId));
   const pending = received.filter((k) => k.status === "pending");
   const approvedClips = received.filter((k) => k.status === "approved");
   const totalSpent = received.reduce((s, k) => s + clipEarnings(k, campaigns), 0);
@@ -72,11 +77,11 @@ export default function CreatorPage() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <span className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-base font-semibold text-white">
-              N
+              {(user?.name ?? "C").trim().charAt(0).toUpperCase()}
             </span>
             <div>
               <h1 className="text-2xl font-semibold tracking-tight">
-                {CREATOR_NAME}
+                {user?.name ?? user?.email ?? "Creator"}
               </h1>
               <p className="text-sm text-muted">Creator dashboard</p>
             </div>
@@ -93,7 +98,7 @@ export default function CreatorPage() {
         <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <StatCard
             label="Active campaigns"
-            value={String(campaigns.filter((c) => c.status === "open").length)}
+            value={String(myCampaigns.filter((c) => c.status === "open").length)}
             icon={<LayoutGrid size={16} />}
           />
           <StatCard
@@ -121,7 +126,7 @@ export default function CreatorPage() {
             Your campaigns
           </h2>
           <div className="space-y-4">
-            {campaigns.map((c) => {
+            {myCampaigns.map((c) => {
               const campClips = clips.filter((k) => k.campaignId === c.id);
               const approvedN = campClips.filter((k) => k.status === "approved").length;
               const pendingN = campClips.filter((k) => k.status === "pending").length;
@@ -323,7 +328,7 @@ export default function CreatorPage() {
           onSubmit={(title, brief, platform, payout, niche, budget) => {
             addCampaign({
               title,
-              creator: CREATOR_NAME,
+              creator: user?.name ?? user?.email ?? "Creator",
               brief,
               platform,
               payout,
