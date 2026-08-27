@@ -14,8 +14,6 @@ import {
   Sparkles,
   BadgeCheck,
 } from "lucide-react";
-import { TopBar } from "@/components/TopBar";
-import { AuthGuard } from "@/components/AuthGuard";
 import { StatCard } from "@/components/StatCard";
 import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
@@ -69,10 +67,8 @@ export default function CreatorPage() {
     .slice(0, 4);
 
   return (
-    <AuthGuard role="creator">
-      <main className="min-h-screen">
-        <TopBar active="creator" />
-      <div className="mx-auto max-w-5xl px-6 py-10">
+    <>
+      <div className="space-y-10">
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -121,7 +117,7 @@ export default function CreatorPage() {
         </div>
 
         {/* Campaigns */}
-        <section className="mt-10">
+        <section id="campaigns" className="mt-10">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
             Your campaigns
           </h2>
@@ -206,7 +202,7 @@ export default function CreatorPage() {
 
         {/* Review queue + top clips */}
         <div className="mt-10 grid gap-8 lg:grid-cols-2">
-          <section>
+          <section id="review">
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
               Review queue
             </h2>
@@ -258,7 +254,7 @@ export default function CreatorPage() {
             </div>
           </section>
 
-          <section>
+          <section id="payouts">
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
               Top clips
             </h2>
@@ -341,8 +337,7 @@ export default function CreatorPage() {
           }}
         />
       )}
-    </main>
-    </AuthGuard>
+    </>
   );
 }
 
