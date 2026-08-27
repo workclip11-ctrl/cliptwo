@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Home } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
 export function TopBar({
@@ -27,12 +26,13 @@ export function TopBar({
   const initial = user?.name?.[0]?.toUpperCase() ?? "U";
   const isClipper = user?.role === "clipper";
   const isCreator = user?.role === "creator";
+  const logoHref = isCreator ? "/creator" : isClipper ? "/clipper" : "/";
 
   return (
     <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
         <Link
-          href="/"
+          href={logoHref}
           className="flex items-center gap-2 font-semibold tracking-tight"
         >
           <span className="flex h-6 w-6 items-center justify-center rounded-md bg-accent text-xs text-white">
@@ -42,16 +42,6 @@ export function TopBar({
         </Link>
 
         <nav className="flex items-center gap-1 rounded-lg border bg-card p-1">
-          <Link
-            href="/"
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              active === "home"
-                ? "bg-accent-soft text-foreground"
-                : "text-muted hover:text-foreground"
-            }`}
-          >
-            <Home size={14} /> Home
-          </Link>
           {!isCreator && (
             <Link
               href="/clipper"
