@@ -24,6 +24,8 @@ export function TopBar({
   }, []);
 
   const initial = user?.name?.[0]?.toUpperCase() ?? "U";
+  const isClipper = user?.role === "clipper";
+  const isCreator = user?.role === "creator";
 
   return (
     <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur">
@@ -39,26 +41,30 @@ export function TopBar({
         </Link>
 
         <nav className="flex items-center gap-1 rounded-lg border bg-card p-1">
-          <Link
-            href="/clipper"
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              active === "clipper"
-                ? "bg-accent-soft text-foreground"
-                : "text-muted hover:text-foreground"
-            }`}
-          >
-            Clipper
-          </Link>
-          <Link
-            href="/creator"
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              active === "creator"
-                ? "bg-accent-soft text-foreground"
-                : "text-muted hover:text-foreground"
-            }`}
-          >
-            Creator
-          </Link>
+          {!isCreator && (
+            <Link
+              href="/clipper"
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                active === "clipper"
+                  ? "bg-accent-soft text-foreground"
+                  : "text-muted hover:text-foreground"
+              }`}
+            >
+              Clipper
+            </Link>
+          )}
+          {!isClipper && (
+            <Link
+              href="/creator"
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                active === "creator"
+                  ? "bg-accent-soft text-foreground"
+                  : "text-muted hover:text-foreground"
+              }`}
+            >
+              Creator
+            </Link>
+          )}
         </nav>
 
         {isSignedIn ? (

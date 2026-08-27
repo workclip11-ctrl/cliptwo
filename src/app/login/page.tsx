@@ -32,10 +32,11 @@ export default function AuthPage() {
     try {
       if (mode === "signup") {
         await signUp({ id: "", name: name.trim() || "Clipper", email, role, password });
+        router.push(role === "clipper" ? "/clipper" : "/creator");
       } else {
-        await signIn(role, { email, password, name });
+        const u = await signIn(role, { email, password, name });
+        router.push(u?.role === "creator" ? "/creator" : "/clipper");
       }
-      router.push(role === "clipper" ? "/clipper" : "/creator");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed.");
     } finally {
@@ -68,21 +69,23 @@ export default function AuthPage() {
             </p>
           </div>
 
-          {/* role switch */}
-          <div className="mt-6 grid grid-cols-2 gap-2 rounded-xl border bg-background p-1">
-            {(["clipper", "creator"] as Role[]).map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setRole(r)}
-                className={`rounded-lg py-2 text-sm font-medium capitalize transition-colors ${
-                  role === r ? "bg-accent text-white" : "text-muted"
-                }`}
-              >
-                {r === "clipper" ? "I'm a clipper" : "I'm a creator"}
-              </button>
-            ))}
-          </div>
+          {/* role switch — only when creating an account */}
+          {mode === "signup" && (
+            <div className="mt-6 grid grid-cols-2 gap-2 rounded-xl border bg-background p-1">
+              {(["clipper", "creator"] as Role[]).map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setRole(r)}
+                  className={`rounded-lg py-2 text-sm font-medium capitalize transition-colors ${
+                    role === r ? "bg-accent text-white" : "text-muted"
+                  }`}
+                >
+                  {r === "clipper" ? "I'm a clipper" : "I'm a creator"}
+                </button>
+              ))}
+            </div>
+          )}
 
           <form onSubmit={submit} className="mt-6 space-y-4">
             {mode === "signup" && (

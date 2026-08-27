@@ -27,7 +27,7 @@ interface AuthValue {
   signIn: (
     role: Role,
     creds: { email: string; password: string; name?: string },
-  ) => Promise<void>;
+  ) => Promise<UserProfile | null>;
   signUp: (data: UserProfile & { password: string }) => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -128,10 +128,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const u = profileFromUser(data.user);
     if (u) {
       const finalRole = u.role === "clipper" || u.role === "creator" ? u.role : r;
-      setUser({ ...u, role: finalRole });
+      const profile = { ...u, role: finalRole };
+      setUser(profile);
       setRole(finalRole);
+      setIsSignedIn(true);
+      return profile;
     }
     setIsSignedIn(true);
+    return null;
   };
 
   const signUp: AuthValue["signUp"] = async (data) => {

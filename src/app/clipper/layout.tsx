@@ -9,11 +9,13 @@ import {
   Film,
   Wallet,
   Settings,
+  Home,
 } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
 import { AuthGuard } from "@/components/AuthGuard";
 
 const NAV = [
+  { href: "/", label: "Home", icon: Home, exact: true },
   { href: "/clipper", label: "Dashboard", icon: LayoutGrid, exact: true },
   { href: "/clipper/campaigns", label: "Campaigns", icon: Megaphone },
   { href: "/clipper/submissions", label: "My Submissions", icon: Film },
