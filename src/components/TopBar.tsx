@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Home } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
 export function TopBar({
@@ -41,6 +42,16 @@ export function TopBar({
         </Link>
 
         <nav className="flex items-center gap-1 rounded-lg border bg-card p-1">
+          <Link
+            href="/"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              active === "home"
+                ? "bg-accent-soft text-foreground"
+                : "text-muted hover:text-foreground"
+            }`}
+          >
+            <Home size={14} /> Home
+          </Link>
           {!isCreator && (
             <Link
               href="/clipper"
