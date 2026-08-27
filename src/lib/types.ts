@@ -31,6 +31,7 @@ export interface Clip {
   views: number;
   submittedAt: number;
   platform?: Platform;
+  userId?: string;
 }
 
 export interface StoreState {

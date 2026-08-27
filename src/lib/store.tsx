@@ -8,9 +8,15 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { Campaign, Clip, ClipStatus, StoreState } from "./types";
-
-const STORAGE_KEY = "cliptwo-store-v1";
+import type {
+  Campaign,
+  CampaignStatus,
+  Clip,
+  ClipStatus,
+  Platform,
+  StoreState,
+} from "./types";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
 
 const seed: StoreState = {
   campaigns: [
@@ -123,69 +129,181 @@ interface StoreActions {
   closeCampaign: (id: string) => void;
 }
 
+function mapCampaign(r: Record<string, unknown>): Campaign {
+  return {
+    id: String(r.id),
+    title: String(r.title ?? ""),
+    creator: String(r.creator ?? ""),
+    brief: String(r.brief ?? ""),
+    platform: (r.platform as Platform) ?? "Instagram",
+    payout: Number(r.payout ?? 0),
+    status: (r.status as CampaignStatus) ?? "open",
+    createdAt: r.created_at ? new Date(String(r.created_at)).getTime() : Date.now(),
+    niche: r.niche ? String(r.niche) : undefined,
+    budget: r.budget != null ? Number(r.budget) : undefined,
+    spent: r.spent != null ? Number(r.spent) : undefined,
+    daysLeft: r.days_left != null ? Number(r.days_left) : undefined,
+    sourceLink: r.source_link ? String(r.source_link) : undefined,
+    rules: r.rules ? String(r.rules) : undefined,
+  };
+}
+
+function mapClip(r: Record<string, unknown>): Clip {
+  return {
+    id: String(r.id),
+    campaignId: String(r.campaign_id),
+    clipper: String(r.clipper ?? ""),
+    videoUrl: String(r.video_url ?? ""),
+    caption: String(r.caption ?? ""),
+    status: (r.status as ClipStatus) ?? "pending",
+    views: Number(r.views ?? 0),
+    submittedAt: r.submitted_at ? new Date(String(r.submitted_at)).getTime() : Date.now(),
+    platform: (r.platform as Platform) ?? "Instagram",
+    userId: r.user_id ? String(r.user_id) : undefined,
+  };
+}
+
 const StoreContext = createContext<(StoreState & StoreActions) | null>(null);
+
+function ignore(p: PromiseLike<unknown>) {
+  Promise.resolve(p).catch(() => {});
+}
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<StoreState>(seed);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setState(JSON.parse(raw));
-    } catch {
-      /* ignore */
-    }
-  }, []);
+    if (!isSupabaseConfigured) return;
+    let active = true;
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch {
-      /* ignore */
-    }
-  }, [state]);
+    (async () => {
+      const [{ data: camps }, { data: clps }] = await Promise.all([
+        supabase.from("campaigns").select("*"),
+        supabase.from("clips").select("*"),
+      ]);
+      if (!active) return;
+      if (camps) setState((s) => ({ ...s, campaigns: camps.map(mapCampaign) }));
+      if (clps) setState((s) => ({ ...s, clips: clps.map(mapClip) }));
+    })().catch(() => {
+      /* keep seed on failure */
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const actions = useMemo<StoreActions>(
     () => ({
-      addCampaign: (c) =>
-        setState((s) => ({
-          ...s,
-          campaigns: [
-            {
-              ...c,
-              id: `c${Date.now()}`,
-              createdAt: Date.now(),
+      addCampaign: (c) => {
+        const optimistic: Campaign = {
+          ...c,
+          id: `c${Date.now()}`,
+          createdAt: Date.now(),
+          status: "open",
+        };
+        setState((s) => ({ ...s, campaigns: [optimistic, ...s.campaigns] }));
+
+        if (!isSupabaseConfigured) return;
+        (async () => {
+          const { data: u } = await supabase.auth.getUser();
+          const handle =
+            (u.user?.user_metadata?.name as string) ||
+            u.user?.email ||
+            c.creator;
+          const { data } = await supabase
+            .from("campaigns")
+            .insert({
+              title: c.title,
+              creator: handle,
+              brief: c.brief,
+              platform: c.platform,
+              payout: c.payout,
+              niche: c.niche ?? null,
+              budget: c.budget ?? 0,
+              spent: 0,
+              days_left: c.daysLeft ?? 30,
               status: "open",
-            },
-            ...s.campaigns,
-          ],
-        })),
-      addClip: (k) =>
-        setState((s) => ({
-          ...s,
-          clips: [
-            {
-              ...k,
-              id: `k${Date.now()}`,
-              submittedAt: Date.now(),
-              status: "pending",
-              views: 0,
-            },
-            ...s.clips,
-          ],
-        })),
-      setClipStatus: (id, status) =>
+              source_link: c.sourceLink ?? null,
+              rules: c.rules ?? null,
+              created_by: u.user?.id ?? null,
+            })
+            .select()
+            .single();
+          if (data) {
+            setState((s) => ({
+              ...s,
+              campaigns: [
+                mapCampaign(data as Record<string, unknown>),
+                ...s.campaigns.filter((x) => x.id !== optimistic.id),
+              ],
+            }));
+          }
+        })().catch(() => {});
+      },
+
+      addClip: (k) => {
+        const optimistic: Clip = {
+          ...k,
+          id: `k${Date.now()}`,
+          submittedAt: Date.now(),
+          status: "pending",
+          views: 0,
+        };
+        setState((s) => ({ ...s, clips: [optimistic, ...s.clips] }));
+
+        if (!isSupabaseConfigured) return;
+        (async () => {
+          const { data: u } = await supabase.auth.getUser();
+          const handle =
+            (u.user?.user_metadata?.name as string) ||
+            u.user?.email ||
+            k.clipper;
+          const { data } = await supabase
+            .from("clips")
+            .insert({
+              campaign_id: k.campaignId,
+              clipper: handle,
+              caption: k.caption,
+              video_url: k.videoUrl,
+              platform: k.platform ?? "Instagram",
+              user_id: u.user?.id ?? null,
+            })
+            .select()
+            .single();
+          if (data) {
+            setState((s) => ({
+              ...s,
+              clips: [
+                mapClip(data as Record<string, unknown>),
+                ...s.clips.filter((x) => x.id !== optimistic.id),
+              ],
+            }));
+          }
+        })().catch(() => {});
+      },
+
+      setClipStatus: (id, status) => {
         setState((s) => ({
           ...s,
           clips: s.clips.map((k) => (k.id === id ? { ...k, status } : k)),
-        })),
-      closeCampaign: (id) =>
+        }));
+        if (!isSupabaseConfigured) return;
+        ignore(supabase.from("clips").update({ status }).eq("id", id));
+      },
+
+      closeCampaign: (id) => {
         setState((s) => ({
           ...s,
           campaigns: s.campaigns.map((c) =>
             c.id === id ? { ...c, status: "closed" } : c,
           ),
-        })),
+        }));
+        if (!isSupabaseConfigured) return;
+        ignore(
+          supabase.from("campaigns").update({ status: "closed" }).eq("id", id),
+        );
+      },
     }),
     [],
   );

@@ -12,6 +12,7 @@ import { supabase } from "@/lib/supabase/client";
 export type Role = "clipper" | "creator";
 
 export interface UserProfile {
+  id: string;
   name: string;
   email: string;
   role: Role;
@@ -46,6 +47,7 @@ function mapError(err: { message: string }): string {
 }
 
 function profileFromUser(user: {
+  id?: string | null;
   email?: string | null;
   user_metadata?: Record<string, unknown>;
 } | null): UserProfile | null {
@@ -59,7 +61,7 @@ function profileFromUser(user: {
     typeof meta.name === "string" && meta.name
       ? meta.name
       : (user.email?.split("@")[0] ?? "User");
-  return { name, email: user.email ?? "", role };
+  return { id: user.id ?? "", name, email: user.email ?? "", role };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -149,7 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(msg);
       throw new Error(msg);
     }
-    setUser({ name: data.name, email: data.email, role: data.role });
+    setUser({ id: res.user?.id ?? "", name: data.name, email: data.email, role: data.role });
     setRole(data.role);
     setIsSignedIn(true);
   };

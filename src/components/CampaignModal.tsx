@@ -20,8 +20,6 @@ function rup(n: number) {
   return "₹" + Math.round(n).toLocaleString("en-IN");
 }
 
-const CLIPPER_NAME = "maya.cuts";
-
 export function CampaignModal({
   campaign,
   onClose,
@@ -30,7 +28,7 @@ export function CampaignModal({
   onClose: () => void;
 }) {
   const router = useRouter();
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, user } = useAuth();
   const { campaigns, clips, addClip } = useStore();
   const [submitOpen, setSubmitOpen] = useState(false);
 
@@ -145,7 +143,7 @@ export function CampaignModal({
           onSubmit={(caption, videoUrl, platform) => {
             addClip({
               campaignId: campaign.id,
-              clipper: CLIPPER_NAME,
+              clipper: user?.name ?? user?.email ?? "clipper",
               caption,
               videoUrl,
               platform,

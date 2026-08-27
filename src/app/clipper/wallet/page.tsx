@@ -1,9 +1,9 @@
 "use client";
 
 import { useStore } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
 import type { Campaign, Clip } from "@/lib/types";
 
-const CLIPPER_NAME = "maya.cuts";
 const UPI_ID = "maya.cuts@upi";
 
 function rup(n: number) {
@@ -17,7 +17,8 @@ function clipEarnings(clip: Clip, campaigns: Campaign[]) {
 
 export default function ClipperWalletPage() {
   const { campaigns, clips } = useStore();
-  const myClips = clips.filter((k) => k.clipper === CLIPPER_NAME);
+  const { user } = useAuth();
+  const myClips = clips.filter((k) => k.userId === user?.id);
   const total = myClips.reduce((s, k) => s + clipEarnings(k, campaigns), 0);
 
   const byCampaign = new Map<string, number>();

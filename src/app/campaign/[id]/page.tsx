@@ -24,8 +24,6 @@ function gradientFor(id: string) {
   return GRADIENTS[h];
 }
 
-const CLIPPER_NAME = "maya.cuts";
-
 function rup(n: number) {
   return "₹" + Math.round(n).toLocaleString("en-IN");
 }
@@ -44,7 +42,7 @@ export default function CampaignDetail() {
   const params = useParams<{ id: string }>();
   const id = params.id as string;
   const { campaigns, clips, addClip, setClipStatus } = useStore();
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, user } = useAuth();
   const router = useRouter();
   const [active, setActive] = useState(false);
 
@@ -249,7 +247,7 @@ export default function CampaignDetail() {
           onSubmit={(caption, videoUrl, platform: Platform) => {
             addClip({
               campaignId: campaign.id,
-              clipper: CLIPPER_NAME,
+              clipper: user?.name ?? user?.email ?? "clipper",
               caption,
               videoUrl,
               platform,

@@ -390,7 +390,7 @@ export default function Home() {
   const router = useRouter();
   const { campaigns } = useStore();
   const [active, setActive] = useState<Campaign | null>(null);
-  const showFeatured = false;
+  const showFeatured = true;
 
   const featured = showFeatured
     ? campaigns.filter((c) => c.status === "open").slice(0, 4)

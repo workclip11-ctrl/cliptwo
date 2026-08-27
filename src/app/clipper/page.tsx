@@ -17,9 +17,8 @@ import { StatCard } from "@/components/StatCard";
 import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { useStore } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
 import type { Campaign, Clip } from "@/lib/types";
-
-const CLIPPER_NAME = "maya.cuts";
 
 const ACCOUNTS = [
   { platform: "Instagram", handle: "@maya.cuts", status: "verified" },
@@ -43,9 +42,10 @@ function clipEarnings(clip: Clip, campaigns: Campaign[]) {
 
 export default function ClipperPage() {
   const { campaigns, clips } = useStore();
+  const { user } = useAuth();
   const router = useRouter();
 
-  const myClips = clips.filter((k) => k.clipper === CLIPPER_NAME);
+  const myClips = clips.filter((k) => k.userId === user?.id);
   const approved = myClips.filter((k) => k.status === "approved");
   const openCampaigns = campaigns.filter((c) => c.status === "open");
   const earnings = myClips.reduce((s, k) => s + clipEarnings(k, campaigns), 0);
@@ -62,7 +62,7 @@ export default function ClipperPage() {
             </span>
             <div>
               <h1 className="text-2xl font-semibold tracking-tight">
-                Welcome back, @{CLIPPER_NAME}
+                Welcome back, @{user?.name ?? user?.email ?? "clipper"}
               </h1>
               <p className="text-sm text-muted">Clipper dashboard</p>
             </div>

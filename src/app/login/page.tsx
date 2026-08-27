@@ -31,7 +31,7 @@ export default function AuthPage() {
     setLoading(true);
     try {
       if (mode === "signup") {
-        await signUp({ name: name.trim() || "Clipper", email, role, password });
+        await signUp({ id: "", name: name.trim() || "Clipper", email, role, password });
       } else {
         await signIn(role, { email, password, name });
       }

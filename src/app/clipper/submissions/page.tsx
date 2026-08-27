@@ -1,11 +1,10 @@
 "use client";
 
 import { useStore } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
 import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import type { Campaign, Clip } from "@/lib/types";
-
-const CLIPPER_NAME = "maya.cuts";
 
 function rup(n: number) {
   return "₹" + Math.round(n).toLocaleString("en-IN");
@@ -18,7 +17,8 @@ function clipEarnings(clip: Clip, campaigns: Campaign[]) {
 
 export default function ClipperSubmissionsPage() {
   const { campaigns, clips } = useStore();
-  const myClips = clips.filter((k) => k.clipper === CLIPPER_NAME);
+  const { user } = useAuth();
+  const myClips = clips.filter((k) => k.userId === user?.id);
   const campaignTitle = (id: string) =>
     campaigns.find((c) => c.id === id)?.title ?? id;
 
