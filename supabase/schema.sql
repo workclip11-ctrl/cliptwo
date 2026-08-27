@@ -1,6 +1,8 @@
 -- cliptwo Supabase schema
 -- Run this in Supabase Dashboard -> SQL Editor -> Run.
 
+create extension if not exists pgcrypto;
+
 -- =========================================================================
 -- Table: campaigns  (created by creators)
 -- =========================================================================
@@ -83,23 +85,21 @@ create policy "clips_delete" on public.clips
   for delete using (auth.role() = 'authenticated');
 
 -- =========================================================================
--- Seed data (only if tables are empty)
+-- Seed data (only if tables are empty) using fixed UUIDs
 -- =========================================================================
-insert into public.campaigns (title, creator, niche, brief, platform, payout, status, budget, spent, days_left, source_link, rules)
+insert into public.campaigns (id, title, creator, niche, brief, platform, payout, status, budget, spent, days_left, source_link, rules)
 select * from (values
-  ('Launch teaser for our new app', 'Northwind Labs', 'Tech', 'Cut a 20s hook from the keynote. Punchy, fast-paced, end on CTA.', 'Instagram', 220, 'open', 40000, 4048, 12, 'https://drive.google.com/drive/folders/launch-teaser', 'Cut a 20s hook from the keynote. Punchy, fast-paced, end on CTA. No watermarks.'),
-  ('Workout routine highlight', 'FitForm', 'Fitness', 'Turn the 12-min session into 3 separate 30s reels. Vertical only.', 'Reels', 160, 'open', 25000, 1920, 26, 'https://drive.google.com/drive/folders/workout-routine', 'Turn the 12-min session into 3 separate 30s reels. Vertical only. Upbeat music.'),
-  ('Founder story short', 'Maker House', 'Finance', 'Use the intro monologue. Emotional, cinematic, subtitles on.', 'YouTube', 280, 'open', 60000, 0, 9, 'https://drive.google.com/drive/folders/founder-story', 'Vertical 9:16 only. Keep the monologue intact. English subtitles required.'),
-  ('Stand-up Set — Delhi Live', 'Kabir Sethi', 'Comedy', 'Punchline-first cuts, 20-40s max. Keep crowd reactions in.', 'Reels', 190, 'open', 30000, 0, 14, 'https://drive.google.com/drive/folders/delhi-live', 'No profanity in captions. 20-40s clips. Add a hook in the first 3 seconds.')
-) as seed(title, creator, niche, brief, platform, payout, status, budget, spent, days_left, source_link, rules)
+  ('11111111-1111-1111-1111-111111111111'::uuid, 'Launch teaser for our new app', 'Northwind Labs', 'Tech', 'Cut a 20s hook from the keynote. Punchy, fast-paced, end on CTA.', 'Instagram', 220, 'open', 40000, 4048, 12, 'https://drive.google.com/drive/folders/launch-teaser', 'No watermarks.'),
+  ('22222222-2222-2222-2222-222222222222'::uuid, 'Workout routine highlight', 'FitForm', 'Fitness', 'Turn the 12-min session into 3 separate 30s reels. Vertical only.', 'Reels', 160, 'open', 25000, 1920, 26, 'https://drive.google.com/drive/folders/workout-routine', 'Vertical only. Upbeat music.'),
+  ('33333333-3333-3333-3333-333333333333'::uuid, 'Founder story short', 'Maker House', 'Finance', 'Use the intro monologue. Emotional, cinematic, subtitles on.', 'YouTube', 280, 'open', 60000, 0, 9, 'https://drive.google.com/drive/folders/founder-story', 'Vertical 9:16 only. English subtitles required.'),
+  ('44444444-4444-4444-4444-444444444444'::uuid, 'Stand-up Set — Delhi Live', 'Kabir Sethi', 'Comedy', 'Punchline-first cuts, 20-40s max. Keep crowd reactions in.', 'Reels', 190, 'open', 30000, 0, 14, 'https://drive.google.com/drive/folders/delhi-live', 'No profanity in captions. 20-40s clips.')
+) as seed(id, title, creator, niche, brief, platform, payout, status, budget, spent, days_left, source_link, rules)
 where not exists (select 1 from public.campaigns);
 
 insert into public.clips (campaign_id, clipper, caption, video_url, platform, views, status)
-select c.id, v.clipper, v.caption, v.video_url, v.platform, v.views, v.status
-from public.campaigns c
-cross join (values
-  ('maya.cuts', 'This app is unhinged 🔥 #tech', 'https://instagram.com/reel/xk29a', 'Instagram', 18400, 'approved'),
-  ('devon.edits', 'The keynote moment everyone missed', 'https://youtube.com/shorts/8kd92', 'YouTube', 0, 'pending'),
-  ('maya.cuts', '3 moves that fixed my posture', 'https://instagram.com/reel/pw001', 'Instagram', 0, 'pending')
-) as v(clipper, caption, video_url, platform, views, status)
-where c.title = 'Launch teaser for our new app' and not exists (select 1 from public.clips);
+select * from (values
+  ('11111111-1111-1111-1111-111111111111'::uuid, 'maya.cuts', 'This app is unhinged 🔥 #tech', 'https://instagram.com/reel/xk29a', 'Instagram', 18400, 'approved'),
+  ('11111111-1111-1111-1111-111111111111'::uuid, 'devon.edits', 'The keynote moment everyone missed', 'https://youtube.com/shorts/8kd92', 'YouTube', 0, 'pending'),
+  ('22222222-2222-2222-2222-222222222222'::uuid, 'maya.cuts', '3 moves that fixed my posture', 'https://instagram.com/reel/pw001', 'Instagram', 0, 'pending')
+) as seed(campaign_id, clipper, caption, video_url, platform, views, status)
+where not exists (select 1 from public.clips);
