@@ -6,21 +6,21 @@ import type { ReactNode } from "react";
 import { useAuth, type Role } from "@/lib/auth";
 
 export function AuthGuard({ role, children }: { role: Role; children: ReactNode }) {
-  const { isSignedIn, role: current } = useAuth();
+  const { isSignedIn, role: current, loading } = useAuth();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted || loading) return;
     if (!isSignedIn) {
       router.replace("/login");
     } else if (current && current !== role) {
       router.replace(current === "clipper" ? "/clipper" : "/creator");
     }
-  }, [mounted, isSignedIn, current, role, router]);
+  }, [mounted, loading, isSignedIn, current, role, router]);
 
-  if (!mounted || !isSignedIn || (current && current !== role)) return null;
+  if (!mounted || loading || !isSignedIn || (current && current !== role)) return null;
   return <>{children}</>;
 }

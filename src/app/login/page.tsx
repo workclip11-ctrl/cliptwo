@@ -18,8 +18,9 @@ export default function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  function submit(e: FormEvent) {
+  async function submit(e: FormEvent) {
     e.preventDefault();
     setError("");
 
@@ -27,12 +28,19 @@ export default function AuthPage() {
     if (!emailOk) return setError("Enter a valid email address.");
     if (password.length < 6) return setError("Password must be at least 6 characters.");
 
-    if (mode === "signup") {
-      signUp({ name: name.trim() || "Clipper", email, role });
-    } else {
-      signIn(role, { email, name });
+    setLoading(true);
+    try {
+      if (mode === "signup") {
+        await signUp({ name: name.trim() || "Clipper", email, role, password });
+      } else {
+        await signIn(role, { email, password, name });
+      }
+      router.push(role === "clipper" ? "/clipper" : "/creator");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Authentication failed.");
+    } finally {
+      setLoading(false);
     }
-    router.push(role === "clipper" ? "/clipper" : "/creator");
   }
 
   return (
@@ -119,10 +127,11 @@ export default function AuthPage() {
 
             <button
               type="submit"
-              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
+              disabled={loading}
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
             >
-              {mode === "signin" ? "Sign in" : "Create account"}
-              <ArrowRight size={15} />
+              {loading ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
+              {!loading && <ArrowRight size={15} />}
             </button>
           </form>
 
@@ -142,7 +151,7 @@ export default function AuthPage() {
         </div>
 
         <p className="mt-6 text-center text-xs text-muted">
-          Prototype build — accounts are stored locally in your browser.
+          Prototype build — accounts are stored in your browser session via Supabase.
         </p>
       </div>
     </main>

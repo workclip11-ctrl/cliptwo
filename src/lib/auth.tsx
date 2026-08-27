@@ -3,9 +3,11 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useState,
   type ReactNode,
 } from "react";
+import { supabase } from "@/lib/supabase/client";
 
 export type Role = "clipper" | "creator";
 
@@ -19,73 +21,150 @@ interface AuthValue {
   isSignedIn: boolean;
   role: Role | null;
   user: UserProfile | null;
-  signIn: (role: Role, profile?: Partial<UserProfile>) => void;
-  signUp: (profile: UserProfile) => void;
-  signOut: () => void;
+  loading: boolean;
+  error: string | null;
+  signIn: (
+    role: Role,
+    creds: { email: string; password: string; name?: string },
+  ) => Promise<void>;
+  signUp: (data: UserProfile & { password: string }) => Promise<void>;
+  signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthValue | null>(null);
 
-function readUser(): UserProfile | null {
-  if (typeof window === "undefined") return null;
-  const raw = localStorage.getItem("cliptwo-user");
-  if (!raw) return null;
-  try {
-    const u = JSON.parse(raw) as UserProfile;
-    if (u.role === "clipper" || u.role === "creator") return u;
-  } catch {
-    /* ignore corrupt value */
-  }
-  return null;
+function mapError(err: { message: string }): string {
+  const m = err.message.toLowerCase();
+  if (m.includes("invalid login") || m.includes("invalid credentials"))
+    return "Invalid email or password.";
+  if (m.includes("email not confirmed"))
+    return "Please confirm your email before signing in.";
+  if (m.includes("user already registered"))
+    return "An account with this email already exists.";
+  if (m.includes("password")) return "Password must be at least 6 characters.";
+  return err.message;
 }
 
-function readRole(): Role | null {
-  if (typeof window === "undefined") return null;
-  const r = localStorage.getItem("cliptwo-role");
-  return r === "clipper" || r === "creator" ? r : null;
+function profileFromUser(user: {
+  email?: string | null;
+  user_metadata?: Record<string, unknown>;
+} | null): UserProfile | null {
+  if (!user) return null;
+  const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+  const role: Role =
+    meta.role === "clipper" || meta.role === "creator"
+      ? (meta.role as Role)
+      : "clipper";
+  const name =
+    typeof meta.name === "string" && meta.name
+      ? meta.name
+      : (user.email?.split("@")[0] ?? "User");
+  return { name, email: user.email ?? "", role };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [isSignedIn, setIsSignedIn] = useState(
-    () => typeof window !== "undefined" && localStorage.getItem("cliptwo-auth") === "1",
-  );
-  const [role, setRole] = useState<Role | null>(readRole);
-  const [user, setUser] = useState<UserProfile | null>(readUser);
+  const [isSignedIn, setIsSignedIn] = useState(false);
+  const [role, setRole] = useState<Role | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const signIn = (r: Role, profile?: Partial<UserProfile>) => {
-    const full: UserProfile = {
-      name: profile?.name ?? user?.name ?? "User",
-      email: profile?.email ?? user?.email ?? "",
-      role: r,
+  useEffect(() => {
+    let active = true;
+
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!active) return;
+        const u = profileFromUser(data.session?.user ?? null);
+        if (u) {
+          setUser(u);
+          setRole(u.role);
+          setIsSignedIn(true);
+        } else {
+          setIsSignedIn(false);
+        }
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setIsSignedIn(false);
+        setLoading(false);
+      });
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      const u = profileFromUser(session?.user ?? null);
+      if (u) {
+        setUser(u);
+        setRole(u.role);
+        setIsSignedIn(true);
+      } else {
+        setUser(null);
+        setRole(null);
+        setIsSignedIn(false);
+      }
+    });
+
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
     };
-    localStorage.setItem("cliptwo-auth", "1");
-    localStorage.setItem("cliptwo-role", r);
-    localStorage.setItem("cliptwo-user", JSON.stringify(full));
-    setRole(r);
-    setUser(full);
+  }, []);
+
+  const signIn: AuthValue["signIn"] = async (r, creds) => {
+    setError(null);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: creds.email,
+      password: creds.password,
+    });
+    if (error) {
+      const msg = mapError(error);
+      setError(msg);
+      throw new Error(msg);
+    }
+    const { data } = await supabase.auth.getUser();
+    const u = profileFromUser(data.user);
+    if (u) {
+      const finalRole = u.role === "clipper" || u.role === "creator" ? u.role : r;
+      setUser({ ...u, role: finalRole });
+      setRole(finalRole);
+    }
     setIsSignedIn(true);
   };
 
-  const signUp = (p: UserProfile) => {
-    localStorage.setItem("cliptwo-auth", "1");
-    localStorage.setItem("cliptwo-role", p.role);
-    localStorage.setItem("cliptwo-user", JSON.stringify(p));
-    setRole(p.role);
-    setUser(p);
+  const signUp: AuthValue["signUp"] = async (data) => {
+    setError(null);
+    const { data: res, error } = await supabase.auth.signUp({
+      email: data.email,
+      password: data.password,
+      options: { data: { name: data.name, role: data.role } },
+    });
+    if (error) {
+      const msg = mapError(error);
+      setError(msg);
+      throw new Error(msg);
+    }
+    if (!res.session) {
+      const msg = "Please check your email to confirm your account.";
+      setError(msg);
+      throw new Error(msg);
+    }
+    setUser({ name: data.name, email: data.email, role: data.role });
+    setRole(data.role);
     setIsSignedIn(true);
   };
 
-  const signOut = () => {
-    localStorage.removeItem("cliptwo-auth");
-    localStorage.removeItem("cliptwo-role");
-    localStorage.removeItem("cliptwo-user");
-    setIsSignedIn(false);
-    setRole(null);
+  const signOut: AuthValue["signOut"] = async () => {
+    await supabase.auth.signOut();
     setUser(null);
+    setRole(null);
+    setIsSignedIn(false);
   };
 
   return (
-    <AuthContext.Provider value={{ isSignedIn, role, user, signIn, signUp, signOut }}>
+    <AuthContext.Provider
+      value={{ isSignedIn, role, user, loading, error, signIn, signUp, signOut }}
+    >
       {children}
     </AuthContext.Provider>
   );
