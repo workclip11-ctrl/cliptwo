@@ -11,22 +11,37 @@ type Role = "clipper" | "creator";
 
 export default function AuthPage() {
   const router = useRouter();
-  const { signIn } = useAuth();
+  const { signIn, signUp } = useAuth();
   const [mode, setMode] = useState<Mode>("signin");
   const [role, setRole] = useState<Role>("clipper");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    signIn(role);
+    setError("");
+
+    const emailOk = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
+    if (!emailOk) return setError("Enter a valid email address.");
+    if (password.length < 6) return setError("Password must be at least 6 characters.");
+
+    if (mode === "signup") {
+      signUp({ name: name.trim() || "Clipper", email, role });
+    } else {
+      signIn(role, { email, name });
+    }
     router.push(role === "clipper" ? "/clipper" : "/creator");
   }
 
   return (
     <main className="flex min-h-screen items-center justify-center px-6 py-12">
       <div className="w-full max-w-md">
-        <Link href="/" className="mb-8 flex items-center justify-center gap-2 font-semibold tracking-tight">
+        <Link
+          href="/"
+          className="mb-8 flex items-center justify-center gap-2 font-semibold tracking-tight"
+        >
           <span className="flex h-7 w-7 items-center justify-center rounded-md bg-accent text-white">
             <Scissors size={15} />
           </span>
@@ -52,7 +67,9 @@ export default function AuthPage() {
                 key={r}
                 type="button"
                 onClick={() => setRole(r)}
-                className={`rounded-lg py-2 text-sm font-medium capitalize transition-colors ${role === r ? "bg-accent text-white" : "text-muted"}`}
+                className={`rounded-lg py-2 text-sm font-medium capitalize transition-colors ${
+                  role === r ? "bg-accent text-white" : "text-muted"
+                }`}
               >
                 {r === "clipper" ? "I'm a clipper" : "I'm a creator"}
               </button>
@@ -64,7 +81,8 @@ export default function AuthPage() {
               <div>
                 <label className="mb-1.5 block text-sm font-medium">Name</label>
                 <input
-                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   placeholder="Your name"
                   className="w-full rounded-lg border bg-background px-3 py-2.5 text-sm outline-none focus:border-foreground"
                 />
@@ -93,6 +111,12 @@ export default function AuthPage() {
               />
             </div>
 
+            {error && (
+              <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-500">
+                {error}
+              </p>
+            )}
+
             <button
               type="submit"
               className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
@@ -106,7 +130,10 @@ export default function AuthPage() {
             {mode === "signin" ? "New to cliptwo? " : "Already have an account? "}
             <button
               type="button"
-              onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
+              onClick={() => {
+                setMode(mode === "signin" ? "signup" : "signin");
+                setError("");
+              }}
               className="font-medium text-foreground underline-offset-4 hover:underline"
             >
               {mode === "signin" ? "Create an account" : "Sign in"}
@@ -115,7 +142,7 @@ export default function AuthPage() {
         </div>
 
         <p className="mt-6 text-center text-xs text-muted">
-          Prototype build — no real authentication. Choosing a role drops you into that dashboard.
+          Prototype build — accounts are stored locally in your browser.
         </p>
       </div>
     </main>

@@ -3,50 +3,89 @@
 import {
   createContext,
   useContext,
-  useEffect,
   useState,
   type ReactNode,
 } from "react";
 
 export type Role = "clipper" | "creator";
 
+export interface UserProfile {
+  name: string;
+  email: string;
+  role: Role;
+}
+
 interface AuthValue {
   isSignedIn: boolean;
   role: Role | null;
-  signIn: (role?: Role) => void;
+  user: UserProfile | null;
+  signIn: (role: Role, profile?: Partial<UserProfile>) => void;
+  signUp: (profile: UserProfile) => void;
   signOut: () => void;
 }
 
 const AuthContext = createContext<AuthValue | null>(null);
 
+function readUser(): UserProfile | null {
+  if (typeof window === "undefined") return null;
+  const raw = localStorage.getItem("cliptwo-user");
+  if (!raw) return null;
+  try {
+    const u = JSON.parse(raw) as UserProfile;
+    if (u.role === "clipper" || u.role === "creator") return u;
+  } catch {
+    /* ignore corrupt value */
+  }
+  return null;
+}
+
+function readRole(): Role | null {
+  if (typeof window === "undefined") return null;
+  const r = localStorage.getItem("cliptwo-role");
+  return r === "clipper" || r === "creator" ? r : null;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [isSignedIn, setIsSignedIn] = useState(false);
-  const [role, setRole] = useState<Role | null>(null);
+  const [isSignedIn, setIsSignedIn] = useState(
+    () => typeof window !== "undefined" && localStorage.getItem("cliptwo-auth") === "1",
+  );
+  const [role, setRole] = useState<Role | null>(readRole);
+  const [user, setUser] = useState<UserProfile | null>(readUser);
 
-  useEffect(() => {
-    setIsSignedIn(localStorage.getItem("cliptwo-auth") === "1");
-    const r = localStorage.getItem("cliptwo-role") as Role | null;
-    if (r === "clipper" || r === "creator") setRole(r);
-  }, []);
-
-  const signIn = (r?: Role) => {
+  const signIn = (r: Role, profile?: Partial<UserProfile>) => {
+    const full: UserProfile = {
+      name: profile?.name ?? user?.name ?? "User",
+      email: profile?.email ?? user?.email ?? "",
+      role: r,
+    };
     localStorage.setItem("cliptwo-auth", "1");
-    if (r) {
-      localStorage.setItem("cliptwo-role", r);
-      setRole(r);
-    }
+    localStorage.setItem("cliptwo-role", r);
+    localStorage.setItem("cliptwo-user", JSON.stringify(full));
+    setRole(r);
+    setUser(full);
+    setIsSignedIn(true);
+  };
+
+  const signUp = (p: UserProfile) => {
+    localStorage.setItem("cliptwo-auth", "1");
+    localStorage.setItem("cliptwo-role", p.role);
+    localStorage.setItem("cliptwo-user", JSON.stringify(p));
+    setRole(p.role);
+    setUser(p);
     setIsSignedIn(true);
   };
 
   const signOut = () => {
     localStorage.removeItem("cliptwo-auth");
     localStorage.removeItem("cliptwo-role");
+    localStorage.removeItem("cliptwo-user");
     setIsSignedIn(false);
     setRole(null);
+    setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ isSignedIn, role, signIn, signOut }}>
+    <AuthContext.Provider value={{ isSignedIn, role, user, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );

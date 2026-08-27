@@ -11,6 +11,7 @@ import {
   Settings,
 } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
+import { AuthGuard } from "@/components/AuthGuard";
 
 const NAV = [
   { href: "/clipper", label: "Dashboard", icon: LayoutGrid, exact: true },
@@ -24,36 +25,38 @@ export default function ClipperLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   return (
-    <main className="min-h-screen bg-background">
-      <TopBar active="clipper" />
-      <div className="mx-auto flex max-w-6xl gap-8 px-6 py-8">
-        <aside className="w-56 shrink-0">
-          <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-widest text-muted">
-            Menu
-          </p>
-          <nav className="flex flex-col gap-1">
-            {NAV.map((n) => {
-              const active = n.exact
-                ? pathname === n.href
-                : pathname.startsWith(n.href);
-              return (
-                <Link
-                  key={n.href}
-                  href={n.href}
-                  className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                    active
-                      ? "bg-accent-soft text-foreground"
-                      : "text-muted hover:bg-accent-soft/60 hover:text-foreground"
-                  }`}
-                >
-                  <n.icon size={16} /> {n.label}
-                </Link>
-              );
-            })}
-          </nav>
-        </aside>
-        <div className="min-w-0 flex-1">{children}</div>
-      </div>
-    </main>
+    <AuthGuard role="clipper">
+      <main className="min-h-screen bg-background">
+        <TopBar active="clipper" />
+        <div className="mx-auto flex max-w-6xl gap-8 px-6 py-8">
+          <aside className="w-56 shrink-0">
+            <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-widest text-muted">
+              Menu
+            </p>
+            <nav className="flex flex-col gap-1">
+              {NAV.map((n) => {
+                const active = n.exact
+                  ? pathname === n.href
+                  : pathname.startsWith(n.href);
+                return (
+                  <Link
+                    key={n.href}
+                    href={n.href}
+                    className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                      active
+                        ? "bg-accent-soft text-foreground"
+                        : "text-muted hover:bg-accent-soft/60 hover:text-foreground"
+                    }`}
+                  >
+                    <n.icon size={16} /> {n.label}
+                  </Link>
+                );
+              })}
+            </nav>
+          </aside>
+          <div className="min-w-0 flex-1">{children}</div>
+        </div>
+      </main>
+    </AuthGuard>
   );
 }

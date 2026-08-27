@@ -15,6 +15,7 @@ import {
   BadgeCheck,
 } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
+import { AuthGuard } from "@/components/AuthGuard";
 import { StatCard } from "@/components/StatCard";
 import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
@@ -63,8 +64,9 @@ export default function CreatorPage() {
     .slice(0, 4);
 
   return (
-    <main className="min-h-screen">
-      <TopBar active="creator" />
+    <AuthGuard role="creator">
+      <main className="min-h-screen">
+        <TopBar active="creator" />
       <div className="mx-auto max-w-5xl px-6 py-10">
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -335,6 +337,7 @@ export default function CreatorPage() {
         />
       )}
     </main>
+    </AuthGuard>
   );
 }
 
