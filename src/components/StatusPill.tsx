@@ -1,0 +1,18 @@
+import type { ClipStatus } from "@/lib/types";
+
+const map: Record<ClipStatus, { label: string; cls: string }> = {
+  pending: { label: "Pending", cls: "bg-amber/10 text-amber border-amber/20" },
+  approved: { label: "Approved", cls: "bg-green/10 text-green border-green/20" },
+  rejected: { label: "Rejected", cls: "bg-red/10 text-red border-red/20" },
+};
+
+export function StatusPill({ status }: { status: ClipStatus }) {
+  const s = map[status];
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${s.cls}`}
+    >
+      {s.label}
+    </span>
+  );
+}
