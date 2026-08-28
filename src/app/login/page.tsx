@@ -1,32 +1,24 @@
 "use client";
 
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Scissors, ArrowRight } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
 type Mode = "signin" | "signup";
-type Role = "clipper" | "creator" | "admin";
+type Role = "clipper" | "creator";
 
 export default function AuthPage() {
   const router = useRouter();
   const { signIn, signUp } = useAuth();
   const [mode, setMode] = useState<Mode>("signin");
   const [role, setRole] = useState<Role>("clipper");
-  const [adminMode, setAdminMode] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const p = new URLSearchParams(window.location.search).get("admin");
-      if (p === "1") setAdminMode(true);
-    }
-  }, []);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -39,10 +31,8 @@ export default function AuthPage() {
     setLoading(true);
     try {
       if (mode === "signup") {
-        await signUp({ id: "", name: name.trim() || "Admin", email, role, password });
-        router.push(
-          role === "admin" ? "/admin" : role === "clipper" ? "/clipper" : "/creator",
-        );
+        await signUp({ id: "", name: name.trim() || "Clipper", email, role, password });
+        router.push(role === "clipper" ? "/clipper" : "/creator");
       } else {
         const u = await signIn(role, { email, password, name });
         router.push(
@@ -87,25 +77,19 @@ export default function AuthPage() {
 
           {/* role switch — only when creating an account */}
           {mode === "signup" && (
-            <div
-              className={`mt-6 grid gap-2 rounded-xl border bg-background p-1 ${
-                adminMode ? "grid-cols-3" : "grid-cols-2"
-              }`}
-            >
-              {(["clipper", "creator", "admin"] as Role[])
-                .filter((r) => r !== "admin" || adminMode)
-                .map((r) => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => setRole(r)}
-                    className={`rounded-lg py-2 text-sm font-medium capitalize transition-colors ${
-                      role === r ? "bg-accent text-white" : "text-muted"
-                    }`}
-                  >
-                    {r === "clipper" ? "I'm a clipper" : r === "creator" ? "I'm a creator" : "I'm an admin"}
-                  </button>
-                ))}
+            <div className="mt-6 grid grid-cols-2 gap-2 rounded-xl border bg-background p-1">
+              {(["clipper", "creator"] as Role[]).map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setRole(r)}
+                  className={`rounded-lg py-2 text-sm font-medium capitalize transition-colors ${
+                    role === r ? "bg-accent text-white" : "text-muted"
+                  }`}
+                >
+                  {r === "clipper" ? "I'm a clipper" : "I'm a creator"}
+                </button>
+              ))}
             </div>
           )}
 
@@ -173,17 +157,6 @@ export default function AuthPage() {
               {mode === "signin" ? "Create an account" : "Sign in"}
             </button>
           </p>
-
-          {!adminMode && (
-            <p className="mt-3 text-center text-sm text-muted">
-              <Link
-                href="/login?admin=1"
-                className="font-medium text-foreground underline-offset-4 hover:underline"
-              >
-                Admin? Sign in here
-              </Link>
-            </p>
-          )}
         </div>
 
         <p className="mt-6 text-center text-xs text-muted">

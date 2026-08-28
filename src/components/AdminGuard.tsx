@@ -15,7 +15,7 @@ export function AdminGuard({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!mounted || loading) return;
     if (!isSignedIn) {
-      router.replace("/login?admin=1");
+      router.replace("/login");
     } else if (role !== "admin") {
       router.replace(role === "creator" ? "/creator" : "/clipper");
     }
