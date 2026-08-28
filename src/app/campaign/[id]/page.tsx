@@ -180,7 +180,7 @@ export default function CampaignDetail() {
           </div>
         )}
 
-        {campaign.status === "open" && (
+        {campaign.status === "open" && user?.role === "clipper" && (
           <button
             onClick={join}
             className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90"
