@@ -50,7 +50,7 @@ export function CampaignCard({
           <span>{campaign.daysLeft}d left</span>
         </div>
       </div>
-      <div className="flex items-center justify-between border-t px-4 py-3">
+      <div className="mt-auto flex items-center justify-between border-t px-4 py-3">
         <span className="text-xs text-muted">{clippersIn} clippers in</span>
         <span className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white">
           View campaign
@@ -68,7 +68,7 @@ export function CampaignCard({
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") onView(campaign);
         }}
-        className="group block cursor-pointer overflow-hidden rounded-2xl border bg-card transition hover:shadow-sm"
+        className="group flex flex-col cursor-pointer overflow-hidden rounded-2xl border bg-card transition hover:shadow-sm"
       >
         {inner}
       </div>
@@ -78,7 +78,7 @@ export function CampaignCard({
   return (
     <Link
       href={`/campaign/${campaign.id}`}
-      className="group block overflow-hidden rounded-2xl border bg-card transition hover:shadow-sm"
+      className="group flex flex-col overflow-hidden rounded-2xl border bg-card transition hover:shadow-sm"
     >
       {inner}
     </Link>
