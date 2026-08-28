@@ -173,6 +173,17 @@ export default function AuthPage() {
               {mode === "signin" ? "Create an account" : "Sign in"}
             </button>
           </p>
+
+          {!adminMode && (
+            <p className="mt-3 text-center text-sm text-muted">
+              <Link
+                href="/login?admin=1"
+                className="font-medium text-foreground underline-offset-4 hover:underline"
+              >
+                Admin? Sign in here
+              </Link>
+            </p>
+          )}
         </div>
 
         <p className="mt-6 text-center text-xs text-muted">

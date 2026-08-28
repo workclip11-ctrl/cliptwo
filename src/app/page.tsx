@@ -715,6 +715,7 @@ export default function Home() {
               <h5 className="text-sm font-semibold">Company</h5>
               <ul className="mt-3 space-y-2 text-sm text-muted">
                 <li><Link href="/login" className="hover:text-foreground">Sign in</Link></li>
+                <li><Link href="/login?admin=1" className="hover:text-foreground">Admin</Link></li>
                 <li><a href="#" className="hover:text-foreground">About</a></li>
                 <li><a href="#" className="hover:text-foreground">Careers</a></li>
                 <li><a href="#" className="hover:text-foreground">Blog</a></li>
