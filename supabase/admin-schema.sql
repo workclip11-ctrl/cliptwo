@@ -2,6 +2,18 @@
 -- Run this in Supabase Dashboard -> SQL Editor -> Run.
 -- Additive only: it does NOT drop the existing campaigns/clips tables or data.
 
+-- ---------------------------------------------------------------------------
+-- profiles (one row per auth user) — MUST exist before the is_admin() helper
+-- ---------------------------------------------------------------------------
+create table if not exists public.profiles (
+  id         uuid primary key references auth.users (id) on delete cascade,
+  name       text not null default '',
+  email      text not null default '',
+  role       text not null default 'clipper',
+  status     text not null default 'active',
+  created_at timestamptz not null default now()
+);
+
 -- Helper: is the current user an admin? (reads the public.profiles table)
 create or replace function public.is_admin()
 returns boolean
@@ -13,18 +25,6 @@ as $$
     select 1 from public.profiles where id = auth.uid() and role = 'admin'
   );
 $$;
-
--- ---------------------------------------------------------------------------
--- profiles (one row per auth user)
--- ---------------------------------------------------------------------------
-create table if not exists public.profiles (
-  id         uuid primary key references auth.users (id) on delete cascade,
-  name       text not null default '',
-  email      text not null default '',
-  role       text not null default 'clipper',
-  status     text not null default 'active',
-  created_at timestamptz not null default now()
-);
 
 alter table public.profiles enable row level security;
 
