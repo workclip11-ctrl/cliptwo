@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Check, Ban, ExternalLink } from "lucide-react";
+import { ArrowLeft, ExternalLink } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
 import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
@@ -27,8 +26,7 @@ function clipEarnings(clip: Clip, campaigns: Campaign[]) {
 export default function ClipDetail() {
   const params = useParams<{ id: string }>();
   const id = params.id as string;
-  const { campaigns, clips, setClipStatus } = useStore();
-  const [justActed, setJustActed] = useState<Clip["status"] | null>(null);
+  const { campaigns, clips } = useStore();
 
   const clip = clips.find((k) => k.id === id);
 
@@ -116,31 +114,10 @@ export default function ClipDetail() {
         </div>
 
         {clip.status === "pending" && (
-          <div className="mt-6 flex items-center gap-3">
-            <button
-              onClick={() => {
-                setClipStatus(clip.id, "approved");
-                setJustActed("approved");
-              }}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-green/10 px-4 py-2 text-sm font-medium text-green"
-            >
-              <Check size={15} /> Approve
-            </button>
-            <button
-              onClick={() => {
-                setClipStatus(clip.id, "rejected");
-                setJustActed("rejected");
-              }}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-red/10 px-4 py-2 text-sm font-medium text-red"
-            >
-              <Ban size={15} /> Reject
-            </button>
-            {justActed && (
-              <span className="text-xs text-muted">
-                Clip {justActed}. Status updates live.
-              </span>
-            )}
-          </div>
+          <p className="mt-6 text-sm text-muted">
+            Awaiting admin review — status will update once our team approves or
+            rejects this clip.
+          </p>
         )}
       </div>
     </main>

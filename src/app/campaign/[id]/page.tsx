@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Plus, Check, Ban, Link2 } from "lucide-react";
+import { ArrowLeft, Plus, Link2 } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
 import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
@@ -41,7 +41,7 @@ function clipEarnings(clip: Clip, campaigns: Campaign[]) {
 export default function CampaignDetail() {
   const params = useParams<{ id: string }>();
   const id = params.id as string;
-  const { campaigns, clips, addClip, setClipStatus } = useStore();
+  const { campaigns, clips, addClip } = useStore();
   const { isSignedIn, user } = useAuth();
   const router = useRouter();
   const [active, setActive] = useState(false);
@@ -211,22 +211,6 @@ export default function CampaignDetail() {
                   </div>
                   <div className="flex items-center gap-2">
                     <StatusPill status={k.status} />
-                    {k.status === "pending" && (
-                      <div className="flex gap-1">
-                        <button
-                          onClick={() => setClipStatus(k.id, "approved")}
-                          className="rounded-md bg-green/10 px-2 py-1 text-xs font-medium text-green"
-                        >
-                          <Check size={13} />
-                        </button>
-                        <button
-                          onClick={() => setClipStatus(k.id, "rejected")}
-                          className="rounded-md bg-red/10 px-2 py-1 text-xs font-medium text-red"
-                        >
-                          <Ban size={13} />
-                        </button>
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
