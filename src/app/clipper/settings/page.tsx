@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, Link2, CheckCircle2, BadgeCheck } from "lucide-react";
+import { LogOut, Link2, CheckCircle2, BadgeCheck, Save } from "lucide-react";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { useAuth } from "@/lib/auth";
+import { useStore } from "@/lib/store";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
 
 const INITIAL_ACCOUNTS = [
   { platform: "Instagram", handle: "@maya.cuts", status: "verified" },
@@ -14,12 +16,22 @@ const INITIAL_ACCOUNTS = [
 
 export default function ClipperSettingsPage() {
   const router = useRouter();
-  const { signOut } = useAuth();
-  const [name, setName] = useState("maya.cuts");
-  const [email, setEmail] = useState("maya@example.com");
-  const [upi, setUpi] = useState("maya.cuts@upi");
+  const { user, signOut } = useAuth();
+  const { profiles, updateProfile } = useStore();
+  const [name, setName] = useState("");
+  const [upi, setUpi] = useState("");
   const [accounts, setAccounts] = useState(INITIAL_ACCOUNTS);
   const [saved, setSaved] = useState(false);
+  const loaded = useRef(false);
+
+  useEffect(() => {
+    if (!loaded.current && user) {
+      const me = profiles.find((p) => p.id === user.id);
+      setName(user.name || user.email || "");
+      setUpi(me?.upi ?? "");
+      loaded.current = true;
+    }
+  }, [user, profiles]);
 
   function toggle(platform: string) {
     setAccounts((prev) =>
@@ -29,6 +41,16 @@ export default function ClipperSettingsPage() {
           : a,
       ),
     );
+  }
+
+  function save() {
+    if (!user) return;
+    updateProfile(user.id, { name: name.trim(), upi: upi.trim() });
+    if (isSupabaseConfigured) {
+      supabase.auth.updateUser({ data: { name: name.trim() } }).catch(() => {});
+    }
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
   }
 
   return (
@@ -66,9 +88,9 @@ export default function ClipperSettingsPage() {
           <label className="block text-sm">
             <span className="text-muted">Email</span>
             <input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
+              value={user?.email ?? ""}
+              readOnly
+              className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm text-muted outline-none"
             />
           </label>
         </div>
@@ -104,6 +126,9 @@ export default function ClipperSettingsPage() {
             </li>
           ))}
         </ul>
+        <p className="mt-3 text-xs text-muted">
+          Connect buttons are demo-only in this prototype build.
+        </p>
       </section>
 
       {/* UPI */}
@@ -126,13 +151,10 @@ export default function ClipperSettingsPage() {
       </section>
 
       <button
-        onClick={() => {
-          setSaved(true);
-          setTimeout(() => setSaved(false), 2000);
-        }}
-        className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+        onClick={save}
+        className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
       >
-        {saved ? "Saved" : "Save changes"}
+        <Save size={14} /> {saved ? "Saved" : "Save changes"}
       </button>
     </div>
   );

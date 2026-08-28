@@ -1,26 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
-import type { Campaign, Clip } from "@/lib/types";
-
-function rup(n: number) {
-  return "₹" + Math.round(n).toLocaleString("en-IN");
-}
-function clipEarnings(clip: Clip, campaigns: Campaign[]) {
-  if (clip.status !== "approved") return 0;
-  const camp = campaigns.find((c) => c.id === clip.campaignId);
-  return camp ? (clip.views / 1000) * camp.payout : 0;
-}
+import { rup, clipEarnings } from "@/lib/format";
 
 export default function ClipperSubmissionsPage() {
   const { campaigns, clips } = useStore();
   const { user } = useAuth();
   const myClips = clips.filter((k) => k.userId === user?.id || !k.userId);
-  const campaignTitle = (id: string) =>
-    campaigns.find((c) => c.id === id)?.title ?? id;
 
   return (
     <div className="space-y-6">
@@ -49,7 +39,9 @@ export default function ClipperSubmissionsPage() {
               {myClips.map((k) => (
                 <tr key={k.id} className="border-b last:border-0">
                   <td className="px-4 py-3">
-                    <p className="font-medium">{campaignTitle(k.campaignId)}</p>
+                    <Link href={`/clip/${k.id}`} className="font-medium hover:underline underline-offset-2">
+                      {campaigns.find((c) => c.id === k.campaignId)?.title ?? "Campaign"}
+                    </Link>
                     <p className="line-clamp-1 max-w-xs text-xs text-muted">{k.caption}</p>
                   </td>
                   <td className="px-4 py-3">

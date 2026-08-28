@@ -10,6 +10,7 @@ import { PlatformIcon } from "@/components/PlatformIcon";
 import { SubmitClipModal } from "@/components/SubmitClipModal";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
+import { rup, fmtViews, clipEarnings } from "@/lib/format";
 import type { Campaign, Clip, Platform } from "@/lib/types";
 
 const GRADIENTS = [
@@ -24,20 +25,6 @@ function gradientFor(id: string) {
   return GRADIENTS[h];
 }
 
-function rup(n: number) {
-  return "₹" + Math.round(n).toLocaleString("en-IN");
-}
-function fmtViews(n: number) {
-  if (n >= 100000) return (n / 100000).toFixed(1) + "L";
-  if (n >= 1000) return (n / 1000).toFixed(1) + "K";
-  return String(n);
-}
-function clipEarnings(clip: Clip, campaigns: Campaign[]) {
-  if (clip.status !== "approved") return 0;
-  const camp = campaigns.find((c) => c.id === clip.campaignId);
-  return camp ? (clip.views / 1000) * camp.payout : 0;
-}
-
 export default function CampaignDetail() {
   const params = useParams<{ id: string }>();
   const id = params.id as string;
@@ -45,6 +32,7 @@ export default function CampaignDetail() {
   const { isSignedIn, user } = useAuth();
   const router = useRouter();
   const [active, setActive] = useState(false);
+  const isClipper = user?.role === "clipper";
 
   const campaign = campaigns.find((c) => c.id === id);
   const campClips = clips.filter((k) => k.campaignId === id);
@@ -88,12 +76,11 @@ export default function CampaignDetail() {
       <TopBar active="clipper" />
       <div className="mx-auto max-w-3xl px-6 py-8">
         <div className="flex items-center gap-3 text-sm text-muted">
-          <Link href="/clipper" className="inline-flex items-center gap-1 hover:text-foreground">
-            <ArrowLeft size={14} /> Clipper
-          </Link>
-          <span>/</span>
-          <Link href="/creator" className="hover:text-foreground">
-            Creator
+          <Link
+            href={isClipper ? "/clipper/campaigns" : "/creator"}
+            className="inline-flex items-center gap-1 hover:text-foreground"
+          >
+            <ArrowLeft size={14} /> {isClipper ? "Campaigns" : "Creator"}
           </Link>
         </div>
 
@@ -200,12 +187,12 @@ export default function CampaignDetail() {
           </div>
         )}
 
-        {campaign.status === "open" && user?.role === "clipper" && (
+        {campaign.status === "open" && isClipper && (
           <button
             onClick={join}
             className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90"
           >
-            <Plus size={15} /> Join campaign
+            <Plus size={15} /> Submit a clip
           </button>
         )}
 

@@ -2,45 +2,35 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ArrowLeft, ExternalLink, BadgeCheck } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
 import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { useStore } from "@/lib/store";
-import type { Campaign, Clip } from "@/lib/types";
-
-function rup(n: number) {
-  return "₹" + Math.round(n).toLocaleString("en-IN");
-}
-function fmtViews(n: number) {
-  if (n >= 100000) return (n / 100000).toFixed(1) + "L";
-  if (n >= 1000) return (n / 1000).toFixed(1) + "K";
-  return String(n);
-}
-function clipEarnings(clip: Clip, campaigns: Campaign[]) {
-  if (clip.status !== "approved") return 0;
-  const camp = campaigns.find((c) => c.id === clip.campaignId);
-  return camp ? (clip.views / 1000) * camp.payout : 0;
-}
+import { useAuth } from "@/lib/auth";
+import { rup, fmtViews, clipEarnings } from "@/lib/format";
 
 export default function ClipDetail() {
   const params = useParams<{ id: string }>();
   const id = params.id as string;
   const { campaigns, clips } = useStore();
+  const { user } = useAuth();
+  const isClipper = user?.role === "clipper";
+  const home = isClipper ? "/clipper" : "/creator";
 
   const clip = clips.find((k) => k.id === id);
 
   if (!clip) {
     return (
       <main className="min-h-screen">
-        <TopBar active="creator" />
+        <TopBar active={isClipper ? "clipper" : "creator"} />
         <div className="mx-auto max-w-3xl px-6 py-20 text-center">
           <h1 className="text-2xl font-semibold">Clip not found</h1>
           <Link
-            href="/creator"
+            href={home}
             className="mt-6 inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white"
           >
-            Back to creator dashboard
+            Back to dashboard
           </Link>
         </div>
       </main>
@@ -52,15 +42,11 @@ export default function ClipDetail() {
 
   return (
     <main className="min-h-screen">
-      <TopBar active="creator" />
+      <TopBar active={isClipper ? "clipper" : "creator"} />
       <div className="mx-auto max-w-3xl px-6 py-8">
         <div className="flex items-center gap-3 text-sm text-muted">
-          <Link href="/creator" className="inline-flex items-center gap-1 hover:text-foreground">
-            <ArrowLeft size={14} /> Creator
-          </Link>
-          <span>/</span>
-          <Link href="/clipper" className="hover:text-foreground">
-            Clipper
+          <Link href={home} className="inline-flex items-center gap-1 hover:text-foreground">
+            <ArrowLeft size={14} /> {isClipper ? "Clipper" : "Creator"}
           </Link>
         </div>
 
@@ -117,6 +103,16 @@ export default function ClipDetail() {
           <p className="mt-6 text-sm text-muted">
             Awaiting admin review — status will update once our team approves or
             rejects this clip.
+          </p>
+        )}
+        {clip.status === "rejected" && (
+          <p className="mt-6 rounded-lg bg-red/10 px-3 py-2 text-sm text-red">
+            This clip was rejected and won&apos;t earn. Submit a new cut for the same campaign if you&apos;d like to try again.
+          </p>
+        )}
+        {clip.status === "paid" && (
+          <p className="mt-6 flex items-center gap-1.5 text-sm text-green">
+            <BadgeCheck /> Paid out to your UPI.
           </p>
         )}
       </div>

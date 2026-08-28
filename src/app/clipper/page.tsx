@@ -18,6 +18,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
+import { rup, fmtViews, clipEarnings } from "@/lib/format";
 import type { Campaign, Clip } from "@/lib/types";
 
 const ACCOUNTS = [
@@ -25,20 +26,6 @@ const ACCOUNTS = [
   { platform: "YouTube", handle: "@mayacuts", status: "verified" },
   { platform: "TikTok", handle: "@maya.in", status: "connecting" },
 ];
-
-function rup(n: number) {
-  return "₹" + Math.round(n).toLocaleString("en-IN");
-}
-function fmtViews(n: number) {
-  if (n >= 100000) return (n / 100000).toFixed(1) + "L";
-  if (n >= 1000) return (n / 1000).toFixed(1) + "K";
-  return String(n);
-}
-function clipEarnings(clip: Clip, campaigns: Campaign[]) {
-  if (clip.status !== "approved") return 0;
-  const camp = campaigns.find((c) => c.id === clip.campaignId);
-  return camp ? (clip.views / 1000) * camp.payout : 0;
-}
 
 export default function ClipperPage() {
   const { campaigns, clips } = useStore();
@@ -58,7 +45,7 @@ export default function ClipperPage() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <span className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-base font-semibold text-white">
-              M
+              {(user?.name?.[0] ?? user?.email?.[0] ?? "C").toUpperCase()}
             </span>
             <div>
               <h1 className="text-2xl font-semibold tracking-tight">
@@ -203,14 +190,17 @@ export default function ClipperPage() {
                   </div>
                 ))}
               </div>
-              <button className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-accent-soft">
-                <Link2 size={14} /> Connect account
-              </button>
+              <Link
+                href="/clipper/settings"
+                className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-accent-soft"
+              >
+                <Link2 size={14} /> Manage accounts
+              </Link>
             </div>
 
             <div className="mt-4 rounded-2xl border bg-foreground p-5 text-white">
               <p className="text-xs uppercase tracking-wide text-white/60">
-                Your rate
+                Best rate
               </p>
               <p className="mt-2 font-mono text-2xl font-medium">
                 {rup(
@@ -219,7 +209,7 @@ export default function ClipperPage() {
                 <span className="text-sm font-normal text-white/60"> / 1K</span>
               </p>
               <p className="mt-1 text-xs text-white/50">
-                Top CPM across your claimed campaigns.
+                Highest payout per 1K views among open campaigns.
               </p>
             </div>
           </aside>

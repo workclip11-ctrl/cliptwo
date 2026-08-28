@@ -11,8 +11,12 @@ create table if not exists public.profiles (
   email      text not null default '',
   role       text not null default 'clipper',
   status     text not null default 'active',
+  upi        text,
   created_at timestamptz not null default now()
 );
+
+-- Add the payout UPI column to existing profiles tables (no-op if present).
+alter table public.profiles add column if not exists upi text;
 
 -- Helper: is the current user an admin? (reads the public.profiles table)
 create or replace function public.is_admin()

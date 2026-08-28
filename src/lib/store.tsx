@@ -141,6 +141,7 @@ interface StoreActions {
   deleteCampaign: (id: string) => void;
   updateProfileStatus: (id: string, status: ProfileStatus) => void;
   deleteProfile: (id: string) => void;
+  updateProfile: (id: string, patch: Partial<Pick<Profile, "name" | "upi">>) => void;
   setSiteSettings: (s: SiteSettings) => void;
 }
 
@@ -186,6 +187,7 @@ function mapProfile(r: Record<string, unknown>): Profile {
     email: String(r.email ?? ""),
     role: (r.role as ProfileRole) ?? "clipper",
     status: (r.status as ProfileStatus) ?? "active",
+    upi: r.upi ? String(r.upi) : undefined,
     createdAt: r.created_at ? new Date(String(r.created_at)).getTime() : Date.now(),
   };
 }
@@ -370,6 +372,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setState((s) => ({ ...s, profiles: s.profiles.filter((p) => p.id !== id) }));
         if (!isSupabaseConfigured) return;
         ignore(supabase.from("profiles").delete().eq("id", id));
+      },
+
+      updateProfile: (id, patch) => {
+        setState((s) => ({
+          ...s,
+          profiles: s.profiles.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+        }));
+        if (!isSupabaseConfigured) return;
+        ignore(
+          supabase
+            .from("profiles")
+            .update({ name: patch.name, upi: patch.upi })
+            .eq("id", id),
+        );
       },
 
       setSiteSettings: (site) => {

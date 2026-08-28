@@ -45,6 +45,7 @@ export interface Profile {
   role: ProfileRole;
   status: ProfileStatus;
   createdAt: number;
+  upi?: string;
 }
 
 export interface SiteSettings {
