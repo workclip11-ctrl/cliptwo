@@ -5,6 +5,7 @@ import { Wallet, TrendingUp } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup, fmtViews, clipEarnings } from "@/lib/format";
+import { financeOf, isEarned } from "@/lib/finance";
 
 export default function CreatorWalletPage() {
   const { campaigns, clips } = useStore();
@@ -15,10 +16,11 @@ export default function CreatorWalletPage() {
   );
   const myCampaignIds = new Set(myCampaigns.map((c) => c.id));
   const received = clips.filter((k) => myCampaignIds.has(k.campaignId));
-  const approvedClips = received.filter((k) => k.status === "approved");
-  const totalSpent = received.reduce((s, k) => s + clipEarnings(k, campaigns), 0);
+  const fin = financeOf(received, campaigns);
+  const totalSpent = fin.paid; // paid out = completed payouts only
 
-  const topClips = [...approvedClips]
+  const topClips = [...received]
+    .filter((k) => isEarned(k.status))
     .sort((a, b) => clipEarnings(b, campaigns) - clipEarnings(a, campaigns))
     .slice(0, 6);
 
@@ -33,20 +35,16 @@ export default function CreatorWalletPage() {
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <div className="rounded-2xl border bg-card p-5">
-          <p className="text-xs text-muted">Total approved</p>
-          <p className="mt-1 font-mono text-2xl font-semibold">{rup(totalSpent)}</p>
+          <p className="text-xs text-muted">Total earned</p>
+          <p className="mt-1 font-mono text-2xl font-semibold">{rup(fin.earned)}</p>
         </div>
         <div className="rounded-2xl border bg-card p-5">
-          <p className="text-xs text-muted">Paid clips</p>
-          <p className="mt-1 font-mono text-2xl font-semibold">
-            {approvedClips.length}
-          </p>
+          <p className="text-xs text-muted">Paid out</p>
+          <p className="mt-1 font-mono text-2xl font-semibold">{rup(totalSpent)}</p>
         </div>
         <div className="col-span-2 rounded-2xl border bg-card p-5 sm:col-span-1">
-          <p className="text-xs text-muted">Pending review</p>
-          <p className="mt-1 font-mono text-2xl font-semibold">
-            {received.filter((k) => k.status === "pending").length}
-          </p>
+          <p className="text-xs text-muted">Outstanding payable</p>
+          <p className="mt-1 font-mono text-2xl font-semibold">{rup(fin.outstanding)}</p>
         </div>
       </div>
 
@@ -89,7 +87,7 @@ export default function CreatorWalletPage() {
           </table>
           {topClips.length === 0 && (
             <p className="p-6 text-center text-sm text-muted">
-              No approved clips yet.
+              No earned clips yet.
             </p>
           )}
         </div>

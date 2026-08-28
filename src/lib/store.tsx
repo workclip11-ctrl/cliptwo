@@ -90,17 +90,17 @@ const seed: StoreState = {
     },
   ],
   clips: [
-    {
-      id: "k1",
-      campaignId: "c1",
-      clipper: "maya.cuts",
-      videoUrl: "https://instagram.com/reel/xk29a",
-      caption: "This app is unhinged 🔥 #tech",
-      status: "approved",
-      views: 18400,
-      submittedAt: Date.now() - 1000 * 60 * 60 * 20,
-      platform: "Instagram",
-    },
+      {
+        id: "k1",
+        campaignId: "c1",
+        clipper: "maya.cuts",
+        videoUrl: "https://instagram.com/reel/xk29a",
+        caption: "This app is unhinged 🔥 #tech",
+        status: "paid",
+        views: 18400,
+        submittedAt: Date.now() - 1000 * 60 * 60 * 20,
+        platform: "Instagram",
+      },
     {
       id: "k2",
       campaignId: "c1",

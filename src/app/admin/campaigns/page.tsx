@@ -5,6 +5,7 @@ import { Megaphone, Ban, Trash2 } from "lucide-react";
 import { StatusPill } from "@/components/StatusPill";
 import { useStore } from "@/lib/store";
 import { rup } from "@/lib/format";
+import { campaignSpent } from "@/lib/finance";
 
 export default function AdminCampaigns() {
   const { campaigns, clips, closeCampaign, deleteCampaign } = useStore();
@@ -34,7 +35,7 @@ export default function AdminCampaigns() {
             {campaigns.map((c) => {
               const n = clips.filter((k) => k.campaignId === c.id).length;
               const budget = c.budget ?? 0;
-              const spent = c.spent ?? 0;
+              const spent = campaignSpent(c, clips);
               const pct = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
               return (
                 <tr key={c.id}>

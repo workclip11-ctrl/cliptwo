@@ -11,6 +11,7 @@ import { SubmitClipModal } from "@/components/SubmitClipModal";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup, fmtViews, clipEarnings } from "@/lib/format";
+import { campaignSpent } from "@/lib/finance";
 import type { Campaign, Clip, Platform } from "@/lib/types";
 
 const GRADIENTS = [
@@ -66,10 +67,9 @@ export default function CampaignDetail() {
     );
   }
 
-  const remaining = (campaign.budget ?? 0) - (campaign.spent ?? 0);
-  const pct = campaign.budget
-    ? Math.min(100, Math.round(((campaign.spent ?? 0) / campaign.budget) * 100))
-    : 0;
+  const spent = campaignSpent(campaign, clips);
+  const remaining = (campaign.budget ?? 0) - spent;
+  const pct = campaign.budget ? Math.min(100, Math.round((spent / campaign.budget) * 100)) : 0;
 
   return (
     <main className="min-h-screen">
@@ -139,6 +139,7 @@ export default function CampaignDetail() {
             <p className="text-xs text-muted">Budget</p>
             <p className="mt-1 font-mono text-lg font-medium">{rup(campaign.budget ?? 0)}</p>
             <p className="text-[11px] text-muted">{rup(remaining)} left</p>
+            <p className="text-[11px] text-muted">{rup(spent)} paid out</p>
           </div>
           <div className="rounded-xl border bg-card p-4">
             <p className="text-xs text-muted">Clippers in</p>
@@ -154,7 +155,7 @@ export default function CampaignDetail() {
 
         <div className="mt-3 rounded-xl border bg-card p-4">
           <div className="mb-1 flex items-center justify-between text-[11px] text-muted">
-            <span>{rup(campaign.spent ?? 0)} spent</span>
+            <span>{rup(spent)} spent</span>
             <span>{rup(remaining)} left</span>
           </div>
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-accent-soft">

@@ -1,4 +1,5 @@
 import type { Campaign, Clip } from "./types";
+import { isEarned } from "./finance";
 
 export function rup(n: number) {
   return "₹" + Math.round(n).toLocaleString("en-IN");
@@ -11,8 +12,8 @@ export function fmtViews(n: number) {
 }
 
 export function clipEarnings(clip: Clip, campaigns: Campaign[]) {
-  // Both approved and paid clips earn money; pending/rejected do not.
-  if (clip.status !== "approved" && clip.status !== "paid") return 0;
+  // Any earned clip (approved and beyond) earns money; pending/rejected do not.
+  if (!isEarned(clip.status)) return 0;
   const camp = campaigns.find((c) => c.id === clip.campaignId);
   return camp ? (clip.views / 1000) * camp.payout : 0;
 }

@@ -20,7 +20,15 @@ export interface Campaign {
   created_by?: string;
 }
 
-export type ClipStatus = "pending" | "approved" | "rejected" | "paid";
+export type ClipStatus =
+  | "pending"
+  | "approved"
+  | "payable"
+  | "processing"
+  | "paid"
+  | "failed"
+  | "held"
+  | "rejected";
 
 export type ProfileRole = "clipper" | "creator" | "admin";
 export type ProfileStatus = "active" | "suspended";

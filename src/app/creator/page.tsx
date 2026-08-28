@@ -17,6 +17,7 @@ import { NewCampaignModal } from "@/components/NewCampaignModal";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup, fmtViews, clipEarnings } from "@/lib/format";
+import { financeOf, campaignSpent, isEarned } from "@/lib/finance";
 import type { Campaign, Clip, Platform } from "@/lib/types";
 
 export default function CreatorPage() {
@@ -30,12 +31,16 @@ export default function CreatorPage() {
   );
   const myCampaignIds = new Set(myCampaigns.map((c) => c.id));
   const received = clips.filter((k) => myCampaignIds.has(k.campaignId));
+  const fin = financeOf(received, campaigns);
   const pending = received.filter((k) => k.status === "pending");
-  const approvedClips = received.filter((k) => k.status === "approved");
-  const totalSpent = received.reduce((s, k) => s + clipEarnings(k, campaigns), 0);
+  const pendingCount = fin.pendingCount;
+  const totalSpent = fin.paid; // "Paid out" = only completed payouts
+  const totalEarned = fin.earned;
+  const outstanding = fin.outstanding;
 
-  const topClips = [...approvedClips]
-    .sort((a, b) => b.views - a.views)
+  const topClips = [...received]
+    .filter((k) => isEarned(k.status))
+    .sort((a, b) => clipEarnings(b, campaigns) - clipEarnings(a, campaigns))
     .slice(0, 4);
 
   return (
@@ -75,7 +80,7 @@ export default function CreatorPage() {
         />
         <StatCard
           label="Pending review"
-          value={String(pending.length)}
+          value={String(pendingCount)}
           hint="Awaiting decision"
           icon={<Clock size={16} />}
         />
@@ -199,11 +204,11 @@ export default function CreatorPage() {
               ))}
             </tbody>
           </table>
-          {topClips.length === 0 && (
-            <p className="p-6 text-center text-sm text-muted">
-              No approved clips yet.
-            </p>
-          )}
+               {topClips.length === 0 && (
+                <p className="p-6 text-center text-sm text-muted">
+                  No earned clips yet.
+                </p>
+              )}
         </div>
 
         <div className="mt-4 rounded-2xl border bg-foreground p-5 text-white">
@@ -211,14 +216,18 @@ export default function CreatorPage() {
             <TrendingUp size={16} className="text-white/70" />
             <p className="text-sm font-medium">Payout summary</p>
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="mt-4 grid grid-cols-3 gap-3">
             <div className="rounded-xl bg-white/5 p-3">
-              <p className="font-mono text-lg font-medium">{rup(totalSpent)}</p>
-              <p className="text-[11px] text-white/50">total approved</p>
+              <p className="font-mono text-lg font-medium">{rup(totalEarned)}</p>
+              <p className="text-[11px] text-white/50">total earned</p>
             </div>
             <div className="rounded-xl bg-white/5 p-3">
-              <p className="font-mono text-lg font-medium">{approvedClips.length}</p>
-              <p className="text-[11px] text-white/50">paid clips</p>
+              <p className="font-mono text-lg font-medium">{rup(totalSpent)}</p>
+              <p className="text-[11px] text-white/50">paid out</p>
+            </div>
+            <div className="rounded-xl bg-white/5 p-3">
+              <p className="font-mono text-lg font-medium">{rup(outstanding)}</p>
+              <p className="text-[11px] text-white/50">outstanding</p>
             </div>
           </div>
         </div>
@@ -267,9 +276,8 @@ function CampaignRow({
   onOpen: () => void;
 }) {
   const campClips = clips.filter((k) => k.campaignId === c.id);
-  const pct = c.budget
-    ? Math.min(100, Math.round(((c.spent ?? 0) / c.budget) * 100))
-    : 0;
+  const spent = campaignSpent(c, clips);
+  const pct = c.budget ? Math.min(100, Math.round((spent / c.budget) * 100)) : 0;
   const isOpen = c.status === "open";
   return (
     <button
@@ -301,7 +309,7 @@ function CampaignRow({
         />
       </div>
       <p className="mt-2 text-[11px] text-muted">
-        {campClips.length} clips · {c.daysLeft}d left · {rup(c.spent ?? 0)} spent
+        {campClips.length} clips · {c.daysLeft}d left · {rup(spent)} spent
       </p>
     </button>
   );
@@ -319,10 +327,11 @@ function CampaignDetailModal({
   const campClips = clips.filter((k) => k.campaignId === campaign.id);
   const approvedN = campClips.filter((k) => k.status === "approved").length;
   const pendingN = campClips.filter((k) => k.status === "pending").length;
+  const spent = campaignSpent(campaign, clips);
   const pct = campaign.budget
-    ? Math.min(100, Math.round(((campaign.spent ?? 0) / campaign.budget) * 100))
+    ? Math.min(100, Math.round((spent / campaign.budget) * 100))
     : 0;
-  const remaining = (campaign.budget ?? 0) - (campaign.spent ?? 0);
+  const remaining = (campaign.budget ?? 0) - spent;
   const isOpen = campaign.status === "open";
 
   return (
@@ -376,7 +385,7 @@ function CampaignDetailModal({
 
         <div className="mt-4">
           <div className="mb-1 flex items-center justify-between text-[11px] text-muted">
-            <span>{rup(campaign.spent ?? 0)} spent</span>
+            <span>{rup(spent)} spent</span>
             <span>{rup(remaining)} left</span>
           </div>
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-accent-soft">

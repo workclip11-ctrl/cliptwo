@@ -19,6 +19,7 @@ import { PlatformIcon } from "@/components/PlatformIcon";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup, fmtViews, clipEarnings } from "@/lib/format";
+import { financeOf, campaignSpent } from "@/lib/finance";
 import type { Campaign, Clip } from "@/lib/types";
 
 const ACCOUNTS = [
@@ -33,10 +34,11 @@ export default function ClipperPage() {
   const router = useRouter();
 
   const myClips = clips.filter((k) => k.userId === user?.id || !k.userId);
-  const approved = myClips.filter((k) => k.status === "approved");
+  const fin = financeOf(myClips, campaigns);
   const openCampaigns = campaigns.filter((c) => c.status === "open");
-  const earnings = myClips.reduce((s, k) => s + clipEarnings(k, campaigns), 0);
-  const pendingCount = myClips.filter((k) => k.status === "pending").length;
+  const earnings = fin.earned;
+  const approvedCount = fin.earnedCount;
+  const pendingCount = fin.pendingCount;
   const maxViews = Math.max(1, ...myClips.map((k) => k.views));
 
   return (
@@ -72,8 +74,8 @@ export default function ClipperPage() {
             icon={<Film size={16} />}
           />
           <StatCard
-            label="Approved"
-            value={String(approved.length)}
+            label="Earned"
+            value={String(approvedCount)}
             hint={`${pendingCount} awaiting review`}
             icon={<CheckCircle2 size={16} />}
           />
@@ -98,9 +100,10 @@ export default function ClipperPage() {
             </div>
             <div className="space-y-4">
               {openCampaigns.map((c) => {
-                const remaining = (c.budget ?? 0) - (c.spent ?? 0);
+                const spent = campaignSpent(c, clips);
+                const remaining = (c.budget ?? 0) - spent;
                 const pct = c.budget
-                  ? Math.min(100, Math.round(((c.spent ?? 0) / c.budget) * 100))
+                  ? Math.min(100, Math.round((spent / c.budget) * 100))
                   : 0;
                 return (
                   <div key={c.id} className="rounded-2xl border bg-card p-5">
@@ -133,7 +136,7 @@ export default function ClipperPage() {
 
                     <div className="mt-4">
                       <div className="mb-1 flex items-center justify-between text-[11px] text-muted">
-                        <span>{rup(c.spent ?? 0)} spent</span>
+                        <span>{rup(spent)} spent</span>
                         <span>{rup(remaining)} left</span>
                       </div>
                       <div className="h-1.5 w-full overflow-hidden rounded-full bg-accent-soft">

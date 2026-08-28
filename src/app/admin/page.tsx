@@ -5,7 +5,8 @@ import { Users, Megaphone, Wallet, Clock, CheckCircle2, Banknote } from "lucide-
 import { StatCard } from "@/components/StatCard";
 import { StatusPill } from "@/components/StatusPill";
 import { useStore } from "@/lib/store";
-import { rup, fmtViews, clipEarnings } from "@/lib/format";
+import { rup, fmtViews } from "@/lib/format";
+import { financeOf, campaignSpent } from "@/lib/finance";
 
 export default function AdminDashboard() {
   const { campaigns, clips, profiles } = useStore();
@@ -14,20 +15,21 @@ export default function AdminDashboard() {
   const creators = profiles.filter((p) => p.role === "creator");
   const admins = profiles.filter((p) => p.role === "admin");
 
-  const pending = clips.filter((k) => k.status === "pending");
-  const approved = clips.filter((k) => k.status === "approved");
-  const rejected = clips.filter((k) => k.status === "rejected");
-  const paid = clips.filter((k) => k.status === "paid");
+  const fin = financeOf(clips, campaigns);
+  const pendingCount = fin.pendingCount;
+  const approvedCount = fin.earnedCount;
+  const paidCount = fin.paidCount;
+  const rejectedCount = fin.rejectedCount;
 
   // Earnings that have actually been released to clippers.
-  const paidOut = paid.reduce((s, k) => s + clipEarnings(k, campaigns), 0);
-  // Approved clips not yet paid — the admin's outstanding payable.
-  const payable = approved.reduce((s, k) => s + clipEarnings(k, campaigns), 0);
-  const totalEarned = clips.reduce((s, k) => s + clipEarnings(k, campaigns), 0);
+  const paidOut = fin.paid;
+  // Approved (+ payable/processing) clips not yet paid — the admin's outstanding payable.
+  const payable = fin.outstanding;
+  const totalEarned = fin.earned;
 
   const openCampaigns = campaigns.filter((c) => c.status === "open");
   const totalBudget = campaigns.reduce((s, c) => s + (c.budget ?? 0), 0);
-  const totalSpent = campaigns.reduce((s, c) => s + (c.spent ?? 0), 0);
+  const totalSpent = campaigns.reduce((s, c) => s + campaignSpent(c, clips), 0);
 
   const recentClips = [...clips]
     .sort((a, b) => b.submittedAt - a.submittedAt)
@@ -48,7 +50,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="Clippers" value={String(clippers.length)} icon={<Users size={16} />} />
         <StatCard label="Creators" value={String(creators.length)} icon={<Megaphone size={16} />} />
-        <StatCard label="Pending review" value={String(pending.length)} icon={<Clock size={16} />} />
+          <StatCard label="Pending review" value={String(pendingCount)} icon={<Clock size={16} />} />
         <StatCard label="Paid out" value={rup(paidOut)} icon={<Wallet size={16} />} />
       </div>
 
@@ -60,18 +62,18 @@ export default function AdminDashboard() {
           <p className="flex items-center gap-2 text-sm font-medium text-muted">
             <Clock size={14} /> Awaiting review
           </p>
-          <p className="mt-2 font-mono text-2xl font-semibold">{pending.length}</p>
+          <p className="mt-2 font-mono text-2xl font-semibold">{pendingCount}</p>
           <p className="mt-1 text-xs text-muted">clips need an approve / reject decision</p>
         </Link>
         <Link
-          href="/admin/clips?filter=approved"
+          href="/admin/clips?filter=payable"
           className="rounded-2xl border bg-card p-5 transition-colors hover:border-foreground/30"
         >
           <p className="flex items-center gap-2 text-sm font-medium text-muted">
             <Banknote size={14} /> Outstanding payable
           </p>
           <p className="mt-2 font-mono text-2xl font-semibold">{rup(payable)}</p>
-          <p className="mt-1 text-xs text-muted">approved, not yet paid</p>
+          <p className="mt-1 text-xs text-muted">earned, not yet released</p>
         </Link>
         <Link
           href="/admin/clips?filter=paid"
@@ -81,7 +83,7 @@ export default function AdminDashboard() {
             <CheckCircle2 size={14} /> Released to clippers
           </p>
           <p className="mt-2 font-mono text-2xl font-semibold">{rup(paidOut)}</p>
-          <p className="mt-1 text-xs text-muted">{paid.length} clips paid</p>
+          <p className="mt-1 text-xs text-muted">{paidCount} clips paid</p>
         </Link>
       </div>
 
@@ -94,19 +96,19 @@ export default function AdminDashboard() {
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="rounded-xl border bg-card p-3 text-center">
-              <p className="font-mono text-lg font-semibold">{pending.length}</p>
+              <p className="font-mono text-lg font-semibold">{pendingCount}</p>
               <p className="text-xs text-muted">Pending</p>
             </div>
             <div className="rounded-xl border bg-card p-3 text-center">
-              <p className="font-mono text-lg font-semibold">{approved.length}</p>
-              <p className="text-xs text-muted">Approved</p>
+              <p className="font-mono text-lg font-semibold">{approvedCount}</p>
+              <p className="text-xs text-muted">Earned</p>
             </div>
             <div className="rounded-xl border bg-card p-3 text-center">
-              <p className="font-mono text-lg font-semibold">{paid.length}</p>
+              <p className="font-mono text-lg font-semibold">{paidCount}</p>
               <p className="text-xs text-muted">Paid</p>
             </div>
             <div className="rounded-xl border bg-card p-3 text-center">
-              <p className="font-mono text-lg font-semibold">{rejected.length}</p>
+              <p className="font-mono text-lg font-semibold">{rejectedCount}</p>
               <p className="text-xs text-muted">Rejected</p>
             </div>
           </div>

@@ -5,6 +5,7 @@ import { Film } from "lucide-react";
 import { StatusPill } from "@/components/StatusPill";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
+import { isEarned } from "@/lib/finance";
 
 export default function CreatorSubmissionsPage() {
   const { campaigns, clips } = useStore();
@@ -16,7 +17,7 @@ export default function CreatorSubmissionsPage() {
   const myCampaignIds = new Set(myCampaigns.map((c) => c.id));
   const received = clips.filter((k) => myCampaignIds.has(k.campaignId));
   const pending = received.filter((k) => k.status === "pending");
-  const approved = received.filter((k) => k.status === "approved");
+  const approved = received.filter((k) => isEarned(k.status));
 
   return (
     <div className="space-y-8">

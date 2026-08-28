@@ -1,18 +1,33 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Ban, Wallet, Undo2, Clock, Banknote } from "lucide-react";
+import {
+  Check,
+  Ban,
+  Wallet,
+  Undo2,
+  Clock,
+  Banknote,
+  RefreshCw,
+  AlertTriangle,
+  PlayCircle,
+} from "lucide-react";
 import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { useStore } from "@/lib/store";
 import { rup, fmtViews, clipEarnings } from "@/lib/format";
+import { financeOf } from "@/lib/finance";
 import type { ClipStatus } from "@/lib/types";
 
 const FILTERS: Array<{ key: ClipStatus | "all"; label: string }> = [
   { key: "all", label: "All" },
   { key: "pending", label: "Pending" },
   { key: "approved", label: "Approved" },
+  { key: "payable", label: "Payable" },
+  { key: "processing", label: "Processing" },
   { key: "paid", label: "Paid" },
+  { key: "failed", label: "Failed" },
+  { key: "held", label: "Held" },
   { key: "rejected", label: "Rejected" },
 ];
 
@@ -20,46 +35,46 @@ export default function AdminClips() {
   const { clips, campaigns, setClipStatus } = useStore();
   const [filter, setFilter] = useState<ClipStatus | "all">("all");
 
-  // Allow deep-links like /admin/clips?filter=pending from the dashboard.
   useEffect(() => {
     const f = new URLSearchParams(window.location.search).get("filter");
-    if (f && (FILTERS.some((x) => x.key === f))) setFilter(f as ClipStatus | "all");
+    if (f && FILTERS.some((x) => x.key === f)) setFilter(f as ClipStatus | "all");
   }, []);
 
+  const fin = financeOf(clips, campaigns);
   const list = [...clips]
     .sort((a, b) => b.submittedAt - a.submittedAt)
     .filter((k) => (filter === "all" ? true : k.status === filter));
-
-  const payable = clips
-    .filter((k) => k.status === "approved")
-    .reduce((s, k) => s + clipEarnings(k, campaigns), 0);
-  const paidOut = clips
-    .filter((k) => k.status === "paid")
-    .reduce((s, k) => s + clipEarnings(k, campaigns), 0);
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Review &amp; payouts</h1>
         <p className="mt-1 text-sm text-muted">
-          Approve submitted clips, reject what doesn&apos;t fit, and mark approved
-          clips as paid once funds are released.
+          Approve submitted clips, then move them through payable → processing → paid.
+          Every number here is derived from the clip ledger.
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-3">
         <div className="flex items-center gap-3 rounded-xl border bg-card p-4">
           <Banknote size={18} className="text-amber" />
           <div>
-            <p className="font-mono text-lg font-semibold">{rup(payable)}</p>
-            <p className="text-xs text-muted">Outstanding payable (approved)</p>
+            <p className="font-mono text-lg font-semibold">{rup(fin.outstanding)}</p>
+            <p className="text-xs text-muted">Outstanding payable</p>
           </div>
         </div>
         <div className="flex items-center gap-3 rounded-xl border bg-card p-4">
           <Wallet size={18} className="text-blue-500" />
           <div>
-            <p className="font-mono text-lg font-semibold">{rup(paidOut)}</p>
+            <p className="font-mono text-lg font-semibold">{rup(fin.paid)}</p>
             <p className="text-xs text-muted">Released to clippers</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 rounded-xl border bg-card p-4">
+          <AlertTriangle size={18} className="text-purple-400" />
+          <div>
+            <p className="font-mono text-lg font-semibold">{rup(fin.held)}</p>
+            <p className="text-xs text-muted">Held / disputed</p>
           </div>
         </div>
       </div>
@@ -127,19 +142,59 @@ export default function AdminClips() {
                 )}
                 {k.status === "approved" && (
                   <button
-                    onClick={() => setClipStatus(k.id, "paid")}
-                    className="inline-flex items-center gap-1 rounded-md bg-blue-500/10 px-2.5 py-1 text-xs font-medium text-blue-500"
+                    onClick={() => setClipStatus(k.id, "payable")}
+                    className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-accent-soft"
                   >
-                    <Wallet size={13} /> Mark paid
+                    <Clock size={13} /> Mark payable
+                  </button>
+                )}
+                {k.status === "payable" && (
+                  <button
+                    onClick={() => setClipStatus(k.id, "processing")}
+                    className="inline-flex items-center gap-1 rounded-md bg-amber/10 px-2.5 py-1 text-xs font-medium text-amber"
+                  >
+                    <PlayCircle size={13} /> Start payout
+                  </button>
+                )}
+                {k.status === "processing" && (
+                  <>
+                    <button
+                      onClick={() => setClipStatus(k.id, "paid")}
+                      className="inline-flex items-center gap-1 rounded-md bg-blue-500/10 px-2.5 py-1 text-xs font-medium text-blue-500"
+                    >
+                      <Wallet size={13} /> Mark paid
+                    </button>
+                    <button
+                      onClick={() => setClipStatus(k.id, "failed")}
+                      className="inline-flex items-center gap-1 rounded-md bg-red/10 px-2.5 py-1 text-xs font-medium text-red"
+                    >
+                      <Ban size={13} /> Fail
+                    </button>
+                  </>
+                )}
+                {k.status === "failed" && (
+                  <button
+                    onClick={() => setClipStatus(k.id, "payable")}
+                    className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-accent-soft"
+                  >
+                    <RefreshCw size={13} /> Retry
                   </button>
                 )}
                 {k.status === "paid" && (
                   <button
-                    onClick={() => setClipStatus(k.id, "approved")}
+                    onClick={() => setClipStatus(k.id, "payable")}
                     className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-accent-soft"
-                    title="Revert to approved (not yet paid)"
+                    title="Revert to payable (not yet released)"
                   >
-                    <Undo2 size={13} /> Unpay
+                    <Undo2 size={13} /> Revert
+                  </button>
+                )}
+                {k.status === "held" && (
+                  <button
+                    onClick={() => setClipStatus(k.id, "payable")}
+                    className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-accent-soft"
+                  >
+                    <Undo2 size={13} /> Release
                   </button>
                 )}
                 {k.status === "rejected" && (

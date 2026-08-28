@@ -3,6 +3,7 @@
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup, clipEarnings } from "@/lib/format";
+import { financeOf } from "@/lib/finance";
 
 const UPI_ID = "maya.cuts@upi";
 
@@ -10,13 +11,11 @@ export default function ClipperWalletPage() {
   const { campaigns, clips } = useStore();
   const { user } = useAuth();
   const myClips = clips.filter((k) => k.userId === user?.id || !k.userId);
+  const fin = financeOf(myClips, campaigns);
 
-  // Paid clips have been released; approved (not yet paid) are pending payout.
-  const paid = myClips.filter((k) => k.status === "paid");
-  const approved = myClips.filter((k) => k.status === "approved");
-  const available = paid.reduce((s, k) => s + clipEarnings(k, campaigns), 0);
-  const pending = approved.reduce((s, k) => s + clipEarnings(k, campaigns), 0);
-  const total = available + pending;
+  const available = fin.paid;
+  const pending = fin.outstanding;
+  const total = fin.earned;
 
   const byCampaign = new Map<string, number>();
   for (const k of myClips) {
@@ -42,7 +41,7 @@ export default function ClipperWalletPage() {
             <p className="mt-1 font-mono text-lg font-semibold text-green">{rup(available)}</p>
           </div>
           <div className="rounded-xl bg-background p-3">
-            <p className="text-xs text-muted">Pending approval</p>
+            <p className="text-xs text-muted">Pending payout</p>
             <p className="mt-1 font-mono text-lg font-semibold text-amber">{rup(pending)}</p>
           </div>
         </div>

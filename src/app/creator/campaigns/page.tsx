@@ -7,6 +7,7 @@ import { NewCampaignModal } from "@/components/NewCampaignModal";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup } from "@/lib/format";
+import { campaignSpent } from "@/lib/finance";
 import type { Platform } from "@/lib/types";
 
 export default function CreatorCampaignsPage() {
@@ -40,10 +41,9 @@ export default function CreatorCampaignsPage() {
           const campClips = clips.filter((k) => k.campaignId === c.id);
           const approvedN = campClips.filter((k) => k.status === "approved").length;
           const pendingN = campClips.filter((k) => k.status === "pending").length;
-          const pct = c.budget
-            ? Math.min(100, Math.round(((c.spent ?? 0) / c.budget) * 100))
-            : 0;
-          const remaining = (c.budget ?? 0) - (c.spent ?? 0);
+          const spent = campaignSpent(c, clips);
+          const pct = c.budget ? Math.min(100, Math.round((spent / c.budget) * 100)) : 0;
+          const remaining = (c.budget ?? 0) - spent;
           return (
             <div key={c.id} className="rounded-2xl border bg-card p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -81,7 +81,7 @@ export default function CreatorCampaignsPage() {
 
               <div className="mt-4">
                 <div className="mb-1 flex items-center justify-between text-[11px] text-muted">
-                  <span>{rup(c.spent ?? 0)} spent</span>
+                  <span>{rup(spent)} spent</span>
                   <span>{rup(remaining)} left</span>
                 </div>
                 <div className="h-1.5 w-full overflow-hidden rounded-full bg-accent-soft">

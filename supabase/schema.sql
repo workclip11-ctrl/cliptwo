@@ -66,12 +66,12 @@ create policy "clips_delete" on public.clips for delete using (auth.role() = 'au
 insert into public.campaigns (id, title, creator, niche, brief, platform, payout, status, budget, spent, days_left, source_link, rules)
 values
   ('11111111-1111-1111-1111-111111111111', 'Launch teaser for our new app', 'Northwind Labs', 'Tech', 'Cut a 20s hook from the keynote.', 'Instagram', 220, 'open', 40000, 4048, 12, 'https://drive.google.com/drive/folders/launch-teaser', 'No watermarks.'),
-  ('22222222-2222-2222-2222-222222222222', 'Workout routine highlight', 'FitForm', 'Fitness', 'Turn the 12-min session into 3 reels.', 'Reels', 160, 'open', 25000, 1920, 26, 'https://drive.google.com/drive/folders/workout-routine', 'Vertical only.'),
+  ('22222222-2222-2222-2222-222222222222', 'Workout routine highlight', 'FitForm', 'Fitness', 'Turn the 12-min session into 3 reels.', 'Reels', 160, 'open', 25000, 0, 26, 'https://drive.google.com/drive/folders/workout-routine', 'Vertical only.'),
   ('33333333-3333-3333-3333-333333333333', 'Founder story short', 'Maker House', 'Finance', 'Use the intro monologue.', 'YouTube', 280, 'open', 60000, 0, 9, 'https://drive.google.com/drive/folders/founder-story', 'Vertical 9:16 only.'),
   ('44444444-4444-4444-4444-444444444444', 'Stand-up Set - Delhi Live', 'Kabir Sethi', 'Comedy', 'Punchline-first cuts, 20-40s max.', 'Reels', 190, 'open', 30000, 0, 14, 'https://drive.google.com/drive/folders/delhi-live', 'No profanity in captions.');
 
 insert into public.clips (campaign_id, clipper, caption, video_url, platform, views, status)
 values
-  ('11111111-1111-1111-1111-111111111111', 'maya.cuts', 'This app is unhinged #tech', 'https://instagram.com/reel/xk29a', 'Instagram', 18400, 'approved'),
+  ('11111111-1111-1111-1111-111111111111', 'maya.cuts', 'This app is unhinged #tech', 'https://instagram.com/reel/xk29a', 'Instagram', 18400, 'paid'),
   ('11111111-1111-1111-1111-111111111111', 'devon.edits', 'The keynote moment everyone missed', 'https://youtube.com/shorts/8kd92', 'YouTube', 0, 'pending'),
   ('22222222-2222-2222-2222-222222222222', 'maya.cuts', '3 moves that fixed my posture', 'https://instagram.com/reel/pw001', 'Instagram', 0, 'pending');
