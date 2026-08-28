@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import {
   LayoutGrid,
@@ -12,14 +13,17 @@ import {
 } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { PlatformIcon } from "@/components/PlatformIcon";
+import { NewCampaignModal } from "@/components/NewCampaignModal";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup, fmtViews, clipEarnings } from "@/lib/format";
-import type { Campaign, Clip } from "@/lib/types";
+import type { Campaign, Clip, Platform } from "@/lib/types";
 
 export default function CreatorPage() {
-  const { campaigns, clips } = useStore();
+  const { campaigns, clips, addCampaign } = useStore();
   const { user } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<Campaign | null>(null);
 
   const myCampaigns = campaigns.filter(
     (c) => !c.created_by || c.created_by === user?.id,
@@ -49,12 +53,12 @@ export default function CreatorPage() {
             <p className="text-sm text-muted">Creator dashboard</p>
           </div>
         </div>
-        <Link
-          href="/creator/campaigns"
+        <button
+          onClick={() => setOpen(true)}
           className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
         >
           <Plus size={15} /> New campaign
-        </Link>
+        </button>
       </div>
 
       {/* KPIs */}
@@ -98,7 +102,12 @@ export default function CreatorPage() {
           </div>
           <div className="space-y-3">
             {myCampaigns.slice(0, 3).map((c) => (
-              <CampaignRow key={c.id} c={c} clips={clips} />
+              <CampaignRow
+                key={c.id}
+                c={c}
+                clips={clips}
+                onOpen={() => setSelected(c)}
+              />
             ))}
             {myCampaigns.length === 0 && (
               <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted">
@@ -214,20 +223,58 @@ export default function CreatorPage() {
           </div>
         </div>
       </section>
+
+      {open && (
+        <NewCampaignModal
+          creatorName={user?.name ?? user?.email ?? "Creator"}
+          onClose={() => setOpen(false)}
+          onSubmit={(title, brief, platform, payout, niche, budget) => {
+            addCampaign({
+              title,
+              creator: user?.name ?? user?.email ?? "Creator",
+              brief,
+              platform: platform as Platform,
+              payout,
+              niche,
+              budget,
+              spent: 0,
+              daysLeft: 30,
+            });
+            setOpen(false);
+          }}
+        />
+      )}
+
+      {selected && (
+        <CampaignDetailModal
+          campaign={selected}
+          clips={clips}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </div>
   );
 }
 
-function CampaignRow({ c, clips }: { c: Campaign; clips: Clip[] }) {
+function CampaignRow({
+  c,
+  clips,
+  onOpen,
+}: {
+  c: Campaign;
+  clips: Clip[];
+  onOpen: () => void;
+}) {
   const campClips = clips.filter((k) => k.campaignId === c.id);
   const pct = c.budget
     ? Math.min(100, Math.round(((c.spent ?? 0) / c.budget) * 100))
     : 0;
   const isOpen = c.status === "open";
   return (
-    <Link
-      href={`/creator/campaigns`}
-      className="block rounded-xl border bg-card p-4 transition-colors hover:border-foreground/30"
+    <button
+      type="button"
+      onClick={onOpen}
+      className="block w-full rounded-xl border bg-card p-4 text-left transition-colors hover:border-foreground/30"
     >
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
@@ -255,6 +302,88 @@ function CampaignRow({ c, clips }: { c: Campaign; clips: Clip[] }) {
       <p className="mt-2 text-[11px] text-muted">
         {campClips.length} clips · {c.daysLeft}d left · {rup(c.spent ?? 0)} spent
       </p>
-    </Link>
+    </button>
+  );
+}
+
+function CampaignDetailModal({
+  campaign,
+  clips,
+  onClose,
+}: {
+  campaign: Campaign;
+  clips: Clip[];
+  onClose: () => void;
+}) {
+  const campClips = clips.filter((k) => k.campaignId === campaign.id);
+  const approvedN = campClips.filter((k) => k.status === "approved").length;
+  const pendingN = campClips.filter((k) => k.status === "pending").length;
+  const pct = campaign.budget
+    ? Math.min(100, Math.round(((campaign.spent ?? 0) / campaign.budget) * 100))
+    : 0;
+  const remaining = (campaign.budget ?? 0) - (campaign.spent ?? 0);
+  const isOpen = campaign.status === "open";
+
+  return (
+    <div
+      className="fixed inset-0 z-20 flex items-center justify-center bg-black/30 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg rounded-2xl border bg-card p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="text-lg font-semibold">{campaign.title}</h3>
+            <p className="mt-0.5 text-xs text-muted">
+              {campaign.creator} · {campaign.niche} · {campaign.platform}
+            </p>
+          </div>
+          <span
+            className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium ${
+              isOpen
+                ? "border-green/20 bg-green/10 text-green"
+                : "border-muted/20 bg-accent-soft text-muted"
+            }`}
+          >
+            {isOpen ? "Open" : "Closed"}
+          </span>
+        </div>
+
+        <p className="mt-3 text-sm text-muted">{campaign.brief}</p>
+
+        <div className="mt-4">
+          <div className="mb-1 flex items-center justify-between text-[11px] text-muted">
+            <span>{rup(campaign.spent ?? 0)} spent</span>
+            <span>{rup(remaining)} left</span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-accent-soft">
+            <div
+              className="h-full rounded-full bg-accent"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-muted">
+          <span className="inline-flex items-center gap-1">
+            <Sparkles size={13} /> {campClips.length} clips
+          </span>
+          <span className="text-green">● {approvedN} approved</span>
+          <span className="text-amber">● {pendingN} pending</span>
+          <span className="inline-flex items-center gap-1">
+            <Sparkles size={12} /> {campaign.daysLeft} days left
+          </span>
+        </div>
+
+        <button
+          onClick={onClose}
+          className="mt-6 w-full rounded-lg border px-3 py-2 text-sm font-medium hover:bg-accent-soft"
+        >
+          Close
+        </button>
+      </div>
+    </div>
   );
 }
