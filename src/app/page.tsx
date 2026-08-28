@@ -388,12 +388,21 @@ function FAQ() {
 
 export default function Home() {
   const router = useRouter();
-  const { campaigns } = useStore();
+  const { campaigns, siteSettings } = useStore();
   const [active, setActive] = useState<Campaign | null>(null);
   const showFeatured = true;
 
+  const heroTitle =
+    siteSettings.heroTitle || "Get paid to post for India's biggest creators";
+  const heroSubtitle =
+    siteSettings.heroSubtitle ||
+    "cliptwo connects creators who have long-form content with clippers who cut it into clips — paid per verified view, settled straight to UPI.";
+
+  const featuredIds = siteSettings.featuredIds;
   const featured = showFeatured
-    ? campaigns.filter((c) => c.status === "open").slice(0, 4)
+    ? featuredIds.length
+      ? campaigns.filter((c) => featuredIds.includes(c.id))
+      : campaigns.filter((c) => c.status === "open").slice(0, 4)
     : [];
 
   return (
@@ -430,10 +439,10 @@ export default function Home() {
             <Sparkles size={13} /> India&apos;s clipping marketplace
           </span>
           <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
-            Get paid to post for India&apos;s biggest creators
+            {heroTitle}
           </h1>
           <p className="mt-4 max-w-md text-[17px] leading-relaxed text-muted">
-            cliptwo connects creators who have long-form content with clippers who cut it into clips — paid per verified view, settled straight to UPI.
+            {heroSubtitle}
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             <Link href="/clipper" className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:opacity-90">

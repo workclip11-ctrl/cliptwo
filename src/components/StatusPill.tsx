@@ -1,12 +1,17 @@
-import type { ClipStatus } from "@/lib/types";
+import type { CampaignStatus, ClipStatus } from "@/lib/types";
 
-const map: Record<ClipStatus, { label: string; cls: string }> = {
+type AnyStatus = ClipStatus | CampaignStatus;
+
+const map: Record<AnyStatus, { label: string; cls: string }> = {
   pending: { label: "Pending", cls: "bg-amber/10 text-amber border-amber/20" },
   approved: { label: "Approved", cls: "bg-green/10 text-green border-green/20" },
   rejected: { label: "Rejected", cls: "bg-red/10 text-red border-red/20" },
+  paid: { label: "Paid", cls: "bg-blue-500/10 text-blue-500 border-blue-500/20" },
+  open: { label: "Open", cls: "bg-green/10 text-green border-green/20" },
+  closed: { label: "Closed", cls: "bg-muted/10 text-muted border-muted/20" },
 };
 
-export function StatusPill({ status }: { status: ClipStatus }) {
+export function StatusPill({ status }: { status: AnyStatus }) {
   const s = map[status];
   return (
     <span

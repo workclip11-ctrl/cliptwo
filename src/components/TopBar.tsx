@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/auth";
 export function TopBar({
   active,
 }: {
-  active?: "home" | "clipper" | "creator" | "campaigns";
+  active?: "home" | "clipper" | "creator" | "campaigns" | "admin";
 }) {
   const { isSignedIn, user, signOut } = useAuth();
   const router = useRouter();
@@ -26,7 +26,14 @@ export function TopBar({
   const initial = user?.name?.[0]?.toUpperCase() ?? "U";
   const isClipper = user?.role === "clipper";
   const isCreator = user?.role === "creator";
-  const logoHref = isCreator ? "/creator" : isClipper ? "/clipper" : "/";
+  const isAdmin = user?.role === "admin";
+  const logoHref = isAdmin
+    ? "/admin"
+    : isCreator
+      ? "/creator"
+      : isClipper
+        ? "/clipper"
+        : "/";
 
   return (
     <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur">
@@ -42,29 +49,44 @@ export function TopBar({
         </Link>
 
         <nav className="flex items-center gap-1 rounded-lg border bg-card p-1">
-          {!isCreator && (
+          {isAdmin ? (
             <Link
-              href="/clipper"
+              href="/admin"
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                active === "clipper"
+                active === "admin"
                   ? "bg-accent-soft text-foreground"
                   : "text-muted hover:text-foreground"
               }`}
             >
-              Clipper
+              Admin
             </Link>
-          )}
-          {!isClipper && (
-            <Link
-              href="/creator"
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                active === "creator"
-                  ? "bg-accent-soft text-foreground"
-                  : "text-muted hover:text-foreground"
-              }`}
-            >
-              Creator
-            </Link>
+          ) : (
+            <>
+              {!isCreator && (
+                <Link
+                  href="/clipper"
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    active === "clipper"
+                      ? "bg-accent-soft text-foreground"
+                      : "text-muted hover:text-foreground"
+                  }`}
+                >
+                  Clipper
+                </Link>
+              )}
+              {!isClipper && (
+                <Link
+                  href="/creator"
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    active === "creator"
+                      ? "bg-accent-soft text-foreground"
+                      : "text-muted hover:text-foreground"
+                  }`}
+                >
+                  Creator
+                </Link>
+              )}
+            </>
           )}
         </nav>
 
@@ -84,7 +106,13 @@ export function TopBar({
                   <p className="truncate text-xs text-muted">{user?.email}</p>
                 </div>
                 <Link
-                  href={user?.role === "creator" ? "/creator" : "/clipper/settings"}
+                  href={
+                    isAdmin
+                      ? "/admin"
+                      : user?.role === "creator"
+                        ? "/creator"
+                        : "/clipper/settings"
+                  }
                   className="block px-4 py-2.5 text-sm hover:bg-accent-soft"
                 >
                   Settings

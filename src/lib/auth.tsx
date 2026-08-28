@@ -7,9 +7,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { supabase } from "@/lib/supabase/client";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
 
-export type Role = "clipper" | "creator";
+export type Role = "clipper" | "creator" | "admin";
 
 export interface UserProfile {
   id: string;
@@ -80,7 +80,7 @@ function profileFromUser(user: {
   if (!user) return null;
   const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
   const role: Role =
-    meta.role === "clipper" || meta.role === "creator"
+    meta.role === "clipper" || meta.role === "creator" || meta.role === "admin"
       ? (meta.role as Role)
       : "clipper";
   const name =
@@ -88,6 +88,30 @@ function profileFromUser(user: {
       ? meta.name
       : (user.email?.split("@")[0] ?? "User");
   return { id: user.id ?? "", name, email: user.email ?? "", role };
+}
+
+// Backfill a public `profiles` row for any signed-in user. This lets the admin
+// panel list and manage accounts even for users created before profiles existed.
+async function ensureProfile(u: UserProfile) {
+  if (!isSupabaseConfigured) return;
+  try {
+    const { data } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("id", u.id)
+      .maybeSingle();
+    if (!data) {
+      await supabase.from("profiles").insert({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        status: "active",
+      });
+    }
+  } catch {
+    /* non-fatal */
+  }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -106,6 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(u);
         setRole(u.role);
         setIsSignedIn(true);
+        ensureProfile(u);
       } else {
         setUser(null);
         setRole(null);
@@ -165,12 +190,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const u = profileFromUser(session.user ?? null);
     if (u) {
-      const finalRole = u.role === "clipper" || u.role === "creator" ? u.role : r;
+      const finalRole =
+        u.role === "clipper" || u.role === "creator" || u.role === "admin"
+          ? u.role
+          : r;
       const profile = { ...u, role: finalRole };
       markTabSession(profile.id);
       setUser(profile);
       setRole(finalRole);
       setIsSignedIn(true);
+      ensureProfile(profile);
       return profile;
     }
     setIsSignedIn(true);
@@ -205,6 +234,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     setRole(data.role);
     setIsSignedIn(true);
+    ensureProfile({
+      id: res.user?.id ?? "",
+      name: data.name,
+      email: data.email,
+      role: data.role,
+    });
   };
 
   const signOut: AuthValue["signOut"] = async () => {

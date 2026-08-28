@@ -1,0 +1,131 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { Server, Check, KeyRound } from "lucide-react";
+import { useStore } from "@/lib/store";
+import { isSupabaseConfigured } from "@/lib/supabase/client";
+
+export default function AdminBackend() {
+  const { siteSettings, campaigns, clips, profiles, setSiteSettings } = useStore();
+  const [razorpayKey, setRazorpayKey] = useState("");
+  const [saved, setSaved] = useState(false);
+  const dirty = useRef(false);
+
+  useEffect(() => {
+    if (!dirty.current) setRazorpayKey(siteSettings.razorpayKey);
+  }, [siteSettings]);
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  let host = "";
+  try {
+    host = new URL(url).host;
+  } catch {
+    host = "";
+  }
+
+  function save() {
+    dirty.current = true;
+    setSiteSettings({
+      heroTitle: siteSettings.heroTitle,
+      heroSubtitle: siteSettings.heroSubtitle,
+      featuredIds: siteSettings.featuredIds,
+      razorpayKey: razorpayKey.trim(),
+    });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Backend</h1>
+        <p className="mt-1 text-sm text-muted">
+          Connection status and payout configuration.
+        </p>
+      </div>
+
+      <section className="rounded-2xl border bg-card p-6">
+        <h2 className="text-sm font-semibold uppercase tracking-widest text-muted">
+          Supabase
+        </h2>
+        <div className="mt-4 space-y-3 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-muted">Status</span>
+            <span className="inline-flex items-center gap-1.5 font-medium">
+              {isSupabaseConfigured ? (
+                <>
+                  <Check size={14} className="text-green" /> Connected
+                </>
+              ) : (
+                <span className="text-amber">Not configured</span>
+              )}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-muted">Host</span>
+            <span className="font-mono text-xs">{host || "—"}</span>
+          </div>
+        </div>
+        {!isSupabaseConfigured && (
+          <p className="mt-3 rounded-lg bg-amber/10 px-3 py-2 text-xs text-amber">
+            Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to
+            enable live data. The app currently runs on seed data.
+          </p>
+        )}
+      </section>
+
+      <section className="rounded-2xl border bg-card p-6">
+        <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-widest text-muted">
+          <KeyRound size={14} /> Razorpay
+        </h2>
+        <label className="mt-4 block text-sm font-medium">API key</label>
+        <input
+          value={razorpayKey}
+          onChange={(e) => {
+            dirty.current = true;
+            setRazorpayKey(e.target.value);
+          }}
+          placeholder="rzp_live_…"
+          className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground sm:max-w-md"
+        />
+        <button
+          onClick={save}
+          className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+        >
+          {saved ? "Saved" : "Save key"}
+        </button>
+      </section>
+
+      <section className="rounded-2xl border bg-card p-6">
+        <h2 className="text-sm font-semibold uppercase tracking-widest text-muted">
+          Data counts
+        </h2>
+        <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="rounded-xl bg-background p-4">
+            <p className="font-mono text-xl font-semibold">{campaigns.length}</p>
+            <p className="text-xs text-muted">campaigns</p>
+          </div>
+          <div className="rounded-xl bg-background p-4">
+            <p className="font-mono text-xl font-semibold">{clips.length}</p>
+            <p className="text-xs text-muted">clips</p>
+          </div>
+          <div className="rounded-xl bg-background p-4">
+            <p className="font-mono text-xl font-semibold">{profiles.length}</p>
+            <p className="text-xs text-muted">profiles</p>
+          </div>
+          <div className="rounded-xl bg-background p-4">
+            <p className="font-mono text-xl font-semibold">{profiles.filter((p) => p.role === "admin").length}</p>
+            <p className="text-xs text-muted">admins</p>
+          </div>
+        </div>
+      </section>
+
+      <p className="flex items-start gap-2 text-xs text-muted">
+        <Server size={14} className="mt-0.5 shrink-0" />
+        Admin tables (profiles, site_settings) are created by running
+        <code className="mx-1 rounded bg-accent-soft px-1.5 py-0.5">supabase/admin-schema.sql</code>
+        in the Supabase SQL editor.
+      </p>
+    </div>
+  );
+}

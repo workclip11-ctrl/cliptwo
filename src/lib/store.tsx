@@ -14,6 +14,10 @@ import type {
   Clip,
   ClipStatus,
   Platform,
+  Profile,
+  ProfileRole,
+  ProfileStatus,
+  SiteSettings,
   StoreState,
 } from "./types";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
@@ -120,6 +124,13 @@ const seed: StoreState = {
       platform: "Instagram",
     },
   ],
+  profiles: [],
+  siteSettings: {
+    heroTitle: "",
+    heroSubtitle: "",
+    featuredIds: [],
+    razorpayKey: "",
+  },
 };
 
 interface StoreActions {
@@ -127,6 +138,10 @@ interface StoreActions {
   addClip: (k: Omit<Clip, "id" | "submittedAt" | "status" | "views">) => void;
   setClipStatus: (id: string, status: ClipStatus) => void;
   closeCampaign: (id: string) => void;
+  deleteCampaign: (id: string) => void;
+  updateProfileStatus: (id: string, status: ProfileStatus) => void;
+  deleteProfile: (id: string) => void;
+  setSiteSettings: (s: SiteSettings) => void;
 }
 
 function mapCampaign(r: Record<string, unknown>): Campaign {
@@ -164,6 +179,30 @@ function mapClip(r: Record<string, unknown>): Clip {
   };
 }
 
+function mapProfile(r: Record<string, unknown>): Profile {
+  return {
+    id: String(r.id),
+    name: String(r.name ?? ""),
+    email: String(r.email ?? ""),
+    role: (r.role as ProfileRole) ?? "clipper",
+    status: (r.status as ProfileStatus) ?? "active",
+    createdAt: r.created_at ? new Date(String(r.created_at)).getTime() : Date.now(),
+  };
+}
+
+function mapSiteSettings(r: Record<string, unknown> | null): SiteSettings {
+  if (!r) {
+    return { heroTitle: "", heroSubtitle: "", featuredIds: [], razorpayKey: "" };
+  }
+  const fids = r.featured_ids;
+  return {
+    heroTitle: r.hero_title ? String(r.hero_title) : "",
+    heroSubtitle: r.hero_subtitle ? String(r.hero_subtitle) : "",
+    featuredIds: Array.isArray(fids) ? (fids as unknown[]).map(String) : [],
+    razorpayKey: r.razorpay_key ? String(r.razorpay_key) : "",
+  };
+}
+
 const StoreContext = createContext<(StoreState & StoreActions) | null>(null);
 
 function ignore(p: PromiseLike<unknown>) {
@@ -178,13 +217,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     let active = true;
 
     (async () => {
-      const [{ data: camps }, { data: clps }] = await Promise.all([
-        supabase.from("campaigns").select("*"),
-        supabase.from("clips").select("*"),
-      ]);
+      const [{ data: camps }, { data: clps }, { data: profs }, { data: site }] =
+        await Promise.all([
+          supabase.from("campaigns").select("*"),
+          supabase.from("clips").select("*"),
+          supabase.from("profiles").select("*"),
+          supabase.from("site_settings").select("*").eq("id", 1).maybeSingle(),
+        ]);
       if (!active) return;
       if (camps) setState((s) => ({ ...s, campaigns: camps.map(mapCampaign) }));
       if (clps) setState((s) => ({ ...s, clips: clps.map(mapClip) }));
+      if (profs) setState((s) => ({ ...s, profiles: profs.map(mapProfile) }));
+      if (site)
+        setState((s) => ({ ...s, siteSettings: mapSiteSettings(site as Record<string, unknown>) }));
     })().catch(() => {
       /* keep seed on failure */
     });
@@ -303,6 +348,43 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (!isSupabaseConfigured) return;
         ignore(
           supabase.from("campaigns").update({ status: "closed" }).eq("id", id),
+        );
+      },
+
+      deleteCampaign: (id) => {
+        setState((s) => ({ ...s, campaigns: s.campaigns.filter((c) => c.id !== id) }));
+        if (!isSupabaseConfigured) return;
+        ignore(supabase.from("campaigns").delete().eq("id", id));
+      },
+
+      updateProfileStatus: (id, status) => {
+        setState((s) => ({
+          ...s,
+          profiles: s.profiles.map((p) => (p.id === id ? { ...p, status } : p)),
+        }));
+        if (!isSupabaseConfigured) return;
+        ignore(supabase.from("profiles").update({ status }).eq("id", id));
+      },
+
+      deleteProfile: (id) => {
+        setState((s) => ({ ...s, profiles: s.profiles.filter((p) => p.id !== id) }));
+        if (!isSupabaseConfigured) return;
+        ignore(supabase.from("profiles").delete().eq("id", id));
+      },
+
+      setSiteSettings: (site) => {
+        setState((s) => ({ ...s, siteSettings: site }));
+        if (!isSupabaseConfigured) return;
+        ignore(
+          supabase
+            .from("site_settings")
+            .upsert({
+              id: 1,
+              hero_title: site.heroTitle,
+              hero_subtitle: site.heroSubtitle,
+              featured_ids: site.featuredIds,
+              razorpay_key: site.razorpayKey,
+            }),
         );
       },
     }),
