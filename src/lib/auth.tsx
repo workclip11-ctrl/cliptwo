@@ -114,6 +114,31 @@ async function ensureProfile(u: UserProfile) {
   }
 }
 
+// Resolve the authoritative role from the public `profiles` table (which the
+// admin seed sets explicitly), falling back to auth metadata for brand-new
+// users who don't have a profile row yet.
+async function resolveUser(user: UserProfile | null): Promise<UserProfile | null> {
+  if (!user) return null;
+  if (!isSupabaseConfigured) return user;
+  try {
+    const { data } = await supabase
+      .from("profiles")
+      .select("role, status")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (
+      data?.role === "clipper" ||
+      data?.role === "creator" ||
+      data?.role === "admin"
+    ) {
+      return { ...user, role: data.role };
+    }
+  } catch {
+    /* fall back to metadata below */
+  }
+  return user;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [role, setRole] = useState<Role | null>(null);
@@ -124,13 +149,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
 
-    const apply = (u: UserProfile | null) => {
+    const apply = async (u: UserProfile | null) => {
       if (!active) return;
-      if (u && !isTabLoggedOut()) {
-        setUser(u);
-        setRole(u.role);
+      const resolved = await resolveUser(u);
+      if (resolved && !isTabLoggedOut()) {
+        setUser(resolved);
+        setRole(resolved.role);
         setIsSignedIn(true);
-        ensureProfile(u);
+        ensureProfile(resolved);
       } else {
         setUser(null);
         setRole(null);
@@ -188,16 +214,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(msg);
     }
 
-    const u = profileFromUser(session.user ?? null);
-    if (u) {
-      const finalRole =
-        u.role === "clipper" || u.role === "creator" || u.role === "admin"
-          ? u.role
-          : r;
-      const profile = { ...u, role: finalRole };
+    const base = profileFromUser(session.user ?? null);
+    if (base) {
+      const profile = (await resolveUser(base)) ?? base;
       markTabSession(profile.id);
       setUser(profile);
-      setRole(finalRole);
+      setRole(profile.role);
       setIsSignedIn(true);
       ensureProfile(profile);
       return profile;
