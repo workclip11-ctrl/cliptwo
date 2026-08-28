@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { BadgeCheck } from "lucide-react";
+import { BadgeCheck, Upload, Film } from "lucide-react";
 import type { Platform } from "@/lib/types";
 
 const PLATFORMS: Platform[] = ["TikTok", "YouTube", "Instagram", "Reels"];
@@ -21,6 +21,7 @@ export function NewCampaignModal({
     payout: number,
     niche: string,
     budget: number,
+    sourceLink: string,
   ) => void;
 }) {
   const [title, setTitle] = useState("");
@@ -29,6 +30,16 @@ export function NewCampaignModal({
   const [niche, setNiche] = useState(NICHES[0]);
   const [payout, setPayout] = useState("220");
   const [budget, setBudget] = useState("40000");
+  const [sourceLink, setSourceLink] = useState("");
+  const [fileName, setFileName] = useState("");
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (f) {
+      setFileName(f.name);
+      if (!sourceLink) setSourceLink(f.name);
+    }
+  }
 
   return (
     <div
@@ -111,6 +122,35 @@ export function NewCampaignModal({
           </div>
         </div>
 
+        {/* Video resource */}
+        <div className="mt-4">
+          <label className="block text-sm font-medium">Video resource</label>
+          <p className="text-xs text-muted">
+            The source video clippers will cut from (URL or upload).
+          </p>
+          <input
+            value={sourceLink}
+            onChange={(e) => setSourceLink(e.target.value)}
+            placeholder="https://youtube.com/watch?v=… or drive link"
+            className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
+          />
+          <div className="mt-2 flex items-center gap-3">
+            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-accent-soft">
+              <Upload size={14} /> Upload video
+              <input
+                type="file"
+                accept="video/*"
+                className="hidden"
+                onChange={handleFile}
+              />
+            </label>
+            <span className="inline-flex items-center gap-1.5 text-xs text-muted">
+              <Film size={13} />
+              {fileName || "No file chosen"}
+            </span>
+          </div>
+        </div>
+
         <div className="mt-6 flex justify-end gap-2">
           <button
             onClick={onClose}
@@ -128,6 +168,7 @@ export function NewCampaignModal({
                 Number(payout) || 0,
                 niche,
                 Number(budget) || 0,
+                sourceLink,
               )
             }
             className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"

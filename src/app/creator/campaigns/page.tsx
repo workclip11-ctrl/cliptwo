@@ -126,7 +126,7 @@ export default function CreatorCampaignsPage() {
         <NewCampaignModal
           creatorName={user?.name ?? user?.email ?? "Creator"}
           onClose={() => setOpen(false)}
-          onSubmit={(title, brief, platform, payout, niche, budget) => {
+          onSubmit={(title, brief, platform, payout, niche, budget, sourceLink) => {
             addCampaign({
               title,
               creator: user?.name ?? user?.email ?? "Creator",
@@ -135,6 +135,7 @@ export default function CreatorCampaignsPage() {
               payout,
               niche,
               budget,
+              sourceLink: sourceLink || undefined,
               spent: 0,
               daysLeft: 30,
             });

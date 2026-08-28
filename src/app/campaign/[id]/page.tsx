@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Plus, Link2 } from "lucide-react";
+import { ArrowLeft, Plus, Link2, Film } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
 import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
@@ -126,6 +126,26 @@ export default function CampaignDetail() {
         <p className="mt-4 rounded-xl border bg-card p-4 text-sm text-muted">
           {campaign.brief}
         </p>
+
+        {campaign.sourceLink && (
+          <div className="mt-3 rounded-xl border bg-card p-4">
+            <p className="text-xs text-muted">Video resource</p>
+            {/^https?:\/\//i.test(campaign.sourceLink) ? (
+              <a
+                href={campaign.sourceLink}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-1 inline-flex items-center gap-1.5 text-sm font-medium text-accent hover:underline underline-offset-2"
+              >
+                <Film size={14} /> Open source video
+              </a>
+            ) : (
+              <p className="mt-1 inline-flex items-center gap-1.5 text-sm text-muted">
+                <Film size={14} /> {campaign.sourceLink}
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <div className="rounded-xl border bg-card p-4">

@@ -228,7 +228,7 @@ export default function CreatorPage() {
         <NewCampaignModal
           creatorName={user?.name ?? user?.email ?? "Creator"}
           onClose={() => setOpen(false)}
-          onSubmit={(title, brief, platform, payout, niche, budget) => {
+          onSubmit={(title, brief, platform, payout, niche, budget, sourceLink) => {
             addCampaign({
               title,
               creator: user?.name ?? user?.email ?? "Creator",
@@ -237,6 +237,7 @@ export default function CreatorPage() {
               payout,
               niche,
               budget,
+              sourceLink: sourceLink || undefined,
               spent: 0,
               daysLeft: 30,
             });
@@ -352,6 +353,26 @@ function CampaignDetailModal({
         </div>
 
         <p className="mt-3 text-sm text-muted">{campaign.brief}</p>
+
+        {campaign.sourceLink && (
+          <div className="mt-4">
+            <p className="text-xs text-muted">Video resource</p>
+            {/^https?:\/\//i.test(campaign.sourceLink) ? (
+              <a
+                href={campaign.sourceLink}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-1 inline-flex items-center gap-1.5 text-sm font-medium text-accent hover:underline underline-offset-2"
+              >
+                <Film size={14} /> Open source video
+              </a>
+            ) : (
+              <p className="mt-1 inline-flex items-center gap-1.5 text-sm text-muted">
+                <Film size={14} /> {campaign.sourceLink}
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="mt-4">
           <div className="mb-1 flex items-center justify-between text-[11px] text-muted">
