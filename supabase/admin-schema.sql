@@ -82,6 +82,17 @@ drop policy if exists "campaigns_delete" on public.campaigns;
 create policy "campaigns_delete" on public.campaigns
   for delete using (auth.uid() = created_by or public.is_admin());
 
+-- Clips: only the owner (or an admin) may edit / delete a clip. The base
+-- schema used `auth.role() = 'authenticated'`, which let ANY signed-in user
+-- tamper with anyone's clip (e.g. mark another clipper's clip as paid).
+drop policy if exists "clips_update" on public.clips;
+create policy "clips_update" on public.clips
+  for update using (auth.uid() = user_id or public.is_admin());
+
+drop policy if exists "clips_delete" on public.clips;
+create policy "clips_delete" on public.clips
+  for delete using (auth.uid() = user_id or public.is_admin());
+
 -- ---------------------------------------------------------------------------
 -- helper: does an account with this email already exist? (used by the login
 -- page to tell "new user" apart from "wrong password"). Callable by anon so

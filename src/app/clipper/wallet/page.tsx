@@ -2,28 +2,28 @@
 
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
-import type { Campaign, Clip } from "@/lib/types";
+import { rup, clipEarnings } from "@/lib/format";
 
 const UPI_ID = "maya.cuts@upi";
-
-function rup(n: number) {
-  return "₹" + Math.round(n).toLocaleString("en-IN");
-}
-function clipEarnings(clip: Clip, campaigns: Campaign[]) {
-  if (clip.status !== "approved") return 0;
-  const camp = campaigns.find((c) => c.id === clip.campaignId);
-  return camp ? (clip.views / 1000) * camp.payout : 0;
-}
 
 export default function ClipperWalletPage() {
   const { campaigns, clips } = useStore();
   const { user } = useAuth();
   const myClips = clips.filter((k) => k.userId === user?.id || !k.userId);
-  const total = myClips.reduce((s, k) => s + clipEarnings(k, campaigns), 0);
+
+  // Paid clips have been released; approved (not yet paid) are pending payout.
+  const paid = myClips.filter((k) => k.status === "paid");
+  const approved = myClips.filter((k) => k.status === "approved");
+  const available = paid.reduce((s, k) => s + clipEarnings(k, campaigns), 0);
+  const pending = approved.reduce((s, k) => s + clipEarnings(k, campaigns), 0);
+  const total = available + pending;
 
   const byCampaign = new Map<string, number>();
   for (const k of myClips) {
-    byCampaign.set(k.campaignId, (byCampaign.get(k.campaignId) ?? 0) + clipEarnings(k, campaigns));
+    byCampaign.set(
+      k.campaignId,
+      (byCampaign.get(k.campaignId) ?? 0) + clipEarnings(k, campaigns),
+    );
   }
 
   return (
@@ -36,7 +36,16 @@ export default function ClipperWalletPage() {
       <div className="rounded-2xl border bg-card p-6">
         <p className="text-sm text-muted">Total earnings</p>
         <p className="mt-1 font-mono text-3xl font-semibold">{rup(total)}</p>
-        <p className="mt-2 text-xs text-muted">Paid out weekly over UPI for approved clips.</p>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="rounded-xl bg-background p-3">
+            <p className="text-xs text-muted">Available (paid)</p>
+            <p className="mt-1 font-mono text-lg font-semibold text-green">{rup(available)}</p>
+          </div>
+          <div className="rounded-xl bg-background p-3">
+            <p className="text-xs text-muted">Pending approval</p>
+            <p className="mt-1 font-mono text-lg font-semibold text-amber">{rup(pending)}</p>
+          </div>
+        </div>
       </div>
 
       <section>

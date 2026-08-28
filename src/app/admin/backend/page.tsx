@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Server, Check, KeyRound } from "lucide-react";
+import { Server, Check, KeyRound, RefreshCw } from "lucide-react";
 import { useStore } from "@/lib/store";
-import { isSupabaseConfigured } from "@/lib/supabase/client";
+import { isSupabaseConfigured, supabase } from "@/lib/supabase/client";
 
 export default function AdminBackend() {
   const { siteSettings, campaigns, clips, profiles, setSiteSettings } = useStore();
   const [razorpayKey, setRazorpayKey] = useState("");
   const [saved, setSaved] = useState(false);
   const dirty = useRef(false);
+  const [ping, setPing] = useState<"idle" | "testing" | "ok" | "fail">("idle");
 
   useEffect(() => {
     if (!dirty.current) setRazorpayKey(siteSettings.razorpayKey);
@@ -33,6 +34,20 @@ export default function AdminBackend() {
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  }
+
+  async function testConnection() {
+    if (!isSupabaseConfigured) return;
+    setPing("testing");
+    try {
+      const { error } = await supabase
+        .from("campaigns")
+        .select("id", { count: "exact", head: true });
+      setPing(error ? "fail" : "ok");
+    } catch {
+      setPing("fail");
+    }
+    setTimeout(() => setPing("idle"), 4000);
   }
 
   return (
@@ -60,6 +75,23 @@ export default function AdminBackend() {
                 <span className="text-amber">Not configured</span>
               )}
             </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-muted">Live ping</span>
+            <button
+              onClick={testConnection}
+              disabled={!isSupabaseConfigured || ping === "testing"}
+              className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-accent-soft disabled:opacity-60"
+            >
+              <RefreshCw size={12} className={ping === "testing" ? "animate-spin" : ""} />
+              {ping === "ok"
+                ? "Reachable"
+                : ping === "fail"
+                  ? "Unreachable"
+                  : ping === "testing"
+                    ? "Testing…"
+                    : "Test connection"}
+            </button>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-muted">Host</span>

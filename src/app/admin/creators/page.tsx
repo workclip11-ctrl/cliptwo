@@ -1,20 +1,57 @@
 "use client";
 
-import { Ban, Check, Trash2 } from "lucide-react";
-import { StatusPill } from "@/components/StatusPill";
+import { useMemo, useState } from "react";
+import { Ban, Check, Trash2, Search } from "lucide-react";
 import { useStore } from "@/lib/store";
+
+function StatusBadge({ suspended }: { suspended: boolean }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${
+        suspended
+          ? "bg-red/10 text-red border-red/20"
+          : "bg-green/10 text-green border-green/20"
+      }`}
+    >
+      {suspended ? "Suspended" : "Active"}
+    </span>
+  );
+}
 
 export default function AdminCreators() {
   const { profiles, campaigns, updateProfileStatus, deleteProfile } = useStore();
-  const creators = profiles.filter((p) => p.role === "creator");
+  const [q, setQ] = useState("");
+  const creators = useMemo(
+    () =>
+      profiles
+        .filter((p) => p.role === "creator")
+        .filter(
+          (p) =>
+            !q ||
+            p.name.toLowerCase().includes(q.toLowerCase()) ||
+            p.email.toLowerCase().includes(q.toLowerCase()),
+        ),
+    [profiles, q],
+  );
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Creators</h1>
         <p className="mt-1 text-sm text-muted">
-          {creators.length} creator account{creators.length === 1 ? "" : "s"}.
+          {creators.length} creator account{creators.length === 1 ? "" : "s"}
+          {q ? " (filtered)" : ""}.
         </p>
+      </div>
+
+      <div className="relative max-w-sm">
+        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search by name or email"
+          className="w-full rounded-lg border bg-background py-2 pl-9 pr-3 text-sm outline-none focus:border-foreground"
+        />
       </div>
 
       <div className="overflow-hidden rounded-2xl border bg-card">
@@ -38,7 +75,7 @@ export default function AdminCreators() {
                   <td className="px-4 py-3 text-muted">{p.email}</td>
                   <td className="px-4 py-3 text-right font-mono">{owns}</td>
                   <td className="px-4 py-3 text-center">
-                    <StatusPill status={suspended ? "rejected" : "approved"} />
+                    <StatusBadge suspended={suspended} />
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-1">
@@ -69,7 +106,7 @@ export default function AdminCreators() {
             {creators.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-8 text-center text-muted">
-                  No creator accounts yet.
+                  No creator accounts{profiles.length ? " matching your search" : " yet"}.
                 </td>
               </tr>
             )}
