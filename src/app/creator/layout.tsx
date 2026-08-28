@@ -3,15 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { LayoutGrid, Megaphone, Film, Wallet } from "lucide-react";
+import { LayoutGrid, Megaphone, Film, Wallet, Settings } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
 import { AuthGuard } from "@/components/AuthGuard";
 
 const NAV = [
   { href: "/creator", label: "Dashboard", icon: LayoutGrid, exact: true },
-  { href: "/creator#campaigns", label: "Campaigns", icon: Megaphone },
-  { href: "/creator#review", label: "Review queue", icon: Film },
-  { href: "/creator#payouts", label: "Payouts", icon: Wallet },
+  { href: "/creator/campaigns", label: "Campaigns", icon: Megaphone },
+  { href: "/creator/submissions", label: "Submissions", icon: Film },
+  { href: "/creator/wallet", label: "Wallet", icon: Wallet },
+  { href: "/creator/settings", label: "Settings", icon: Settings },
 ];
 
 export default function CreatorLayout({ children }: { children: ReactNode }) {
@@ -29,7 +30,9 @@ export default function CreatorLayout({ children }: { children: ReactNode }) {
               </p>
               <nav className="flex flex-col gap-1">
                 {NAV.map((n) => {
-                  const active = n.exact ? pathname === n.href : false;
+                  const active = n.exact
+                    ? pathname === n.href
+                    : pathname === n.href || pathname.startsWith(n.href + "/");
                   return (
                     <Link
                       key={n.href}
