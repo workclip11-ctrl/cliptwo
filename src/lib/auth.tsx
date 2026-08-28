@@ -122,26 +122,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn: AuthValue["signIn"] = async (r, creds) => {
     setError(null);
-    let res = await supabase.auth.signInWithPassword({
+    const first = await supabase.auth.signInWithPassword({
       email: creds.email,
       password: creds.password,
     });
 
-    // If a session already exists in storage (e.g. this tab was logged out
-    // via the per-tab flag but the shared session is still valid), reuse it
-    // for this tab instead of erroring out or touching other tabs.
-    if (res.error) {
+    // Prefer the session from sign-in. If that fails because a session
+    // already exists in shared storage (this tab was flagged logged out but
+    // the session is still valid), reuse it for this tab instead of
+    // erroring out or touching other tabs.
+    let session = first.data.session;
+    if (first.error || !session) {
       const { data: cur } = await supabase.auth.getSession();
-      if (cur.session) {
-        res = { data: cur, error: null };
-      } else {
-        const msg = mapError(res.error);
-        setError(msg);
-        throw new Error(msg);
-      }
+      session = cur.session;
+    }
+    if (!session) {
+      const msg = mapError(
+        first.error ?? { message: "Unable to sign in. Please try again." },
+      );
+      setError(msg);
+      throw new Error(msg);
     }
 
-    const u = profileFromUser(res.data.session?.user ?? null);
+    const u = profileFromUser(session.user ?? null);
     if (u) {
       if (typeof window !== "undefined")
         sessionStorage.removeItem(TAB_LOGOUT_KEY);
