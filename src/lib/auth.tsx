@@ -171,22 +171,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password: creds.password,
     });
 
-    // Prefer the session from sign-in. If that fails because a session
-    // already exists in shared storage (this tab was flagged logged out but
-    // the session is still valid), reuse it for this tab instead of
-    // erroring out or touching other tabs.
-    let session = first.data.session;
-    if (first.error || !session) {
-      const { data: cur } = await supabase.auth.getSession();
-      session = cur.session;
-    }
-    if (!session) {
+    // Do NOT fall back to a shared session on failure. Reusing getSession()
+    // here would silently log a failed login in as whatever account is already
+    // in storage (e.g. admin) — a privilege-escalation bug.
+    if (first.error || !first.data.session) {
       const msg = mapError(
         first.error ?? { message: "Unable to sign in. Please try again." },
       );
       setError(msg);
       throw new Error(msg);
     }
+    const session = first.data.session;
 
     const base = profileFromUser(session.user ?? null);
     if (base) {
