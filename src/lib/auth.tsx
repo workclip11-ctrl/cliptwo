@@ -114,31 +114,6 @@ async function ensureProfile(u: UserProfile) {
   }
 }
 
-// Resolve the authoritative role from the public `profiles` table (which the
-// admin seed sets explicitly), falling back to auth metadata for brand-new
-// users who don't have a profile row yet.
-async function resolveUser(user: UserProfile | null): Promise<UserProfile | null> {
-  if (!user) return null;
-  if (!isSupabaseConfigured) return user;
-  try {
-    const { data } = await supabase
-      .from("profiles")
-      .select("role, status")
-      .eq("id", user.id)
-      .maybeSingle();
-    if (
-      data?.role === "clipper" ||
-      data?.role === "creator" ||
-      data?.role === "admin"
-    ) {
-      return { ...user, role: data.role };
-    }
-  } catch {
-    /* fall back to metadata below */
-  }
-  return user;
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [role, setRole] = useState<Role | null>(null);
@@ -149,14 +124,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
 
-    const apply = async (u: UserProfile | null) => {
+    const apply = (u: UserProfile | null) => {
       if (!active) return;
-      const resolved = await resolveUser(u);
-      if (resolved && !isTabLoggedOut()) {
-        setUser(resolved);
-        setRole(resolved.role);
+      if (u && !isTabLoggedOut()) {
+        setUser(u);
+        setRole(u.role);
         setIsSignedIn(true);
-        ensureProfile(resolved);
+        ensureProfile(u);
       } else {
         setUser(null);
         setRole(null);
@@ -216,13 +190,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const base = profileFromUser(session.user ?? null);
     if (base) {
-      const profile = (await resolveUser(base)) ?? base;
-      markTabSession(profile.id);
-      setUser(profile);
-      setRole(profile.role);
+      markTabSession(base.id);
+      setUser(base);
+      setRole(base.role);
       setIsSignedIn(true);
-      ensureProfile(profile);
-      return profile;
+      ensureProfile(base);
+      return base;
     }
     setIsSignedIn(true);
     return null;
