@@ -18,6 +18,18 @@ export interface UserProfile {
   role: Role;
 }
 
+// Per-tab logout flag. Unlike Supabase's global signOut (which clears the
+// shared localStorage session and logs out every tab), this lets "logout"
+// apply to only the current tab while other tabs stay signed in.
+const TAB_LOGOUT_KEY = "cliptwo_tab_logged_out";
+
+function isTabLoggedOut() {
+  return (
+    typeof window !== "undefined" &&
+    sessionStorage.getItem(TAB_LOGOUT_KEY) === "1"
+  );
+}
+
 interface AuthValue {
   isSignedIn: boolean;
   role: Role | null;
@@ -74,29 +86,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
 
-    supabase.auth
-      .getSession()
-      .then(({ data }) => {
-        if (!active) return;
-        const u = profileFromUser(data.session?.user ?? null);
-        if (u) {
-          setUser(u);
-          setRole(u.role);
-          setIsSignedIn(true);
-        } else {
-          setIsSignedIn(false);
-        }
-        setLoading(false);
-      })
-      .catch(() => {
-        if (!active) return;
-        setIsSignedIn(false);
-        setLoading(false);
-      });
-
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      const u = profileFromUser(session?.user ?? null);
-      if (u) {
+    const apply = (u: UserProfile | null) => {
+      if (!active) return;
+      if (u && !isTabLoggedOut()) {
         setUser(u);
         setRole(u.role);
         setIsSignedIn(true);
@@ -105,7 +97,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRole(null);
         setIsSignedIn(false);
       }
-    });
+      setLoading(false);
+    };
+
+    supabase.auth
+      .getSession()
+      .then(({ data }) => apply(profileFromUser(data.session?.user ?? null)))
+      .catch(() => {
+        if (active) {
+          setIsSignedIn(false);
+          setLoading(false);
+        }
+      });
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) =>
+      apply(profileFromUser(session?.user ?? null)),
+    );
 
     return () => {
       active = false;
@@ -115,18 +122,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn: AuthValue["signIn"] = async (r, creds) => {
     setError(null);
-    const { error } = await supabase.auth.signInWithPassword({
+    let res = await supabase.auth.signInWithPassword({
       email: creds.email,
       password: creds.password,
     });
-    if (error) {
-      const msg = mapError(error);
-      setError(msg);
-      throw new Error(msg);
+
+    // If a session already exists in storage (e.g. this tab was logged out
+    // via the per-tab flag but the shared session is still valid), reuse it
+    // for this tab instead of erroring out or touching other tabs.
+    if (res.error) {
+      const { data: cur } = await supabase.auth.getSession();
+      if (cur.session) {
+        res = { data: cur, error: null };
+      } else {
+        const msg = mapError(res.error);
+        setError(msg);
+        throw new Error(msg);
+      }
     }
-    const { data } = await supabase.auth.getUser();
-    const u = profileFromUser(data.user);
+
+    const u = profileFromUser(res.data.session?.user ?? null);
     if (u) {
+      if (typeof window !== "undefined")
+        sessionStorage.removeItem(TAB_LOGOUT_KEY);
       const finalRole = u.role === "clipper" || u.role === "creator" ? u.role : r;
       const profile = { ...u, role: finalRole };
       setUser(profile);
@@ -155,13 +173,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(msg);
       throw new Error(msg);
     }
-    setUser({ id: res.user?.id ?? "", name: data.name, email: data.email, role: data.role });
+    if (typeof window !== "undefined")
+      sessionStorage.removeItem(TAB_LOGOUT_KEY);
+    setUser({
+      id: res.user?.id ?? "",
+      name: data.name,
+      email: data.email,
+      role: data.role,
+    });
     setRole(data.role);
     setIsSignedIn(true);
   };
 
   const signOut: AuthValue["signOut"] = async () => {
-    await supabase.auth.signOut();
+    // Per-tab logout: flag this tab only. We deliberately do NOT call
+    // supabase.auth.signOut() because that clears the shared session and
+    // would log out every tab.
+    if (typeof window !== "undefined")
+      sessionStorage.setItem(TAB_LOGOUT_KEY, "1");
     setUser(null);
     setRole(null);
     setIsSignedIn(false);
