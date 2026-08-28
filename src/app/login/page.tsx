@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Scissors, ArrowRight } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
 
 type Mode = "signin" | "signup";
 type Role = "clipper" | "creator";
@@ -44,7 +45,22 @@ export default function AuthPage() {
         );
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Authentication failed.");
+      const msg = err instanceof Error ? err.message : "Authentication failed.";
+      // A failed sign-in could mean "wrong password" or "no such account".
+      // If the account doesn't exist, switch to sign-up with a friendly note.
+      if (mode === "signin" && msg === "Invalid email or password." && isSupabaseConfigured) {
+        try {
+          const { data } = await supabase.rpc("user_exists", { target_email: email });
+          if (data === false) {
+            setMode("signup");
+            setError("You're new here — create your account below.");
+            return;
+          }
+        } catch {
+          /* fall through to generic message */
+        }
+      }
+      setError(msg);
     } finally {
       setLoading(false);
     }

@@ -81,3 +81,19 @@ create policy "campaigns_update" on public.campaigns
 drop policy if exists "campaigns_delete" on public.campaigns;
 create policy "campaigns_delete" on public.campaigns
   for delete using (auth.uid() = created_by or public.is_admin());
+
+-- ---------------------------------------------------------------------------
+-- helper: does an account with this email already exist? (used by the login
+-- page to tell "new user" apart from "wrong password"). Callable by anon so
+-- the unauthenticated login form can use it.
+-- ---------------------------------------------------------------------------
+create or replace function public.user_exists(target_email text)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from auth.users where email = target_email);
+$$;
+
+grant execute on function public.user_exists(text) to anon, authenticated;
