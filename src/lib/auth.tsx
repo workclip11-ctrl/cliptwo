@@ -22,12 +22,26 @@ export interface UserProfile {
 // shared localStorage session and logs out every tab), this lets "logout"
 // apply to only the current tab while other tabs stay signed in.
 const TAB_LOGOUT_KEY = "cliptwo_tab_logged_out";
+const TAB_UID_KEY = "cliptwo_tab_uid";
 
 function isTabLoggedOut() {
   return (
     typeof window !== "undefined" &&
     sessionStorage.getItem(TAB_LOGOUT_KEY) === "1"
   );
+}
+
+function tabUid() {
+  return typeof window !== "undefined"
+    ? sessionStorage.getItem(TAB_UID_KEY)
+    : null;
+}
+
+function markTabSession(id: string) {
+  if (typeof window !== "undefined") {
+    sessionStorage.setItem(TAB_UID_KEY, id);
+    sessionStorage.removeItem(TAB_LOGOUT_KEY);
+  }
 }
 
 interface AuthValue {
@@ -110,9 +124,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       });
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) =>
-      apply(profileFromUser(session?.user ?? null)),
-    );
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      const incoming = profileFromUser(session?.user ?? null);
+      // Ignore cross-tab session changes that switch this tab to a different
+      // user, so each tab keeps its own identity (e.g. a tab signed in as
+      // creator won't flip to clipper when another tab signs in as clipper).
+      if (incoming && tabUid() && incoming.id !== tabUid()) return;
+      apply(incoming);
+    });
 
     return () => {
       active = false;
@@ -146,10 +165,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const u = profileFromUser(session.user ?? null);
     if (u) {
-      if (typeof window !== "undefined")
-        sessionStorage.removeItem(TAB_LOGOUT_KEY);
       const finalRole = u.role === "clipper" || u.role === "creator" ? u.role : r;
       const profile = { ...u, role: finalRole };
+      markTabSession(profile.id);
       setUser(profile);
       setRole(finalRole);
       setIsSignedIn(true);
@@ -178,6 +196,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     if (typeof window !== "undefined")
       sessionStorage.removeItem(TAB_LOGOUT_KEY);
+    markTabSession(res.user?.id ?? data.email);
     setUser({
       id: res.user?.id ?? "",
       name: data.name,
