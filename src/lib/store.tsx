@@ -642,10 +642,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
       updateProfile: (id, patch) => {
-        setState((s) => ({
-          ...s,
-          profiles: s.profiles.map((p) => (p.id === id ? { ...p, ...patch } : p)),
-        }));
+        setState((s) => {
+          const exists = s.profiles.some((p) => p.id === id);
+          if (exists) {
+            return {
+              ...s,
+              profiles: s.profiles.map((p) =>
+                p.id === id ? { ...p, ...patch } : p,
+              ),
+            };
+          }
+          const created: Profile = {
+            id,
+            email: "",
+            role: "clipper",
+            status: "active",
+            createdAt: Date.now(),
+            ...patch,
+            name: patch.name ?? "",
+          };
+          return { ...s, profiles: [...s.profiles, created] };
+        });
         if (!isSupabaseConfigured) return;
         ignore(
           supabase
