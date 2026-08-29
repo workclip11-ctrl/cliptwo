@@ -131,14 +131,33 @@ export interface Clip {
   audit?: AuditEntry[];
 }
 
+export interface Appeal {
+  id: string;
+  clipId?: string;
+  campaignId?: string;
+  reason: string;
+  status: "open" | "reviewing" | "approved" | "rejected";
+  at: number;
+  response?: string;
+}
+
 export interface Profile {
   id: string;
   name: string;
+  username?: string;
   email: string;
   role: ProfileRole;
   status: ProfileStatus;
+  verified?: boolean;
+  verifiedAt?: number;
   createdAt: number;
   upi?: string;
+  riskFlag?: boolean;
+  riskNote?: string;
+  adminNotes?: string;
+  suspendedReason?: string;
+  appeals?: Appeal[];
+  audit?: AuditEntry[];
 }
 
 export type SocialAccountStatus =

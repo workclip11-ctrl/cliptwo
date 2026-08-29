@@ -24,6 +24,7 @@ import type {
   Platform,
   Profile,
   ProfileRole,
+  Appeal,
   ProfileStatus,
   SocialAccount,
   SocialAccountStatus,
@@ -370,30 +371,386 @@ const seed: StoreState = {
             action: "failed",
             by: "workclip11@gmail.com",
             at: Date.now() - 1000 * 60 * 60 * 26,
-            note: "UPI verification failed — the UPI ID could not be verified. Update your payment method and retry.",
-          },
-        ],
-      },
+          note: "UPI verification failed — the UPI ID could not be verified. Update your payment method and retry.",
+        },
+      ],
+    },
+    {
+      id: "kp1",
+      campaignId: "c1",
+      clipper: "priya.viral",
+      videoUrl: "https://instagram.com/reel/priya01",
+      caption: "This app actually fixed my screen-time 😭",
+      status: "approved",
+      views: 52000,
+      submittedAt: Date.now() - 1000 * 60 * 60 * 24 * 9,
+      platform: "Instagram",
+      engagement: { likes: 6200, comments: 410, shares: 980 },
+      audit: [
+        { action: "submitted", by: "priya.viral", at: Date.now() - 1000 * 60 * 60 * 24 * 9 },
+        { action: "approved", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 24 * 8 },
+      ],
+    },
+    {
+      id: "kp2",
+      campaignId: "c1",
+      clipper: "priya.viral",
+      videoUrl: "https://instagram.com/reel/priya02",
+      caption: "3 features you missed",
+      status: "approved",
+      views: 31000,
+      submittedAt: Date.now() - 1000 * 60 * 60 * 24 * 6,
+      platform: "Instagram",
+      engagement: { likes: 3300, comments: 220, shares: 510 },
+      audit: [
+        { action: "submitted", by: "priya.viral", at: Date.now() - 1000 * 60 * 60 * 24 * 6 },
+        { action: "approved", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 24 * 5 },
+      ],
+    },
+    {
+      id: "kp3",
+      campaignId: "c1",
+      clipper: "priya.viral",
+      videoUrl: "https://youtube.com/shorts/priya03",
+      caption: "The aha moment",
+      status: "payable",
+      views: 12000,
+      submittedAt: Date.now() - 1000 * 60 * 60 * 24 * 3,
+      platform: "YouTube",
+      engagement: { likes: 1200, comments: 90, shares: 140 },
+      audit: [
+        { action: "submitted", by: "priya.viral", at: Date.now() - 1000 * 60 * 60 * 24 * 3 },
+        { action: "approved", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 24 * 2 },
+        { action: "payable", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 24 * 1 },
+      ],
+    },
+    {
+      id: "kar1",
+      campaignId: "c2",
+      clipper: "arjun.cuts",
+      videoUrl: "https://instagram.com/reel/arjun01",
+      caption: "Posture fix in 30s",
+      status: "approved",
+      views: 18000,
+      submittedAt: Date.now() - 1000 * 60 * 60 * 24 * 4,
+      platform: "Reels",
+      engagement: { likes: 2100, comments: 130, shares: 260 },
+      audit: [
+        { action: "submitted", by: "arjun.cuts", at: Date.now() - 1000 * 60 * 60 * 24 * 4 },
+        { action: "approved", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 24 * 3 },
+      ],
+    },
+    {
+      id: "kr1",
+      campaignId: "c1",
+      clipper: "rahul.bot",
+      videoUrl: "https://tiktok.com/@rahulbot/video/1",
+      caption: "Viral hack!!",
+      status: "rejected",
+      views: 88000,
+      submittedAt: Date.now() - 1000 * 60 * 60 * 24 * 6,
+      platform: "TikTok",
+      rejectionReason: "Fake engagement",
+      rejectionDetails: "Retention curve is non-human; views inconsistent with watch-time. Suspected bot traffic.",
+      engagement: { likes: 40, comments: 3, shares: 5 },
+      audit: [
+        { action: "submitted", by: "rahul.bot", at: Date.now() - 1000 * 60 * 60 * 24 * 6 },
+        {
+          action: "rejected",
+          by: "workclip11@gmail.com",
+          at: Date.now() - 1000 * 60 * 60 * 24 * 5,
+          note: "Fake engagement — retention curve is non-human; suspected bot traffic.",
+        },
+      ],
+    },
+    {
+      id: "kr2",
+      campaignId: "c1",
+      clipper: "rahul.bot",
+      videoUrl: "https://tiktok.com/@rahulbot/video/2",
+      caption: "Another one",
+      status: "approved",
+      views: 2400,
+      submittedAt: Date.now() - 1000 * 60 * 60 * 24 * 2,
+      platform: "TikTok",
+      engagement: { likes: 60, comments: 4, shares: 8 },
+      audit: [
+        { action: "submitted", by: "rahul.bot", at: Date.now() - 1000 * 60 * 60 * 24 * 2 },
+        { action: "approved", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 24 * 1 },
+      ],
+    },
+    {
+      id: "kb1",
+      campaignId: "c1",
+      clipper: "banned.user",
+      videoUrl: "https://instagram.com/reel/spam01",
+      caption: "Buy followers",
+      status: "rejected",
+      views: 60000,
+      submittedAt: Date.now() - 1000 * 60 * 60 * 24 * 8,
+      platform: "Instagram",
+      rejectionReason: "View fraud",
+      rejectionDetails: "Views traced to incentivised/fake sources.",
+      engagement: { likes: 10, comments: 0, shares: 1 },
+      audit: [
+        { action: "submitted", by: "banned.user", at: Date.now() - 1000 * 60 * 60 * 24 * 8 },
+        {
+          action: "rejected",
+          by: "workclip11@gmail.com",
+          at: Date.now() - 1000 * 60 * 60 * 24 * 7,
+          note: "View fraud — views traced to incentivised/fake sources.",
+        },
+      ],
+    },
+    {
+      id: "kb2",
+      campaignId: "c1",
+      clipper: "banned.user",
+      videoUrl: "https://youtube.com/shorts/spam02",
+      caption: "Spam reel",
+      status: "failed",
+      views: 3000,
+      submittedAt: Date.now() - 1000 * 60 * 60 * 24 * 6,
+      platform: "YouTube",
+      failureReason: "Account suspended before payout.",
+      engagement: { likes: 20, comments: 1, shares: 2 },
+      audit: [
+        { action: "submitted", by: "banned.user", at: Date.now() - 1000 * 60 * 60 * 24 * 6 },
+        { action: "approved", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 24 * 5 },
+        {
+          action: "failed",
+          by: "workclip11@gmail.com",
+          at: Date.now() - 1000 * 60 * 60 * 24 * 4,
+          note: "Account suspended before payout.",
+        },
+      ],
+    },
+    {
+      id: "ksb1",
+      campaignId: "c2",
+      clipper: "simran.m",
+      videoUrl: "https://instagram.com/reel/simran01",
+      caption: "My first cut",
+      status: "pending",
+      views: 0,
+      submittedAt: Date.now() - 1000 * 60 * 60 * 24 * 1,
+      platform: "Reels",
+      audit: [
+        { action: "submitted", by: "simran.m", at: Date.now() - 1000 * 60 * 60 * 24 * 1 },
+      ],
+    },
+    {
+      id: "kl1",
+      campaignId: "c1",
+      clipper: "leo.edits",
+      videoUrl: "https://instagram.com/reel/leo01",
+      caption: "Smooth transition edit",
+      status: "approved",
+      views: 9000,
+      submittedAt: Date.now() - 1000 * 60 * 60 * 24 * 5,
+      platform: "Instagram",
+      engagement: { likes: 800, comments: 50, shares: 120 },
+      audit: [
+        { action: "submitted", by: "leo.edits", at: Date.now() - 1000 * 60 * 60 * 24 * 5 },
+        { action: "approved", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 24 * 4 },
+      ],
+    },
+    {
+      id: "kl2",
+      campaignId: "c1",
+      clipper: "leo.edits",
+      videoUrl: "https://instagram.com/reel/leo02",
+      caption: "Off-brief try",
+      status: "rejected",
+      views: 2000,
+      submittedAt: Date.now() - 1000 * 60 * 60 * 24 * 3,
+      platform: "Instagram",
+      rejectionReason: "Off-brief",
+      rejectionDetails: "Used horizontal footage against the brief.",
+      engagement: { likes: 90, comments: 6, shares: 10 },
+      audit: [
+        { action: "submitted", by: "leo.edits", at: Date.now() - 1000 * 60 * 60 * 24 * 3 },
+        {
+          action: "rejected",
+          by: "workclip11@gmail.com",
+          at: Date.now() - 1000 * 60 * 60 * 24 * 2,
+          note: "Off-brief — used horizontal footage against the brief.",
+        },
+      ],
+    },
   ],
-  profiles: [],
+  profiles: [
+    {
+      id: "u_maya",
+      name: "Maya Reddy",
+      username: "maya.cuts",
+      email: "maya@cliptwo.app",
+      role: "clipper",
+      status: "active",
+      verified: true,
+      verifiedAt: Date.now() - 1000 * 60 * 60 * 24 * 45,
+      createdAt: Date.now() - 1000 * 60 * 60 * 24 * 50,
+      upi: "maya.reddy@okaxis",
+    },
+    {
+      id: "u_devon",
+      name: "Devon Pereira",
+      username: "devon.edits",
+      email: "devon@cliptwo.app",
+      role: "clipper",
+      status: "active",
+      verified: false,
+      createdAt: Date.now() - 1000 * 60 * 60 * 24 * 20,
+    },
+    {
+      id: "u_priya",
+      name: "Priya Nair",
+      username: "priya.viral",
+      email: "priya@cliptwo.app",
+      role: "clipper",
+      status: "active",
+      verified: true,
+      verifiedAt: Date.now() - 1000 * 60 * 60 * 24 * 75,
+      createdAt: Date.now() - 1000 * 60 * 60 * 24 * 80,
+      upi: "priya.nair@okhdfc",
+    },
+    {
+      id: "u_arjun",
+      name: "Arjun Mehta",
+      username: "arjun.cuts",
+      email: "arjun@cliptwo.app",
+      role: "clipper",
+      status: "active",
+      verified: true,
+      verifiedAt: Date.now() - 1000 * 60 * 60 * 24 * 55,
+      createdAt: Date.now() - 1000 * 60 * 60 * 24 * 60,
+    },
+    {
+      id: "u_rahul",
+      name: "Rahul Verma",
+      username: "rahul.bot",
+      email: "rahul@cliptwo.app",
+      role: "clipper",
+      status: "active",
+      verified: false,
+      createdAt: Date.now() - 1000 * 60 * 60 * 24 * 15,
+      riskFlag: true,
+      riskNote: "Multiple clips show abnormal retention (bot-like traffic) and one was rejected for fake engagement.",
+      appeals: [
+        {
+          id: "ap_1",
+          clipId: "kr1",
+          campaignId: "c1",
+          reason: "My views are real — my account just grew fast. Please reconsider the rejection.",
+          status: "open",
+          at: Date.now() - 1000 * 60 * 60 * 24 * 2,
+        },
+      ],
+    },
+    {
+      id: "u_banned",
+      name: "Spam Account",
+      username: "banned.user",
+      email: "spam@cliptwo.app",
+      role: "clipper",
+      status: "suspended",
+      suspendedReason: "Confirmed view fraud across two campaigns.",
+      verified: false,
+      createdAt: Date.now() - 1000 * 60 * 60 * 24 * 10,
+      riskFlag: true,
+      riskNote: "Permanently flagged for fraudulent views.",
+    },
+    {
+      id: "u_simran",
+      name: "Simran Kaur",
+      username: "simran.m",
+      email: "simran@cliptwo.app",
+      role: "clipper",
+      status: "active",
+      verified: false,
+      createdAt: Date.now() - 1000 * 60 * 60 * 24 * 5,
+    },
+    {
+      id: "u_leo",
+      name: "Leo D'Souza",
+      username: "leo.edits",
+      email: "leo@cliptwo.app",
+      role: "clipper",
+      status: "active",
+      verified: true,
+      verifiedAt: Date.now() - 1000 * 60 * 60 * 24 * 35,
+      createdAt: Date.now() - 1000 * 60 * 60 * 24 * 40,
+    },
+  ],
   socialAccounts: [
     {
       id: "sa_ig",
+      userId: "u_maya",
       platform: "Instagram",
       handle: "@maya.cuts",
       status: "connected",
       verified: false,
       connectedAt: Date.now() - 1000 * 60 * 60 * 24 * 40,
-      lastSyncAt: Date.now() - 1000 * 60 * 60 * 6,
+      lastSyncAt: Date.now() - 1000 * 60 * 60 * 24 * 6,
     },
     {
       id: "sa_yt",
+      userId: "u_maya",
       platform: "YouTube",
       handle: "@mayacuts",
       status: "connected",
       verified: false,
       connectedAt: Date.now() - 1000 * 60 * 60 * 24 * 12,
-      lastSyncAt: Date.now() - 1000 * 60 * 60 * 30,
+      lastSyncAt: Date.now() - 1000 * 60 * 60 * 24 * 30,
+    },
+    {
+      id: "sa_priya_tt",
+      userId: "u_priya",
+      platform: "TikTok",
+      handle: "@priyaviral",
+      status: "verified",
+      verified: true,
+      connectedAt: Date.now() - 1000 * 60 * 60 * 24 * 70,
+      lastSyncAt: Date.now() - 1000 * 60 * 60 * 24 * 1,
+    },
+    {
+      id: "sa_arjun_ig",
+      userId: "u_arjun",
+      platform: "Instagram",
+      handle: "@arjun.cuts",
+      status: "connected",
+      verified: false,
+      connectedAt: Date.now() - 1000 * 60 * 60 * 24 * 50,
+      lastSyncAt: Date.now() - 1000 * 60 * 60 * 24 * 3,
+    },
+    {
+      id: "sa_rahul_yt",
+      userId: "u_rahul",
+      platform: "YouTube",
+      handle: "@rahulbot",
+      status: "connected",
+      verified: false,
+      connectedAt: Date.now() - 1000 * 60 * 60 * 24 * 14,
+      lastSyncAt: Date.now() - 1000 * 60 * 60 * 24 * 9,
+    },
+    {
+      id: "sa_leo_ig",
+      userId: "u_leo",
+      platform: "Instagram",
+      handle: "@leo.edits",
+      status: "connected",
+      verified: false,
+      connectedAt: Date.now() - 1000 * 60 * 60 * 24 * 38,
+      lastSyncAt: Date.now() - 1000 * 60 * 60 * 24 * 2,
+    },
+    {
+      id: "sa_simran_re",
+      userId: "u_simran",
+      platform: "Reels",
+      handle: "@simran.m",
+      status: "connecting",
+      verified: false,
+      connectedAt: Date.now() - 1000 * 60 * 60 * 24 * 5,
     },
   ],
   siteSettings: {
@@ -425,8 +782,23 @@ interface StoreActions {
     action?: string,
     note?: string,
   ) => void;
-  updateProfileStatus: (id: string, status: ProfileStatus) => void;
+  updateProfileStatus: (
+    id: string,
+    status: ProfileStatus,
+    actor?: string,
+    reason?: string,
+  ) => void;
   deleteProfile: (id: string) => void;
+  verifyProfile: (id: string, actor: string, verified: boolean) => void;
+  setProfileRisk: (id: string, actor: string, flagged: boolean, note?: string) => void;
+  saveAdminNotes: (id: string, notes: string, actor: string) => void;
+  respondToAppeal: (
+    id: string,
+    appealId: string,
+    response: string,
+    status: "reviewing" | "approved" | "rejected",
+    actor: string,
+  ) => void;
   updateProfile: (id: string, patch: Partial<Pick<Profile, "name" | "upi">>) => void;
   addSocialAccount: (a: Omit<SocialAccount, "id" | "connectedAt" | "lastSyncAt"> & {
     connectedAt?: number;
@@ -472,6 +844,25 @@ const CAMPAIGN_DB_MAP: Record<string, string> = {
   style: "style",
   rights: "rights",
   status: "status",
+};
+
+// Maps Profile model keys to DB columns for admin updates. Only keys present
+// in the patch are written, so partial edits never clobber fields.
+const PROFILE_DB_MAP: Record<string, string> = {
+  name: "name",
+  username: "username",
+  email: "email",
+  role: "role",
+  status: "status",
+  verified: "verified",
+  verifiedAt: "verified_at",
+  upi: "upi",
+  riskFlag: "risk_flag",
+  riskNote: "risk_note",
+  adminNotes: "admin_notes",
+  suspendedReason: "suspended_reason",
+  appeals: "appeals",
+  audit: "audit",
 };
 
 function mapCampaign(r: Record<string, unknown>): Campaign {
@@ -578,11 +969,20 @@ function mapProfile(r: Record<string, unknown>): Profile {
   return {
     id: String(r.id),
     name: String(r.name ?? ""),
+    username: r.username ? String(r.username) : undefined,
     email: String(r.email ?? ""),
     role: (r.role as ProfileRole) ?? "clipper",
     status: (r.status as ProfileStatus) ?? "active",
+    verified: r.verified != null ? Boolean(r.verified) : undefined,
+    verifiedAt: r.verified_at ? new Date(String(r.verified_at)).getTime() : undefined,
     upi: r.upi ? String(r.upi) : undefined,
     createdAt: r.created_at ? new Date(String(r.created_at)).getTime() : Date.now(),
+    riskFlag: r.risk_flag != null ? Boolean(r.risk_flag) : undefined,
+    riskNote: r.risk_note ? String(r.risk_note) : undefined,
+    adminNotes: r.admin_notes ? String(r.admin_notes) : undefined,
+    suspendedReason: r.suspended_reason ? String(r.suspended_reason) : undefined,
+    appeals: Array.isArray(r.appeals) ? (r.appeals as Appeal[]) : undefined,
+    audit: Array.isArray(r.audit) ? (r.audit as AuditEntry[]) : undefined,
   };
 }
 
@@ -650,8 +1050,41 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const actions = useMemo<StoreActions>(
-    () => ({
+  const actions = useMemo<StoreActions>(() => {
+    // Core admin profile patcher: merges a partial profile update, appends an
+    // audit entry, and persists both to Supabase. New profile actions are thin
+    // wrappers around this so every change is audited consistently.
+    const adminProfilePatch = (
+      id: string,
+      patch: Partial<Profile>,
+      actor?: string,
+      action?: string,
+      note?: string,
+    ) => {
+      setState((s) => {
+        const entry: AuditEntry = { action: action ?? "updated", by: actor, at: Date.now(), note };
+        return {
+          ...s,
+          profiles: s.profiles.map((p) =>
+            p.id === id ? { ...p, ...patch, audit: [...(p.audit ?? []), entry] } : p,
+          ),
+        };
+      });
+      if (!isSupabaseConfigured) return;
+      const update: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(patch)) {
+        const col = PROFILE_DB_MAP[k];
+        if (col) update[col] = (v as unknown) ?? null;
+      }
+      const existing = stateRef.current.profiles.find((p) => p.id === id);
+      update.audit = [
+        ...(existing?.audit ?? []),
+        { action: action ?? "updated", by: actor, at: Date.now(), note },
+      ];
+      ignore(supabase.from("profiles").update(update).eq("id", id));
+    };
+
+    return {
       addCampaign: (c, status = "open") => {
         const optimistic: Campaign = {
           ...c,
@@ -873,13 +1306,46 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ignore(supabase.from("campaigns").update(update).eq("id", id));
       },
 
-      updateProfileStatus: (id, status) => {
-        setState((s) => ({
-          ...s,
-          profiles: s.profiles.map((p) => (p.id === id ? { ...p, status } : p)),
-        }));
-        if (!isSupabaseConfigured) return;
-        ignore(supabase.from("profiles").update({ status }).eq("id", id));
+      updateProfileStatus: (id, status, actor, reason) => {
+        const patch: Partial<Profile> =
+          status === "suspended"
+            ? { status, suspendedReason: reason }
+            : { status, suspendedReason: undefined };
+        adminProfilePatch(id, patch, actor, status === "suspended" ? "suspended" : "reactivated", reason);
+      },
+
+      verifyProfile: (id, actor, verified) => {
+        adminProfilePatch(
+          id,
+          verified
+            ? { verified: true, verifiedAt: Date.now() }
+            : { verified: false, verifiedAt: undefined },
+          actor,
+          verified ? "verified" : "unverified",
+        );
+      },
+
+      setProfileRisk: (id, actor, flagged, note) => {
+        adminProfilePatch(
+          id,
+          { riskFlag: flagged, riskNote: note },
+          actor,
+          flagged ? "risk_flagged" : "risk_cleared",
+          note,
+        );
+      },
+
+      saveAdminNotes: (id, notes, actor) => {
+        adminProfilePatch(id, { adminNotes: notes }, actor, "admin_notes");
+      },
+
+      respondToAppeal: (id, appealId, response, status, actor) => {
+        const profile = stateRef.current.profiles.find((p) => p.id === id);
+        if (!profile?.appeals) return;
+        const appeals = profile.appeals.map((a) =>
+          a.id === appealId ? { ...a, status, response, at: a.at } : a,
+        );
+        adminProfilePatch(id, { appeals }, actor, "appeal_response", response);
       },
 
       deleteProfile: (id) => {
@@ -995,9 +1461,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             }),
         );
       },
-    }),
-    [],
-  );
+    };
+  }, []);
 
   const value = { ...state, ...actions };
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

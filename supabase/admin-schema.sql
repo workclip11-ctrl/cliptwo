@@ -18,6 +18,17 @@ create table if not exists public.profiles (
 -- Add the payout UPI column to existing profiles tables (no-op if present).
 alter table public.profiles add column if not exists upi text;
 
+-- Admin-managed clipper profile fields (no-op if present).
+alter table public.profiles add column if not exists username text;
+alter table public.profiles add column if not exists verified boolean;
+alter table public.profiles add column if not exists verified_at timestamptz;
+alter table public.profiles add column if not exists risk_flag boolean;
+alter table public.profiles add column if not exists risk_note text;
+alter table public.profiles add column if not exists admin_notes text;
+alter table public.profiles add column if not exists suspended_reason text;
+alter table public.profiles add column if not exists appeals jsonb;
+alter table public.profiles add column if not exists audit jsonb;
+
 -- Helper: is the current user an admin? (reads the public.profiles table)
 create or replace function public.is_admin()
 returns boolean

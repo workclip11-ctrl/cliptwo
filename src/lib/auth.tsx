@@ -16,6 +16,7 @@ export interface UserProfile {
   name: string;
   email: string;
   role: Role;
+  permissions?: string[];
 }
 
 // Per-tab logout flag. Unlike Supabase's global signOut (which clears the
