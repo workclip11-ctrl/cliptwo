@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { X } from "lucide-react";
+import { rup } from "@/lib/format";
 import type { Campaign, CampaignRights, Platform } from "@/lib/types";
 
 const PLATFORM_OPTIONS: Platform[] = ["Instagram", "YouTube"];
@@ -115,7 +116,7 @@ export function EditCampaignModal({
     const b = Number(budget) || 0;
     if (b < currentSpend) {
       setBudgetError(
-        `Budget cannot be lower than the amount already spent (${currentSpend}).`,
+        `Budget cannot be lower than the amount already spent (${rup(currentSpend)}).`,
       );
       return;
     }
@@ -127,7 +128,6 @@ export function EditCampaignModal({
       objective: objective.trim() || undefined,
       brief: brief.trim(),
       platforms,
-      payout: b > 0 ? b : campaign.payout,
       budget: b,
       maxPayoutPerClip: maxPerClip ? Number(maxPerClip) : undefined,
       spendCap: spendCap ? Number(spendCap) : undefined,
