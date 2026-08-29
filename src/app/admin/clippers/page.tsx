@@ -80,7 +80,11 @@ function clipperStats(
 ): Stats {
   const own = clips.filter((k) => k.clipper === p.username);
   const earned = own.filter((k) => isEarned(k.status));
-  const approved = earned.length;
+  // "Approved" = reached an approved/payable state, but a failed payout is not
+  // a clean approval, so it's excluded from the approval rate.
+  const approved = own.filter(
+    (k) => isEarned(k.status) && k.status !== "failed",
+  ).length;
   const rejected = own.filter((k) => k.status === "rejected").length;
   const approvalRate =
     approved + rejected > 0

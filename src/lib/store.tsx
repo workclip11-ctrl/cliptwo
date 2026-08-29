@@ -1071,10 +1071,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         };
       });
       if (!isSupabaseConfigured) return;
+      // Profile field keys that map to timestamptz columns must be sent as ISO
+      // strings, not raw epoch numbers, or Postgres rejects the input.
+      const DATE_KEYS = new Set(["verifiedAt"]);
       const update: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(patch)) {
         const col = PROFILE_DB_MAP[k];
-        if (col) update[col] = (v as unknown) ?? null;
+        if (!col) continue;
+        if (v === undefined) {
+          update[col] = null;
+        } else if (DATE_KEYS.has(k) && typeof v === "number") {
+          update[col] = new Date(v).toISOString();
+        } else {
+          update[col] = v as unknown;
+        }
       }
       const existing = stateRef.current.profiles.find((p) => p.id === id);
       update.audit = [
