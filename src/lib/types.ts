@@ -1,6 +1,6 @@
 export type Platform = "TikTok" | "YouTube" | "Instagram" | "Reels";
 
-export type CampaignStatus = "open" | "closed";
+export type CampaignStatus = "open" | "closed" | "draft";
 
 export interface CampaignSourceAsset {
   label: string;
@@ -29,6 +29,15 @@ export interface CampaignApproval {
   criteria?: string;
   rejectionReasons?: string[];
   appeal?: string;
+  autoReview?: boolean;
+}
+
+export interface CampaignRights {
+  ads: boolean;
+  social: boolean;
+  website: boolean;
+  other: boolean;
+  otherText?: string;
 }
 
 export interface Campaign {
@@ -68,6 +77,13 @@ export interface Campaign {
   exampleClips?: CampaignExampleClip[];
   viewRules?: CampaignViewRules;
   approval?: CampaignApproval;
+  thumbnails?: string[];
+  brandAssets?: CampaignSourceAsset[];
+  spendCap?: number;
+  timezone?: string;
+  whatToMake?: string;
+  style?: string;
+  rights?: CampaignRights;
 }
 
 export type ClipStatus =

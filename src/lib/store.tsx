@@ -15,6 +15,7 @@ import type {
   CampaignExampleClip,
   CampaignViewRules,
   CampaignApproval,
+  CampaignRights,
   Clip,
   ClipStatus,
   Platform,
@@ -365,7 +366,10 @@ const seed: StoreState = {
 };
 
 interface StoreActions {
-  addCampaign: (c: Omit<Campaign, "id" | "createdAt" | "status">) => void;
+  addCampaign: (
+    c: Omit<Campaign, "id" | "createdAt" | "status">,
+    status?: CampaignStatus,
+  ) => void;
   addClip: (k: Omit<Clip, "id" | "submittedAt" | "status" | "views">) => void;
   setClipStatus: (id: string, status: ClipStatus, patch?: Partial<Clip>) => void;
   closeCampaign: (id: string) => void;
@@ -426,6 +430,20 @@ function mapCampaign(r: Record<string, unknown>): Campaign {
     approval:
       r.approval && typeof r.approval === "object"
         ? (r.approval as CampaignApproval)
+        : undefined,
+    thumbnails: Array.isArray(r.thumbnails)
+      ? (r.thumbnails as string[])
+      : undefined,
+    brandAssets: Array.isArray(r.brand_assets)
+      ? (r.brand_assets as CampaignSourceAsset[])
+      : undefined,
+    spendCap: r.spend_cap != null ? Number(r.spend_cap) : undefined,
+    timezone: r.timezone ? String(r.timezone) : undefined,
+    whatToMake: r.what_to_make ? String(r.what_to_make) : undefined,
+    style: r.style ? String(r.style) : undefined,
+    rights:
+      r.rights && typeof r.rights === "object"
+        ? (r.rights as CampaignRights)
         : undefined,
   };
 }
@@ -536,12 +554,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const actions = useMemo<StoreActions>(
     () => ({
-      addCampaign: (c) => {
+      addCampaign: (c, status = "open") => {
         const optimistic: Campaign = {
           ...c,
           id: `c${Date.now()}`,
           createdAt: Date.now(),
-          status: "open",
+          status,
         };
         setState((s) => ({ ...s, campaigns: [optimistic, ...s.campaigns] }));
 
@@ -564,7 +582,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               budget: c.budget ?? 0,
               spent: 0,
               days_left: c.daysLeft ?? 30,
-              status: "open",
+              status,
               source_link: c.sourceLink ?? null,
               rules: c.rules ?? null,
               created_by: u.user?.id ?? null,
@@ -587,6 +605,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               example_clips: c.exampleClips ?? null,
               view_rules: c.viewRules ?? null,
               approval: c.approval ?? null,
+              thumbnails: c.thumbnails ?? null,
+              brand_assets: c.brandAssets ?? null,
+              spend_cap: c.spendCap ?? null,
+              timezone: c.timezone ?? null,
+              what_to_make: c.whatToMake ?? null,
+              style: c.style ?? null,
+              rights: c.rights ?? null,
             })
             .select()
             .single();

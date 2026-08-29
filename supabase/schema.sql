@@ -39,6 +39,13 @@ create table public.campaigns (
   example_clips jsonb,
   view_rules  jsonb,
   approval    jsonb,
+  thumbnails  jsonb,
+  brand_assets jsonb,
+  spend_cap   numeric,
+  timezone    text,
+  what_to_make text,
+  style       text,
+  rights      jsonb,
   created_at  timestamptz not null default now()
 );
 

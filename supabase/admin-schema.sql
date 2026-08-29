@@ -114,6 +114,18 @@ $$;
 grant execute on function public.user_exists(text) to anon, authenticated;
 
 -- ---------------------------------------------------------------------------
+-- campaigns — add columns used by the multi-step campaign creation wizard.
+-- Additive only (no drop), safe to re-run on existing databases.
+-- ---------------------------------------------------------------------------
+alter table public.campaigns add column if not exists thumbnails jsonb;
+alter table public.campaigns add column if not exists brand_assets jsonb;
+alter table public.campaigns add column if not exists spend_cap numeric;
+alter table public.campaigns add column if not exists timezone text;
+alter table public.campaigns add column if not exists what_to_make text;
+alter table public.campaigns add column if not exists style text;
+alter table public.campaigns add column if not exists rights jsonb;
+
+-- ---------------------------------------------------------------------------
 -- social_accounts — a clipper's connected publishing platforms.
 -- SECURITY: stores ONLY non-secret metadata. OAuth tokens / client secrets /
 -- service-role keys MUST NEVER live here or reach the browser; real platform

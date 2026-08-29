@@ -13,6 +13,7 @@ const map: Record<AnyStatus, { label: string; cls: string }> = {
   rejected: { label: "Rejected", cls: "bg-red/10 text-red border-red/20" },
   open: { label: "Open", cls: "bg-green/10 text-green border-green/20" },
   closed: { label: "Closed", cls: "bg-muted/10 text-muted border-muted/20" },
+  draft: { label: "Draft", cls: "bg-amber/10 text-amber border-amber/20" },
 };
 
 export function StatusPill({ status }: { status: AnyStatus }) {

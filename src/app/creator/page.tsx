@@ -58,12 +58,20 @@ export default function CreatorPage() {
             <p className="text-sm text-muted">Creator dashboard</p>
           </div>
         </div>
-        <button
-          onClick={() => setOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-        >
-          <Plus size={15} /> New campaign
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/creator/campaigns/new"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+          >
+            <Plus size={15} /> Create campaign
+          </Link>
+          <button
+            onClick={() => setOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-2 text-sm font-medium hover:bg-accent-soft"
+          >
+            Quick add
+          </button>
+        </div>
       </div>
 
       {/* KPIs */}

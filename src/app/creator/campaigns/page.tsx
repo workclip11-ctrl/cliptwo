@@ -28,12 +28,20 @@ export default function CreatorCampaignsPage() {
             Manage your active and past campaigns.
           </p>
         </div>
-        <button
-          onClick={() => setOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-        >
-          <Plus size={15} /> New campaign
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/creator/campaigns/new"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+          >
+            <Plus size={15} /> Create campaign
+          </Link>
+          <button
+            onClick={() => setOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-2 text-sm font-medium hover:bg-accent-soft"
+          >
+            Quick add
+          </button>
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -59,10 +67,12 @@ export default function CreatorCampaignsPage() {
                       className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium ${
                         c.status === "open"
                           ? "border-green/20 bg-green/10 text-green"
-                          : "border-muted/20 bg-accent-soft text-muted"
+                          : c.status === "draft"
+                            ? "border-amber/30 bg-amber/10 text-amber"
+                            : "border-muted/20 bg-accent-soft text-muted"
                       }`}
                     >
-                      {c.status === "open" ? "Open" : "Closed"}
+                      {c.status === "open" ? "Open" : c.status === "draft" ? "Draft" : "Closed"}
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-muted">
