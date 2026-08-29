@@ -67,6 +67,7 @@ create table public.clips (
 -- with RLS forbidding SELECT) and are read exclusively by backend jobs that
 -- later power view tracking. The client never receives them.
 -- ---------------------------------------------------------------------------
+drop table if exists public.social_accounts;
 create table public.social_accounts (
   id            uuid primary key default gen_random_uuid(),
   user_id       uuid references auth.users (id) on delete cascade,

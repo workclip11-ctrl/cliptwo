@@ -238,7 +238,7 @@ export default function SocialAccountsPage() {
                       acc.status !== "connection_error" && (
                         <button
                           onClick={() => disconnect(acc)}
-                          disabled={isConnecting}
+                          disabled={isConnecting || acc.status === "connecting"}
                           className="inline-flex items-center gap-1.5 rounded-lg border border-red/30 px-3 py-1.5 text-xs font-medium text-red disabled:opacity-50"
                         >
                           <Unlink size={13} /> Disconnect
