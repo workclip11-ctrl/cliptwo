@@ -140,6 +140,11 @@ export default function NewCampaignWizard() {
     );
   }
 
+  function goStep(n: number) {
+    setErrors({});
+    setStep(n);
+  }
+
   function validate(): Record<string, string> {
     const e: Record<string, string> = {};
     if (!title.trim()) e.title = "Campaign name is required.";
@@ -286,7 +291,7 @@ export default function NewCampaignWizard() {
           <button
             key={s}
             type="button"
-            onClick={() => setStep(i)}
+            onClick={() => goStep(i)}
             className={`rounded-full border px-3 py-1 text-xs font-medium ${
               i === step
                 ? "border-foreground bg-accent-soft"
@@ -962,7 +967,7 @@ export default function NewCampaignWizard() {
         <button
           type="button"
           disabled={step === 0}
-          onClick={() => setStep((s) => Math.max(0, s - 1))}
+          onClick={() => goStep(Math.max(0, step - 1))}
           className="inline-flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-medium disabled:opacity-40"
         >
           <ArrowLeft size={14} /> Prev
@@ -978,7 +983,7 @@ export default function NewCampaignWizard() {
           </button>
           <button
             type="button"
-            onClick={() => setStep(9)}
+            onClick={() => goStep(9)}
             className="inline-flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent-soft"
           >
             <Eye size={14} /> Preview
@@ -986,7 +991,7 @@ export default function NewCampaignWizard() {
           {step < STEPS.length - 1 ? (
             <button
               type="button"
-              onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}
+              onClick={() => goStep(Math.min(STEPS.length - 1, step + 1))}
               className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white"
             >
               Next <ArrowRight size={14} />
