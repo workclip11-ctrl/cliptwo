@@ -110,10 +110,10 @@ export default function ClipperPage() {
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <div className="flex items-center gap-2">
-                          <Link
-                            href={`/campaign/${c.id}`}
-                            className="font-semibold hover:underline underline-offset-2"
-                          >
+                            <Link
+                              href={`/campaigns/${c.id}`}
+                              className="font-semibold hover:underline underline-offset-2"
+                            >
                             {c.title}
                           </Link>
                           <span className="rounded-md bg-accent-soft px-2 py-0.5 text-xs font-medium">
@@ -152,7 +152,7 @@ export default function ClipperPage() {
                         <Sparkles size={13} /> {c.daysLeft} days left
                       </span>
                       <button
-                        onClick={() => router.push(`/campaign/${c.id}`)}
+                        onClick={() => router.push(`/campaigns/${c.id}`)}
                         className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
                       >
                         <Plus size={14} /> View campaign

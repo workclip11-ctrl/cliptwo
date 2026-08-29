@@ -20,6 +20,25 @@ create table public.campaigns (
   days_left   integer not null default 30,
   source_link text,
   rules       text,
+  category    text,
+  platforms   jsonb,
+  verified    boolean,
+  objective   text,
+  start_date  date,
+  end_date    date,
+  max_payout_per_clip numeric,
+  recommended_duration text,
+  hook        text,
+  caption_req text,
+  aspect_ratio text,
+  cta         text,
+  branding    text,
+  do_list     jsonb,
+  dont_list   jsonb,
+  source_assets jsonb,
+  example_clips jsonb,
+  view_rules  jsonb,
+  approval    jsonb,
   created_at  timestamptz not null default now()
 );
 
@@ -63,12 +82,12 @@ create policy "clips_update" on public.clips for update using (auth.role() = 'au
 drop policy if exists "clips_delete" on public.clips;
 create policy "clips_delete" on public.clips for delete using (auth.role() = 'authenticated');
 
-insert into public.campaigns (id, title, creator, niche, brief, platform, payout, status, budget, spent, days_left, source_link, rules)
+insert into public.campaigns (id, title, creator, niche, brief, platform, payout, status, budget, spent, days_left, source_link, rules, category, platforms, verified, objective, start_date, end_date, max_payout_per_clip, recommended_duration, hook, caption_req, aspect_ratio, cta, branding, do_list, dont_list, source_assets, example_clips, view_rules, approval)
 values
-  ('11111111-1111-1111-1111-111111111111', 'Launch teaser for our new app', 'Northwind Labs', 'Tech', 'Cut a 20s hook from the keynote.', 'Instagram', 220, 'open', 40000, 4048, 12, 'https://drive.google.com/drive/folders/launch-teaser', 'No watermarks.'),
-  ('22222222-2222-2222-2222-222222222222', 'Workout routine highlight', 'FitForm', 'Fitness', 'Turn the 12-min session into 3 reels.', 'Reels', 160, 'open', 25000, 0, 26, 'https://drive.google.com/drive/folders/workout-routine', 'Vertical only.'),
-  ('33333333-3333-3333-3333-333333333333', 'Founder story short', 'Maker House', 'Finance', 'Use the intro monologue.', 'YouTube', 280, 'open', 60000, 0, 9, 'https://drive.google.com/drive/folders/founder-story', 'Vertical 9:16 only.'),
-  ('44444444-4444-4444-4444-444444444444', 'Stand-up Set - Delhi Live', 'Kabir Sethi', 'Comedy', 'Punchline-first cuts, 20-40s max.', 'Reels', 190, 'open', 30000, 0, 14, 'https://drive.google.com/drive/folders/delhi-live', 'No profanity in captions.');
+  ('11111111-1111-1111-1111-111111111111', 'Launch teaser for our new app', 'Northwind Labs', 'Tech', 'Cut a 20s hook from the keynote.', 'Instagram', 220, 'open', 40000, 4048, 12, 'https://drive.google.com/drive/folders/launch-teaser', 'No watermarks.', 'Tech', '["Instagram","YouTube","TikTok"]'::jsonb, true, 'Drive pre-launch awareness for our new productivity app.', '2026-08-21', '2026-09-10', 5000, '15–30s', 'Open with the ''this app is unhinged'' moment in the first 3 seconds.', 'English caption + 3 hashtags (#productivity #app #tech). Subtitles on.', '9:16 vertical', 'Link in bio to install ClipTwo.', 'Keep our logo in the last 2s. No competitor mentions.', '["Use the official keynote footage","Show a real, relatable use-case","Fast cuts under 1s between beats"]'::jsonb, '["No watermarks or other brand logos","No fake engagement or bots","Don''t misrepresent app features"]'::jsonb, '[{"label":"Keynote raw (Drive)","url":"https://drive.google.com/drive/folders/launch-teaser"}]'::jsonb, '[]'::jsonb, '{"verifiedView":"A view counts when watched past 3s by a unique account.","whenCounted":"Counted 48h after the post goes live.","updateFrequency":"Refreshed every 24h.","minViews":1000,"maxPayout":5000,"deletedPolicy":"If the post is deleted or set private, earnings are reversed.","payableWhen":"Becomes payable once approved and views stabilise (48h)."}'::jsonb, '{"afterSubmission":"You''ll get a submission ticket linked to this campaign.","reviewTime":"Within 48 hours.","criteria":"Original, on-brief, vertical, clear hook in first 3s.","rejectionReasons":["Watermark","Off-brief","Low retention"],"appeal":"Reply to the decision email within 7 days."}'::jsonb),
+  ('22222222-2222-2222-2222-222222222222', 'Workout routine highlight', 'FitForm', 'Fitness', 'Turn the 12-min session into 3 reels.', 'Reels', 160, 'open', 25000, 0, 26, 'https://drive.google.com/drive/folders/workout-routine', 'Vertical only.', 'Fitness', '["Reels","Instagram","TikTok"]'::jsonb, true, 'Repurpose our 12-minute workout into snackable reels that people finish and save.', '2026-08-22', '2026-09-30', 3000, '25–35s', 'Show the result first (better posture) then the move.', 'Upbeat tone, mention @fitform, add #homeworkout.', '9:16 vertical', 'Save this routine and follow @fitform.', 'Keep ''FitForm'' lower-third for 3s.', '["Make 3 separate reels from the session","Use trending fitness audio","Show before/after posture"]'::jsonb, '["No horizontal footage","No medical claims","No other gym tags"]'::jsonb, '[{"label":"Full session (Drive)","url":"https://drive.google.com/drive/folders/workout-routine"}]'::jsonb, '[]'::jsonb, '{"verifiedView":"Unique view past 5s with sound on.","whenCounted":"Counted 24h after posting.","updateFrequency":"Every 12h.","minViews":500,"maxPayout":3000,"deletedPolicy":"Private or deleted posts forfeit earnings.","payableWhen":"Payable 24h after approval."}'::jsonb, '{"afterSubmission":"Ticket created under your clipper profile.","reviewTime":"Within 24 hours.","criteria":"Vertical, on-brand, clear transformation.","rejectionReasons":["Horizontal","Off-brand","Medical claim"],"appeal":"Open a help ticket within 5 days."}'::jsonb),
+  ('33333333-3333-3333-3333-333333333333', 'Founder story short', 'Maker House', 'Finance', 'Use the intro monologue.', 'YouTube', 280, 'open', 60000, 0, 9, 'https://drive.google.com/drive/folders/founder-story', 'Vertical 9:16 only.', 'Finance', '["YouTube","Instagram","TikTok"]'::jsonb, false, 'Make our founder''s origin story land with first-time founders and builders.', '2026-08-16', '2026-09-09', 8000, '30–60s', 'Start on the emotional line, not the logo.', 'English subtitles required. Keep monologue intact.', '9:16 vertical', 'Follow Maker House for build diaries.', 'Subtle Maker House lower-third, no outro splash.', '["Keep the monologue intact","Cinematic grade, stable shots","Burn-in English subtitles"]'::jsonb, '["Don''t cut the monologue","No fake subtitles","No stock footage"]'::jsonb, '[{"label":"Founder interview (Drive)","url":"https://drive.google.com/drive/folders/founder-story"}]'::jsonb, '[]'::jsonb, '{"verifiedView":"Unique viewer past 10s.","whenCounted":"Counted 72h after posting.","updateFrequency":"Every 24h.","minViews":2000,"maxPayout":8000,"deletedPolicy":"Deleted posts reverse all earnings.","payableWhen":"Payable 72h after approval."}'::jsonb, '{"afterSubmission":"Ticket created, reviewed by brand team.","reviewTime":"Within 72 hours.","criteria":"Cinematic, intact monologue, correct subtitles.","rejectionReasons":["Cut monologue","No subtitles","Reused stock"],"appeal":"Email founders@makerhouse within 7 days."}'::jsonb),
+  ('44444444-4444-4444-4444-444444444444', 'Stand-up Set — Delhi Live', 'Kabir Sethi', 'Comedy', 'Punchline-first cuts, 20-40s max.', 'Reels', 190, 'open', 30000, 0, 14, 'https://drive.google.com/drive/folders/delhi-live', 'No profanity in captions.', 'Comedy', '["Reels","Instagram","TikTok"]'::jsonb, false, 'Turn the Delhi live set into viral punchline cuts that grow the comic''s following.', '2026-08-19', '2026-09-12', 4000, '20–40s', 'Lead with the punchline, keep the crowd laugh.', 'No profanity in captions. Add #standup.', '9:16 vertical', 'Follow Kabir Sethi for tour dates.', 'Keep ''Kabir Sethi'' tag for 2s.', '["Punchline-first edits","Keep crowd reactions","20–40s clips"]'::jsonb, '["No profanity in captions","No long setups","No other comic tags"]'::jsonb, '[{"label":"Full set (Drive)","url":"https://drive.google.com/drive/folders/delhi-live"}]'::jsonb, '[]'::jsonb, '{"verifiedView":"Unique view past 5s.","whenCounted":"Counted 48h after posting.","updateFrequency":"Every 24h.","minViews":1000,"maxPayout":4000,"deletedPolicy":"Deleted or private posts forfeit earnings.","payableWhen":"Payable 48h after approval."}'::jsonb, '{"afterSubmission":"Ticket created under your profile.","reviewTime":"Within 48 hours.","criteria":"Funny, punchline-first, clean captions.","rejectionReasons":["Profanity","Too long","No laugh"],"appeal":"Help ticket within 5 days."}'::jsonb);
 
 insert into public.clips (campaign_id, clipper, caption, video_url, platform, views, status)
 values

@@ -39,6 +39,7 @@ export default function ClipDetail() {
 
   const camp = campaigns.find((c) => c.id === clip.campaignId);
   const earnings = clipEarnings(clip, campaigns);
+  const campHref = isClipper ? `/campaigns/${clip.campaignId}` : `/campaign/${clip.campaignId}`;
 
   return (
     <main className="min-h-screen">
@@ -54,7 +55,7 @@ export default function ClipDetail() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Clip by @{clip.clipper}</h1>
             <Link
-              href={`/campaign/${clip.campaignId}`}
+              href={campHref}
               className="mt-1 inline-block text-sm text-muted hover:text-foreground hover:underline underline-offset-2"
             >
               {camp?.title ?? "Campaign"}

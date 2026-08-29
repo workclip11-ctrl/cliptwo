@@ -114,7 +114,7 @@ export function CampaignModal({
           <button
             onClick={() => {
               onClose();
-              router.push(`/campaign/${campaign.id}`);
+              router.push(`/campaigns/${campaign.id}`);
             }}
             className="inline-flex items-center gap-1 text-sm font-medium text-muted hover:text-foreground"
           >

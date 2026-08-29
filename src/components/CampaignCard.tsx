@@ -77,7 +77,7 @@ export function CampaignCard({
 
   return (
     <Link
-      href={`/campaign/${campaign.id}`}
+      href={`/campaigns/${campaign.id}`}
       className="group flex flex-col overflow-hidden rounded-2xl border bg-card transition hover:shadow-sm"
     >
       {inner}

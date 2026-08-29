@@ -2,10 +2,22 @@
 
 import { useState } from "react";
 import { BadgeCheck, Upload, Film } from "lucide-react";
+import { PlatformIcon } from "@/components/PlatformIcon";
 import type { Platform } from "@/lib/types";
 
 const PLATFORMS: Platform[] = ["TikTok", "YouTube", "Instagram", "Reels"];
 const NICHES = ["Tech", "Gaming", "Finance", "Comedy", "Fitness", "Podcast"];
+
+export interface NewCampaignExtra {
+  platforms: Platform[];
+  objective: string;
+  maxPayoutPerClip: number;
+  recommendedDuration: string;
+  aspectRatio: string;
+  cta: string;
+  hook: string;
+  branding: string;
+}
 
 export function NewCampaignModal({
   creatorName,
@@ -22,16 +34,32 @@ export function NewCampaignModal({
     niche: string,
     budget: number,
     sourceLink: string,
+    extra: NewCampaignExtra,
   ) => void;
 }) {
   const [title, setTitle] = useState("");
   const [brief, setBrief] = useState("");
   const [platform, setPlatform] = useState<Platform>("Instagram");
+  const [platforms, setPlatforms] = useState<Platform[]>(["Instagram"]);
   const [niche, setNiche] = useState(NICHES[0]);
   const [payout, setPayout] = useState("220");
   const [budget, setBudget] = useState("40000");
   const [sourceLink, setSourceLink] = useState("");
   const [fileName, setFileName] = useState("");
+
+  const [objective, setObjective] = useState("");
+  const [maxPayout, setMaxPayout] = useState("");
+  const [duration, setDuration] = useState("");
+  const [aspectRatio, setAspectRatio] = useState("9:16 vertical");
+  const [cta, setCta] = useState("");
+  const [hook, setHook] = useState("");
+  const [branding, setBranding] = useState("");
+
+  function togglePlatform(p: Platform) {
+    setPlatforms((prev) =>
+      prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p],
+    );
+  }
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -47,7 +75,7 @@ export function NewCampaignModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-2xl border bg-card p-6"
+        className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl border bg-card p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="text-lg font-semibold">New campaign</h3>
@@ -74,7 +102,7 @@ export function NewCampaignModal({
 
         <div className="mt-4 grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium">Platform</label>
+            <label className="block text-sm font-medium">Primary platform</label>
             <select
               value={platform}
               onChange={(e) => setPlatform(e.target.value as Platform)}
@@ -96,6 +124,22 @@ export function NewCampaignModal({
                 <option key={n}>{n}</option>
               ))}
             </select>
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <label className="block text-sm font-medium">Supported platforms</label>
+          <div className="mt-1.5 flex flex-wrap gap-2">
+            {PLATFORMS.map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => togglePlatform(p)}
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium ${platforms.includes(p) ? "border-accent bg-accent-soft" : "text-muted"}`}
+              >
+                <PlatformIcon p={p} size={13} /> {p}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -121,6 +165,70 @@ export function NewCampaignModal({
             />
           </div>
         </div>
+
+        <div className="mt-4">
+          <label className="block text-sm font-medium">Max payout / clip (₹)</label>
+          <input
+            type="number"
+            min={0}
+            value={maxPayout}
+            onChange={(e) => setMaxPayout(e.target.value)}
+            placeholder="Optional cap"
+            className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
+          />
+        </div>
+
+        <label className="mt-4 block text-sm font-medium">Objective</label>
+        <textarea
+          value={objective}
+          onChange={(e) => setObjective(e.target.value)}
+          rows={2}
+          placeholder="What you want from the clips…"
+          className="mt-1 w-full resize-none rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
+        />
+
+        {/* Creative brief */}
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium">Clip duration</label>
+            <input
+              value={duration}
+              onChange={(e) => setDuration(e.target.value)}
+              placeholder="e.g. 15–30s"
+              className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium">Aspect ratio</label>
+            <input
+              value={aspectRatio}
+              onChange={(e) => setAspectRatio(e.target.value)}
+              placeholder="9:16 vertical"
+              className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
+            />
+          </div>
+        </div>
+        <label className="mt-4 block text-sm font-medium">Hook requirement</label>
+        <input
+          value={hook}
+          onChange={(e) => setHook(e.target.value)}
+          placeholder="Lead with…"
+          className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
+        />
+        <label className="mt-4 block text-sm font-medium">CTA</label>
+        <input
+          value={cta}
+          onChange={(e) => setCta(e.target.value)}
+          placeholder="Link in bio…"
+          className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
+        />
+        <label className="mt-4 block text-sm font-medium">Branding</label>
+        <input
+          value={branding}
+          onChange={(e) => setBranding(e.target.value)}
+          placeholder="Logo in last 2s…"
+          className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
+        />
 
         {/* Video resource */}
         <div className="mt-4">
@@ -169,6 +277,16 @@ export function NewCampaignModal({
                 niche,
                 Number(budget) || 0,
                 sourceLink,
+                {
+                  platforms,
+                  objective,
+                  maxPayoutPerClip: Number(maxPayout) || 0,
+                  recommendedDuration: duration,
+                  aspectRatio,
+                  cta,
+                  hook,
+                  branding,
+                },
               )
             }
             className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"

@@ -126,7 +126,16 @@ export default function CreatorCampaignsPage() {
         <NewCampaignModal
           creatorName={user?.name ?? user?.email ?? "Creator"}
           onClose={() => setOpen(false)}
-          onSubmit={(title, brief, platform, payout, niche, budget, sourceLink) => {
+               onSubmit={(
+            title,
+            brief,
+            platform,
+            payout,
+            niche,
+            budget,
+            sourceLink,
+            extra,
+          ) => {
             addCampaign({
               title,
               creator: user?.name ?? user?.email ?? "Creator",
@@ -138,6 +147,17 @@ export default function CreatorCampaignsPage() {
               sourceLink: sourceLink || undefined,
               spent: 0,
               daysLeft: 30,
+              category: niche,
+              platforms: extra.platforms,
+              objective: extra.objective || undefined,
+              maxPayoutPerClip: extra.maxPayoutPerClip || undefined,
+              recommendedDuration: extra.recommendedDuration || undefined,
+              aspectRatio: extra.aspectRatio || undefined,
+              cta: extra.cta || undefined,
+              hook: extra.hook || undefined,
+              branding: extra.branding || undefined,
+              startDate: new Date().toISOString().slice(0, 10),
+              endDate: new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10),
             });
             setOpen(false);
           }}
