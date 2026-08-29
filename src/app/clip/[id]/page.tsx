@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, ExternalLink, BadgeCheck } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
 import { StatusPill } from "@/components/StatusPill";
@@ -17,6 +17,7 @@ export default function ClipDetail() {
   const { user } = useAuth();
   const isClipper = user?.role === "clipper";
   const home = isClipper ? "/clipper" : "/creator";
+  const router = useRouter();
 
   const clip = clips.find((k) => k.id === id);
 
@@ -46,9 +47,17 @@ export default function ClipDetail() {
       <TopBar active={isClipper ? "clipper" : "creator"} />
       <div className="mx-auto max-w-3xl px-6 py-8">
         <div className="flex items-center gap-3 text-sm text-muted">
-          <Link href={home} className="inline-flex items-center gap-1 hover:text-foreground">
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== "undefined" && window.history.length > 1)
+                router.back();
+              else router.push(home);
+            }}
+            className="inline-flex items-center gap-1 hover:text-foreground"
+          >
             <ArrowLeft size={14} /> {isClipper ? "Clipper" : "Creator"}
-          </Link>
+          </button>
         </div>
 
         <div className="mt-4 flex flex-wrap items-start justify-between gap-3">

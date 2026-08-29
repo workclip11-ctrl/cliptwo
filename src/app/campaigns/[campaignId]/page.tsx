@@ -143,6 +143,10 @@ export default function CampaignDetailPage() {
   }
 
   const isClipper = user?.role === "clipper";
+  function goBack() {
+    if (typeof window !== "undefined" && window.history.length > 1) router.back();
+    else router.push(isClipper ? "/clipper/campaigns" : "/creator");
+  }
   const platforms = campaign.platforms?.length ? campaign.platforms : [campaign.platform];
   const spent = campaignSpent(campaign, clips);
   const remaining = (campaign.budget ?? 0) - spent;
@@ -156,12 +160,13 @@ export default function CampaignDetailPage() {
       <TopBar active="clipper" />
       <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
         <div className="flex items-center gap-3 text-sm text-muted">
-          <Link
-            href="/clipper/campaigns"
+          <button
+            type="button"
+            onClick={goBack}
             className="inline-flex items-center gap-1 hover:text-foreground"
           >
-            <ArrowLeft size={14} /> Campaigns
-          </Link>
+            <ArrowLeft size={14} /> Back
+          </button>
         </div>
 
         {/* Header */}

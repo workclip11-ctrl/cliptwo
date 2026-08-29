@@ -76,12 +76,17 @@ export default function CampaignDetail() {
       <TopBar active="clipper" />
       <div className="mx-auto max-w-3xl px-6 py-8">
         <div className="flex items-center gap-3 text-sm text-muted">
-          <Link
-            href={isClipper ? "/clipper/campaigns" : "/creator"}
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== "undefined" && window.history.length > 1)
+                router.back();
+              else router.push(isClipper ? "/clipper/campaigns" : "/creator");
+            }}
             className="inline-flex items-center gap-1 hover:text-foreground"
           >
             <ArrowLeft size={14} /> {isClipper ? "Campaigns" : "Creator"}
-          </Link>
+          </button>
         </div>
 
         <div
