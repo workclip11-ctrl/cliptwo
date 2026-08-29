@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { LayoutGrid, Megaphone, Film, Wallet, Settings } from "lucide-react";
+import { LayoutGrid, Megaphone, Film, Wallet, Settings, BarChart3 } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
 import { AuthGuard } from "@/components/AuthGuard";
 
 const NAV = [
   { href: "/creator", label: "Dashboard", icon: LayoutGrid, exact: true },
   { href: "/creator/campaigns", label: "Campaigns", icon: Megaphone },
+  { href: "/creator/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/creator/submissions", label: "Submissions", icon: Film },
   { href: "/creator/wallet", label: "Wallet", icon: Wallet },
   { href: "/creator/settings", label: "Settings", icon: Settings },

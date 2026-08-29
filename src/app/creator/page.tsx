@@ -10,6 +10,7 @@ import {
   Plus,
   Sparkles,
   TrendingUp,
+  BarChart3,
 } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { PlatformIcon } from "@/components/PlatformIcon";
@@ -71,6 +72,12 @@ export default function CreatorPage() {
           >
             Quick add
           </button>
+          <Link
+            href="/creator/analytics"
+            className="inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-2 text-sm font-medium hover:bg-accent-soft"
+          >
+            <BarChart3 size={15} /> Analytics
+          </Link>
         </div>
       </div>
 
