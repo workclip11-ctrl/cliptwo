@@ -18,7 +18,7 @@ import { PlatformIcon } from "@/components/PlatformIcon";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup, fmtViews, clipEarnings } from "@/lib/format";
-import { financeOf } from "@/lib/finance";
+import { financeOf, isEarned } from "@/lib/finance";
 import type { ClipStatus } from "@/lib/types";
 
 function fmtDateTime(t: number) {
@@ -146,7 +146,23 @@ export default function AdminClips() {
                 {k.status === "pending" && (
                   <>
                     <button
-                      onClick={() => setClipStatus(k.id, "approved", undefined, actor)}
+                      onClick={() => {
+                        const c2 = campaigns.find((x) => x.id === k.campaignId);
+                        if (c2?.budget != null) {
+                          const campEarned = clips
+                            .filter((x) => x.campaignId === c2.id && isEarned(x.status))
+                            .reduce((s, x) => s + clipEarnings(x, campaigns), 0);
+                          if (campEarned + clipEarnings(k, campaigns) > c2.budget) {
+                            alert(
+                              `Cannot approve: this would exceed the campaign budget (${rup(
+                                c2.budget,
+                              )}). Raise the budget or reject the clip.`,
+                            );
+                            return;
+                          }
+                        }
+                        setClipStatus(k.id, "approved", undefined, actor);
+                      }}
                       className="inline-flex items-center gap-1 rounded-md bg-green/10 px-2.5 py-1 text-xs font-medium text-green"
                     >
                       <Check size={13} /> Approve

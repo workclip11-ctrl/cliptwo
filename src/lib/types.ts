@@ -1,6 +1,6 @@
 export type Platform = "TikTok" | "YouTube" | "Instagram" | "Reels";
 
-export type CampaignStatus = "open" | "closed" | "draft";
+export type CampaignStatus = "open" | "closed" | "draft" | "paused";
 
 export interface CampaignSourceAsset {
   label: string;
@@ -84,6 +84,7 @@ export interface Campaign {
   whatToMake?: string;
   style?: string;
   rights?: CampaignRights;
+  audit?: AuditEntry[];
 }
 
 export type ClipStatus =

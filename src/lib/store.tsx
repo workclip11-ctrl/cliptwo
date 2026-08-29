@@ -418,6 +418,13 @@ interface StoreActions {
   ) => void;
   closeCampaign: (id: string) => void;
   deleteCampaign: (id: string) => void;
+  updateCampaign: (
+    id: string,
+    patch: Partial<Campaign>,
+    actor?: string,
+    action?: string,
+    note?: string,
+  ) => void;
   updateProfileStatus: (id: string, status: ProfileStatus) => void;
   deleteProfile: (id: string) => void;
   updateProfile: (id: string, patch: Partial<Pick<Profile, "name" | "upi">>) => void;
@@ -428,6 +435,44 @@ interface StoreActions {
   updateSocialAccount: (id: string, patch: Partial<SocialAccount>) => void;
   setSiteSettings: (s: SiteSettings) => void;
 }
+
+// Maps Campaign model keys to DB columns for `updateCampaign`. Only keys
+// present in the patch are written, so partial edits never clobber fields.
+const CAMPAIGN_DB_MAP: Record<string, string> = {
+  title: "title",
+  brief: "brief",
+  platform: "platform",
+  payout: "payout",
+  niche: "niche",
+  budget: "budget",
+  spent: "spent",
+  daysLeft: "days_left",
+  sourceLink: "source_link",
+  rules: "rules",
+  category: "category",
+  platforms: "platforms",
+  verified: "verified",
+  objective: "objective",
+  startDate: "start_date",
+  endDate: "end_date",
+  maxPayoutPerClip: "max_payout_per_clip",
+  recommendedDuration: "recommended_duration",
+  hook: "hook",
+  captionReq: "caption_req",
+  aspectRatio: "aspect_ratio",
+  cta: "cta",
+  branding: "branding",
+  viewRules: "view_rules",
+  approval: "approval",
+  thumbnails: "thumbnails",
+  brandAssets: "brand_assets",
+  spendCap: "spend_cap",
+  timezone: "timezone",
+  whatToMake: "what_to_make",
+  style: "style",
+  rights: "rights",
+  status: "status",
+};
 
 function mapCampaign(r: Record<string, unknown>): Campaign {
   return {
@@ -489,6 +534,7 @@ function mapCampaign(r: Record<string, unknown>): Campaign {
       r.rights && typeof r.rights === "object"
         ? (r.rights as CampaignRights)
         : undefined,
+    audit: Array.isArray(r.audit) ? (r.audit as AuditEntry[]) : undefined,
   };
 }
 
@@ -789,6 +835,42 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setState((s) => ({ ...s, campaigns: s.campaigns.filter((c) => c.id !== id) }));
         if (!isSupabaseConfigured) return;
         ignore(supabase.from("campaigns").delete().eq("id", id));
+      },
+
+      updateCampaign: (id, patch, actor, action, note) => {
+        setState((s) => {
+          const entry: AuditEntry = {
+            action: action ?? "updated",
+            by: actor,
+            at: Date.now(),
+            note,
+          };
+          return {
+            ...s,
+            campaigns: s.campaigns.map((c) =>
+              c.id === id
+                ? { ...c, ...patch, audit: [...(c.audit ?? []), entry] }
+                : c,
+            ),
+          };
+        });
+        if (!isSupabaseConfigured) return;
+        const update: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(patch)) {
+          const col = CAMPAIGN_DB_MAP[k];
+          if (col) update[col] = (v as unknown) ?? null;
+        }
+        const existing = stateRef.current.campaigns.find((c) => c.id === id);
+        update.audit = [
+          ...(existing?.audit ?? []),
+          {
+            action: action ?? "updated",
+            by: actor,
+            at: Date.now(),
+            note,
+          },
+        ];
+        ignore(supabase.from("campaigns").update(update).eq("id", id));
       },
 
       updateProfileStatus: (id, status) => {

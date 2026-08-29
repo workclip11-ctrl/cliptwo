@@ -57,10 +57,10 @@ export default function CreatorCampaignsPage() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <Link
-                      href={`/campaign/${c.id}`}
-                      className="font-semibold hover:underline underline-offset-2"
-                    >
+                     <Link
+                       href={`/creator/campaigns/${c.id}`}
+                       className="font-semibold hover:underline underline-offset-2"
+                     >
                       {c.title}
                     </Link>
                     <span
@@ -72,7 +72,13 @@ export default function CreatorCampaignsPage() {
                             : "border-muted/20 bg-accent-soft text-muted"
                       }`}
                     >
-                      {c.status === "open" ? "Open" : c.status === "draft" ? "Draft" : "Closed"}
+                      {c.status === "open"
+                        ? "Open"
+                        : c.status === "draft"
+                          ? "Draft"
+                          : c.status === "paused"
+                            ? "Paused"
+                            : "Closed"}
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-muted">

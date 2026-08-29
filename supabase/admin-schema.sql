@@ -102,6 +102,10 @@ create policy "clips_delete" on public.clips
 alter table public.clips add column if not exists engagement jsonb;
 alter table public.clips add column if not exists audit jsonb;
 
+-- Campaign audit trail of creator management actions (edit / pause / resume /
+-- end / budget changes / rule changes). Idempotent on re-run.
+alter table public.campaigns add column if not exists audit jsonb;
+
 -- ---------------------------------------------------------------------------
 -- helper: does an account with this email already exist? (used by the login
 -- page to tell "new user" apart from "wrong password"). Callable by anon so

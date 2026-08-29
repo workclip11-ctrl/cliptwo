@@ -14,6 +14,7 @@ const map: Record<AnyStatus, { label: string; cls: string }> = {
   open: { label: "Open", cls: "bg-green/10 text-green border-green/20" },
   closed: { label: "Closed", cls: "bg-muted/10 text-muted border-muted/20" },
   draft: { label: "Draft", cls: "bg-amber/10 text-amber border-amber/20" },
+  paused: { label: "Paused", cls: "bg-amber/10 text-amber border-amber/20" },
 };
 
 export function StatusPill({ status }: { status: AnyStatus }) {

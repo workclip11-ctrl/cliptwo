@@ -46,6 +46,7 @@ create table public.campaigns (
   what_to_make text,
   style       text,
   rights      jsonb,
+  audit       jsonb,
   created_at  timestamptz not null default now()
 );
 
