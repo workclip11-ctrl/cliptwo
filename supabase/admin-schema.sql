@@ -28,6 +28,8 @@ alter table public.profiles add column if not exists admin_notes text;
 alter table public.profiles add column if not exists suspended_reason text;
 alter table public.profiles add column if not exists appeals jsonb;
 alter table public.profiles add column if not exists audit jsonb;
+alter table public.profiles add column if not exists company text;
+alter table public.profiles add column if not exists team jsonb;
 
 -- Helper: is the current user an admin? (reads the public.profiles table)
 create or replace function public.is_admin()

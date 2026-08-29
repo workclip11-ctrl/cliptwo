@@ -141,6 +141,12 @@ export interface Appeal {
   response?: string;
 }
 
+export interface TeamMember {
+  name: string;
+  email?: string;
+  role?: string;
+}
+
 export interface Profile {
   id: string;
   name: string;
@@ -152,6 +158,8 @@ export interface Profile {
   verifiedAt?: number;
   createdAt: number;
   upi?: string;
+  company?: string;
+  team?: TeamMember[];
   riskFlag?: boolean;
   riskNote?: string;
   adminNotes?: string;
