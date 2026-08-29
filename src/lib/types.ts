@@ -109,6 +109,29 @@ export interface Profile {
   upi?: string;
 }
 
+export type SocialAccountStatus =
+  | "not_connected"
+  | "connecting"
+  | "connected"
+  | "verified"
+  | "connection_error"
+  | "disconnected";
+
+// A connected social account for a clipper. Only non-secret metadata lives here.
+// OAuth tokens / access secrets must NEVER be stored on the client or in this
+// table — they belong in a server-only secret store (see supabase/schema.sql).
+export interface SocialAccount {
+  id: string;
+  userId?: string;
+  platform: Platform;
+  handle: string;
+  status: SocialAccountStatus;
+  verified: boolean;
+  connectedAt?: number;
+  lastSyncAt?: number;
+  error?: string;
+}
+
 export interface SiteSettings {
   heroTitle: string;
   heroSubtitle: string;
@@ -120,5 +143,6 @@ export interface StoreState {
   campaigns: Campaign[];
   clips: Clip[];
   profiles: Profile[];
+  socialAccounts: SocialAccount[];
   siteSettings: SiteSettings;
 }

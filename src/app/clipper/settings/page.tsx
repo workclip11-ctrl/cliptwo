@@ -1,18 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LogOut, Link2, CheckCircle2, BadgeCheck, Save } from "lucide-react";
-import { PlatformIcon } from "@/components/PlatformIcon";
+import { LogOut, BadgeCheck, Save } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
-
-const INITIAL_ACCOUNTS = [
-  { platform: "Instagram", handle: "@maya.cuts", status: "verified" },
-  { platform: "YouTube", handle: "@mayacuts", status: "verified" },
-  { platform: "TikTok", handle: "@maya.in", status: "connecting" },
-];
 
 export default function ClipperSettingsPage() {
   const router = useRouter();
@@ -20,7 +14,6 @@ export default function ClipperSettingsPage() {
   const { profiles, updateProfile } = useStore();
   const [name, setName] = useState("");
   const [upi, setUpi] = useState("");
-  const [accounts, setAccounts] = useState(INITIAL_ACCOUNTS);
   const [saved, setSaved] = useState(false);
   const loaded = useRef(false);
 
@@ -32,16 +25,6 @@ export default function ClipperSettingsPage() {
       loaded.current = true;
     }
   }, [user, profiles]);
-
-  function toggle(platform: string) {
-    setAccounts((prev) =>
-      prev.map((a) =>
-        a.platform === platform
-          ? { ...a, status: a.status === "verified" ? "connecting" : "verified" }
-          : a,
-      ),
-    );
-  }
 
   function save() {
     if (!user) return;
@@ -101,34 +84,16 @@ export default function ClipperSettingsPage() {
         <h2 className="text-sm font-semibold uppercase tracking-widest text-muted">
           Social media accounts
         </h2>
-        <ul className="mt-4 divide-y">
-          {accounts.map((a) => (
-            <li key={a.platform} className="flex items-center justify-between py-3">
-              <div className="flex items-center gap-3">
-                <PlatformIcon p={a.platform as never} size={20} />
-                <div>
-                  <p className="text-sm font-medium">{a.platform}</p>
-                  <p className="text-xs text-muted">{a.handle}</p>
-                </div>
-              </div>
-              {a.status === "verified" ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full border bg-accent-soft px-3 py-1.5 text-xs font-medium text-green">
-                  <CheckCircle2 size={13} /> Connected
-                </span>
-              ) : (
-                <button
-                  onClick={() => toggle(a.platform)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium hover:bg-accent-soft"
-                >
-                  <Link2 size={13} /> Connect
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
-        <p className="mt-3 text-xs text-muted">
-          Connect buttons are demo-only in this prototype build.
+        <p className="mt-1 text-sm text-muted">
+          Manage the platforms you post clips to, their connection and
+          verification status.
         </p>
+        <Link
+          href="/clipper/accounts"
+          className="mt-4 inline-flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent-soft"
+        >
+          Manage connected accounts →
+        </Link>
       </section>
 
       {/* UPI */}

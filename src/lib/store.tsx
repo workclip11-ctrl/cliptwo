@@ -21,6 +21,8 @@ import type {
   Profile,
   ProfileRole,
   ProfileStatus,
+  SocialAccount,
+  SocialAccountStatus,
   SiteSettings,
   StoreState,
 } from "./types";
@@ -334,6 +336,26 @@ const seed: StoreState = {
     },
   ],
   profiles: [],
+  socialAccounts: [
+    {
+      id: "sa_ig",
+      platform: "Instagram",
+      handle: "@maya.cuts",
+      status: "connected",
+      verified: false,
+      connectedAt: Date.now() - 1000 * 60 * 60 * 24 * 40,
+      lastSyncAt: Date.now() - 1000 * 60 * 60 * 6,
+    },
+    {
+      id: "sa_yt",
+      platform: "YouTube",
+      handle: "@mayacuts",
+      status: "connected",
+      verified: false,
+      connectedAt: Date.now() - 1000 * 60 * 60 * 24 * 12,
+      lastSyncAt: Date.now() - 1000 * 60 * 60 * 30,
+    },
+  ],
   siteSettings: {
     heroTitle: "",
     heroSubtitle: "",
@@ -351,6 +373,11 @@ interface StoreActions {
   updateProfileStatus: (id: string, status: ProfileStatus) => void;
   deleteProfile: (id: string) => void;
   updateProfile: (id: string, patch: Partial<Pick<Profile, "name" | "upi">>) => void;
+  addSocialAccount: (a: Omit<SocialAccount, "id" | "connectedAt" | "lastSyncAt"> & {
+    connectedAt?: number;
+    lastSyncAt?: number;
+  }) => string;
+  updateSocialAccount: (id: string, patch: Partial<SocialAccount>) => void;
   setSiteSettings: (s: SiteSettings) => void;
 }
 
@@ -400,6 +427,20 @@ function mapCampaign(r: Record<string, unknown>): Campaign {
       r.approval && typeof r.approval === "object"
         ? (r.approval as CampaignApproval)
         : undefined,
+  };
+}
+
+function mapSocialAccount(r: Record<string, unknown>): SocialAccount {
+  return {
+    id: String(r.id),
+    userId: r.user_id ? String(r.user_id) : undefined,
+    platform: (r.platform as Platform) ?? "Instagram",
+    handle: String(r.handle ?? ""),
+    status: (r.status as SocialAccountStatus) ?? "not_connected",
+    verified: r.verified != null ? Boolean(r.verified) : false,
+    connectedAt: r.connected_at ? new Date(String(r.connected_at)).getTime() : undefined,
+    lastSyncAt: r.last_sync_at ? new Date(String(r.last_sync_at)).getTime() : undefined,
+    error: r.error ? String(r.error) : undefined,
   };
 }
 
@@ -460,17 +501,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     let active = true;
 
     (async () => {
-      const [{ data: camps }, { data: clps }, { data: profs }, { data: site }] =
-        await Promise.all([
-          supabase.from("campaigns").select("*"),
-          supabase.from("clips").select("*"),
-          supabase.from("profiles").select("*"),
-          supabase.from("site_settings").select("*").eq("id", 1).maybeSingle(),
-        ]);
+      const [
+        { data: camps },
+        { data: clps },
+        { data: profs },
+        { data: accts },
+        { data: site },
+      ] = await Promise.all([
+        supabase.from("campaigns").select("*"),
+        supabase.from("clips").select("*"),
+        supabase.from("profiles").select("*"),
+        supabase.from("social_accounts").select("*"),
+        supabase.from("site_settings").select("*").eq("id", 1).maybeSingle(),
+      ]);
       if (!active) return;
       if (camps) setState((s) => ({ ...s, campaigns: camps.map(mapCampaign) }));
       if (clps) setState((s) => ({ ...s, clips: clps.map(mapClip) }));
       if (profs) setState((s) => ({ ...s, profiles: profs.map(mapProfile) }));
+      if (accts)
+        setState((s) => ({
+          ...s,
+          socialAccounts: accts.map(mapSocialAccount),
+        }));
       if (site)
         setState((s) => ({ ...s, siteSettings: mapSiteSettings(site as Record<string, unknown>) }));
     })().catch(() => {
@@ -669,6 +721,67 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             .from("profiles")
             .update({ name: patch.name, upi: patch.upi })
             .eq("id", id),
+        );
+      },
+
+      addSocialAccount: (a) => {
+        const id = `sa_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        const record: SocialAccount = {
+          id,
+          userId: a.userId,
+          platform: a.platform,
+          handle: a.handle,
+          status: a.status,
+          verified: a.verified,
+          connectedAt: a.connectedAt,
+          lastSyncAt: a.lastSyncAt,
+          error: a.error,
+        };
+        setState((s) => ({ ...s, socialAccounts: [...s.socialAccounts, record] }));
+        if (!isSupabaseConfigured) return id;
+        ignore(
+          supabase.from("social_accounts").insert({
+            id,
+            user_id: a.userId,
+            platform: a.platform,
+            handle: a.handle,
+            status: a.status,
+            verified: a.verified,
+            connected_at: a.connectedAt
+              ? new Date(a.connectedAt).toISOString()
+              : null,
+            last_sync_at: a.lastSyncAt
+              ? new Date(a.lastSyncAt).toISOString()
+              : null,
+            error: a.error,
+          }),
+        );
+        return id;
+      },
+
+      updateSocialAccount: (id, patch) => {
+        setState((s) => ({
+          ...s,
+          socialAccounts: s.socialAccounts.map((acc) =>
+            acc.id === id ? { ...acc, ...patch } : acc,
+          ),
+        }));
+        if (!isSupabaseConfigured) return;
+        const payload: Record<string, unknown> = {};
+        if (patch.handle !== undefined) payload.handle = patch.handle;
+        if (patch.status !== undefined) payload.status = patch.status;
+        if (patch.verified !== undefined) payload.verified = patch.verified;
+        if (patch.error !== undefined) payload.error = patch.error;
+        if (patch.connectedAt !== undefined)
+          payload.connected_at = patch.connectedAt
+            ? new Date(patch.connectedAt).toISOString()
+            : null;
+        if (patch.lastSyncAt !== undefined)
+          payload.last_sync_at = patch.lastSyncAt
+            ? new Date(patch.lastSyncAt).toISOString()
+            : null;
+        ignore(
+          supabase.from("social_accounts").update(payload).eq("id", id),
         );
       },
 

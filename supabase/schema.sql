@@ -58,6 +58,46 @@ create table public.clips (
   failure_reason text
 );
 
+-- ---------------------------------------------------------------------------
+-- social_accounts — a clipper's connected publishing platforms.
+-- SECURITY: this table stores ONLY non-secret metadata (handle, status, etc).
+-- OAuth access tokens / client secrets / service-role keys MUST NEVER be stored
+-- here or exposed to the browser. Real platform credentials belong in a
+-- server-only secret store (e.g. a Supabase Vault secret or encrypted column
+-- with RLS forbidding SELECT) and are read exclusively by backend jobs that
+-- later power view tracking. The client never receives them.
+-- ---------------------------------------------------------------------------
+create table public.social_accounts (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid references auth.users (id) on delete cascade,
+  platform      text not null,
+  handle        text not null,
+  status        text not null default 'not_connected',
+  verified      boolean not null default false,
+  connected_at  timestamptz,
+  last_sync_at  timestamptz,
+  error         text,
+  created_at    timestamptz not null default now()
+);
+
+alter table public.social_accounts enable row level security;
+
+drop policy if exists "social_accounts_select" on public.social_accounts;
+create policy "social_accounts_select" on public.social_accounts
+  for select using (auth.uid() = user_id);
+
+drop policy if exists "social_accounts_insert" on public.social_accounts;
+create policy "social_accounts_insert" on public.social_accounts
+  for insert with check (auth.uid() = user_id);
+
+drop policy if exists "social_accounts_update" on public.social_accounts;
+create policy "social_accounts_update" on public.social_accounts
+  for update using (auth.uid() = user_id);
+
+drop policy if exists "social_accounts_delete" on public.social_accounts;
+create policy "social_accounts_delete" on public.social_accounts
+  for delete using (auth.uid() = user_id);
+
 alter table public.campaigns enable row level security;
 alter table public.clips enable row level security;
 

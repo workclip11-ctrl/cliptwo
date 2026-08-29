@@ -9,6 +9,7 @@ import {
   Film,
   Wallet,
   Settings,
+  Link2,
 } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
 import { AuthGuard } from "@/components/AuthGuard";
@@ -18,6 +19,7 @@ const NAV = [
   { href: "/clipper/campaigns", label: "Campaigns", icon: Megaphone },
   { href: "/clipper/submissions", label: "My Submissions", icon: Film },
   { href: "/clipper/wallet", label: "Wallet", icon: Wallet },
+  { href: "/clipper/accounts", label: "Connected accounts", icon: Link2 },
   { href: "/clipper/settings", label: "Settings", icon: Settings },
 ];
 
