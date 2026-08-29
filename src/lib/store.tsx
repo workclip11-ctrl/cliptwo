@@ -720,28 +720,34 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         })().catch(() => {});
       },
 
-      setClipStatus: (id, status, patch, actor) => {
-        setState((s) => {
-          const entry: AuditEntry = {
-            action: status,
-            by: actor,
-            at: Date.now(),
-            note: patch?.rejectionReason ?? patch?.failureReason,
-          };
-          return {
-            ...s,
-            clips: s.clips.map((k) =>
-              k.id === id
-                ? {
-                    ...k,
-                    status,
-                    ...patch,
-                    audit: [...(k.audit ?? []), entry],
-                  }
-                : k,
-            ),
-          };
-        });
+       setClipStatus: (id, status, patch, actor) => {
+         setState((s) => {
+           const entry: AuditEntry = {
+             action: status,
+             by: actor,
+             at: Date.now(),
+             note: patch?.rejectionReason ?? patch?.failureReason,
+           };
+           return {
+             ...s,
+             clips: s.clips.map((k) => {
+               if (k.id !== id) return k;
+               const merged: Clip = {
+                 ...k,
+                 status,
+                 ...patch,
+                 audit: [...(k.audit ?? []), entry],
+               };
+               // Keep local state in sync with the DB: a clip that is no
+               // longer rejected/failed should not show a stale reason.
+               if (status !== "rejected" && patch?.rejectionReason === undefined)
+                 merged.rejectionReason = undefined;
+               if (status !== "failed" && patch?.failureReason === undefined)
+                 merged.failureReason = undefined;
+               return merged;
+             }),
+           };
+         });
         if (!isSupabaseConfigured) return;
         const update: Record<string, unknown> = { status };
         if (patch?.rejectionReason !== undefined)
