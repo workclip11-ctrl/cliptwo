@@ -124,7 +124,6 @@ export default function CreatorCampaignsPage() {
 
       {open && (
         <NewCampaignModal
-          creatorName={user?.name ?? user?.email ?? "Creator"}
           onClose={() => setOpen(false)}
                onSubmit={(
             title,

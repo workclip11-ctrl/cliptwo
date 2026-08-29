@@ -20,11 +20,9 @@ export interface NewCampaignExtra {
 }
 
 export function NewCampaignModal({
-  creatorName,
   onClose,
   onSubmit,
 }: {
-  creatorName: string;
   onClose: () => void;
   onSubmit: (
     title: string,

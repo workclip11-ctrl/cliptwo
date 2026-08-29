@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useSyncExternalStore, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -28,7 +28,7 @@ import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup, fmtViews, clipEarnings } from "@/lib/format";
 import { campaignSpent } from "@/lib/finance";
-import type { Campaign, Clip, Platform } from "@/lib/types";
+import type { Clip, Platform } from "@/lib/types";
 
 const GRADIENTS = [
   "from-sky-500/25 to-indigo-500/25",
@@ -78,22 +78,28 @@ export default function CampaignDetailPage() {
   const { isSignedIn, user } = useAuth();
   const router = useRouter();
   const [active, setActive] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [reported, setReported] = useState(false);
+
+  const saved = useSyncExternalStore(
+    (cb) => {
+      if (typeof window === "undefined") return () => {};
+      window.addEventListener("cliptwo:saved", cb);
+      return () => window.removeEventListener("cliptwo:saved", cb);
+    },
+    () => {
+      try {
+        const raw = localStorage.getItem("cliptwo:saved-campaigns");
+        const arr: string[] = raw ? JSON.parse(raw) : [];
+        return arr.includes(id);
+      } catch {
+        return false;
+      }
+    },
+    () => false,
+  );
 
   const campaign = campaigns.find((c) => c.id === id);
   const campClips = clips.filter((k) => k.campaignId === id);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !id) return;
-    try {
-      const raw = localStorage.getItem("cliptwo:saved-campaigns");
-      const arr: string[] = raw ? JSON.parse(raw) : [];
-      setSaved(arr.includes(id));
-    } catch {
-      /* ignore */
-    }
-  }, [id]);
 
   function toggleSave() {
     try {
@@ -101,9 +107,10 @@ export default function CampaignDetailPage() {
       const arr: string[] = raw ? JSON.parse(raw) : [];
       const next = saved ? arr.filter((x) => x !== id) : [...new Set([...arr, id])];
       localStorage.setItem("cliptwo:saved-campaigns", JSON.stringify(next));
-      setSaved(!saved);
+      if (typeof window !== "undefined")
+        window.dispatchEvent(new Event("cliptwo:saved"));
     } catch {
-      setSaved(!saved);
+      /* ignore */
     }
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Check,
   Ban,
@@ -33,12 +33,11 @@ const FILTERS: Array<{ key: ClipStatus | "all"; label: string }> = [
 
 export default function AdminClips() {
   const { clips, campaigns, setClipStatus } = useStore();
-  const [filter, setFilter] = useState<ClipStatus | "all">("all");
-
-  useEffect(() => {
+  const [filter, setFilter] = useState<ClipStatus | "all">(() => {
+    if (typeof window === "undefined") return "all";
     const f = new URLSearchParams(window.location.search).get("filter");
-    if (f && FILTERS.some((x) => x.key === f)) setFilter(f as ClipStatus | "all");
-  }, []);
+    return f && FILTERS.some((x) => x.key === f) ? (f as ClipStatus | "all") : "all";
+  });
 
   const fin = financeOf(clips, campaigns);
   const list = [...clips]

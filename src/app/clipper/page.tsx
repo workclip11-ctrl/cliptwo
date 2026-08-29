@@ -20,7 +20,6 @@ import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup, fmtViews, clipEarnings } from "@/lib/format";
 import { financeOf, campaignSpent } from "@/lib/finance";
-import type { Campaign, Clip } from "@/lib/types";
 
 const ACCOUNTS = [
   { platform: "Instagram", handle: "@maya.cuts", status: "verified" },

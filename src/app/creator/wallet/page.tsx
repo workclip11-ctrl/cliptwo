@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Wallet, TrendingUp } from "lucide-react";
+import { Wallet } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup, fmtViews, clipEarnings } from "@/lib/format";

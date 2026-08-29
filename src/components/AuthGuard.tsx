@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useAuth, type Role } from "@/lib/auth";
@@ -8,9 +8,11 @@ import { useAuth, type Role } from "@/lib/auth";
 export function AuthGuard({ role, children }: { role: Role; children: ReactNode }) {
   const { isSignedIn, role: current, loading } = useAuth();
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => setMounted(true), []);
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
   useEffect(() => {
     if (!mounted || loading) return;

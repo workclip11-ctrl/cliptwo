@@ -12,7 +12,7 @@ import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup, fmtViews, clipEarnings } from "@/lib/format";
 import { campaignSpent } from "@/lib/finance";
-import type { Campaign, Clip, Platform } from "@/lib/types";
+import type { Platform } from "@/lib/types";
 
 const GRADIENTS = [
   "from-sky-500/25 to-indigo-500/25",
