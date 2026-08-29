@@ -62,7 +62,9 @@ create table public.clips (
   submitted_at timestamptz not null default now(),
   rejection_reason text,
   rejection_details text,
-  failure_reason text
+  failure_reason text,
+  engagement    jsonb,
+  audit         jsonb
 );
 
 -- ---------------------------------------------------------------------------

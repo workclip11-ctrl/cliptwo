@@ -18,6 +18,8 @@ import type {
   CampaignRights,
   Clip,
   ClipStatus,
+  ClipEngagement,
+  AuditEntry,
   Platform,
   Profile,
   ProfileRole,
@@ -286,6 +288,14 @@ const seed: StoreState = {
         views: 18400,
         submittedAt: Date.now() - 1000 * 60 * 60 * 20,
         platform: "Instagram",
+        engagement: { likes: 2100, comments: 142, shares: 380 },
+        audit: [
+          { action: "submitted", by: "maya.cuts", at: Date.now() - 1000 * 60 * 60 * 20 },
+          { action: "approved", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 18 },
+          { action: "payable", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 17 },
+          { action: "processing", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 12 },
+          { action: "paid", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 10, note: "Released to UPI" },
+        ],
       },
     {
       id: "k2",
@@ -293,22 +303,28 @@ const seed: StoreState = {
       clipper: "devon.edits",
       videoUrl: "https://youtube.com/shorts/8kd92",
       caption: "The keynote moment everyone missed",
-      status: "pending",
-      views: 0,
-      submittedAt: Date.now() - 1000 * 60 * 60 * 3,
-      platform: "YouTube",
-    },
+        status: "pending",
+        views: 0,
+        submittedAt: Date.now() - 1000 * 60 * 60 * 3,
+        platform: "YouTube",
+        audit: [
+          { action: "submitted", by: "devon.edits", at: Date.now() - 1000 * 60 * 60 * 3 },
+        ],
+      },
     {
       id: "k3",
       campaignId: "c2",
       clipper: "maya.cuts",
       videoUrl: "https://instagram.com/reel/pw001",
       caption: "3 moves that fixed my posture",
-      status: "pending",
-      views: 0,
-      submittedAt: Date.now() - 1000 * 60 * 60 * 1,
-      platform: "Instagram",
-    },
+        status: "pending",
+        views: 0,
+        submittedAt: Date.now() - 1000 * 60 * 60 * 1,
+        platform: "Instagram",
+        audit: [
+          { action: "submitted", by: "maya.cuts", at: Date.now() - 1000 * 60 * 60 * 1 },
+        ],
+      },
     {
       id: "k4",
       campaignId: "c1",
@@ -319,9 +335,19 @@ const seed: StoreState = {
       views: 6200,
       submittedAt: Date.now() - 1000 * 60 * 60 * 40,
       platform: "Instagram",
-      rejectionReason: "Campaign rule violation",
-      rejectionDetails: "Background music was not allowed for this campaign.",
-    },
+        rejectionReason: "Campaign rule violation",
+        rejectionDetails: "Background music was not allowed for this campaign.",
+        engagement: { likes: 240, comments: 18, shares: 12 },
+        audit: [
+          { action: "submitted", by: "maya.cuts", at: Date.now() - 1000 * 60 * 60 * 40 },
+          {
+            action: "rejected",
+            by: "workclip11@gmail.com",
+            at: Date.now() - 1000 * 60 * 60 * 38,
+            note: "Campaign rule violation — Background music was not allowed for this campaign.",
+          },
+        ],
+      },
     {
       id: "k5",
       campaignId: "c1",
@@ -332,9 +358,21 @@ const seed: StoreState = {
       views: 9100,
       submittedAt: Date.now() - 1000 * 60 * 60 * 30,
       platform: "Instagram",
-      failureReason:
-        "UPI verification failed — the UPI ID could not be verified. Update your payment method and retry.",
-    },
+        failureReason:
+          "UPI verification failed — the UPI ID could not be verified. Update your payment method and retry.",
+        engagement: { likes: 510, comments: 33, shares: 44 },
+        audit: [
+          { action: "submitted", by: "maya.cuts", at: Date.now() - 1000 * 60 * 60 * 30 },
+          { action: "approved", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 28 },
+          { action: "payable", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 27 },
+          {
+            action: "failed",
+            by: "workclip11@gmail.com",
+            at: Date.now() - 1000 * 60 * 60 * 26,
+            note: "UPI verification failed — the UPI ID could not be verified. Update your payment method and retry.",
+          },
+        ],
+      },
   ],
   profiles: [],
   socialAccounts: [
@@ -371,7 +409,12 @@ interface StoreActions {
     status?: CampaignStatus,
   ) => void;
   addClip: (k: Omit<Clip, "id" | "submittedAt" | "status" | "views">) => void;
-  setClipStatus: (id: string, status: ClipStatus, patch?: Partial<Clip>) => void;
+  setClipStatus: (
+    id: string,
+    status: ClipStatus,
+    patch?: Partial<Clip>,
+    actor?: string,
+  ) => void;
   closeCampaign: (id: string) => void;
   deleteCampaign: (id: string) => void;
   updateProfileStatus: (id: string, status: ProfileStatus) => void;
@@ -477,6 +520,10 @@ function mapClip(r: Record<string, unknown>): Clip {
     rejectionReason: r.rejection_reason ? String(r.rejection_reason) : undefined,
     rejectionDetails: r.rejection_details ? String(r.rejection_details) : undefined,
     failureReason: r.failure_reason ? String(r.failure_reason) : undefined,
+    engagement: (r.engagement as ClipEngagement) ?? undefined,
+    audit: Array.isArray(r.audit)
+      ? (r.audit as AuditEntry[])
+      : undefined,
   };
 }
 
@@ -668,19 +715,46 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         })().catch(() => {});
       },
 
-      setClipStatus: (id, status, patch) => {
-        setState((s) => ({
-          ...s,
-          clips: s.clips.map((k) =>
-            k.id === id ? { ...k, status, ...patch } : k,
-          ),
-        }));
+      setClipStatus: (id, status, patch, actor) => {
+        setState((s) => {
+          const entry: AuditEntry = {
+            action: status,
+            by: actor,
+            at: Date.now(),
+            note: patch?.rejectionReason ?? patch?.failureReason,
+          };
+          return {
+            ...s,
+            clips: s.clips.map((k) =>
+              k.id === id
+                ? {
+                    ...k,
+                    status,
+                    ...patch,
+                    audit: [...(k.audit ?? []), entry],
+                  }
+                : k,
+            ),
+          };
+        });
         if (!isSupabaseConfigured) return;
         const update: Record<string, unknown> = { status };
         if (patch?.rejectionReason !== undefined)
           update.rejection_reason = patch.rejectionReason;
         if (patch?.rejectionDetails !== undefined)
           update.rejection_details = patch.rejectionDetails;
+        if (patch?.failureReason !== undefined)
+          update.failure_reason = patch.failureReason;
+        const existing = state.clips.find((k) => k.id === id);
+        update.audit = [
+          ...(existing?.audit ?? []),
+          {
+            action: status,
+            by: actor,
+            at: Date.now(),
+            note: patch?.rejectionReason ?? patch?.failureReason,
+          },
+        ];
         ignore(supabase.from("clips").update(update).eq("id", id));
       },
 

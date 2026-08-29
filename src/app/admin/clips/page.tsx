@@ -11,13 +11,25 @@ import {
   RefreshCw,
   AlertTriangle,
   PlayCircle,
+  History,
 } from "lucide-react";
 import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { useStore } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
 import { rup, fmtViews, clipEarnings } from "@/lib/format";
 import { financeOf } from "@/lib/finance";
 import type { ClipStatus } from "@/lib/types";
+
+function fmtDateTime(t: number) {
+  return new Date(t).toLocaleString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 const FILTERS: Array<{ key: ClipStatus | "all"; label: string }> = [
   { key: "all", label: "All" },
@@ -33,6 +45,8 @@ const FILTERS: Array<{ key: ClipStatus | "all"; label: string }> = [
 
 export default function AdminClips() {
   const { clips, campaigns, setClipStatus } = useStore();
+  const { user } = useAuth();
+  const actor = user?.email ?? user?.name ?? "Admin";
   const [filter, setFilter] = useState<ClipStatus | "all">(() => {
     if (typeof window === "undefined") return "all";
     const f = new URLSearchParams(window.location.search).get("filter");
@@ -43,6 +57,7 @@ export default function AdminClips() {
   const [rejectDetails, setRejectDetails] = useState("");
   const [failingId, setFailingId] = useState<string | null>(null);
   const [failReason, setFailReason] = useState("");
+  const [auditId, setAuditId] = useState<string | null>(null);
 
   const fin = financeOf(clips, campaigns);
   const list = [...clips]
@@ -131,7 +146,7 @@ export default function AdminClips() {
                 {k.status === "pending" && (
                   <>
                     <button
-                      onClick={() => setClipStatus(k.id, "approved")}
+                      onClick={() => setClipStatus(k.id, "approved", undefined, actor)}
                       className="inline-flex items-center gap-1 rounded-md bg-green/10 px-2.5 py-1 text-xs font-medium text-green"
                     >
                       <Check size={13} /> Approve
@@ -157,7 +172,7 @@ export default function AdminClips() {
                               setClipStatus(k.id, "rejected", {
                                 rejectionReason: rejectReason || "Rejected by admin",
                                 rejectionDetails: rejectDetails || undefined,
-                              });
+                              }, actor);
                               setRejectingId(null);
                               setRejectReason("");
                               setRejectDetails("");
@@ -194,7 +209,7 @@ export default function AdminClips() {
                 )}
                 {k.status === "approved" && (
                   <button
-                    onClick={() => setClipStatus(k.id, "payable")}
+                    onClick={() => setClipStatus(k.id, "payable", undefined, actor)}
                     className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-accent-soft"
                   >
                     <Clock size={13} /> Mark payable
@@ -202,7 +217,7 @@ export default function AdminClips() {
                 )}
                 {k.status === "payable" && (
                   <button
-                    onClick={() => setClipStatus(k.id, "processing")}
+                    onClick={() => setClipStatus(k.id, "processing", undefined, actor)}
                     className="inline-flex items-center gap-1 rounded-md bg-amber/10 px-2.5 py-1 text-xs font-medium text-amber"
                   >
                     <PlayCircle size={13} /> Start payout
@@ -211,7 +226,7 @@ export default function AdminClips() {
                 {k.status === "processing" && (
                   <>
                     <button
-                      onClick={() => setClipStatus(k.id, "paid")}
+                      onClick={() => setClipStatus(k.id, "paid", undefined, actor)}
                       className="inline-flex items-center gap-1 rounded-md bg-blue-500/10 px-2.5 py-1 text-xs font-medium text-blue-500"
                     >
                       <Wallet size={13} /> Mark paid
@@ -242,7 +257,7 @@ export default function AdminClips() {
                         onClick={() => {
                           setClipStatus(k.id, "failed", {
                             failureReason: failReason || "Payout failed",
-                          });
+                          }, actor);
                           setFailingId(null);
                           setFailReason("");
                         }}
@@ -264,7 +279,7 @@ export default function AdminClips() {
                 )}
                 {k.status === "failed" && (
                   <button
-                    onClick={() => setClipStatus(k.id, "payable")}
+                    onClick={() => setClipStatus(k.id, "payable", undefined, actor)}
                     className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-accent-soft"
                   >
                     <RefreshCw size={13} /> Retry
@@ -272,7 +287,7 @@ export default function AdminClips() {
                 )}
                 {k.status === "paid" && (
                   <button
-                    onClick={() => setClipStatus(k.id, "payable")}
+                    onClick={() => setClipStatus(k.id, "payable", undefined, actor)}
                     className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-accent-soft"
                     title="Revert to payable (not yet released)"
                   >
@@ -281,7 +296,7 @@ export default function AdminClips() {
                 )}
                 {k.status === "held" && (
                   <button
-                    onClick={() => setClipStatus(k.id, "payable")}
+                    onClick={() => setClipStatus(k.id, "payable", undefined, actor)}
                     className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-accent-soft"
                   >
                     <Undo2 size={13} /> Release
@@ -289,14 +304,47 @@ export default function AdminClips() {
                 )}
                 {k.status === "rejected" && (
                   <button
-                    onClick={() => setClipStatus(k.id, "pending")}
+                    onClick={() => setClipStatus(k.id, "pending", undefined, actor)}
                     className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-accent-soft"
                     title="Send back to review queue"
                   >
                     <Clock size={13} /> Reopen
                   </button>
                 )}
+                <button
+                  onClick={() => setAuditId(auditId === k.id ? null : k.id)}
+                  className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-accent-soft ${
+                    auditId === k.id ? "bg-accent-soft" : ""
+                  }`}
+                >
+                  <History size={13} /> Audit
+                  {k.audit?.length ? ` (${k.audit.length})` : ""}
+                </button>
               </div>
+              {auditId === k.id && k.audit && k.audit.length > 0 && (
+                <div className="mt-3 rounded-lg border bg-background/50 p-3">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                    Audit trail
+                  </p>
+                  <ol className="space-y-2">
+                    {k.audit.map((e, i) => (
+                      <li key={i} className="flex items-start gap-2 text-xs">
+                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+                        <div className="min-w-0">
+                          <p className="font-medium capitalize">{e.action}</p>
+                          <p className="text-muted">
+                            {e.by ? `${e.by} · ` : ""}
+                            {fmtDateTime(e.at)}
+                          </p>
+                          {e.note && (
+                            <p className="mt-0.5 text-muted">{e.note}</p>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
             </div>
           );
         })}

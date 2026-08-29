@@ -99,6 +99,19 @@ export type ClipStatus =
 export type ProfileRole = "clipper" | "creator" | "admin";
 export type ProfileStatus = "active" | "suspended";
 
+export interface ClipEngagement {
+  likes?: number;
+  comments?: number;
+  shares?: number;
+}
+
+export interface AuditEntry {
+  action: string;
+  by?: string;
+  at: number;
+  note?: string;
+}
+
 export interface Clip {
   id: string;
   campaignId: string;
@@ -113,6 +126,8 @@ export interface Clip {
   rejectionReason?: string;
   rejectionDetails?: string;
   failureReason?: string;
+  engagement?: ClipEngagement;
+  audit?: AuditEntry[];
 }
 
 export interface Profile {

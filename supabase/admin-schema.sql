@@ -97,6 +97,11 @@ drop policy if exists "clips_delete" on public.clips;
 create policy "clips_delete" on public.clips
   for delete using (auth.uid() = user_id or public.is_admin());
 
+-- Additive columns for engagement metrics + an audit trail of every status
+-- change (who did what, when, optional note). Idempotent on re-run.
+alter table public.clips add column if not exists engagement jsonb;
+alter table public.clips add column if not exists audit jsonb;
+
 -- ---------------------------------------------------------------------------
 -- helper: does an account with this email already exist? (used by the login
 -- page to tell "new user" apart from "wrong password"). Callable by anon so
