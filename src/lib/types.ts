@@ -94,6 +94,8 @@ export interface Clip {
   submittedAt: number;
   platform?: Platform;
   userId?: string;
+  rejectionReason?: string;
+  rejectionDetails?: string;
 }
 
 export interface Profile {

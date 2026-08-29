@@ -1,16 +1,83 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { useStore } from "@/lib/store";
-import { useAuth } from "@/lib/auth";
+import {
+  ExternalLink,
+  Film,
+  MessageSquareWarning,
+  ChevronDown,
+} from "lucide-react";
 import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
-import { rup, clipEarnings } from "@/lib/format";
+import { useStore } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
+import { rup, fmtViews, clipEarnings } from "@/lib/format";
+import { financeOf } from "@/lib/finance";
+
+const TABS = [
+  { key: "all", label: "All" },
+  { key: "pending", label: "Pending" },
+  { key: "approved", label: "Approved" },
+  { key: "rejected", label: "Rejected" },
+  { key: "paid", label: "Paid" },
+  { key: "held", label: "Held/Disputed" },
+] as const;
+
+type TabKey = (typeof TABS)[number]["key"];
+
+const PAGE_SIZE = 8;
+
+const GRADIENTS = [
+  "from-sky-500/25 to-indigo-500/25",
+  "from-rose-500/25 to-orange-500/25",
+  "from-emerald-500/25 to-teal-500/25",
+  "from-violet-500/25 to-fuchsia-500/25",
+];
+function gradientFor(id: string) {
+  let h = 0;
+  for (const ch of id) h = (h + ch.charCodeAt(0)) % GRADIENTS.length;
+  return GRADIENTS[h];
+}
+
+function fmtDate(ts: number) {
+  return new Date(ts).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 export default function ClipperSubmissionsPage() {
   const { campaigns, clips } = useStore();
   const { user } = useAuth();
+  const [tab, setTab] = useState<TabKey>("all");
+  const [page, setPage] = useState(1);
+  const [appealed, setAppealed] = useState<Record<string, boolean>>({});
+
+  function selectTab(key: TabKey) {
+    setTab(key);
+    setPage(1);
+  }
+
   const myClips = clips.filter((k) => k.userId === user?.id || !k.userId);
+
+  const counts = TABS.reduce<Record<string, number>>((acc, t) => {
+    acc[t.key] =
+      t.key === "all"
+        ? myClips.length
+        : myClips.filter((k) => k.status === t.key).length;
+    return acc;
+  }, {});
+
+  const filtered =
+    tab === "all" ? myClips : myClips.filter((k) => k.status === tab);
+
+  const sorted = [...filtered].sort((a, b) => b.submittedAt - a.submittedAt);
+  const visible = sorted.slice(0, page * PAGE_SIZE);
+  const hasMore = visible.length < sorted.length;
+
+  const fin = financeOf(myClips, campaigns);
 
   return (
     <div className="space-y-6">
@@ -21,43 +88,201 @@ export default function ClipperSubmissionsPage() {
         </p>
       </div>
 
-      {myClips.length === 0 ? (
-        <p className="text-sm text-muted">You haven&apos;t submitted any clips yet.</p>
+      {/* Summary */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-xl border bg-card p-4">
+          <p className="text-xs text-muted">Total earned</p>
+          <p className="mt-1 font-mono text-lg font-semibold">{rup(fin.earned)}</p>
+        </div>
+        <div className="rounded-xl border bg-card p-4">
+          <p className="text-xs text-muted">Paid out</p>
+          <p className="mt-1 font-mono text-lg font-semibold text-green">
+            {rup(fin.paid)}
+          </p>
+        </div>
+        <div className="rounded-xl border bg-card p-4">
+          <p className="text-xs text-muted">Pending</p>
+          <p className="mt-1 font-mono text-lg font-semibold text-amber">
+            {fin.pendingCount}
+          </p>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex flex-wrap gap-2">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => selectTab(t.key)}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                tab === t.key
+                  ? "border-accent bg-accent-soft text-foreground"
+                  : "text-muted hover:bg-accent-soft"
+              }`}
+            >
+            {t.label}
+            <span className="rounded-full bg-background px-1.5 text-xs">{counts[t.key]}</span>
+          </button>
+        ))}
+      </div>
+
+      {sorted.length === 0 ? (
+        <p className="rounded-xl border border-dashed p-8 text-center text-sm text-muted">
+          No clips in this view.
+        </p>
       ) : (
-        <div className="overflow-hidden rounded-2xl border bg-card">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left text-xs uppercase tracking-wide text-muted">
-                <th className="px-4 py-3 font-medium">Clip</th>
-                <th className="px-4 py-3 font-medium">Platform</th>
-                <th className="px-4 py-3 font-medium">Views</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 text-right font-medium">Earnings</th>
-              </tr>
-            </thead>
-            <tbody>
-              {myClips.map((k) => (
-                <tr key={k.id} className="border-b last:border-0">
-                  <td className="px-4 py-3">
-                    <Link href={`/clip/${k.id}`} className="font-medium hover:underline underline-offset-2">
-                      {campaigns.find((c) => c.id === k.campaignId)?.title ?? "Campaign"}
-                    </Link>
-                    <p className="line-clamp-1 max-w-xs text-xs text-muted">{k.caption}</p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <PlatformIcon p={k.platform ?? "Instagram"} size={18} />
-                  </td>
-                  <td className="px-4 py-3 font-mono">{k.views.toLocaleString("en-IN")}</td>
-                  <td className="px-4 py-3">
-                    <StatusPill status={k.status} />
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono">
-                    {rup(clipEarnings(k, campaigns))}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="space-y-4">
+          {visible.map((k) => {
+            const campaign = campaigns.find((c) => c.id === k.campaignId);
+            const e = clipEarnings(k, campaigns);
+            const earnedShown = e;
+            const paidShown = k.status === "paid" ? e : 0;
+            const cpm = campaign?.payout ?? 0;
+
+            return (
+              <div key={k.id} className="rounded-2xl border bg-card p-4">
+                <div className="flex gap-4">
+                  {/* Thumbnail placeholder */}
+                  <Link
+                    href={`/clip/${k.id}`}
+                    className={`flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${gradientFor(k.id)} text-foreground/70`}
+                  >
+                    <PlatformIcon p={k.platform ?? "Instagram"} size={26} />
+                  </Link>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <Link
+                          href={`/campaigns/${k.campaignId}`}
+                          className="font-semibold hover:underline underline-offset-2"
+                        >
+                          {campaign?.title ?? "Campaign"}
+                        </Link>
+                        <p className="line-clamp-1 text-xs text-muted">{k.caption}</p>
+                      </div>
+                      <StatusPill status={k.status} />
+                    </div>
+
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+                      <span className="inline-flex items-center gap-1">
+                        <PlatformIcon p={k.platform ?? "Instagram"} size={13} />
+                        {k.platform ?? "Instagram"}
+                      </span>
+                      <span>Submitted {fmtDate(k.submittedAt)}</span>
+                      {campaign && (
+                        <span className="inline-flex items-center gap-1">
+                          Campaign:{" "}
+                          <StatusPill status={campaign.status} />
+                        </span>
+                      )}
+                    </div>
+
+                    <a
+                      href={k.videoUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-1 inline-flex max-w-full items-center gap-1 truncate font-mono text-xs text-accent hover:underline"
+                    >
+                      {k.videoUrl} <ExternalLink size={11} />
+                    </a>
+                  </div>
+                </div>
+
+                {/* Stats grid */}
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+                  <div className="rounded-lg border bg-background p-2.5">
+                    <p className="text-[11px] text-muted">Verified views</p>
+                    <p className="mt-0.5 font-mono text-sm font-medium">
+                      {k.views ? fmtViews(k.views) : "—"}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border bg-background p-2.5">
+                    <p className="text-[11px] text-muted">CPM</p>
+                    <p className="mt-0.5 font-mono text-sm font-medium">
+                      {rup(cpm)}
+                      <span className="text-[10px] text-muted">/1K</span>
+                    </p>
+                  </div>
+                  <div className="rounded-lg border bg-background p-2.5">
+                    <p className="text-[11px] text-muted">Est. / earned</p>
+                    <p className="mt-0.5 font-mono text-sm font-medium">
+                      {rup(earnedShown)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border bg-background p-2.5">
+                    <p className="text-[11px] text-muted">Paid</p>
+                    <p className="mt-0.5 font-mono text-sm font-medium text-green">
+                      {rup(paidShown)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border bg-background p-2.5">
+                    <p className="text-[11px] text-muted">Last view update</p>
+                    <p className="mt-0.5 font-mono text-sm font-medium">—</p>
+                  </div>
+                </div>
+
+                {/* Rejection reason */}
+                {k.status === "rejected" && (
+                  <div className="mt-3 rounded-lg border border-red/20 bg-red/5 p-3 text-sm">
+                    <p className="flex items-center gap-1.5 font-medium text-red">
+                      <MessageSquareWarning size={14} /> Rejected
+                    </p>
+                    <p className="mt-1 text-muted">
+                      <span className="font-medium text-foreground">Reason:</span>{" "}
+                      {k.rejectionReason ?? "—"}
+                    </p>
+                    {k.rejectionDetails && (
+                      <p className="mt-0.5 text-muted">
+                        <span className="font-medium text-foreground">Details:</span>{" "}
+                        {k.rejectionDetails}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <Link
+                    href={`/clip/${k.id}`}
+                    className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-accent-soft"
+                  >
+                    <Film size={14} /> View clip
+                  </Link>
+                  <Link
+                    href={`/campaigns/${k.campaignId}`}
+                    className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-accent-soft"
+                  >
+                    <ExternalLink size={14} /> View campaign
+                  </Link>
+                  {k.status === "rejected" && (
+                    <button
+                      onClick={() =>
+                        setAppealed((a) => ({ ...a, [k.id]: true }))
+                      }
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-accent px-3 py-1.5 text-sm font-medium text-accent hover:bg-accent-soft"
+                    >
+                      <MessageSquareWarning size={14} /> Appeal rejection
+                    </button>
+                  )}
+                </div>
+                {appealed[k.id] && (
+                  <p className="mt-2 text-xs text-green">
+                    Appeal submitted — our team will review and respond within 7 days.
+                  </p>
+                )}
+              </div>
+            );
+          })}
+
+          {hasMore && (
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              className="flex w-full items-center justify-center gap-1.5 rounded-xl border bg-card py-3 text-sm font-medium hover:bg-accent-soft"
+            >
+              <ChevronDown size={15} /> Load more
+            </button>
+          )}
         </div>
       )}
     </div>

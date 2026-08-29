@@ -306,6 +306,19 @@ const seed: StoreState = {
       submittedAt: Date.now() - 1000 * 60 * 60 * 1,
       platform: "Instagram",
     },
+    {
+      id: "k4",
+      campaignId: "c1",
+      clipper: "maya.cuts",
+      videoUrl: "https://instagram.com/reel/xk44b",
+      caption: "The keynote but with a loud soundtrack",
+      status: "rejected",
+      views: 6200,
+      submittedAt: Date.now() - 1000 * 60 * 60 * 40,
+      platform: "Instagram",
+      rejectionReason: "Campaign rule violation",
+      rejectionDetails: "Background music was not allowed for this campaign.",
+    },
   ],
   profiles: [],
   siteSettings: {
@@ -319,7 +332,7 @@ const seed: StoreState = {
 interface StoreActions {
   addCampaign: (c: Omit<Campaign, "id" | "createdAt" | "status">) => void;
   addClip: (k: Omit<Clip, "id" | "submittedAt" | "status" | "views">) => void;
-  setClipStatus: (id: string, status: ClipStatus) => void;
+  setClipStatus: (id: string, status: ClipStatus, patch?: Partial<Clip>) => void;
   closeCampaign: (id: string) => void;
   deleteCampaign: (id: string) => void;
   updateProfileStatus: (id: string, status: ProfileStatus) => void;
@@ -389,6 +402,8 @@ function mapClip(r: Record<string, unknown>): Clip {
     submittedAt: r.submitted_at ? new Date(String(r.submitted_at)).getTime() : Date.now(),
     platform: (r.platform as Platform) ?? "Instagram",
     userId: r.user_id ? String(r.user_id) : undefined,
+    rejectionReason: r.rejection_reason ? String(r.rejection_reason) : undefined,
+    rejectionDetails: r.rejection_details ? String(r.rejection_details) : undefined,
   };
 }
 
@@ -562,13 +577,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         })().catch(() => {});
       },
 
-      setClipStatus: (id, status) => {
+      setClipStatus: (id, status, patch) => {
         setState((s) => ({
           ...s,
-          clips: s.clips.map((k) => (k.id === id ? { ...k, status } : k)),
+          clips: s.clips.map((k) =>
+            k.id === id ? { ...k, status, ...patch } : k,
+          ),
         }));
         if (!isSupabaseConfigured) return;
-        ignore(supabase.from("clips").update({ status }).eq("id", id));
+        const update: Record<string, unknown> = { status };
+        if (patch?.rejectionReason !== undefined)
+          update.rejection_reason = patch.rejectionReason;
+        if (patch?.rejectionDetails !== undefined)
+          update.rejection_details = patch.rejectionDetails;
+        ignore(supabase.from("clips").update(update).eq("id", id));
       },
 
       closeCampaign: (id) => {

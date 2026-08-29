@@ -38,6 +38,9 @@ export default function AdminClips() {
     const f = new URLSearchParams(window.location.search).get("filter");
     return f && FILTERS.some((x) => x.key === f) ? (f as ClipStatus | "all") : "all";
   });
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectDetails, setRejectDetails] = useState("");
 
   const fin = financeOf(clips, campaigns);
   const list = [...clips]
@@ -131,12 +134,60 @@ export default function AdminClips() {
                     >
                       <Check size={13} /> Approve
                     </button>
-                    <button
-                      onClick={() => setClipStatus(k.id, "rejected")}
-                      className="inline-flex items-center gap-1 rounded-md bg-red/10 px-2.5 py-1 text-xs font-medium text-red"
-                    >
-                      <Ban size={13} /> Reject
-                    </button>
+                    {rejectingId === k.id ? (
+                      <div className="w-full space-y-2 rounded-lg border border-red/30 bg-red/5 p-3">
+                        <input
+                          value={rejectReason}
+                          onChange={(e) => setRejectReason(e.target.value)}
+                          placeholder="Reason (e.g. Campaign rule violation)"
+                          className="w-full rounded-md border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-foreground"
+                        />
+                        <textarea
+                          value={rejectDetails}
+                          onChange={(e) => setRejectDetails(e.target.value)}
+                          rows={2}
+                          placeholder="Details (optional)"
+                          className="w-full resize-none rounded-md border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-foreground"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setClipStatus(k.id, "rejected", {
+                                rejectionReason: rejectReason || "Rejected by admin",
+                                rejectionDetails: rejectDetails || undefined,
+                              });
+                              setRejectingId(null);
+                              setRejectReason("");
+                              setRejectDetails("");
+                            }}
+                            className="inline-flex items-center gap-1 rounded-md bg-red/10 px-2.5 py-1 text-xs font-medium text-red"
+                          >
+                            <Ban size={13} /> Confirm reject
+                          </button>
+                          <button
+                            onClick={() => {
+                              setRejectingId(null);
+                              setRejectReason("");
+                              setRejectDetails("");
+                            }}
+                            className="rounded-md border px-2.5 py-1 text-xs font-medium"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setRejectingId(k.id);
+                          setRejectReason("");
+                          setRejectDetails("");
+                        }}
+                        className="inline-flex items-center gap-1 rounded-md bg-red/10 px-2.5 py-1 text-xs font-medium text-red"
+                      >
+                        <Ban size={13} /> Reject
+                      </button>
+                    )}
                   </>
                 )}
                 {k.status === "approved" && (
