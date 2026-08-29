@@ -12,8 +12,9 @@ import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
-import { rup, fmtViews, clipEarnings } from "@/lib/format";
-import { financeOf } from "@/lib/finance";
+import { rup, fmtViews } from "@/lib/format";
+import { isEarned, payoutSplit } from "@/lib/finance";
+import type { Clip } from "@/lib/types";
 
 const TABS = [
   { key: "all", label: "All" },
@@ -77,7 +78,14 @@ export default function ClipperSubmissionsPage() {
   const visible = sorted.slice(0, page * PAGE_SIZE);
   const hasMore = visible.length < sorted.length;
 
-  const fin = financeOf(myClips, campaigns);
+  // A clipper receives NET (gross minus platform fee); reflect that in their totals.
+  const netOf = (k: Clip) => payoutSplit(k, campaigns).net;
+  const totalEarnedNet = myClips
+    .filter((k) => isEarned(k.status))
+    .reduce((s, k) => s + netOf(k), 0);
+  const totalPaidNet = myClips
+    .filter((k) => k.status === "paid")
+    .reduce((s, k) => s + netOf(k), 0);
   const pendingReview = myClips.filter((k) => k.status === "pending").length;
 
   return (
@@ -93,12 +101,12 @@ export default function ClipperSubmissionsPage() {
       <div className="grid grid-cols-3 gap-3">
         <div className="rounded-xl border bg-card p-4">
           <p className="text-xs text-muted">Total earned</p>
-          <p className="mt-1 font-mono text-lg font-semibold">{rup(fin.earned)}</p>
+          <p className="mt-1 font-mono text-lg font-semibold">{rup(totalEarnedNet)}</p>
         </div>
         <div className="rounded-xl border bg-card p-4">
           <p className="text-xs text-muted">Paid out</p>
           <p className="mt-1 font-mono text-lg font-semibold text-green">
-            {rup(fin.paid)}
+            {rup(totalPaidNet)}
           </p>
         </div>
         <div className="rounded-xl border bg-card p-4">
@@ -135,7 +143,7 @@ export default function ClipperSubmissionsPage() {
         <div className="space-y-4">
           {visible.map((k) => {
             const campaign = campaigns.find((c) => c.id === k.campaignId);
-            const e = clipEarnings(k, campaigns);
+            const e = netOf(k);
             const earnedShown = e;
             const paidShown = k.status === "paid" ? e : 0;
             const cpm = campaign?.payout ?? 0;

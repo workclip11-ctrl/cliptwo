@@ -18,8 +18,8 @@ import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
-import { rup, fmtViews, clipEarnings } from "@/lib/format";
-import { financeOf, campaignSpent } from "@/lib/finance";
+import { rup, fmtViews } from "@/lib/format";
+import { financeOf, campaignSpent, payoutSplit } from "@/lib/finance";
 
 const ACCOUNTS = [
   { platform: "Instagram", handle: "@maya.cuts", status: "verified" },
@@ -257,7 +257,9 @@ export default function ClipperPage() {
                           {k.views ? fmtViews(k.views) : "—"}
                         </td>
                         <td className="px-4 py-3 text-right font-mono">
-                          {clipEarnings(k, campaigns) ? rup(clipEarnings(k, campaigns)) : "—"}
+                          {payoutSplit(k, campaigns).net
+                            ? rup(payoutSplit(k, campaigns).net)
+                            : "—"}
                         </td>
                         <td className="px-4 py-3 text-right">
                           <StatusPill status={k.status} />

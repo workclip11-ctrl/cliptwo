@@ -15,8 +15,9 @@ import {
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
-import { rup, fmtViews, clipEarnings } from "@/lib/format";
-import { financeOf, isEarned } from "@/lib/finance";
+import { rup, fmtViews } from "@/lib/format";
+import { isEarned, payoutSplit } from "@/lib/finance";
+import type { Clip } from "@/lib/types";
 import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
 
@@ -48,15 +49,23 @@ export default function ClipperWalletPage() {
   const { campaigns, clips, profiles, setClipStatus } = useStore();
   const { user } = useAuth();
   const myClips = clips.filter((k) => k.userId === user?.id || !k.userId);
-  const fin = financeOf(myClips, campaigns);
+  // A clipper receives the NET amount (gross minus the platform fee), so every
+  // wallet figure is derived from payoutSplit(...).net — never gross clipEarnings.
+  const netOf = (k: Clip) => payoutSplit(k, campaigns).net;
 
-  const available = fin.paid;
-  const pendingEarnings = fin.outstanding;
+  const available = myClips
+    .filter((k) => k.status === "paid")
+    .reduce((s, k) => s + netOf(k), 0);
+  const pendingEarnings = myClips
+    .filter((k) => ["approved", "payable", "processing", "failed"].includes(k.status))
+    .reduce((s, k) => s + netOf(k), 0);
   const processing = myClips
     .filter((k) => k.status === "processing")
-    .reduce((s, k) => s + clipEarnings(k, campaigns), 0);
-  const totalEarned = fin.earned;
-  const totalPaid = fin.paid;
+    .reduce((s, k) => s + netOf(k), 0);
+  const totalEarned = myClips
+    .filter((k) => isEarned(k.status))
+    .reduce((s, k) => s + netOf(k), 0);
+  const totalPaid = available;
 
   const profile = profiles.find((p) => p.id === user?.id);
   const upi = profile?.upi || UPI_ID;
@@ -74,7 +83,7 @@ export default function ClipperWalletPage() {
   for (const k of myClips) {
     byCampaign.set(
       k.campaignId,
-      (byCampaign.get(k.campaignId) ?? 0) + clipEarnings(k, campaigns),
+      (byCampaign.get(k.campaignId) ?? 0) + netOf(k),
     );
   }
 
@@ -151,7 +160,7 @@ export default function ClipperWalletPage() {
                 ) : (
                   visible.map((k) => {
                     const camp = campaigns.find((c) => c.id === k.campaignId);
-                    const amount = clipEarnings(k, campaigns);
+                    const amount = netOf(k);
                     const earned = isEarned(k.status);
                     return (
                       <tr key={k.id} className="align-top">
@@ -178,9 +187,9 @@ export default function ClipperWalletPage() {
                         <td className="px-4 py-3 text-right font-mono">
                           {fmtViews(k.views)}
                         </td>
-                        <td className="px-4 py-3 text-right font-mono text-muted">
-                          {camp ? rup(camp.payout) : "—"}
-                        </td>
+                         <td className="px-4 py-3 text-right font-mono text-muted">
+                           {rup(k.views > 0 ? amount / (k.views / 1000) : camp?.payout ?? 0)}
+                         </td>
                         <td className="px-4 py-3 text-right font-mono">
                           {earned ? (
                             <span className="text-green">{rup(amount)}</span>
@@ -347,9 +356,9 @@ export default function ClipperWalletPage() {
                           {fmtDate(k.submittedAt)} · Paid
                         </p>
                       </div>
-                      <span className="font-mono font-medium text-green">
-                        +{rup(clipEarnings(k, campaigns))}
-                      </span>
+                       <span className="font-mono font-medium text-green">
+                         +{rup(netOf(k))}
+                       </span>
                     </div>
                   );
                 })

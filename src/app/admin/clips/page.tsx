@@ -77,6 +77,10 @@ export default function AdminClips() {
 
   const fin = financeOf(clips, campaigns);
   const processingFin = financeOf(clips, campaigns, (k) => k.status === "processing");
+  // What clippers actually received = NET of paid clips (gross minus platform fee).
+  const paidNet = clips
+    .filter((k) => k.status === "paid")
+    .reduce((s, k) => s + payoutSplit(k, campaigns).net, 0);
 
   const tabStatuses = TABS.find((t) => t.key === tab)!.statuses;
 
@@ -143,7 +147,7 @@ export default function AdminClips() {
         />
         <SummaryCard
           icon={<Wallet size={18} className="text-blue-500" />}
-          amount={rup(fin.paid)}
+          amount={rup(paidNet)}
           label="Released to clippers"
         />
         <SummaryCard
@@ -640,6 +644,12 @@ function TransactionTable({
                   >
                     View ↗
                   </a>
+                )}
+                {k.status === "failed" && k.failureReason && (
+                  <p className="mt-1 text-xs text-red">Failed: {k.failureReason}</p>
+                )}
+                {k.status === "held" && k.heldReason && (
+                  <p className="mt-1 text-xs text-muted">Held: {k.heldReason}</p>
                 )}
               </td>
               <td className="px-4 py-3 text-right font-mono">{fmtViews(k.views)}</td>
