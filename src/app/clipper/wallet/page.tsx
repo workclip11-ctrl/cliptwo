@@ -199,9 +199,12 @@ export default function ClipperWalletPage() {
                               <div className="mt-2 flex gap-2">
                                 <button
                                   onClick={() =>
-                                    setClipStatus(k.id, "payable", {
-                                      failureReason: undefined,
-                                    })
+                                    setClipStatus(
+                                      k.id,
+                                      "payable",
+                                      { failureReason: undefined },
+                                      user?.email ?? user?.name ?? k.clipper,
+                                    )
                                   }
                                   className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium hover:bg-accent-soft"
                                 >

@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -560,6 +561,10 @@ function ignore(p: PromiseLike<unknown>) {
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<StoreState>(seed);
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  });
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -741,11 +746,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const update: Record<string, unknown> = { status };
         if (patch?.rejectionReason !== undefined)
           update.rejection_reason = patch.rejectionReason;
+        else if (status !== "rejected") update.rejection_reason = null;
         if (patch?.rejectionDetails !== undefined)
           update.rejection_details = patch.rejectionDetails;
+        else if (status !== "rejected") update.rejection_details = null;
         if (patch?.failureReason !== undefined)
           update.failure_reason = patch.failureReason;
-        const existing = state.clips.find((k) => k.id === id);
+        else if (status !== "failed") update.failure_reason = null;
+        const existing = stateRef.current.clips.find((k) => k.id === id);
         update.audit = [
           ...(existing?.audit ?? []),
           {
