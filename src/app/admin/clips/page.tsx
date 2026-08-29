@@ -41,6 +41,8 @@ export default function AdminClips() {
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectDetails, setRejectDetails] = useState("");
+  const [failingId, setFailingId] = useState<string | null>(null);
+  const [failReason, setFailReason] = useState("");
 
   const fin = financeOf(clips, campaigns);
   const list = [...clips]
@@ -215,12 +217,50 @@ export default function AdminClips() {
                       <Wallet size={13} /> Mark paid
                     </button>
                     <button
-                      onClick={() => setClipStatus(k.id, "failed")}
+                      onClick={() => {
+                        setFailingId(k.id);
+                        setFailReason("");
+                      }}
                       className="inline-flex items-center gap-1 rounded-md bg-red/10 px-2.5 py-1 text-xs font-medium text-red"
                     >
                       <Ban size={13} /> Fail
                     </button>
                   </>
+                )}
+                {failingId === k.id && (
+                  <div className="mt-2 space-y-2 rounded-md border border-red/30 bg-red/5 p-2.5">
+                    <p className="text-xs font-medium text-red">Why did the payout fail?</p>
+                    <textarea
+                      value={failReason}
+                      onChange={(e) => setFailReason(e.target.value)}
+                      rows={2}
+                      placeholder="e.g. UPI verification failed"
+                      className="w-full resize-none rounded-md border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-foreground"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setClipStatus(k.id, "failed", {
+                            failureReason: failReason || "Payout failed",
+                          });
+                          setFailingId(null);
+                          setFailReason("");
+                        }}
+                        className="inline-flex items-center gap-1 rounded-md bg-red/10 px-2.5 py-1 text-xs font-medium text-red"
+                      >
+                        <Ban size={13} /> Confirm fail
+                      </button>
+                      <button
+                        onClick={() => {
+                          setFailingId(null);
+                          setFailReason("");
+                        }}
+                        className="rounded-md border px-2.5 py-1 text-xs font-medium"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
                 )}
                 {k.status === "failed" && (
                   <button

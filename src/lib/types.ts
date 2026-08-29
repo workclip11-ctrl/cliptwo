@@ -96,6 +96,7 @@ export interface Clip {
   userId?: string;
   rejectionReason?: string;
   rejectionDetails?: string;
+  failureReason?: string;
 }
 
 export interface Profile {

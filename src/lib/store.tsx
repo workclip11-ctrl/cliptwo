@@ -319,6 +319,19 @@ const seed: StoreState = {
       rejectionReason: "Campaign rule violation",
       rejectionDetails: "Background music was not allowed for this campaign.",
     },
+    {
+      id: "k5",
+      campaignId: "c1",
+      clipper: "maya.cuts",
+      videoUrl: "https://instagram.com/reel/xk51p",
+      caption: "3 quick takes from the keynote",
+      status: "failed",
+      views: 9100,
+      submittedAt: Date.now() - 1000 * 60 * 60 * 30,
+      platform: "Instagram",
+      failureReason:
+        "UPI verification failed — the UPI ID could not be verified. Update your payment method and retry.",
+    },
   ],
   profiles: [],
   siteSettings: {
@@ -404,6 +417,7 @@ function mapClip(r: Record<string, unknown>): Clip {
     userId: r.user_id ? String(r.user_id) : undefined,
     rejectionReason: r.rejection_reason ? String(r.rejection_reason) : undefined,
     rejectionDetails: r.rejection_details ? String(r.rejection_details) : undefined,
+    failureReason: r.failure_reason ? String(r.failure_reason) : undefined,
   };
 }
 
