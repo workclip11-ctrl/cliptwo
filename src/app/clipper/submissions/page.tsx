@@ -78,6 +78,7 @@ export default function ClipperSubmissionsPage() {
   const hasMore = visible.length < sorted.length;
 
   const fin = financeOf(myClips, campaigns);
+  const pendingReview = myClips.filter((k) => k.status === "pending").length;
 
   return (
     <div className="space-y-6">
@@ -103,7 +104,7 @@ export default function ClipperSubmissionsPage() {
         <div className="rounded-xl border bg-card p-4">
           <p className="text-xs text-muted">Pending</p>
           <p className="mt-1 font-mono text-lg font-semibold text-amber">
-            {fin.pendingCount}
+            {pendingReview}
           </p>
         </div>
       </div>
