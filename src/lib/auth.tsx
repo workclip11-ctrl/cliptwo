@@ -132,6 +132,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRole(u.role);
         setIsSignedIn(true);
         ensureProfile(u);
+        // Load this admin's fine-grained permissions so the UI matches the
+        // database RLS enforcement (the super-admin needs no rows).
+        if (u.role === "admin" && isSupabaseConfigured) {
+          void (async () => {
+            try {
+              const { data } = await supabase
+                .from("admin_permissions")
+                .select("permission")
+                .eq("admin_id", u.id);
+              if (!active) return;
+              if (data && data.length) {
+                const perms = data.map((d) => String(d.permission));
+                setUser((prev) => (prev ? { ...prev, permissions: perms } : prev));
+              }
+            } catch {
+              /* non-fatal */
+            }
+          })();
+        }
       } else {
         setUser(null);
         setRole(null);

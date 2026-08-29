@@ -41,6 +41,56 @@ as $$
   );
 $$;
 
+-- Helper: is the current user the seeded super-admin (holds every permission)?
+create or replace function public.is_super_admin()
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and role = 'admin' and email = 'workclip11@gmail.com'
+  );
+$$;
+
+-- Helper: does the current admin hold a specific fine-grained permission?
+-- The super-admin implicitly holds all permissions.
+create or replace function public.admin_has_perm(perm text)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select public.is_super_admin()
+    or exists (
+      select 1
+      from public.admin_permissions ap
+      join public.profiles p on p.id = ap.admin_id
+      where p.id = auth.uid() and p.role = 'admin' and ap.permission = perm
+    );
+$$;
+
+-- Fine-grained admin permissions: which sensitive actions each admin may do.
+-- Grant/revoke rows here, e.g.
+--   insert into public.admin_permissions (admin_id, permission)
+--   values ('<admin-uuid>', 'clipper.suspend');
+create table if not exists public.admin_permissions (
+  admin_id   uuid not null references auth.users (id) on delete cascade,
+  permission text not null,
+  primary key (admin_id, permission)
+);
+
+alter table public.admin_permissions enable row level security;
+
+drop policy if exists "admin_perms_select" on public.admin_permissions;
+create policy "admin_perms_select" on public.admin_permissions
+  for select using (public.is_admin());
+
+drop policy if exists "admin_perms_write" on public.admin_permissions;
+create policy "admin_perms_write" on public.admin_permissions
+  for all using (public.is_super_admin()) with check (public.is_super_admin());
+
 alter table public.profiles enable row level security;
 
 drop policy if exists "profiles_select" on public.profiles;
@@ -51,9 +101,23 @@ drop policy if exists "profiles_insert" on public.profiles;
 create policy "profiles_insert" on public.profiles
   for insert with check (auth.uid() = id);
 
+-- UPDATE is gated per sensitive field. A clipper may edit their own row; an
+-- admin may change a field only if they hold the matching permission (the
+-- super-admin holds all). Non-sensitive fields (name, upi, ...) are free.
 drop policy if exists "profiles_update" on public.profiles;
 create policy "profiles_update" on public.profiles
-  for update using (auth.uid() = id or public.is_admin());
+  for update using (auth.uid() = id or public.is_admin())
+  with check (
+    (OLD.status IS NOT DISTINCT FROM NEW.status OR public.admin_has_perm('clipper.suspend'))
+    AND (OLD.suspended_reason IS NOT DISTINCT FROM NEW.suspended_reason OR public.admin_has_perm('clipper.suspend'))
+    AND (OLD.verified IS NOT DISTINCT FROM NEW.verified OR public.admin_has_perm('clipper.verify'))
+    AND (OLD.verified_at IS NOT DISTINCT FROM NEW.verified_at OR public.admin_has_perm('clipper.verify'))
+    AND (OLD.risk_flag IS NOT DISTINCT FROM NEW.risk_flag OR public.admin_has_perm('clipper.review_risk'))
+    AND (OLD.risk_note IS NOT DISTINCT FROM NEW.risk_note OR public.admin_has_perm('clipper.review_risk'))
+    AND (OLD.admin_notes IS NOT DISTINCT FROM NEW.admin_notes OR public.admin_has_perm('clipper.notes'))
+    AND (OLD.appeals IS NOT DISTINCT FROM NEW.appeals OR public.admin_has_perm('clipper.appeals'))
+    AND (OLD.audit IS NOT DISTINCT FROM NEW.audit OR public.is_admin())
+  );
 
 drop policy if exists "profiles_delete" on public.profiles;
 create policy "profiles_delete" on public.profiles
