@@ -31,6 +31,13 @@ alter table public.profiles add column if not exists audit jsonb;
 alter table public.profiles add column if not exists company text;
 alter table public.profiles add column if not exists team jsonb;
 
+-- Payout ledger columns on clips (no-op if present).
+alter table public.clips add column if not exists txn_id text;
+alter table public.clips add column if not exists payout_ref text;
+alter table public.clips add column if not exists held_reason text;
+alter table public.clips add column if not exists updated_at timestamptz;
+alter table public.clips add column if not exists payout_date timestamptz;
+
 -- Helper: is the current user an admin? (reads the public.profiles table)
 create or replace function public.is_admin()
 returns boolean

@@ -127,6 +127,11 @@ export interface Clip {
   rejectionReason?: string;
   rejectionDetails?: string;
   failureReason?: string;
+  heldReason?: string;
+  txnId?: string;
+  payoutRef?: string;
+  updatedAt?: number;
+  payoutDate?: number;
   engagement?: ClipEngagement;
   audit?: AuditEntry[];
 }

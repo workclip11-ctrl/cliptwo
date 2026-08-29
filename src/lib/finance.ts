@@ -1,6 +1,32 @@
 import type { Campaign, Clip, ClipStatus } from "./types";
 import { clipEarnings } from "./format";
 
+// Platform commission taken from each approved payout. This is the only place
+// the rate lives, so every payout view derives fee/net from it (single source
+// of truth). "Net clipper amount" = gross - fee is what the clipper receives.
+export const PLATFORM_FEE_RATE = 0.15;
+
+export function platformFee(gross: number): number {
+  return Math.round(gross * PLATFORM_FEE_RATE);
+}
+
+export function netClipper(gross: number): number {
+  return gross - platformFee(gross);
+}
+
+export interface PayoutSplit {
+  gross: number;
+  fee: number;
+  net: number;
+}
+
+export function payoutSplit(clip: Clip, campaigns: Campaign[]): PayoutSplit {
+  const gross = clipEarnings(clip, campaigns);
+  const fee = platformFee(gross);
+  return { gross, fee, net: gross - fee };
+}
+
+
 // ---------------------------------------------------------------------------
 // Single source of truth for all financial calculations.
 //

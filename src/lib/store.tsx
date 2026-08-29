@@ -33,6 +33,7 @@ import type {
   StoreState,
 } from "./types";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
+import { EARNED_STATUSES } from "@/lib/finance";
 
 const isoDaysAgo = (n: number) => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
 const isoInDays = (n: number) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
@@ -286,16 +287,17 @@ const seed: StoreState = {
   ],
   clips: [
       {
-        id: "k1",
-        campaignId: "c1",
-        clipper: "maya.cuts",
-        videoUrl: "https://instagram.com/reel/xk29a",
-        caption: "This app is unhinged 🔥 #tech",
-        status: "paid",
-        views: 18400,
-        submittedAt: Date.now() - 1000 * 60 * 60 * 20,
-        platform: "Instagram",
-        engagement: { likes: 2100, comments: 142, shares: 380 },
+      id: "k1",
+      campaignId: "c1",
+      clipper: "maya.cuts",
+      videoUrl: "https://instagram.com/reel/xk29a",
+      caption: "This app is unhinged 🔥 #tech",
+      status: "paid",
+      views: 18400,
+      submittedAt: Date.now() - 1000 * 60 * 60 * 20,
+      platform: "Instagram",
+      payoutDate: Date.now() - 1000 * 60 * 60 * 10,
+      engagement: { likes: 2100, comments: 142, shares: 380 },
         audit: [
           { action: "submitted", by: "maya.cuts", at: Date.now() - 1000 * 60 * 60 * 20 },
           { action: "approved", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 18 },
@@ -635,6 +637,33 @@ const seed: StoreState = {
           action: "approved",
           by: "kabir@standup.app",
           at: Date.now() - 1000 * 60 * 60 * 24 * 1 + 1000 * 60 * 60 * 3,
+        },
+      ],
+    },
+    {
+      id: "kh1",
+      campaignId: "c1",
+      clipper: "simran.k",
+      videoUrl: "https://instagram.com/reel/hold01",
+      caption: "Teaser with unlicensed audio",
+      status: "held",
+      views: 7600,
+      submittedAt: Date.now() - 1000 * 60 * 60 * 24 * 6,
+      platform: "Instagram",
+      heldReason: "Possible copyright claim on background audio — under review.",
+      engagement: { likes: 300, comments: 18, shares: 22 },
+      audit: [
+        { action: "submitted", by: "simran.k", at: Date.now() - 1000 * 60 * 60 * 24 * 6 },
+        {
+          action: "approved",
+          by: "workclip11@gmail.com",
+          at: Date.now() - 1000 * 60 * 60 * 24 * 5,
+        },
+        {
+          action: "held",
+          by: "workclip11@gmail.com",
+          at: Date.now() - 1000 * 60 * 60 * 24 * 4,
+          note: "Possible copyright claim on background audio — under review.",
         },
       ],
     },
@@ -1087,6 +1116,11 @@ function mapClip(r: Record<string, unknown>): Clip {
     rejectionReason: r.rejection_reason ? String(r.rejection_reason) : undefined,
     rejectionDetails: r.rejection_details ? String(r.rejection_details) : undefined,
     failureReason: r.failure_reason ? String(r.failure_reason) : undefined,
+    heldReason: r.held_reason ? String(r.held_reason) : undefined,
+    txnId: r.txn_id ? String(r.txn_id) : undefined,
+    payoutRef: r.payout_ref ? String(r.payout_ref) : undefined,
+    updatedAt: r.updated_at ? new Date(String(r.updated_at)).getTime() : undefined,
+    payoutDate: r.payout_date ? new Date(String(r.payout_date)).getTime() : undefined,
     engagement: (r.engagement as ClipEngagement) ?? undefined,
     audit: Array.isArray(r.audit)
       ? (r.audit as AuditEntry[])
@@ -1341,56 +1375,85 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
        setClipStatus: (id, status, patch, actor) => {
-         setState((s) => {
-           const entry: AuditEntry = {
+          setState((s) => {
+            const at = Date.now();
+            const entry: AuditEntry = {
+              action: status,
+              by: actor,
+              at,
+              note:
+                patch?.rejectionReason ?? patch?.failureReason ?? patch?.heldReason,
+            };
+            return {
+              ...s,
+              clips: s.clips.map((k) => {
+                if (k.id !== id) return k;
+                const earned = EARNED_STATUSES.includes(status);
+                const merged: Clip = {
+                  ...k,
+                  status,
+                  ...patch,
+                  // A clip earns a stable transaction id the moment it becomes a
+                  // financial transaction (approved and beyond). Deriving it from
+                  // the clip id keeps it unique without extra id generation.
+                  txnId: earned ? (k.txnId ?? `TXN-${k.id.toUpperCase()}`) : k.txnId,
+                  updatedAt: at,
+                  payoutDate: status === "paid" ? at : k.payoutDate,
+                  payoutRef:
+                    status === "paid"
+                      ? k.payoutRef ?? `PAY-${k.id.toUpperCase()}-${at}`
+                      : k.payoutRef,
+                  audit: [...(k.audit ?? []), entry],
+                };
+                // Keep local state in sync with the DB: a clip that is no
+                // longer rejected/failed should not show a stale reason.
+                if (status !== "rejected" && patch?.rejectionReason === undefined)
+                  merged.rejectionReason = undefined;
+                if (status !== "failed" && patch?.failureReason === undefined)
+                  merged.failureReason = undefined;
+                if (status !== "held" && patch?.heldReason === undefined)
+                  merged.heldReason = undefined;
+                return merged;
+              }),
+            };
+          });
+         if (!isSupabaseConfigured) return;
+         const update: Record<string, unknown> = { status };
+         if (patch?.rejectionReason !== undefined)
+           update.rejection_reason = patch.rejectionReason;
+         else if (status !== "rejected") update.rejection_reason = null;
+         if (patch?.rejectionDetails !== undefined)
+           update.rejection_details = patch.rejectionDetails;
+         else if (status !== "rejected") update.rejection_details = null;
+         if (patch?.failureReason !== undefined)
+           update.failure_reason = patch.failureReason;
+         else if (status !== "failed") update.failure_reason = null;
+         if (patch?.heldReason !== undefined) update.held_reason = patch.heldReason;
+         else if (status !== "held") update.held_reason = null;
+         const existing = stateRef.current.clips.find((k) => k.id === id);
+         const at = Date.now();
+         update.txn_id =
+           existing && EARNED_STATUSES.includes(status)
+             ? (existing.txnId ?? `TXN-${id.toUpperCase()}`)
+             : existing?.txnId ?? null;
+         update.updated_at = new Date(at).toISOString();
+         if (status === "paid") {
+           update.payout_date = new Date(at).toISOString();
+           update.payout_ref =
+             existing?.payoutRef ?? `PAY-${id.toUpperCase()}-${at}`;
+         }
+         update.audit = [
+           ...(existing?.audit ?? []),
+           {
              action: status,
              by: actor,
-             at: Date.now(),
-             note: patch?.rejectionReason ?? patch?.failureReason,
-           };
-           return {
-             ...s,
-             clips: s.clips.map((k) => {
-               if (k.id !== id) return k;
-               const merged: Clip = {
-                 ...k,
-                 status,
-                 ...patch,
-                 audit: [...(k.audit ?? []), entry],
-               };
-               // Keep local state in sync with the DB: a clip that is no
-               // longer rejected/failed should not show a stale reason.
-               if (status !== "rejected" && patch?.rejectionReason === undefined)
-                 merged.rejectionReason = undefined;
-               if (status !== "failed" && patch?.failureReason === undefined)
-                 merged.failureReason = undefined;
-               return merged;
-             }),
-           };
-         });
-        if (!isSupabaseConfigured) return;
-        const update: Record<string, unknown> = { status };
-        if (patch?.rejectionReason !== undefined)
-          update.rejection_reason = patch.rejectionReason;
-        else if (status !== "rejected") update.rejection_reason = null;
-        if (patch?.rejectionDetails !== undefined)
-          update.rejection_details = patch.rejectionDetails;
-        else if (status !== "rejected") update.rejection_details = null;
-        if (patch?.failureReason !== undefined)
-          update.failure_reason = patch.failureReason;
-        else if (status !== "failed") update.failure_reason = null;
-        const existing = stateRef.current.clips.find((k) => k.id === id);
-        update.audit = [
-          ...(existing?.audit ?? []),
-          {
-            action: status,
-            by: actor,
-            at: Date.now(),
-            note: patch?.rejectionReason ?? patch?.failureReason,
-          },
-        ];
-        ignore(supabase.from("clips").update(update).eq("id", id));
-      },
+             at,
+             note:
+               patch?.rejectionReason ?? patch?.failureReason ?? patch?.heldReason,
+           },
+         ];
+         ignore(supabase.from("clips").update(update).eq("id", id));
+       },
 
       closeCampaign: (id) => {
         setState((s) => ({
