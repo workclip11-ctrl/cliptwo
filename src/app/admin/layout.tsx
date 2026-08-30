@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { LayoutGrid, Users, Film, Megaphone, Globe, Server, ShieldAlert, Menu } from "lucide-react";
+import { LayoutGrid, Users, Film, Megaphone, Globe, Server, ShieldAlert, History, Menu } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
 import { AdminGuard } from "@/components/AdminGuard";
 import { MobileSidebar } from "@/components/MobileSidebar";
@@ -18,6 +18,7 @@ const NAV = [
   { href: "/admin/website", label: "Website", icon: Globe },
   { href: "/admin/backend", label: "Backend", icon: Server },
   { href: "/admin/risk", label: "Risk", icon: ShieldAlert },
+  { href: "/admin/audit", label: "Audit Log", icon: History },
 ];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {

@@ -36,6 +36,7 @@ import type {
 import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
 import { EARNED_STATUSES, isEarned, financeOf, campaignBudget, wouldExceedBudget, canAcceptSubmission } from "@/lib/finance";
 import { clipEarnings } from "@/lib/format";
+import { appendAuditLog, initAuditLogs } from "@/lib/audit";
 
 const isoDaysAgo = (n: number) => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
 const isoInDays = (n: number) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
@@ -1182,6 +1183,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     stateRef.current = state;
   });
 
+  // Initialize audit log store from localStorage on mount
+  useEffect(() => {
+    initAuditLogs();
+  }, []);
+
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     let active = true;
@@ -1273,6 +1279,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           status,
         };
         setState((s) => ({ ...s, campaigns: [optimistic, ...s.campaigns] }));
+        appendAuditLog({
+          actor: c.creator ?? "creator",
+          action: "campaign_created",
+          targetType: "campaign",
+          targetId: optimistic.id,
+          targetLabel: c.title,
+          newValue: status,
+        });
 
         if (!isSupabaseConfigured) return;
         (async () => {
@@ -1541,12 +1555,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                     supabase
                       .from("campaigns")
                       .update({ status: newStatus })
-                      .eq("id", c.id),
-                  );
-                }
-              }
-            }
-          }
+                       .eq("id", c.id),
+                   );
+                 }
+               }
+             }
+           }
+
+            // ── Centralized audit log ──
+           const clipAfterState = stateRef.current.clips.find((k) => k.id === id);
+           const campLabel = clipAfterState
+             ? stateRef.current.campaigns.find((c) => c.id === clipAfterState.campaignId)?.title ?? clipAfterState.campaignId
+             : id;
+           const auditBase = { actor: actor ?? "admin", targetType: "clip" as const, targetId: id, targetLabel: campLabel };
+           if (status === "approved") appendAuditLog({ ...auditBase, action: "clip_approved", newValue: status, reason: patch?.rejectionReason ?? patch?.failureReason ?? patch?.heldReason });
+           else if (status === "rejected") appendAuditLog({ ...auditBase, action: "clip_rejected", newValue: status, reason: patch?.rejectionReason });
+           else if (status === "held") appendAuditLog({ ...auditBase, action: "clip_held", newValue: status, reason: patch?.heldReason });
+           else if (status === "processing") appendAuditLog({ ...auditBase, action: "payout_initiated" });
+           else if (status === "paid") appendAuditLog({ ...auditBase, action: "payout_completed" });
+           else if (status === "failed") appendAuditLog({ ...auditBase, action: "payout_failed", reason: patch?.failureReason });
         },
 
       closeCampaign: (id) => {
@@ -1556,6 +1583,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             c.id === id ? { ...c, status: "closed" } : c,
           ),
         }));
+        const camp = stateRef.current.campaigns.find((c) => c.id === id);
+        appendAuditLog({
+          actor: "admin",
+          action: "campaign_closed",
+          targetType: "campaign",
+          targetId: id,
+          targetLabel: camp?.title ?? id,
+          previousValue: camp?.status,
+          newValue: "closed",
+        });
         if (!isSupabaseConfigured) return;
         ignore(
           supabase.from("campaigns").update({ status: "closed" }).eq("id", id),
@@ -1585,13 +1622,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             ),
           };
         });
+        const existing = stateRef.current.campaigns.find((c) => c.id === id);
+        appendAuditLog({
+          actor: actor ?? "admin",
+          action: "campaign_edited",
+          targetType: "campaign",
+          targetId: id,
+          targetLabel: existing?.title ?? id,
+          previousValue: existing ? JSON.stringify({ status: existing.status, payout: existing.payout, budget: existing.budget }) : undefined,
+          newValue: JSON.stringify(patch),
+          reason: note,
+        });
         if (!isSupabaseConfigured) return;
         const update: Record<string, unknown> = {};
         for (const [k, v] of Object.entries(patch)) {
           const col = CAMPAIGN_DB_MAP[k];
           if (col) update[col] = (v as unknown) ?? null;
         }
-        const existing = stateRef.current.campaigns.find((c) => c.id === id);
         update.audit = [
           ...(existing?.audit ?? []),
           {
@@ -1610,6 +1657,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             ? { status, suspendedReason: reason }
             : { status, suspendedReason: undefined };
         adminProfilePatch(id, patch, actor, status === "suspended" ? "suspended" : "reactivated", reason);
+        const prof = stateRef.current.profiles.find((p) => p.id === id);
+        appendAuditLog({
+          actor: actor ?? "admin",
+          action: status === "suspended" ? "user_suspended" : "user_reactivated",
+          targetType: "user",
+          targetId: id,
+          targetLabel: prof?.name ?? prof?.email ?? id,
+          previousValue: status === "suspended" ? "active" : "suspended",
+          newValue: status,
+          reason,
+        });
       },
 
       verifyProfile: (id, actor, verified) => {
@@ -1621,6 +1679,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           actor,
           verified ? "verified" : "unverified",
         );
+        const prof = stateRef.current.profiles.find((p) => p.id === id);
+        appendAuditLog({
+          actor: actor ?? "admin",
+          action: verified ? "user_verified" : "user_unverified",
+          targetType: "user",
+          targetId: id,
+          targetLabel: prof?.name ?? prof?.email ?? id,
+          previousValue: verified ? "unverified" : "verified",
+          newValue: verified ? "verified" : "unverified",
+        });
       },
 
       setProfileRisk: (id, actor, flagged, note) => {
@@ -1631,10 +1699,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           flagged ? "risk_flagged" : "risk_cleared",
           note,
         );
+        const prof = stateRef.current.profiles.find((p) => p.id === id);
+        appendAuditLog({
+          actor: actor ?? "admin",
+          action: flagged ? "fraud_flag_created" : "fraud_flag_cleared",
+          targetType: "fraud",
+          targetId: id,
+          targetLabel: prof?.name ?? prof?.email ?? id,
+          previousValue: flagged ? "clear" : "flagged",
+          newValue: flagged ? "flagged" : "clear",
+          reason: note,
+        });
       },
 
       saveAdminNotes: (id, notes, actor) => {
         adminProfilePatch(id, { adminNotes: notes }, actor, "admin_notes");
+        const prof = stateRef.current.profiles.find((p) => p.id === id);
+        appendAuditLog({
+          actor: actor ?? "admin",
+          action: "admin_notes",
+          targetType: "user",
+          targetId: id,
+          targetLabel: prof?.name ?? prof?.email ?? id,
+          reason: notes,
+        });
       },
 
       respondToAppeal: (id, appealId, response, status, actor) => {
@@ -1644,6 +1732,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           a.id === appealId ? { ...a, status, response, at: a.at } : a,
         );
         adminProfilePatch(id, { appeals }, actor, "appeal_response", response);
+        appendAuditLog({
+          actor: actor ?? "admin",
+          action: "appeal_response",
+          targetType: "user",
+          targetId: id,
+          targetLabel: profile.name ?? profile.email ?? id,
+          newValue: status,
+          reason: response,
+        });
       },
 
       deleteProfile: (id) => {

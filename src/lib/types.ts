@@ -244,3 +244,46 @@ export interface StoreState {
   siteSettings: SiteSettings;
   savedCampaigns: string[];
 }
+
+// ── Centralized Admin Audit Log ──────────────────────────────────────────────
+
+export type AuditAction =
+  | "user_created"
+  | "user_suspended"
+  | "user_reactivated"
+  | "user_verified"
+  | "user_unverified"
+  | "campaign_created"
+  | "campaign_edited"
+  | "campaign_paused"
+  | "campaign_ended"
+  | "campaign_closed"
+  | "clip_approved"
+  | "clip_rejected"
+  | "clip_held"
+  | "earnings_adjusted"
+  | "payout_initiated"
+  | "payout_completed"
+  | "payout_failed"
+  | "fraud_flag_created"
+  | "fraud_flag_cleared"
+  | "account_changed"
+  | "permission_changed"
+  | "admin_notes"
+  | "appeal_response"
+  | "risk_flagged"
+  | "risk_cleared"
+  | "other";
+
+export interface AuditLog {
+  id: string;
+  timestamp: number;
+  actor: string;
+  action: AuditAction;
+  targetType: "user" | "campaign" | "clip" | "system" | "fraud";
+  targetId: string;
+  targetLabel?: string;
+  previousValue?: string;
+  newValue?: string;
+  reason?: string;
+}

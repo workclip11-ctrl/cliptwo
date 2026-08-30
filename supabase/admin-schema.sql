@@ -272,3 +272,26 @@ create table if not exists public.notifications (
 -- Indexes for performance
 create index if not exists notifications_user_id_idx on public.notifications(user_id);
 create index if not exists notifications_read_idx on public.notifications(read);
+
+-- ---------------------------------------------------------------------------
+-- Audit Log — append-only record of all admin actions
+-- ---------------------------------------------------------------------------
+create table if not exists public.audit_logs (
+  id             text primary key,
+  timestamp      timestamptz not null default now(),
+  actor          text not null,
+  action         text not null,
+  target_type    text not null,
+  target_id      text not null,
+  target_label   text,
+  previous_value text,
+  new_value      text,
+  reason         text
+);
+
+-- Indexes for search and filtering
+create index if not exists audit_logs_timestamp_idx on public.audit_logs(timestamp desc);
+create index if not exists audit_logs_action_idx on public.audit_logs(action);
+create index if not exists audit_logs_target_type_idx on public.audit_logs(target_type);
+create index if not exists audit_logs_actor_idx on public.audit_logs(actor);
+create index if not exists audit_logs_target_id_idx on public.audit_logs(target_id);
