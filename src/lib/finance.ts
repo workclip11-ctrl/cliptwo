@@ -141,3 +141,78 @@ export function financeOf(
 export function campaignSpent(campaign: Campaign, clips: Clip[]): number {
   return financeOf(clips, [campaign], (k) => k.campaignId === campaign.id).paid;
 }
+
+// ---------------------------------------------------------------------------
+// Strict campaign budget protection
+//
+// Every financial operation must go through these guards. The campaign's
+// `budget` is the hard ceiling — no combination of earned clips may exceed it.
+// ---------------------------------------------------------------------------
+
+export interface CampaignBudget {
+  total: number;
+  spent: number;
+  payable: number;
+  reserved: number;
+  remaining: number;
+  utilizationPct: number;
+  status: "ok" | "near_budget" | "budget_reached";
+}
+
+const NEAR_BUDGET_THRESHOLD = 0.9;
+
+export function campaignBudget(campaign: Campaign, clips: Clip[]): CampaignBudget {
+  const budget = campaign.budget ?? 0;
+  const fin = financeOf(
+    clips,
+    [campaign],
+    (k) => k.campaignId === campaign.id,
+  );
+  const spent = fin.paid;
+  const payable = fin.outstanding;
+  const reserved = spent + payable;
+  const remaining = Math.max(0, budget - reserved);
+  const utilizationPct = budget > 0 ? Math.min(100, (reserved / budget) * 100) : 0;
+
+  let status: CampaignBudget["status"] = "ok";
+  if (budget > 0 && reserved >= budget) {
+    status = "budget_reached";
+  } else if (budget > 0 && utilizationPct >= NEAR_BUDGET_THRESHOLD * 100) {
+    status = "near_budget";
+  }
+
+  return { total: budget, spent, payable, reserved, remaining, utilizationPct, status };
+}
+
+export function canAcceptMorePayable(campaign: Campaign, clips: Clip[]): boolean {
+  const budget = campaign.budget ?? 0;
+  if (budget <= 0) return true;
+  const b = campaignBudget(campaign, clips);
+  return b.remaining > 0 && b.status !== "budget_reached";
+}
+
+export function canAcceptSubmission(campaign: Campaign, clips: Clip[]): boolean {
+  if (campaign.status !== "open") return false;
+  const budget = campaign.budget ?? 0;
+  if (budget <= 0) return true;
+  const b = campaignBudget(campaign, clips);
+  return b.status === "ok";
+}
+
+export function wouldExceedBudget(
+  campaign: Campaign,
+  clips: Clip[],
+  additionalEarnings: number,
+): boolean {
+  const budget = campaign.budget ?? 0;
+  if (budget <= 0) return false;
+  const b = campaignBudget(campaign, clips);
+  return b.remaining < additionalEarnings;
+}
+
+export function budgetStatusText(campaign: Campaign, clips: Clip[]): string {
+  const b = campaignBudget(campaign, clips);
+  if (b.status === "budget_reached") return "Budget Reached";
+  if (b.status === "near_budget") return "Near Budget";
+  return "OK";
+}

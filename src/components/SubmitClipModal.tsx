@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Send } from "lucide-react";
+import { Send, AlertTriangle } from "lucide-react";
 import { PlatformIcon } from "@/components/PlatformIcon";
+import { useStore } from "@/lib/store";
+import { campaignBudget } from "@/lib/finance";
 import type { Campaign, Platform } from "@/lib/types";
 
 function rup(n: number) {
@@ -25,9 +27,15 @@ export function SubmitClipModal({
   onClose: () => void;
   onSubmit: (caption: string, videoUrl: string, platform: Platform) => void;
 }) {
+  const { clips } = useStore();
   const [caption, setCaption] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [platform, setPlatform] = useState<Platform>(campaign.platform);
+
+  const budget = campaignBudget(campaign, clips);
+  const isAtBudget = budget.status === "budget_reached";
+  const isNearBudget = budget.status === "near_budget";
+  const isDisabled = isAtBudget || !videoUrl || !caption;
 
   return (
     <div
@@ -47,6 +55,32 @@ export function SubmitClipModal({
           </span>{" "}
           per 1,000 verified views.
         </p>
+
+        {isAtBudget && (
+          <div className="mt-3 flex items-start gap-2 rounded-lg border border-red/30 bg-red/5 p-3">
+            <AlertTriangle size={16} className="mt-0.5 shrink-0 text-red" />
+            <div>
+              <p className="text-xs font-medium text-red">Campaign budget reached</p>
+              <p className="mt-0.5 text-xs text-muted">
+                This campaign has reached its budget of {rup(campaign.budget ?? 0)}.
+                Submissions are temporarily closed.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {isNearBudget && !isAtBudget && (
+          <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber/30 bg-amber/5 p-3">
+            <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber" />
+            <div>
+              <p className="text-xs font-medium text-amber">Near budget limit</p>
+              <p className="mt-0.5 text-xs text-muted">
+                Only {rup(budget.remaining)} remaining. Your clip may be rejected
+                if the budget is reached before approval.
+              </p>
+            </div>
+          </div>
+        )}
 
         <label className="mt-4 block text-sm font-medium">Platform</label>
         <div className="mt-1.5 flex gap-2">
@@ -90,11 +124,11 @@ export function SubmitClipModal({
             Cancel
           </button>
           <button
-            disabled={!videoUrl || !caption}
+            disabled={isDisabled}
             onClick={() => onSubmit(caption, videoUrl, platform)}
             className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
           >
-            <Send size={13} /> Submit for review
+            <Send size={13} /> {isAtBudget ? "Submissions closed" : "Submit for review"}
           </button>
         </div>
       </div>

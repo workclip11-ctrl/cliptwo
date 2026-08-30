@@ -1,6 +1,12 @@
 export type Platform = "TikTok" | "YouTube" | "Instagram" | "Reels";
 
-export type CampaignStatus = "open" | "closed" | "draft" | "paused";
+export type CampaignStatus =
+  | "open"
+  | "closed"
+  | "draft"
+  | "paused"
+  | "budget_reached"
+  | "near_budget";
 
 export interface CampaignSourceAsset {
   label: string;
@@ -52,6 +58,9 @@ export interface Campaign {
   niche?: string;
   budget?: number;
   spent?: number;
+  reservedBudget?: number;
+  payableAmount?: number;
+  remainingBudget?: number;
   daysLeft?: number;
   sourceLink?: string;
   rules?: string;

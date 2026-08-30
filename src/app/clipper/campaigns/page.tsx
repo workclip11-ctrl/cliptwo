@@ -38,7 +38,9 @@ export default function ClipperCampaignsPage() {
   }, [campaigns]);
 
   const list = useMemo(() => {
-    const active = campaigns.filter((c) => c.status === "open");
+    const active = campaigns.filter(
+      (c) => c.status === "open" || c.status === "near_budget",
+    );
 
     const filtered = active.filter((c) => {
       if (showSaved && !savedCampaigns.includes(c.id)) return false;

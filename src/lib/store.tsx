@@ -34,7 +34,8 @@ import type {
   StoreState,
 } from "./types";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
-import { EARNED_STATUSES, isEarned, financeOf } from "@/lib/finance";
+import { EARNED_STATUSES, isEarned, financeOf, campaignBudget, wouldExceedBudget, canAcceptSubmission } from "@/lib/finance";
+import { clipEarnings } from "@/lib/format";
 
 const isoDaysAgo = (n: number) => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
 const isoInDays = (n: number) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
@@ -1338,6 +1339,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
       addClip: (k) => {
+        // --- Server-side budget enforcement for new submissions ---
+        // Prevent new submissions when campaign is closed, paused, or at budget.
+        const cur = stateRef.current;
+        const camp = cur.campaigns.find((c) => c.id === k.campaignId);
+        if (camp) {
+          if (camp.status !== "open") {
+            console.error(
+              `Budget protection: rejecting submission for campaign "${camp.title}". ` +
+                `Campaign status is "${camp.status}".`,
+            );
+            return;
+          }
+          if (!canAcceptSubmission(camp, cur.clips)) {
+            console.error(
+              `Budget protection: rejecting submission for campaign "${camp.title}". ` +
+                `Campaign has reached its budget.`,
+            );
+            return;
+          }
+        }
+
         const optimistic: Clip = {
           ...k,
           id: `k${Date.now()}`,
@@ -1379,6 +1401,37 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
        setClipStatus: (id, status, patch, actor) => {
+          // --- Server-side budget enforcement ---
+          // When transitioning to an earned status, verify the campaign budget
+          // will not be exceeded. This is the authoritative guard; frontend
+          // checks are convenience only.
+          const isTransitioningToEarned = EARNED_STATUSES.includes(status);
+          if (isTransitioningToEarned) {
+            const cur = stateRef.current;
+            const clip = cur.clips.find((k) => k.id === id);
+            if (clip) {
+              const camp = cur.campaigns.find((c) => c.id === clip.campaignId);
+              if (camp) {
+                const clipAlreadyEarned = EARNED_STATUSES.includes(clip.status);
+                if (!clipAlreadyEarned) {
+                  const additionalEarnings = clipEarnings(
+                    { ...clip, status } as Clip,
+                    cur.campaigns,
+                  );
+                  if (wouldExceedBudget(camp, cur.clips, additionalEarnings)) {
+                    const b = campaignBudget(camp, cur.clips);
+                    console.error(
+                      `Budget protection: rejecting status change for clip ${id}. ` +
+                        `Campaign "${camp.title}" would exceed budget. ` +
+                        `Remaining: ₹${b.remaining}, additional: ₹${additionalEarnings}`,
+                    );
+                    return stateRef.current;
+                  }
+                }
+              }
+            }
+          }
+
           setState((s) => {
             const at = Date.now();
             const entry: AuditEntry = {
@@ -1456,8 +1509,45 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                patch?.rejectionReason ?? patch?.failureReason ?? patch?.heldReason,
            },
          ];
-         ignore(supabase.from("clips").update(update).eq("id", id));
-       },
+          ignore(supabase.from("clips").update(update).eq("id", id));
+
+          // Auto-update campaign budget status after any clip financial change.
+          if (isTransitioningToEarned) {
+            const after = stateRef.current;
+            const clipAfter = after.clips.find((k) => k.id === id);
+            if (clipAfter) {
+              const c = after.campaigns.find((x) => x.id === clipAfter.campaignId);
+              if (c && c.budget && c.budget > 0) {
+                const b = campaignBudget(c, after.clips);
+                let newStatus: CampaignStatus = c.status;
+                if (b.status === "budget_reached" && c.status === "open") {
+                  newStatus = "budget_reached";
+                } else if (b.status === "near_budget" && c.status === "open") {
+                  newStatus = "near_budget";
+                } else if (
+                  b.status === "ok" &&
+                  (c.status === "budget_reached" || c.status === "near_budget")
+                ) {
+                  newStatus = "open";
+                }
+                if (newStatus !== c.status) {
+                  setState((s) => ({
+                    ...s,
+                    campaigns: s.campaigns.map((x) =>
+                      x.id === c.id ? { ...x, status: newStatus } : x,
+                    ),
+                  }));
+                  ignore(
+                    supabase
+                      .from("campaigns")
+                      .update({ status: newStatus })
+                      .eq("id", c.id),
+                  );
+                }
+              }
+            }
+          }
+        },
 
       closeCampaign: (id) => {
         setState((s) => ({

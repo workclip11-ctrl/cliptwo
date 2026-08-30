@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Heart } from "lucide-react";
+import { Heart, AlertTriangle } from "lucide-react";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { StatusPill } from "@/components/StatusPill";
 import { useStore } from "@/lib/store";
+import { campaignBudget } from "@/lib/finance";
 import type { Campaign } from "@/lib/types";
 
 const GRADIENTS = [
@@ -32,9 +33,8 @@ export function CampaignCard({
     clips.filter((k) => k.campaignId === campaign.id).map((k) => k.clipper),
   ).size;
   const isSaved = savedCampaigns.includes(campaign.id);
-  const budget = campaign.budget ?? 0;
-  const spent = campaign.spent ?? 0;
-  const remaining = budget - spent;
+  const b = campaignBudget(campaign, clips);
+  const remaining = b.remaining;
 
   const inner = (
     <>
@@ -75,9 +75,31 @@ export function CampaignCard({
           <span className="font-mono text-amber">{rup(campaign.payout)}/1K</span>
         </div>
         <div className="mt-2 flex items-center justify-between text-xs text-muted">
-          <span>Budget: {rup(remaining)} left</span>
+          <span className="flex items-center gap-1">
+            {b.status === "budget_reached" && (
+              <AlertTriangle size={11} className="text-red" />
+            )}
+            {b.status === "near_budget" && (
+              <AlertTriangle size={11} className="text-amber" />
+            )}
+            Budget: {b.total > 0 ? `${rup(remaining)} left` : "Flexible"}
+          </span>
           <span>{campaign.daysLeft}d left</span>
         </div>
+        {b.total > 0 && (
+          <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-muted/20">
+            <div
+              className={`h-full rounded-full ${
+                b.status === "budget_reached"
+                  ? "bg-red"
+                  : b.status === "near_budget"
+                    ? "bg-amber"
+                    : "bg-accent"
+              }`}
+              style={{ width: `${Math.min(100, b.utilizationPct)}%` }}
+            />
+          </div>
+        )}
         {campaign.viewRules?.minViews != null && campaign.viewRules.minViews > 0 && (
           <p className="mt-1 text-xs text-muted">
             Min views: {campaign.viewRules.minViews.toLocaleString()}

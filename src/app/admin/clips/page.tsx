@@ -20,7 +20,7 @@ import { PlatformIcon } from "@/components/PlatformIcon";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup, fmtViews, clipEarnings } from "@/lib/format";
-import { financeOf, isEarned, payoutSplit, PLATFORM_FEE_RATE } from "@/lib/finance";
+import { financeOf, payoutSplit, PLATFORM_FEE_RATE, campaignBudget } from "@/lib/finance";
 import { clipCPM } from "@/lib/analytics";
 import type { Campaign, Clip, ClipStatus } from "@/lib/types";
 
@@ -102,15 +102,14 @@ export default function AdminClips() {
 
   const approve = (k: Clip) => {
     const c = campaigns.find((x) => x.id === k.campaignId);
-    if (c?.budget != null) {
-      const campEarned = clips
-        .filter((x) => x.campaignId === c.id && isEarned(x.status))
-        .reduce((s, x) => s + clipEarnings(x, campaigns), 0);
-      if (campEarned + clipEarnings(k, campaigns) > c.budget) {
+    if (c?.budget && c.budget > 0) {
+      const b = campaignBudget(c, clips);
+      const additional = clipEarnings(k, campaigns);
+      if (b.remaining < additional) {
         alert(
-          `Cannot approve: this would exceed the campaign budget (${rup(
-            c.budget,
-          )}). Raise the budget or reject the clip.`,
+          `Cannot approve: campaign budget would be exceeded.\n` +
+            `Budget: ${rup(c.budget)} | Used: ${rup(b.reserved)} | Remaining: ${rup(b.remaining)}\n` +
+            `This clip would add: ${rup(additional)}`,
         );
         return;
       }
@@ -156,6 +155,25 @@ export default function AdminClips() {
           label="Held / disputed"
         />
       </div>
+
+      {(() => {
+        const atBudget = campaigns.filter(
+          (c) => c.status === "budget_reached" || c.status === "near_budget",
+        );
+        if (atBudget.length === 0) return null;
+        return (
+          <div className="rounded-xl border border-amber/30 bg-amber/5 p-3">
+            <p className="text-xs font-medium text-amber">
+              {atBudget.length} campaign{atBudget.length === 1 ? " is" : "s are"}{" "}
+              {atBudget.length === 1 ? "at" : "near"} budget limit
+            </p>
+            <p className="mt-1 text-xs text-muted">
+              New approvals for these campaigns may be blocked. Review budget
+              allocation before proceeding.
+            </p>
+          </div>
+        );
+      })()}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-1.5">
