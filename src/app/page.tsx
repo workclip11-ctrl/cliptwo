@@ -452,7 +452,7 @@ function FAQ() {
   const cat = FAQ_CATEGORIES.find((c) => c.title === tab)!;
   return (
     <div>
-      <div className="mb-4 flex flex-wrap gap-1.5">
+      <div className="mx-auto mb-6 flex w-fit rounded-full border bg-card p-1">
         {FAQ_CATEGORIES.map((c) => (
           <button
             key={c.title}
@@ -460,10 +460,10 @@ function FAQ() {
               setTab(c.title);
               setOpen(null);
             }}
-            className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors ${
+            className={`relative rounded-full px-5 py-2 text-sm font-medium transition-colors ${
               tab === c.title
                 ? "bg-accent text-white"
-                : "text-muted hover:bg-accent-soft"
+                : "text-muted hover:text-foreground"
             }`}
           >
             {c.title}
