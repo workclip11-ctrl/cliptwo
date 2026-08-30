@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { Suspense, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Scissors, ArrowRight } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
@@ -10,10 +10,13 @@ import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
 type Mode = "signin" | "signup";
 type Role = "clipper" | "creator";
 
-export default function AuthPage() {
+function AuthForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { signIn, signUp } = useAuth();
-  const [mode, setMode] = useState<Mode>("signin");
+  const [mode, setMode] = useState<Mode>(
+    searchParams.get("mode") === "signup" ? "signup" : "signin",
+  );
   const [role, setRole] = useState<Role>("clipper");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -180,5 +183,13 @@ export default function AuthPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense>
+      <AuthForm />
+    </Suspense>
   );
 }

@@ -630,7 +630,7 @@ export default function Home() {
             <Link href="/login" className="rounded-lg border px-3.5 py-1.5 text-sm font-medium hover:bg-accent-soft">
               Sign in
             </Link>
-            <Link href="/creator" className="rounded-lg bg-accent px-3.5 py-1.5 text-sm font-medium text-white hover:opacity-90">
+            <Link href="/login?mode=signup" className="rounded-lg bg-accent px-3.5 py-1.5 text-sm font-medium text-white hover:opacity-90">
               Get started
             </Link>
           </div>
