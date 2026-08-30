@@ -89,7 +89,7 @@ export function SubmitClipModal({
               key={p}
               type="button"
               onClick={() => setPlatform(p)}
-              className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium ${platform === p ? "border-accent bg-accent-soft" : "text-muted"}`}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 py-2.5 text-sm font-medium sm:flex-initial ${platform === p ? "border-accent bg-accent-soft" : "text-muted"}`}
             >
               <PlatformIcon p={p} size={14} /> {p}
             </button>
@@ -116,17 +116,17 @@ export function SubmitClipModal({
           className="mt-1 w-full resize-none rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
         />
 
-        <div className="mt-6 flex justify-end gap-2">
+        <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button
             onClick={onClose}
-            className="rounded-lg border px-3 py-1.5 text-sm font-medium"
+            className="rounded-lg border px-3 py-2.5 text-sm font-medium sm:py-1.5"
           >
             Cancel
           </button>
           <button
             disabled={isDisabled}
             onClick={() => onSubmit(caption, videoUrl, platform)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40 sm:py-1.5"
           >
             <Send size={13} /> {isAtBudget ? "Submissions closed" : "Submit for review"}
           </button>

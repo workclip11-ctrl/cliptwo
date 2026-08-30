@@ -129,8 +129,8 @@ export default function ClipperCampaignsPage() {
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[200px] max-w-md">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:flex-wrap">
+        <div className="relative min-w-0 flex-1 sm:max-w-md">
           <Search
             size={15}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
@@ -139,55 +139,57 @@ export default function ClipperCampaignsPage() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search campaigns..."
-            className="w-full rounded-lg border bg-background py-2 pl-9 pr-3 text-sm outline-none focus:border-foreground"
+            className="w-full rounded-lg border bg-background py-2.5 pl-9 pr-3 text-sm outline-none focus:border-foreground"
           />
         </div>
 
-        <select
-          value={sort}
-          onChange={(e) => setSort(e.target.value)}
-          className="rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
-        >
-          {SORT_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+        <div className="flex flex-wrap gap-2">
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+            className="flex-1 rounded-lg border bg-background px-3 py-2.5 text-sm outline-none focus:border-foreground sm:flex-initial"
+          >
+            {SORT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
 
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-            showFilters || activeFilterCount > 0
-              ? "border-foreground bg-accent-soft text-foreground"
-              : "text-muted hover:bg-accent-soft/60"
-          }`}
-        >
-          <SlidersHorizontal size={15} />
-          Filters
-          {activeFilterCount > 0 && (
-            <span className="rounded-full bg-accent px-1.5 text-[10px] text-white">
-              {activeFilterCount}
-            </span>
-          )}
-        </button>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors sm:flex-initial ${
+              showFilters || activeFilterCount > 0
+                ? "border-foreground bg-accent-soft text-foreground"
+                : "text-muted hover:bg-accent-soft/60"
+            }`}
+          >
+            <SlidersHorizontal size={15} />
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="rounded-full bg-accent px-1.5 text-[10px] text-white">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
 
-        <button
-          onClick={() => setShowSaved(!showSaved)}
-          className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-            showSaved
-              ? "border-foreground bg-accent-soft text-foreground"
-              : "text-muted hover:bg-accent-soft/60"
-          }`}
-        >
-          <Heart size={15} className={showSaved ? "fill-red text-red" : ""} />
-          Saved
-          {savedCampaigns.length > 0 && (
-            <span className="rounded-full bg-accent px-1.5 text-[10px] text-white">
-              {savedCampaigns.length}
-            </span>
-          )}
-        </button>
+          <button
+            onClick={() => setShowSaved(!showSaved)}
+            className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors sm:flex-initial ${
+              showSaved
+                ? "border-foreground bg-accent-soft text-foreground"
+                : "text-muted hover:bg-accent-soft/60"
+            }`}
+          >
+            <Heart size={15} className={showSaved ? "fill-red text-red" : ""} />
+            Saved
+            {savedCampaigns.length > 0 && (
+              <span className="rounded-full bg-accent px-1.5 text-[10px] text-white">
+                {savedCampaigns.length}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
       {showFilters && (

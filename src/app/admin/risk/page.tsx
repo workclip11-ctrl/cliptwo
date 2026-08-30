@@ -80,8 +80,8 @@ export default function AdminRiskPage() {
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[200px] max-w-md">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:flex-wrap">
+        <div className="relative min-w-0 flex-1 sm:max-w-md">
           <Search
             size={15}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
@@ -90,7 +90,7 @@ export default function AdminRiskPage() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search clipper or campaign..."
-            className="w-full rounded-lg border bg-background py-2 pl-9 pr-3 text-sm outline-none focus:border-foreground"
+            className="w-full rounded-lg border bg-background py-2.5 pl-9 pr-3 text-sm outline-none focus:border-foreground"
           />
         </div>
         <select

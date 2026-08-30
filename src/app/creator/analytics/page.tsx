@@ -159,7 +159,8 @@ export default function CreatorAnalyticsPage() {
               No clippers yet.
             </div>
           ) : (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[400px] text-sm">
               <thead>
                 <tr className="border-b text-left text-xs text-muted">
                   <th className="px-4 py-3 font-medium">#</th>
@@ -183,6 +184,7 @@ export default function CreatorAnalyticsPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </section>

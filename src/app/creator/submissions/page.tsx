@@ -108,8 +108,8 @@ export default function CreatorSubmissionsPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[200px]">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:flex-wrap">
+        <div className="relative min-w-0 flex-1">
           <Search
             size={15}
             className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
@@ -118,15 +118,15 @@ export default function CreatorSubmissionsPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search clipper, caption or campaign"
-            className="w-full rounded-xl border bg-card py-2 pl-9 pr-3 text-sm outline-none focus:border-foreground/30"
+            className="w-full rounded-xl border bg-card py-2.5 pl-9 pr-3 text-sm outline-none focus:border-foreground/30"
           />
         </div>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="-mx-4 flex overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:overflow-visible">
           {FILTERS.map((f) => (
             <button
               key={f.key}
               onClick={() => setFilter(f.key)}
-              className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+              className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium transition ${
                 filter === f.key
                   ? "border-foreground bg-foreground text-background"
                   : "text-muted hover:border-foreground/30 hover:text-foreground"

@@ -187,7 +187,8 @@ export default function CreatorPage() {
           Top clips
         </h2>
         <div className="overflow-hidden rounded-2xl border bg-card">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[400px] text-sm">
             <thead>
               <tr className="border-b text-left text-xs text-muted">
                 <th className="px-4 py-3 font-medium">Clipper</th>
@@ -219,6 +220,7 @@ export default function CreatorPage() {
               ))}
             </tbody>
           </table>
+          </div>
                {topClips.length === 0 && (
                 <p className="p-6 text-center text-sm text-muted">
                   No earned clips yet.

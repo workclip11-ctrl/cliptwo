@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import type { ReactNode } from "react";
-import { LayoutGrid, Megaphone, Film, Wallet, Settings, BarChart3 } from "lucide-react";
+import { LayoutGrid, Megaphone, Film, Wallet, Settings, BarChart3, Menu } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
 import { AuthGuard } from "@/components/AuthGuard";
+import { MobileSidebar } from "@/components/MobileSidebar";
 
 const NAV = [
   { href: "/creator", label: "Dashboard", icon: LayoutGrid, exact: true },
@@ -18,13 +20,32 @@ const NAV = [
 
 export default function CreatorLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
     <AuthGuard role="creator">
       <main className="min-h-screen bg-background">
         <TopBar active="creator" />
-        <div className="mx-auto flex max-w-6xl gap-8 px-6 py-8">
-          <aside className="w-56 shrink-0">
+        <div className="mx-auto flex max-w-6xl gap-8 px-4 py-6 sm:px-6 sm:py-8">
+          {/* Mobile hamburger */}
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="fixed bottom-4 left-4 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-accent text-white shadow-lg sm:hidden"
+            aria-label="Open navigation"
+          >
+            <Menu size={20} />
+          </button>
+
+          {/* Mobile sidebar */}
+          <MobileSidebar
+            open={sidebarOpen}
+            onClose={() => setSidebarOpen(false)}
+            nav={NAV}
+            title="Menu"
+          />
+
+          {/* Desktop sidebar */}
+          <aside className="hidden w-56 shrink-0 sm:block">
             <div className="sticky top-20">
               <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-widest text-muted">
                 Menu

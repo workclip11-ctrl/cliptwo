@@ -96,7 +96,7 @@ export default function ClipperWalletPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <div className="rounded-2xl border bg-card p-4">
           <p className="text-xs text-muted">Available balance</p>
           <p className="mt-1 font-mono text-xl font-semibold text-green">

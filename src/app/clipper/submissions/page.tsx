@@ -98,7 +98,7 @@ export default function ClipperSubmissionsPage() {
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="rounded-xl border bg-card p-4">
           <p className="text-xs text-muted">Total earned</p>
           <p className="mt-1 font-mono text-lg font-semibold">{rup(totalEarnedNet)}</p>
@@ -118,12 +118,12 @@ export default function ClipperSubmissionsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex flex-wrap gap-2">
+      <div className="-mx-4 flex overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:overflow-visible">
           {TABS.map((t) => (
             <button
               key={t.key}
               onClick={() => selectTab(t.key)}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+              className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-sm font-medium transition ${
                 tab === t.key
                   ? "border-accent bg-accent-soft text-foreground"
                   : "text-muted hover:bg-accent-soft"

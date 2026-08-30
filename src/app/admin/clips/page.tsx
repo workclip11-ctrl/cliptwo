@@ -133,7 +133,7 @@ export default function AdminClips() {
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <SummaryCard
           icon={<Banknote size={18} className="text-amber" />}
           amount={rup(fin.outstanding)}
@@ -175,13 +175,13 @@ export default function AdminClips() {
         );
       })()}
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="-mx-4 flex overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:overflow-visible">
           {tabsWithCounts.map((t) => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+              className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
                 tab === t.key
                   ? "border-foreground bg-accent-soft text-foreground"
                   : "text-muted hover:bg-accent-soft/60"
@@ -204,7 +204,7 @@ export default function AdminClips() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search clipper, campaign, txn…"
-            className="w-full rounded-lg border bg-background py-2 pl-9 pr-3 text-sm outline-none focus:border-foreground"
+            className="w-full rounded-lg border bg-background py-2.5 pl-9 pr-3 text-sm outline-none focus:border-foreground"
           />
         </div>
       </div>
