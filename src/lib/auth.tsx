@@ -218,10 +218,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp: AuthValue["signUp"] = async (data) => {
     setError(null);
+    // SECURITY: Never allow self-assigning admin role via signup.
+    const safeRole = data.role === "admin" ? "clipper" : data.role;
     const { data: res, error } = await supabase.auth.signUp({
       email: data.email,
       password: data.password,
-      options: { data: { name: data.name, role: data.role } },
+      options: { data: { name: data.name, role: safeRole } },
     });
     if (error) {
       const msg = mapError(error);
@@ -240,15 +242,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       id: res.user?.id ?? "",
       name: data.name,
       email: data.email,
-      role: data.role,
+      role: safeRole as Role,
     });
-    setRole(data.role);
+    setRole(safeRole as Role);
     setIsSignedIn(true);
     ensureProfile({
       id: res.user?.id ?? "",
       name: data.name,
       email: data.email,
-      role: data.role,
+      role: safeRole as Role,
     });
   };
 

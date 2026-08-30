@@ -146,6 +146,10 @@ create table if not exists public.site_settings (
 
 alter table public.site_settings enable row level security;
 
+-- SECURITY NOTE: site_settings is world-readable because the public homepage
+-- needs hero_title/hero_subtitle/featured_ids. The razorpay_key column should
+-- only be used server-side (API routes) and never sent to the browser. If this
+-- becomes a concern, split into a public view (without key) and an admin-only table.
 drop policy if exists "site_settings_select" on public.site_settings;
 create policy "site_settings_select" on public.site_settings
   for select using (true);
@@ -204,7 +208,7 @@ as $$
   select exists (select 1 from auth.users where email = target_email);
 $$;
 
-grant execute on function public.user_exists(text) to anon, authenticated;
+grant execute on function public.user_exists(text) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- campaigns — add columns used by the multi-step campaign creation wizard.
@@ -273,6 +277,25 @@ create table if not exists public.notifications (
 create index if not exists notifications_user_id_idx on public.notifications(user_id);
 create index if not exists notifications_read_idx on public.notifications(read);
 
+-- RLS: users can only read/modify their own notifications; admins can read all.
+alter table public.notifications enable row level security;
+
+drop policy if exists "notifications_select" on public.notifications;
+create policy "notifications_select" on public.notifications
+  for select using (auth.uid() = user_id or public.is_admin());
+
+drop policy if exists "notifications_insert" on public.notifications;
+create policy "notifications_insert" on public.notifications
+  for insert with check (auth.uid() = user_id or public.is_admin());
+
+drop policy if exists "notifications_update" on public.notifications;
+create policy "notifications_update" on public.notifications
+  for update using (auth.uid() = user_id or public.is_admin());
+
+drop policy if exists "notifications_delete" on public.notifications;
+create policy "notifications_delete" on public.notifications
+  for delete using (auth.uid() = user_id or public.is_admin());
+
 -- ---------------------------------------------------------------------------
 -- Audit Log — append-only record of all admin actions
 -- ---------------------------------------------------------------------------
@@ -295,3 +318,17 @@ create index if not exists audit_logs_action_idx on public.audit_logs(action);
 create index if not exists audit_logs_target_type_idx on public.audit_logs(target_type);
 create index if not exists audit_logs_actor_idx on public.audit_logs(actor);
 create index if not exists audit_logs_target_id_idx on public.audit_logs(target_id);
+
+-- RLS: only admins can read audit logs; only admins can insert (append-only).
+-- No UPDATE or DELETE allowed — audit trail is immutable.
+alter table public.audit_logs enable row level security;
+
+drop policy if exists "audit_logs_select" on public.audit_logs;
+create policy "audit_logs_select" on public.audit_logs
+  for select using (public.is_admin());
+
+drop policy if exists "audit_logs_insert" on public.audit_logs;
+create policy "audit_logs_insert" on public.audit_logs
+  for insert with check (public.is_admin());
+
+-- No UPDATE or DELETE policies = those operations are denied by default.

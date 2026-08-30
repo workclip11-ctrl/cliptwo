@@ -1249,16 +1249,39 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   });
 
   const actions = useMemo<StoreActions>(() => {
+    // ── Auth helpers for ownership checks ──
+    async function getCurrentUser() {
+      if (!isSupabaseConfigured) return null;
+      try {
+        const { data } = await supabase.auth.getUser();
+        return data.user;
+      } catch {
+        return null;
+      }
+    }
+
+    function isUserAdmin(user: { user_metadata?: Record<string, unknown> } | null) {
+      if (!user) return false;
+      const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+      return meta.role === "admin";
+    }
+
     // Core admin profile patcher: merges a partial profile update, appends an
     // audit entry, and persists both to Supabase. New profile actions are thin
     // wrappers around this so every change is audited consistently.
-    const adminProfilePatch = (
+    const adminProfilePatch = async (
       id: string,
       patch: Partial<Profile>,
       actor?: string,
       action?: string,
       note?: string,
     ) => {
+      // SECURITY: Only admins can use adminProfilePatch.
+      const me = await getCurrentUser();
+      if (!isUserAdmin(me)) {
+        console.error(`Authorization: non-admin user cannot admin-patch profile ${id}`);
+        return;
+      }
       setState((s) => {
         const entry: AuditEntry = { action: action ?? "updated", by: actor, at: Date.now(), note };
         return {
@@ -1436,7 +1459,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         })().catch(() => {});
       },
 
-       setClipStatus: (id, status, patch, actor) => {
+       setClipStatus: async (id, status, patch, actor) => {
+          // SECURITY: Only admins can change clip status. Creators cannot approve/reject.
+          const me = await getCurrentUser();
+          if (!isUserAdmin(me)) {
+            console.error(`Authorization: non-admin user cannot change clip status for ${id}`);
+            return;
+          }
           // --- Server-side budget enforcement ---
           // When transitioning to an earned status, verify the campaign budget
           // will not be exceeded. This is the authoritative guard; frontend
@@ -1579,21 +1608,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
            ignore(supabase.from("clips").update(update).eq("id", id));
          },
 
-      closeCampaign: (id) => {
+      closeCampaign: async (id) => {
+        // SECURITY: Only campaign creator or admins can close campaigns.
+        const me = await getCurrentUser();
+        const existingCamp = stateRef.current.campaigns.find((c) => c.id === id);
+        if (me && existingCamp && existingCamp.created_by !== me.id && !isUserAdmin(me)) {
+          console.error(`Authorization: user ${me.id} cannot close campaign ${id}`);
+          return;
+        }
         setState((s) => ({
           ...s,
           campaigns: s.campaigns.map((c) =>
             c.id === id ? { ...c, status: "closed" } : c,
           ),
         }));
-        const camp = stateRef.current.campaigns.find((c) => c.id === id);
         appendAuditLog({
           actor: "admin",
           action: "campaign_closed",
           targetType: "campaign",
           targetId: id,
-          targetLabel: camp?.title ?? id,
-          previousValue: camp?.status,
+          targetLabel: existingCamp?.title ?? id,
+          previousValue: existingCamp?.status,
           newValue: "closed",
         });
         if (!isSupabaseConfigured) return;
@@ -1602,13 +1637,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         );
       },
 
-      deleteCampaign: (id) => {
+      deleteCampaign: async (id) => {
+        // SECURITY: Only campaign creator or admins can delete campaigns.
+        const me = await getCurrentUser();
+        const camp = stateRef.current.campaigns.find((c) => c.id === id);
+        if (me && camp && camp.created_by !== me.id && !isUserAdmin(me)) {
+          console.error(`Authorization: user ${me.id} cannot delete campaign ${id}`);
+          return;
+        }
         setState((s) => ({ ...s, campaigns: s.campaigns.filter((c) => c.id !== id) }));
         if (!isSupabaseConfigured) return;
         ignore(supabase.from("campaigns").delete().eq("id", id));
       },
 
-      updateCampaign: (id, patch, actor, action, note) => {
+      updateCampaign: async (id, patch, actor, action, note) => {
+        // SECURITY: Only campaign creator or admins can update campaigns.
+        const me = await getCurrentUser();
+        const camp = stateRef.current.campaigns.find((c) => c.id === id);
+        if (me && camp && camp.created_by !== me.id && !isUserAdmin(me)) {
+          console.error(`Authorization: user ${me.id} cannot update campaign ${id}`);
+          return;
+        }
         setState((s) => {
           const entry: AuditEntry = {
             action: action ?? "updated",
@@ -1625,14 +1674,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             ),
           };
         });
-        const existing = stateRef.current.campaigns.find((c) => c.id === id);
         appendAuditLog({
           actor: actor ?? "admin",
           action: "campaign_edited",
           targetType: "campaign",
           targetId: id,
-          targetLabel: existing?.title ?? id,
-          previousValue: existing ? JSON.stringify({ status: existing.status, payout: existing.payout, budget: existing.budget }) : undefined,
+          targetLabel: camp?.title ?? id,
+          previousValue: camp ? JSON.stringify({ status: camp.status, payout: camp.payout, budget: camp.budget }) : undefined,
           newValue: JSON.stringify(patch),
           reason: note,
         });
@@ -1643,7 +1691,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           if (col) update[col] = (v as unknown) ?? null;
         }
         update.audit = [
-          ...(existing?.audit ?? []),
+          ...(camp?.audit ?? []),
           {
             action: action ?? "updated",
             by: actor,
@@ -1752,7 +1800,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ignore(supabase.from("profiles").delete().eq("id", id));
       },
 
-      updateProfile: (id, patch) => {
+      updateProfile: async (id, patch) => {
+        // SECURITY: Users can only update their own profile. Admins can update any.
+        const me = await getCurrentUser();
+        if (me && me.id !== id && !isUserAdmin(me)) {
+          console.error(`Authorization: user ${me.id} cannot update profile ${id}`);
+          return;
+        }
         setState((s) => {
           const exists = s.profiles.some((p) => p.id === id);
           if (exists) {
