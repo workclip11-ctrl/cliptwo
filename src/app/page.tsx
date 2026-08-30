@@ -1,20 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Scissors,
   Film,
-  ArrowUpRight,
   Sparkles,
   ShieldCheck,
   IndianRupee,
   Zap,
-  Bell,
-  FileText,
-  Upload,
-  BarChart3,
   Play,
   Ban,
   Check,
@@ -22,39 +17,48 @@ import {
   ChevronDown,
   BadgeCheck,
   ArrowRight,
+  Eye,
+  TrendingUp,
+  AlertTriangle,
+  Calculator,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { CampaignCard } from "@/components/CampaignCard";
 import { CampaignModal } from "@/components/CampaignModal";
+import { rup, clipEarnings } from "@/lib/format";
+import { financeOf, PLATFORM_FEE_RATE } from "@/lib/finance";
 import type { Campaign } from "@/lib/types";
 
 const NICHES = ["Podcast", "Gaming", "Finance", "Comedy", "Fitness", "Tech"];
-
-const STATS = [
-  { num: "1.8L", label: "verified views tracked" },
-  { num: "220+", label: "active clippers" },
-  { num: "38", label: "live campaigns" },
-  { num: "₹9.4L", label: "paid out to clippers" },
-];
 
 const TICKER = ["Find campaigns", "Cut clips", "Post online", "Get paid over UPI"];
 
 const TRUST = [
   {
     icon: ShieldCheck,
-    title: "Verified before payable",
-    body: "View counts are pulled from the platform API, not self-reported, before anything is marked payable.",
+    title: "Verified views",
+    body: "View counts are pulled from platform APIs — Instagram, YouTube, TikTok — not self-reported. Only unique, legitimate views count.",
   },
   {
-    icon: Zap,
-    title: "Fast payout cycles",
-    body: "Payout cycles close often — clippers aren't left waiting weeks for money they've already earned.",
+    icon: TrendingUp,
+    title: "Transparent CPM",
+    body: "You see the exact CPM rate before claiming a campaign. No hidden fees, no surprises — you know exactly what you'll earn per 1,000 views.",
   },
   {
     icon: IndianRupee,
-    title: "UPI-native",
-    body: "Every payout lands directly in a linked UPI account, no manual bank transfer chasing.",
+    title: "Reliable payouts",
+    body: "Payouts settle directly to your UPI once the cycle closes. Every action is recorded in an audit trail — nothing is manual or opaque.",
+  },
+  {
+    icon: Eye,
+    title: "Campaign transparency",
+    body: "Creators set the budget, CPM, and rules upfront. Clippers see everything before they start cutting. Both sides have full visibility.",
+  },
+  {
+    icon: AlertTriangle,
+    title: "Fraud protection",
+    body: "Automated systems detect bot traffic, view farms, and manipulation. Suspicious earnings are frozen before they're paid out.",
   },
 ];
 
@@ -184,6 +188,12 @@ const CAMPAIGN_PREVIEW = [
 
 function fmtINR(n: number) {
   return "₹" + Math.round(n).toLocaleString("en-IN");
+}
+
+function fmtNum(n: number) {
+  if (n >= 100000) return (n / 100000).toFixed(1) + "L";
+  if (n >= 1000) return (n / 1000).toFixed(1) + "K";
+  return String(n);
 }
 
 function HeroVisual() {
@@ -495,11 +505,64 @@ function FAQ() {
   );
 }
 
+function EarningsCalculator() {
+  const [views, setViews] = useState(10000);
+  const [cpm, setCpm] = useState(200);
+  const gross = Math.round((views / 1000) * cpm);
+  const fee = Math.round(gross * PLATFORM_FEE_RATE);
+  const net = gross - fee;
+  return (
+    <div className="rounded-2xl border bg-card p-6">
+      <div className="flex items-center gap-2 mb-4">
+        <Calculator size={18} className="text-amber" />
+        <h3 className="text-lg font-semibold">Earnings calculator</h3>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-xs text-muted">Verified views</label>
+          <input
+            type="number"
+            value={views}
+            onChange={(e) => setViews(Math.max(0, Number(e.target.value)))}
+            className="w-full rounded-lg border bg-background px-3 py-2 text-sm font-mono outline-none focus:border-foreground"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-muted">Campaign CPM (₹)</label>
+          <input
+            type="number"
+            value={cpm}
+            onChange={(e) => setCpm(Math.max(0, Number(e.target.value)))}
+            className="w-full rounded-lg border bg-background px-3 py-2 text-sm font-mono outline-none focus:border-foreground"
+          />
+        </div>
+      </div>
+      <div className="mt-5 grid grid-cols-3 gap-3">
+        <div className="rounded-xl bg-accent-soft p-3 text-center">
+          <p className="text-[11px] text-muted">Gross earnings</p>
+          <p className="font-mono text-lg font-semibold">{fmtINR(gross)}</p>
+        </div>
+        <div className="rounded-xl bg-accent-soft p-3 text-center">
+          <p className="text-[11px] text-muted">Platform fee ({Math.round(PLATFORM_FEE_RATE * 100)}%)</p>
+          <p className="font-mono text-lg font-semibold text-muted">{fmtINR(fee)}</p>
+        </div>
+        <div className="rounded-xl bg-accent-soft p-3 text-center">
+          <p className="text-[11px] text-muted">You receive</p>
+          <p className="font-mono text-lg font-semibold text-green">{fmtINR(net)}</p>
+        </div>
+      </div>
+      <p className="mt-3 text-xs text-muted">
+        Actual payout depends on campaign rules, view verification, and approval.
+        This is an estimate only.
+      </p>
+    </div>
+  );
+}
+
 export default function Home() {
   const router = useRouter();
-  const { campaigns, siteSettings } = useStore();
+  const { campaigns, clips, siteSettings } = useStore();
   const [active, setActive] = useState<Campaign | null>(null);
-  const showFeatured = true;
 
   const heroTitle =
     siteSettings.heroTitle || "Get paid to post for India's biggest creators";
@@ -507,12 +570,44 @@ export default function Home() {
     siteSettings.heroSubtitle ||
     "cliptwo connects creators who have long-form content with clippers who cut it into clips — paid per verified view, settled straight to UPI.";
 
+  // Database-backed statistics
+  const stats = useMemo(() => {
+    const openCampaigns = campaigns.filter((c) => c.status === "open" || c.status === "near_budget").length;
+    const totalViews = clips.reduce((s, k) => s + k.views, 0);
+    const clippers = new Set(clips.map((k) => k.clipper)).size;
+    const fin = financeOf(clips, campaigns);
+    const paidOut = fin.paid;
+    return { openCampaigns, totalViews, clippers, paidOut };
+  }, [clips, campaigns]);
+
+  // Featured campaigns from database
   const featuredIds = siteSettings.featuredIds;
-  const featured = showFeatured
-    ? featuredIds.length
-      ? campaigns.filter((c) => featuredIds.includes(c.id))
-      : campaigns.filter((c) => c.status === "open").slice(0, 4)
-    : [];
+  const featured = useMemo(() => {
+    const open = campaigns.filter(
+      (c) => c.status === "open" || c.status === "near_budget",
+    );
+    if (featuredIds.length) {
+      return open.filter((c) => featuredIds.includes(c.id)).slice(0, 4);
+    }
+    return open.slice(0, 4);
+  }, [campaigns, featuredIds]);
+
+  // Top earners for success stories (real data only)
+  const topEarners = useMemo(() => {
+    const byClipper = new Map<string, { earned: number; clips: number; views: number }>();
+    for (const k of clips) {
+      const e = clipEarnings(k, campaigns);
+      const cur = byClipper.get(k.clipper) ?? { earned: 0, clips: 0, views: 0 };
+      cur.earned += e;
+      cur.clips += 1;
+      cur.views += k.views;
+      byClipper.set(k.clipper, cur);
+    }
+    return Array.from(byClipper.entries())
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.earned - a.earned)
+      .slice(0, 3);
+  }, [clips, campaigns]);
 
   return (
     <main className="min-h-screen">
@@ -542,6 +637,7 @@ export default function Home() {
         </div>
       </header>
 
+      {/* ── Hero ── */}
       <section className="mx-auto grid max-w-5xl gap-12 px-6 py-16 lg:grid-cols-2 lg:items-center">
         <div>
           <span className="inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1 text-xs font-medium text-muted">
@@ -555,10 +651,10 @@ export default function Home() {
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             <Link href="/clipper" className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:opacity-90">
-              Start clipping <Scissors size={14} />
+              <Scissors size={14} /> For Clippers — Start clipping
             </Link>
             <Link href="/creator" className="inline-flex items-center gap-1.5 rounded-lg border px-4 py-2.5 text-sm font-medium hover:bg-accent-soft">
-              Launch a campaign <ArrowUpRight size={15} />
+              <Film size={14} /> For Creators — Launch a campaign
             </Link>
           </div>
           <div className="mt-7 flex flex-wrap items-center gap-5 text-xs text-muted">
@@ -569,8 +665,14 @@ export default function Home() {
         <HeroVisual />
       </section>
 
+      {/* ── Real platform statistics ── */}
       <section className="mx-auto grid max-w-5xl grid-cols-2 gap-4 px-6 pb-4 sm:grid-cols-4">
-        {STATS.map((s) => (
+        {[
+          { num: fmtNum(stats.totalViews), label: "verified views tracked" },
+          { num: String(stats.clippers), label: "active clippers" },
+          { num: String(stats.openCampaigns), label: "live campaigns" },
+          { num: rup(stats.paidOut), label: "paid out to clippers" },
+        ].map((s) => (
           <div key={s.label} className="rounded-2xl border bg-card p-5 text-center">
             <p className="font-mono text-2xl font-medium">{s.num}</p>
             <p className="mt-1 text-xs text-muted">{s.label}</p>
@@ -606,6 +708,7 @@ export default function Home() {
         </div>
       </div>
 
+      {/* ── How it works ── */}
       <section id="how" className="mx-auto max-w-5xl px-6 py-16">
         <p className="text-center text-xs font-semibold uppercase tracking-widest text-muted">How it works</p>
         <h2 className="mx-auto mt-3 max-w-xl text-center text-3xl font-semibold tracking-tight">One loop, two sides.</h2>
@@ -617,177 +720,148 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="border-y bg-card">
-        <div className="mx-auto max-w-5xl px-6 py-20">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      {/* ── Live campaigns ── */}
+      {featured.length > 0 && (
+        <section className="mx-auto max-w-5xl px-6 py-16">
+          <div className="flex items-end justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-muted">Features</p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-                From campaign to cash out.<br />All in one place.
-              </h2>
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted">Live now</p>
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight">Active campaigns</h2>
             </div>
-            <Link href="/creator" className="text-sm font-medium text-foreground underline-offset-4 hover:underline">
-              Explore the dashboard →
-            </Link>
+            <button
+              onClick={() => router.push("/campaigns")}
+              className="inline-flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent-soft"
+            >
+              Browse all <ArrowRight size={15} />
+            </button>
           </div>
-
-          <div className="mt-10 grid auto-rows-[minmax(150px,auto)] gap-4 sm:grid-cols-2 lg:grid-cols-6">
-            {/* Hero feature: Track progress */}
-            <div className="group relative overflow-hidden rounded-2xl border border-transparent bg-foreground p-6 text-white transition-transform hover:-translate-y-0.5 lg:col-span-4">
-              <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/5" />
-              <div className="relative flex items-center gap-2">
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
-                  <BarChart3 size={17} />
-                </span>
-                <h4 className="text-[15px] font-medium">Track progress</h4>
-              </div>
-              <p className="relative mt-3 max-w-sm text-[13px] leading-relaxed text-white/60">
-                Watch every upload, approval, and payout in one dashboard — live views, earnings, and status at a glance.
-              </p>
-              <div className="relative mt-6 grid grid-cols-3 gap-3">
-                {[
-                  ["1.8L", "views"],
-                  ["₹9.4L", "paid out"],
-                  ["220+", "clippers"],
-                ].map(([v, l]) => (
-                  <div key={l} className="rounded-xl bg-white/5 p-3">
-                    <p className="font-mono text-lg font-medium">{v}</p>
-                    <p className="text-[11px] text-white/50">{l}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="relative mt-4 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-                <div className="h-full w-[68%] rounded-full bg-white" />
-              </div>
-            </div>
-
-            {/* Campaign alerts */}
-            <div className="rounded-2xl border bg-background p-5 transition-transform hover:-translate-y-0.5 lg:col-span-2">
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent-soft text-foreground">
-                <Bell size={17} />
-              </span>
-              <h4 className="mt-4 text-[15px] font-medium">Campaign alerts</h4>
-              <p className="mt-1.5 text-[13px] leading-relaxed text-muted">
-                Get notified the moment a campaign in your niche goes live.
-              </p>
-              <div className="mt-4 space-y-2">
-                {["Podcast · ₹220 CPM", "Gaming · ₹160 CPM"].map((t) => (
-                  <div key={t} className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-xs text-muted">
-                    <span className="h-1.5 w-1.5 rounded-full bg-green" />
-                    {t}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Clear briefs */}
-            <div className="rounded-2xl border bg-background p-5 transition-transform hover:-translate-y-0.5 lg:col-span-2">
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent-soft text-foreground">
-                <FileText size={17} />
-              </span>
-              <h4 className="mt-4 text-[15px] font-medium">Clear briefs</h4>
-              <p className="mt-1.5 text-[13px] leading-relaxed text-muted">
-                See CPM, budget, and full guidelines before you start cutting.
-              </p>
-              <div className="mt-4 flex flex-wrap gap-1.5">
-                {["CPM", "Budget", "Niches", "Guidelines"].map((t) => (
-                  <span key={t} className="rounded-full border px-2.5 py-1 text-[11px] font-medium text-muted">
-                    {t}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Easy submissions */}
-            <div className="rounded-2xl border bg-background p-5 transition-transform hover:-translate-y-0.5 sm:col-span-2 lg:col-span-4">
-              <div className="flex items-center gap-2">
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent-soft text-foreground">
-                  <Upload size={17} />
-                </span>
-                <h4 className="text-[15px] font-medium">Easy submissions</h4>
-              </div>
-              <p className="mt-1.5 text-[13px] leading-relaxed text-muted">
-                Add Instagram, YouTube, or TikTok links in a couple of clicks.
-              </p>
-              <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-                <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm text-muted">
-                  <PlatformIcon p="Instagram" size={14} /> instagram.com/reel/…
-                </div>
-                <button className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white">
-                  <Send size={13} /> Submit
-                </button>
-              </div>
-            </div>
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {featured.map((c, i) => (
+              <CampaignCard key={c.id} campaign={c} index={i} onView={setActive} />
+            ))}
           </div>
-        </div>
-      </section>
-
-      {showFeatured && (
-      <section className="mx-auto max-w-5xl px-6 py-16">
-        <div className="flex items-end justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted">Live now</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight">Featured campaigns</h2>
-          </div>
-          <button
-            onClick={() => router.push("/campaigns")}
-            className="inline-flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent-soft"
-          >
-            Browse all <ArrowRight size={15} />
-          </button>
-        </div>
-
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {featured.map((c, i) => (
-            <CampaignCard key={c.id} campaign={c} index={i} onView={setActive} />
-          ))}
-        </div>
-      </section>
+        </section>
       )}
 
-      <section id="why" className="mx-auto max-w-5xl px-6 py-16">
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted">Why cliptwo</p>
-        <h2 className="mt-3 text-3xl font-semibold tracking-tight">Trust is the product.</h2>
-        <p className="mt-3 max-w-lg text-[15px] leading-relaxed text-muted">
-          Clipping platforms live or die on whether clippers believe they&apos;ll actually get paid. These are the mechanics that make that a promise, not a claim.
-        </p>
-        <div className="mt-10 grid gap-4 sm:grid-cols-3">
-          {TRUST.map((t) => (
-            <div key={t.title} className="rounded-2xl border bg-card p-5">
-              <t.icon size={22} className="text-green" />
-              <h4 className="mt-3 text-[15px] font-medium">{t.title}</h4>
-              <p className="mt-2 text-[13px] leading-relaxed text-muted">{t.body}</p>
-            </div>
-          ))}
-        </div>
-        <div className="mt-6 rounded-2xl border bg-card p-6">
-          <div className="flex items-center justify-between">
-            <h4 className="text-[15px] font-medium">A fairer cut</h4>
-            <span className="text-xs text-muted">Illustrative — final take rate to be confirmed at launch</span>
-          </div>
-          <div className="mt-5 space-y-3">
-            <div>
-              <div className="mb-1.5 flex items-center gap-2 text-sm"><span className="w-24 text-muted">cliptwo</span><span className="font-mono">9%</span></div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-accent-soft"><div className="h-full w-[9%] rounded-full bg-accent" /></div>
-            </div>
-            <div>
-              <div className="mb-1.5 flex items-center gap-2 text-sm"><span className="w-24 text-muted">Typical agency</span><span className="font-mono">45%</span></div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-accent-soft"><div className="h-full w-[45%] rounded-full bg-border" /></div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="faq" className="border-y bg-card">
+      {/* ── Why ClipTwo ── */}
+      <section id="why" className="border-y bg-card">
         <div className="mx-auto max-w-5xl px-6 py-16">
-          <p className="text-center text-xs font-semibold uppercase tracking-widest text-muted">FAQ</p>
-          <h2 className="mx-auto mt-3 max-w-xl text-center text-3xl font-semibold tracking-tight">Frequently asked</h2>
-          <div className="mt-10">
-            <FAQ />
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted">Why cliptwo</p>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight">Trust is the product.</h2>
+          <p className="mt-3 max-w-lg text-[15px] leading-relaxed text-muted">
+            Clipping platforms live or die on whether clippers believe they&apos;ll actually get paid. These are the mechanics that make that a promise, not a claim.
+          </p>
+          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {TRUST.map((t) => (
+              <div key={t.title} className="rounded-2xl border bg-background p-5">
+                <t.icon size={22} className="text-green" />
+                <h4 className="mt-3 text-[15px] font-medium">{t.title}</h4>
+                <p className="mt-2 text-[13px] leading-relaxed text-muted">{t.body}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
+      {/* ── Earnings calculator ── */}
+      <section className="mx-auto max-w-5xl px-6 py-16">
+        <div className="grid gap-8 lg:grid-cols-2 lg:items-center">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted">Earnings</p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight">See what you could earn.</h2>
+            <p className="mt-3 max-w-md text-[15px] leading-relaxed text-muted">
+              Enter the number of verified views and the campaign CPM rate. The
+              calculator shows your gross earnings, the platform fee, and your
+              net payout.
+            </p>
+            <div className="mt-5 space-y-2 text-sm text-muted">
+              <p className="flex items-center gap-2"><Check size={14} className="text-green shrink-0" /> Views × CPM ÷ 1,000 = gross earnings</p>
+              <p className="flex items-center gap-2"><Check size={14} className="text-green shrink-0" /> 15% platform fee deducted from gross</p>
+              <p className="flex items-center gap-2"><Check size={14} className="text-green shrink-0" /> Net amount paid to your UPI</p>
+            </div>
+            <p className="mt-4 text-xs text-muted">
+              Actual payout depends on campaign rules, view verification, and
+              approval status. This calculator is for illustration only.
+            </p>
+          </div>
+          <EarningsCalculator />
+        </div>
+      </section>
+
+      {/* ── Success stories (real data only) ── */}
+      {topEarners.length > 0 && (
+        <section className="border-y bg-card">
+          <div className="mx-auto max-w-5xl px-6 py-16">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted">Success stories</p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight">Top earners on ClipTwo</h2>
+            <p className="mt-3 max-w-lg text-[15px] leading-relaxed text-muted">
+              Real clippers, real earnings. These numbers come directly from
+              verified payouts on the platform.
+            </p>
+            <div className="mt-8 grid gap-4 sm:grid-cols-3">
+              {topEarners.map((e) => (
+                <div key={e.name} className="rounded-2xl border bg-background p-5">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-accent-soft text-sm font-semibold text-foreground">
+                      {e.name.charAt(0).toUpperCase()}
+                    </span>
+                    <div>
+                      <p className="font-medium">@{e.name}</p>
+                      <p className="text-xs text-muted">{e.clips} clip{e.clips === 1 ? "" : "s"}</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="rounded-lg bg-accent-soft p-2.5 text-center">
+                      <p className="text-[10px] text-muted">Earned</p>
+                      <p className="font-mono text-sm font-semibold">{rup(e.earned)}</p>
+                    </div>
+                    <div className="rounded-lg bg-accent-soft p-2.5 text-center">
+                      <p className="text-[10px] text-muted">Views</p>
+                      <p className="font-mono text-sm font-semibold">{fmtNum(e.views)}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── FAQ ── */}
+      <section id="faq" className="mx-auto max-w-5xl px-6 py-16">
+        <p className="text-center text-xs font-semibold uppercase tracking-widest text-muted">FAQ</p>
+        <h2 className="mx-auto mt-3 max-w-xl text-center text-3xl font-semibold tracking-tight">Frequently asked</h2>
+        <div className="mt-10">
+          <FAQ />
+        </div>
+      </section>
+
+      {/* ── Final CTA ── */}
+      <section className="border-y bg-card">
+        <div className="mx-auto max-w-5xl px-6 py-16 text-center">
+          <h2 className="text-3xl font-semibold tracking-tight">Ready to start?</h2>
+          <p className="mx-auto mt-3 max-w-md text-[15px] leading-relaxed text-muted">
+            Whether you want to earn by clipping or grow your brand through
+            creator content, ClipTwo is where it happens.
+          </p>
+          <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+            <Link
+              href="/clipper"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-white hover:opacity-90"
+            >
+              <Scissors size={14} /> Start clipping
+            </Link>
+            <Link
+              href="/creator"
+              className="inline-flex items-center gap-1.5 rounded-lg border px-5 py-2.5 text-sm font-medium hover:bg-accent-soft"
+            >
+              <Film size={14} /> Launch a campaign
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Footer ── */}
       <footer className="border-t bg-card">
         <div className="mx-auto max-w-5xl px-6 py-14">
           <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
@@ -834,21 +908,23 @@ export default function Home() {
             <div>
               <h5 className="text-sm font-semibold">Legal</h5>
               <ul className="mt-3 space-y-2 text-sm text-muted">
-                <li><a href="#" className="hover:text-foreground">Terms</a></li>
-                <li><a href="#" className="hover:text-foreground">Privacy</a></li>
-                <li><a href="#" className="hover:text-foreground">Payout policy</a></li>
+                <li><Link href="/terms" className="hover:text-foreground">Terms</Link></li>
+                <li><Link href="/privacy" className="hover:text-foreground">Privacy</Link></li>
+                <li><Link href="/payout-policy" className="hover:text-foreground">Payout policy</Link></li>
+                <li><Link href="/content-policy" className="hover:text-foreground">Content policy</Link></li>
+                <li><Link href="/community-guidelines" className="hover:text-foreground">Community guidelines</Link></li>
               </ul>
             </div>
           </div>
 
           <div className="mt-10 flex flex-col items-start justify-between gap-3 border-t pt-6 text-xs text-muted sm:flex-row sm:items-center">
-            <p>© {new Date().getFullYear()} cliptwo. Prototype build — not a live payments product.</p>
+            <p>&copy; {new Date().getFullYear()} cliptwo.</p>
             <p>Made for creators &amp; clippers across India.</p>
           </div>
         </div>
       </footer>
 
-      {showFeatured && <CampaignModal campaign={active} onClose={() => setActive(null)} />}
+      <CampaignModal campaign={active} onClose={() => setActive(null)} />
     </main>
   );
 }
