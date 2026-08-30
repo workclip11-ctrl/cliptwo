@@ -241,7 +241,7 @@ export function TopBar({
             href="/login"
             className="rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-accent-soft"
           >
-            Sign in
+            Log in
           </Link>
         )}
       </div>
