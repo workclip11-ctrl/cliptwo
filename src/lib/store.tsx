@@ -1693,7 +1693,7 @@ export function useStore() {
 // Reputation calculation functions
 
 // Calculate per-clipper reputation metrics from clips
-function calculateClipperReputation(clips: Clip[], userId: string): {
+export function calculateClipperReputation(clips: Clip[], userId: string, campaigns: Campaign[]): {
   totalApproved: number;
   totalRejected: number;
   approvalRate: number;
@@ -1713,40 +1713,36 @@ function calculateClipperReputation(clips: Clip[], userId: string): {
   const verifiedClips = clipperClips.filter((k) => isEarned(k.status));
   const totalVerifiedViews = verifiedClips.reduce((sum, k) => sum + k.views, 0);
   
-  // Successful campaigns = campaigns with status "open" or "open" that have approved clips
   const successfulCampaigns = new Set(
     clipperClips.map((k) => k.campaignId)
   ).size;
   
-  const totalEarned = financeOf(clipperClips, [])?.earned ?? 0;
+  const totalEarned = financeOf(clipperClips, campaigns).earned;
   
-  // Completed payouts = paid clips
   const completedPayouts = clipperClips.filter((k) => k.status === "paid").length;
   
-  // Account age - use the earliest submitted clip date
   const submittedDates = clipperClips.map((k) => k.submittedAt);
   const accountAge = submittedDates.length > 0 
     ? Math.floor((Date.now() - Math.min(...submittedDates)) / (1000 * 60 * 60 * 24))
     : 0;
   
-  // Verified social accounts - count clips with verified status
   const verifiedSocialAccounts = clipperClips.filter((k) => k.verified).length;
   
   return {
-    totalApproved: totalApproved,
-    totalRejected: totalRejected,
-    approvalRate: approvalRate,
-    totalVerifiedViews: totalVerifiedViews,
-    successfulCampaigns: successfulCampaigns,
-    totalEarned: totalEarned,
-    completedPayouts: completedPayouts,
-    accountAge: accountAge,
-    verifiedSocialAccounts: verifiedSocialAccounts,
+    totalApproved,
+    totalRejected,
+    approvalRate,
+    totalVerifiedViews,
+    successfulCampaigns,
+    totalEarned,
+    completedPayouts,
+    accountAge,
+    verifiedSocialAccounts,
   };
 }
 
 // Calculate overall reputation score (0-100) using transparent rules
-function calculateReputationScore(metrics: {
+export function calculateReputationScore(metrics: {
   totalApproved: number;
   totalRejected: number;
   approvalRate: number;
@@ -1759,32 +1755,25 @@ function calculateReputationScore(metrics: {
 }): number {
   let score = 0;
   
-  // Approval rate component (40% weight)
   score += metrics.approvalRate * 0.4;
   
-  // Success rate component (30% weight) - ratio of successful campaigns to total
   const successRate = metrics.successfulCampaigns > 0 
     ? Math.min(metrics.successfulCampaigns / Math.max(metrics.successfulCampaigns + 1, 1), 1) * 100
     : 0;
   score += successRate * 0.3;
   
-  // Payout success component (20% weight) - ratio of completed payouts to total approved
   const payoutSuccessRate = metrics.totalApproved > 0
     ? Math.min(metrics.completedPayouts / metrics.totalApproved, 1) * 100
     : 0;
   score += payoutSuccessRate * 0.2;
   
-  // Verified accounts component (10% weight)
   score += Math.min(metrics.verifiedSocialAccounts / 10, 1) * 100 * 0.1;
-  
-  // Account activity component (optional, 0% weight but included for future use)
-  // const activityScore = Math.min(metrics.accountAge / 365, 1) * 100 * 0;
   
   return Math.round(Math.max(0, Math.min(100, score)));
 }
 
 // Determine badges based on reputation metrics
-function determineBadges(metrics: {
+export function determineBadges(metrics: {
   totalApproved: number;
   approvalRate: number;
   verifiedViews: number;
@@ -1795,22 +1784,18 @@ function determineBadges(metrics: {
 }): string[] {
   const badges: string[] = [];
   
-  // Verified Clipper: has verified clips
   if (metrics.verifiedViews > 0) {
     badges.push("Verified Clipper");
   }
   
-  // Top Performer: high approval rate and successful campaigns
   if (metrics.approvalRate > 80 && metrics.successfulCampaigns > 2) {
     badges.push("Top Performer");
   }
   
-  // High Approval Rate
   if (metrics.approvalRate > 90) {
     badges.push("High Approval Rate");
   }
   
-  // Consistent Creator - consistent activity over time
   if (metrics.accountAge > 90 && metrics.totalApproved > 5) {
     badges.push("Consistent Creator");
   }
@@ -1819,8 +1804,8 @@ function determineBadges(metrics: {
 }
 
 // Calculate reputation score and badges for a clipper
-function getClipperReputation(clips: Clip[], userId: string) {
-  const metrics = calculateClipperReputation(clips, userId);
+export function getClipperReputation(clips: Clip[], userId: string, campaigns: Campaign[]) {
+  const metrics = calculateClipperReputation(clips, userId, campaigns);
   const score = calculateReputationScore(metrics);
   const badges = determineBadges({
     totalApproved: metrics.totalApproved,
@@ -1832,10 +1817,6 @@ function getClipperReputation(clips: Clip[], userId: string) {
     verifiedSocialAccounts: metrics.verifiedSocialAccounts,
   });
   
-  return {
-    score,
-    metrics,
-    badges,
-  };
+  return { score, metrics, badges };
 }
 
