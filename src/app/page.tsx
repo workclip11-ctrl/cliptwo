@@ -447,37 +447,50 @@ function Journey() {
 }
 
 function FAQ() {
+  const [tab, setTab] = useState(FAQ_CATEGORIES[0].title);
   const [open, setOpen] = useState<string | null>(null);
+  const cat = FAQ_CATEGORIES.find((c) => c.title === tab)!;
   return (
-    <div className="space-y-8">
-      {FAQ_CATEGORIES.map((cat) => (
-        <div key={cat.title}>
-          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
-            {cat.title}
-          </h3>
-          <div className="divide-y rounded-xl border bg-card">
-            {cat.items.map((f) => (
-              <div key={f.q}>
-                <button
-                  onClick={() => setOpen(open === f.q ? null : f.q)}
-                  className="flex w-full items-center justify-between px-5 py-4 text-left text-[15px] font-medium"
-                >
-                  {f.q}
-                  <ChevronDown
-                    size={18}
-                    className={`shrink-0 text-muted transition-transform ${open === f.q ? "rotate-180" : ""}`}
-                  />
-                </button>
-                {open === f.q && (
-                  <p className="px-5 pb-4 text-sm leading-relaxed text-muted">
-                    {f.a}
-                  </p>
-                )}
-              </div>
-            ))}
+    <div>
+      <div className="mb-4 flex flex-wrap gap-1.5">
+        {FAQ_CATEGORIES.map((c) => (
+          <button
+            key={c.title}
+            onClick={() => {
+              setTab(c.title);
+              setOpen(null);
+            }}
+            className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors ${
+              tab === c.title
+                ? "bg-accent text-white"
+                : "text-muted hover:bg-accent-soft"
+            }`}
+          >
+            {c.title}
+          </button>
+        ))}
+      </div>
+      <div className="divide-y rounded-xl border bg-card">
+        {cat.items.map((f) => (
+          <div key={f.q}>
+            <button
+              onClick={() => setOpen(open === f.q ? null : f.q)}
+              className="flex w-full items-center justify-between px-5 py-4 text-left text-[15px] font-medium"
+            >
+              {f.q}
+              <ChevronDown
+                size={18}
+                className={`shrink-0 text-muted transition-transform ${open === f.q ? "rotate-180" : ""}`}
+              />
+            </button>
+            {open === f.q && (
+              <p className="px-5 pb-4 text-sm leading-relaxed text-muted">
+                {f.a}
+              </p>
+            )}
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
