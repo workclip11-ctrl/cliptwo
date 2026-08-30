@@ -20,6 +20,10 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
+import {
+  calculateClipperReputation,
+  calculateReputationScore,
+} from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup, fmtViews, clipEarnings } from "@/lib/format";
 import { isEarned } from "@/lib/finance";
@@ -361,6 +365,10 @@ function ClipperDrawer({
   const accs = accountsFor(profile, socialAccounts);
   const submissionsRef = useRef<HTMLDivElement>(null);
 
+  // Reputation
+  const repMetrics = calculateClipperReputation(clips, profile.id, campaigns);
+  const repScore = calculateReputationScore(repMetrics);
+
   const [riskOpen, setRiskOpen] = useState(false);
   const [riskFlag, setRiskFlag] = useState(!!profile.riskFlag);
   const [riskNote, setRiskNote] = useState(profile.riskNote ?? "");
@@ -561,6 +569,31 @@ function ClipperDrawer({
               <Stat label="Total earned" value={rup(stats.earned)} />
               <Stat label="Total paid" value={rup(stats.paid)} />
               <Stat label="Outstanding" value={rup(stats.earned - stats.paid)} />
+            </div>
+          </Section>
+
+          {/* Reputation */}
+          <Section title="Reputation">
+            <div className="rounded-lg border bg-background p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Reputation Score</p>
+                  <p className="text-xs text-muted">Based on approval rate, campaign success, and payouts</p>
+                </div>
+                <div className={`flex h-14 w-14 items-center justify-center rounded-full text-lg font-bold ${
+                  repScore >= 80 ? "bg-green/10 text-green" :
+                  repScore >= 50 ? "bg-amber/10 text-amber" :
+                  "bg-red/10 text-red"
+                }`}>
+                  {repScore}
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <Stat label="Approved clips" value={String(repMetrics.totalApproved)} />
+                <Stat label="Rejected clips" value={String(repMetrics.totalRejected)} />
+                <Stat label="Campaigns" value={String(repMetrics.successfulCampaigns)} />
+                <Stat label="Payouts completed" value={String(repMetrics.completedPayouts)} />
+              </div>
             </div>
           </Section>
 
