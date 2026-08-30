@@ -17,8 +17,8 @@ import { PlatformIcon } from "@/components/PlatformIcon";
 import { NewCampaignModal } from "@/components/NewCampaignModal";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
-import { rup, fmtViews, clipEarnings } from "@/lib/format";
-import { financeOf, campaignSpent, isEarned } from "@/lib/finance";
+import { rup, fmtViews } from "@/lib/format";
+import { financeOf, campaignSpent, isEarned, payoutSplit } from "@/lib/finance";
 import type { Campaign, Clip, Platform } from "@/lib/types";
 
 export default function CreatorPage() {
@@ -41,7 +41,7 @@ export default function CreatorPage() {
 
   const topClips = [...received]
     .filter((k) => isEarned(k.status))
-    .sort((a, b) => clipEarnings(b, campaigns) - clipEarnings(a, campaigns))
+    .sort((a, b) => payoutSplit(b, campaigns).net - payoutSplit(a, campaigns).net)
     .slice(0, 4);
 
   return (
@@ -214,7 +214,7 @@ export default function CreatorPage() {
                     {fmtViews(k.views)}
                   </td>
                   <td className="px-4 py-3 text-right font-mono">
-                    {rup(clipEarnings(k, campaigns))}
+                    {rup(payoutSplit(k, campaigns).net)}
                   </td>
                 </tr>
               ))}

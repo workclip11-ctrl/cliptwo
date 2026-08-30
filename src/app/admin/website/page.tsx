@@ -26,7 +26,7 @@ export default function AdminWebsite() {
   }
 
   function save() {
-    dirty.current = true;
+    dirty.current = false;
     setSiteSettings({
       heroTitle: heroTitle.trim(),
       heroSubtitle: heroSubtitle.trim(),

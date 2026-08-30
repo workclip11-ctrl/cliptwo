@@ -1490,7 +1490,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                         `Campaign "${camp.title}" would exceed budget. ` +
                         `Remaining: ₹${b.remaining}, additional: ₹${additionalEarnings}`,
                     );
-                    return stateRef.current;
+                    return;
                   }
                 }
               }

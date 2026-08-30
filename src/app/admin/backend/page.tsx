@@ -25,7 +25,7 @@ export default function AdminBackend() {
   }
 
   function save() {
-    dirty.current = true;
+    dirty.current = false;
     setSiteSettings({
       heroTitle: siteSettings.heroTitle,
       heroSubtitle: siteSettings.heroSubtitle,

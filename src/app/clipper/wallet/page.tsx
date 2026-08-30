@@ -7,7 +7,6 @@ import {
   ArrowDownToLine,
   CheckCircle2,
   AlertTriangle,
-  RefreshCw,
   Link2,
   ShieldCheck,
   CalendarClock,
@@ -46,7 +45,7 @@ function fmtDate(ts: number): string {
 }
 
 export default function ClipperWalletPage() {
-  const { campaigns, clips, profiles, setClipStatus } = useStore();
+  const { campaigns, clips, profiles } = useStore();
   const { user } = useAuth();
   const myClips = clips.filter((k) => k.userId === user?.id || !k.userId);
   // A clipper receives the NET amount (gross minus the platform fee), so every
@@ -54,7 +53,7 @@ export default function ClipperWalletPage() {
   const netOf = (k: Clip) => payoutSplit(k, campaigns).net;
 
   const available = myClips
-    .filter((k) => k.status === "paid")
+    .filter((k) => k.status === "payable")
     .reduce((s, k) => s + netOf(k), 0);
   const pendingEarnings = myClips
     .filter((k) => ["approved", "payable", "processing", "failed"].includes(k.status))
@@ -206,19 +205,6 @@ export default function ClipperWalletPage() {
                                 {k.failureReason}
                               </p>
                               <div className="mt-2 flex gap-2">
-                                <button
-                                  onClick={() =>
-                                    setClipStatus(
-                                      k.id,
-                                      "payable",
-                                      { failureReason: undefined },
-                                      user?.email ?? user?.name ?? k.clipper,
-                                    )
-                                  }
-                                  className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium hover:bg-accent-soft"
-                                >
-                                  <RefreshCw size={12} /> Retry payout
-                                </button>
                                 <Link
                                   href="/clipper/settings"
                                   className="inline-flex items-center gap-1 rounded-md bg-accent px-2 py-1 text-[11px] font-medium text-white"
