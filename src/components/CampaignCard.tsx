@@ -6,6 +6,7 @@ import { PlatformIcon } from "@/components/PlatformIcon";
 import { StatusPill } from "@/components/StatusPill";
 import { useStore } from "@/lib/store";
 import { campaignBudget } from "@/lib/finance";
+import { rup } from "@/lib/format";
 import type { Campaign } from "@/lib/types";
 
 const GRADIENTS = [
@@ -14,10 +15,6 @@ const GRADIENTS = [
   "from-emerald-500/25 to-teal-500/25",
   "from-violet-500/25 to-fuchsia-500/25",
 ];
-
-function rup(n: number) {
-  return "₹" + Math.round(n).toLocaleString("en-IN");
-}
 
 export function CampaignCard({
   campaign,

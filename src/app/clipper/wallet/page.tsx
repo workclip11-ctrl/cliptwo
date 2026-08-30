@@ -187,9 +187,9 @@ export default function ClipperWalletPage() {
                         <td className="px-4 py-3 text-right font-mono">
                           {fmtViews(k.views)}
                         </td>
-                         <td className="px-4 py-3 text-right font-mono text-muted">
-                           {rup(k.views > 0 ? amount / (k.views / 1000) : camp?.payout ?? 0)}
-                         </td>
+                          <td className="px-4 py-3 text-right font-mono text-muted">
+                            {rup(camp?.payout ?? 0)}
+                          </td>
                         <td className="px-4 py-3 text-right font-mono">
                           {earned ? (
                             <span className="text-green">{rup(amount)}</span>

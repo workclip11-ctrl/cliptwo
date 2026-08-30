@@ -1226,6 +1226,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Audit log: track clip status changes
+  const prevClipsRef = useRef(state.clips);
+  useEffect(() => {
+    const prev = prevClipsRef.current;
+    const curr = state.clips;
+    for (const clip of curr) {
+      const old = prev.find((c) => c.id === clip.id);
+      if (old && old.status !== clip.status) {
+        const camp = state.campaigns.find((c) => c.id === clip.campaignId);
+        const label = camp?.title ?? clip.campaignId;
+        const base = { actor: "admin", targetType: "clip" as const, targetId: clip.id, targetLabel: label };
+        if (clip.status === "approved") appendAuditLog({ ...base, action: "clip_approved", newValue: clip.status, reason: clip.rejectionReason ?? clip.failureReason ?? clip.heldReason });
+        else if (clip.status === "rejected") appendAuditLog({ ...base, action: "clip_rejected", newValue: clip.status, reason: clip.rejectionReason });
+        else if (clip.status === "held") appendAuditLog({ ...base, action: "clip_held", newValue: clip.status, reason: clip.heldReason });
+        else if (clip.status === "processing") appendAuditLog({ ...base, action: "payout_initiated" });
+        else if (clip.status === "paid") appendAuditLog({ ...base, action: "payout_completed" });
+        else if (clip.status === "failed") appendAuditLog({ ...base, action: "payout_failed", reason: clip.failureReason });
+      }
+    }
+    prevClipsRef.current = curr;
+  });
+
   const actions = useMemo<StoreActions>(() => {
     // Core admin profile patcher: merges a partial profile update, appends an
     // audit entry, and persists both to Supabase. New profile actions are thin
@@ -1488,6 +1510,37 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               }),
             };
           });
+
+          // Auto-update campaign budget status (runs after the clip setState above).
+          setState((s) => {
+            const changedClip = s.clips.find((k) => k.id === id);
+            if (!changedClip || !isTransitioningToEarned) return s;
+            const camp = s.campaigns.find((x) => x.id === changedClip.campaignId);
+            if (!camp || !camp.budget || camp.budget <= 0) return s;
+            const b = campaignBudget(camp, s.clips);
+            let newStatus: CampaignStatus = camp.status;
+            if (b.status === "budget_reached" && camp.status === "open") {
+              newStatus = "budget_reached";
+            } else if (b.status === "near_budget" && camp.status === "open") {
+              newStatus = "near_budget";
+            } else if (
+              b.status === "ok" &&
+              (camp.status === "budget_reached" || camp.status === "near_budget")
+            ) {
+              newStatus = "open";
+            }
+            if (newStatus === camp.status) return s;
+            if (isSupabaseConfigured) {
+              ignore(supabase.from("campaigns").update({ status: newStatus }).eq("id", camp.id));
+            }
+            return {
+              ...s,
+              campaigns: s.campaigns.map((x) =>
+                x.id === camp.id ? { ...x, status: newStatus } : x,
+              ),
+            };
+          });
+
          if (!isSupabaseConfigured) return;
          const update: Record<string, unknown> = { status };
          if (patch?.rejectionReason !== undefined)
@@ -1523,58 +1576,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                patch?.rejectionReason ?? patch?.failureReason ?? patch?.heldReason,
            },
          ];
-          ignore(supabase.from("clips").update(update).eq("id", id));
-
-          // Auto-update campaign budget status after any clip financial change.
-          if (isTransitioningToEarned) {
-            const after = stateRef.current;
-            const clipAfter = after.clips.find((k) => k.id === id);
-            if (clipAfter) {
-              const c = after.campaigns.find((x) => x.id === clipAfter.campaignId);
-              if (c && c.budget && c.budget > 0) {
-                const b = campaignBudget(c, after.clips);
-                let newStatus: CampaignStatus = c.status;
-                if (b.status === "budget_reached" && c.status === "open") {
-                  newStatus = "budget_reached";
-                } else if (b.status === "near_budget" && c.status === "open") {
-                  newStatus = "near_budget";
-                } else if (
-                  b.status === "ok" &&
-                  (c.status === "budget_reached" || c.status === "near_budget")
-                ) {
-                  newStatus = "open";
-                }
-                if (newStatus !== c.status) {
-                  setState((s) => ({
-                    ...s,
-                    campaigns: s.campaigns.map((x) =>
-                      x.id === c.id ? { ...x, status: newStatus } : x,
-                    ),
-                  }));
-                  ignore(
-                    supabase
-                      .from("campaigns")
-                      .update({ status: newStatus })
-                       .eq("id", c.id),
-                   );
-                 }
-               }
-             }
-           }
-
-            // ── Centralized audit log ──
-           const clipAfterState = stateRef.current.clips.find((k) => k.id === id);
-           const campLabel = clipAfterState
-             ? stateRef.current.campaigns.find((c) => c.id === clipAfterState.campaignId)?.title ?? clipAfterState.campaignId
-             : id;
-           const auditBase = { actor: actor ?? "admin", targetType: "clip" as const, targetId: id, targetLabel: campLabel };
-           if (status === "approved") appendAuditLog({ ...auditBase, action: "clip_approved", newValue: status, reason: patch?.rejectionReason ?? patch?.failureReason ?? patch?.heldReason });
-           else if (status === "rejected") appendAuditLog({ ...auditBase, action: "clip_rejected", newValue: status, reason: patch?.rejectionReason });
-           else if (status === "held") appendAuditLog({ ...auditBase, action: "clip_held", newValue: status, reason: patch?.heldReason });
-           else if (status === "processing") appendAuditLog({ ...auditBase, action: "payout_initiated" });
-           else if (status === "paid") appendAuditLog({ ...auditBase, action: "payout_completed" });
-           else if (status === "failed") appendAuditLog({ ...auditBase, action: "payout_failed", reason: patch?.failureReason });
-        },
+           ignore(supabase.from("clips").update(update).eq("id", id));
+         },
 
       closeCampaign: (id) => {
         setState((s) => ({
@@ -1880,7 +1883,7 @@ export function useStore() {
 // Reputation calculation functions
 
 // Calculate per-clipper reputation metrics from clips
-export function calculateClipperReputation(clips: Clip[], userId: string, campaigns: Campaign[]): {
+export function calculateClipperReputation(clips: Clip[], userId: string, campaigns: Campaign[], socialAccounts?: { verified?: boolean }[]): {
   totalApproved: number;
   totalRejected: number;
   approvalRate: number;
@@ -1913,7 +1916,9 @@ export function calculateClipperReputation(clips: Clip[], userId: string, campai
     ? Math.floor((Date.now() - Math.min(...submittedDates)) / (1000 * 60 * 60 * 24))
     : 0;
   
-  const verifiedSocialAccounts = clipperClips.filter((k) => k.verified).length;
+  const verifiedSocialAccounts = socialAccounts
+    ? socialAccounts.filter((a) => a.verified).length
+    : 0;
   
   return {
     totalApproved,
@@ -1991,8 +1996,8 @@ export function determineBadges(metrics: {
 }
 
 // Calculate reputation score and badges for a clipper
-export function getClipperReputation(clips: Clip[], userId: string, campaigns: Campaign[]) {
-  const metrics = calculateClipperReputation(clips, userId, campaigns);
+export function getClipperReputation(clips: Clip[], userId: string, campaigns: Campaign[], socialAccounts?: { verified?: boolean }[]) {
+  const metrics = calculateClipperReputation(clips, userId, campaigns, socialAccounts);
   const score = calculateReputationScore(metrics);
   const badges = determineBadges({
     totalApproved: metrics.totalApproved,

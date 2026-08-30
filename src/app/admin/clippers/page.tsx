@@ -366,7 +366,7 @@ function ClipperDrawer({
   const submissionsRef = useRef<HTMLDivElement>(null);
 
   // Reputation
-  const repMetrics = calculateClipperReputation(clips, profile.id, campaigns);
+  const repMetrics = calculateClipperReputation(clips, profile.id, campaigns, socialAccounts);
   const repScore = calculateReputationScore(repMetrics);
 
   const [riskOpen, setRiskOpen] = useState(false);

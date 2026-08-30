@@ -258,9 +258,7 @@ export default function ClipperPage() {
                           {k.views ? fmtViews(k.views) : "—"}
                         </td>
                         <td className="px-4 py-3 text-right font-mono">
-                          {payoutSplit(k, campaigns).net
-                            ? rup(payoutSplit(k, campaigns).net)
-                            : "—"}
+                          {rup(payoutSplit(k, campaigns).net) || "—"}
                         </td>
                         <td className="px-4 py-3 text-right">
                           <StatusPill status={k.status} />

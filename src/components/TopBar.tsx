@@ -215,7 +215,7 @@ export function TopBar({
                     isAdmin
                       ? "/admin"
                       : user?.role === "creator"
-                        ? "/creator"
+                        ? "/creator/settings"
                         : "/clipper/settings"
                   }
                   className="block px-4 py-2.5 text-sm hover:bg-accent-soft"

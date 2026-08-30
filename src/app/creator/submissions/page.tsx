@@ -251,7 +251,7 @@ export default function CreatorSubmissionsPage() {
                   <Cell label="Campaign">
                     {camp ? (
                       <Link
-                        href={`/campaign/${camp.id}`}
+                        href={`/campaigns/${camp.id}`}
                         className="line-clamp-1 hover:underline"
                       >
                         {camp.title}

@@ -267,7 +267,7 @@ export default function SocialAccountsPage() {
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">Connect {modal}</h2>
               <button
-                onClick={() => setModal(null)}
+                onClick={() => { setModal(null); setHandle(""); }}
                 aria-label="Close"
                 className="rounded-md p-1 text-muted hover:text-foreground"
               >
@@ -297,7 +297,7 @@ export default function SocialAccountsPage() {
                 <Link2 size={14} /> Connect
               </button>
               <button
-                onClick={() => setModal(null)}
+                onClick={() => { setModal(null); setHandle(""); }}
                 className="rounded-lg border px-4 py-2 text-sm font-medium"
               >
                 Cancel

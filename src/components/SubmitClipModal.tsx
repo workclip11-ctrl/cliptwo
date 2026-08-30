@@ -5,11 +5,9 @@ import { Send, AlertTriangle } from "lucide-react";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { useStore } from "@/lib/store";
 import { campaignBudget } from "@/lib/finance";
+import { rup } from "@/lib/format";
 import type { Campaign, Platform } from "@/lib/types";
 
-function rup(n: number) {
-  return "₹" + Math.round(n).toLocaleString("en-IN");
-}
 function derivePlatform(url: string): Platform {
   const u = url.toLowerCase();
   if (u.includes("instagram")) return "Instagram";
