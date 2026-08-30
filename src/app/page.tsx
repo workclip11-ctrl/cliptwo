@@ -58,26 +58,106 @@ const TRUST = [
   },
 ];
 
-const FAQS = [
+const FAQ_CATEGORIES = [
   {
-    q: "How do campaigns work?",
-    a: "Creators fund a campaign at a fixed CPM rate. Clippers browse live campaigns, cut clips from the source footage, post to their own accounts, and submit the link. Once views are verified, earnings are calculated automatically.",
+    title: "For Clippers",
+    items: [
+      {
+        q: "How do I make money?",
+        a: "Browse open campaigns, create a short-form clip from the source material, and post it on your social account. You earn money for every 1,000 verified views your clip receives, at the campaign's CPM rate. A 15% platform fee is deducted from gross earnings.",
+      },
+      {
+        q: "Do I need followers?",
+        a: "No. There is no minimum follower count. Your earnings depend on clip quality and view count, not your follower count.",
+      },
+      {
+        q: "How are views verified?",
+        a: "Views are tracked through platform APIs (Instagram, YouTube, TikTok) where available. Only unique, legitimate views count. Bot traffic, repeat views, and engagement manipulation are filtered out.",
+      },
+      {
+        q: "What is CPM?",
+        a: "CPM stands for Cost Per Mille (per 1,000 views). If a campaign pays ₹200 CPM and your clip gets 5,000 verified views, you earn ₹1,000 gross. After the 15% platform fee, you receive ₹850 net.",
+      },
+      {
+        q: "When do I get paid?",
+        a: "Earnings move through: Pending → Approved → Payable → Processing → Paid. Once your clip reaches the payable threshold and the admin initiates payout, the money is sent to your UPI account.",
+      },
+      {
+        q: "What happens if my clip is rejected?",
+        a: "You'll receive a specific reason (wrong format, missing CTA, policy violation, etc.). You can fix the issue and resubmit, or appeal if you believe the rejection was unfair.",
+      },
+      {
+        q: "Can I join multiple campaigns?",
+        a: "Yes. You can submit clips to as many campaigns as you want, as long as each clip follows the specific campaign brief.",
+      },
+    ],
   },
   {
-    q: "How much can I earn as a clipper?",
-    a: "It depends on the campaign's CPM and how many views your clips generate. CPM rates vary by niche — you'll see the exact rate before you claim a campaign, so there's never a surprise.",
+    title: "For Creators",
+    items: [
+      {
+        q: "How do I launch a campaign?",
+        a: "Go to Creator → Campaigns → New Campaign. Fill in the brief, upload source material, set your budget and CPM rate, and publish. Your campaign appears on the marketplace for clippers to browse.",
+      },
+      {
+        q: "How much does it cost?",
+        a: "You set your own budget and CPM rate. You only pay for verified views your clips receive. There are no upfront fees — you pay as clips earn.",
+      },
+      {
+        q: "How is CPM determined?",
+        a: "You choose the CPM rate when creating the campaign. Higher CPMs attract more clippers and better-quality clips.",
+      },
+      {
+        q: "Can I approve/reject clips?",
+        a: "Yes. You review each submitted clip and approve or reject it with a reason. Approved clips go live and start earning.",
+      },
+      {
+        q: "What happens when the budget is exhausted?",
+        a: "When your budget is fully committed, the campaign status changes to \"Budget Reached\" and new submissions are blocked. You can increase the budget to reopen the campaign.",
+      },
+    ],
   },
   {
-    q: "When do I get paid?",
-    a: "Once a submitted clip is approved and views are verified, earnings move to your payout queue. Payouts are settled directly to your UPI ID.",
+    title: "Payments",
+    items: [
+      {
+        q: "How does UPI work?",
+        a: "You link your UPI ID in your profile settings. Payouts are sent directly to your UPI-linked bank account.",
+      },
+      {
+        q: "What are the fees?",
+        a: "ClipTwo charges a 15% platform fee on gross earnings. This covers payment processing, fraud detection, platform maintenance, and support.",
+      },
+      {
+        q: "How long do payouts take?",
+        a: "Once a payout is initiated, it typically takes 3–5 business days to reach your account, depending on your payment provider.",
+      },
+      {
+        q: "What happens when a payout fails?",
+        a: "If a payout fails (wrong UPI ID, bank issue), the amount stays in your wallet and is retried in the next payout cycle. You'll be notified to update your payment details if needed.",
+      },
+    ],
   },
   {
-    q: "Which platforms are supported?",
-    a: "Instagram Reels, YouTube Shorts, and TikTok. Post to whichever platform fits the campaign guidelines and paste the link back into the app.",
-  },
-  {
-    q: "Is there a fee?",
-    a: "The platform takes a small fee from the creator's campaign budget, not from clipper earnings. Full pricing is published before launch.",
+    title: "Trust & Safety",
+    items: [
+      {
+        q: "How do you detect fake views?",
+        a: "We use platform API data, device fingerprinting, IP analysis, and behavioral patterns to detect bot traffic, view farms, and coordinated inauthentic activity.",
+      },
+      {
+        q: "What happens to suspicious earnings?",
+        a: "Earnings flagged as suspicious are frozen pending investigation. If fraud is confirmed, the affected clips are removed and the earnings are forfeited.",
+      },
+      {
+        q: "What happens if a post is deleted?",
+        a: "If your clip is deleted from social media, view tracking stops. Earnings up to the point of deletion are preserved, but no new views will be counted.",
+      },
+      {
+        q: "How do appeals work?",
+        a: "Submit an appeal through the platform (Submissions → View clip → Appeal). Provide evidence and our team will review within 5 business days.",
+      },
+    ],
   },
 ];
 
@@ -367,19 +447,35 @@ function Journey() {
 }
 
 function FAQ() {
-  const [open, setOpen] = useState(0);
+  const [open, setOpen] = useState<string | null>(null);
   return (
-    <div className="mx-auto max-w-2xl divide-y border-t">
-      {FAQS.map((f, i) => (
-        <div key={i}>
-          <button
-            onClick={() => setOpen(open === i ? -1 : i)}
-            className="flex w-full items-center justify-between py-4 text-left text-[15px] font-medium"
-          >
-            {f.q}
-            <ChevronDown size={18} className={`text-muted transition-transform ${open === i ? "rotate-180" : ""}`} />
-          </button>
-          {open === i && <p className="pb-4 text-sm leading-relaxed text-muted">{f.a}</p>}
+    <div className="space-y-8">
+      {FAQ_CATEGORIES.map((cat) => (
+        <div key={cat.title}>
+          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
+            {cat.title}
+          </h3>
+          <div className="divide-y rounded-xl border bg-card">
+            {cat.items.map((f) => (
+              <div key={f.q}>
+                <button
+                  onClick={() => setOpen(open === f.q ? null : f.q)}
+                  className="flex w-full items-center justify-between px-5 py-4 text-left text-[15px] font-medium"
+                >
+                  {f.q}
+                  <ChevronDown
+                    size={18}
+                    className={`shrink-0 text-muted transition-transform ${open === f.q ? "rotate-180" : ""}`}
+                  />
+                </button>
+                {open === f.q && (
+                  <p className="px-5 pb-4 text-sm leading-relaxed text-muted">
+                    {f.a}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       ))}
     </div>
