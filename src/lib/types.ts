@@ -113,6 +113,28 @@ export interface AuditEntry {
   note?: string;
 }
 
+export type Severity = "low" | "medium" | "high";
+export type RiskType =
+  | "fake_views"
+  | "spam"
+  | "copyright"
+  | "duplicate"
+  | "bot_traffic"
+  | "policy_violation"
+  | "account_sharing"
+  | "content_theft"
+  | "other";
+export type RiskStatus = "New" | "Under Review" | "Cleared" | "Confirmed" | "Held";
+
+export interface RiskFlag {
+  type: RiskType;
+  severity: Severity;
+  note?: string;
+  flaggedBy?: string;
+  at: number;
+  status?: RiskStatus;
+}
+
 export interface Clip {
   id: string;
   campaignId: string;
@@ -134,6 +156,8 @@ export interface Clip {
   payoutDate?: number;
   engagement?: ClipEngagement;
   audit?: AuditEntry[];
+  riskFlags?: RiskFlag[];
+  verified?: boolean;
 }
 
 export interface Appeal {
@@ -209,4 +233,5 @@ export interface StoreState {
   profiles: Profile[];
   socialAccounts: SocialAccount[];
   siteSettings: SiteSettings;
+  savedCampaigns: string[];
 }

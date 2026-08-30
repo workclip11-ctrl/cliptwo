@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { Heart } from "lucide-react";
 import { PlatformIcon } from "@/components/PlatformIcon";
+import { StatusPill } from "@/components/StatusPill";
 import { useStore } from "@/lib/store";
 import type { Campaign } from "@/lib/types";
 
@@ -25,30 +27,62 @@ export function CampaignCard({
   index: number;
   onView?: (c: Campaign) => void;
 }) {
-  const { clips } = useStore();
+  const { clips, savedCampaigns, toggleSaveCampaign } = useStore();
   const clippersIn = new Set(
     clips.filter((k) => k.campaignId === campaign.id).map((k) => k.clipper),
   ).size;
+  const isSaved = savedCampaigns.includes(campaign.id);
+  const budget = campaign.budget ?? 0;
+  const spent = campaign.spent ?? 0;
+  const remaining = budget - spent;
 
   const inner = (
     <>
       <div
-        className={`flex h-28 items-center justify-center bg-gradient-to-br ${GRADIENTS[index % GRADIENTS.length]} text-foreground/70`}
+        className={`flex h-28 items-center justify-center bg-gradient-to-br ${GRADIENTS[index % GRADIENTS.length]} text-foreground/70 relative`}
       >
         <PlatformIcon p={campaign.platform} size={30} />
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            toggleSaveCampaign(campaign.id);
+          }}
+          className="absolute top-2 right-2 rounded-full bg-background/80 p-1.5 hover:bg-background"
+          title={isSaved ? "Unsave" : "Save"}
+        >
+          <Heart
+            size={16}
+            className={isSaved ? "fill-red text-red" : "text-muted"}
+          />
+        </button>
       </div>
       <div className="p-4">
-        <h3 className="font-semibold leading-tight group-hover:underline underline-offset-2">
-          {campaign.title}
-        </h3>
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="font-semibold leading-tight group-hover:underline underline-offset-2">
+            {campaign.title}
+          </h3>
+          <StatusPill status={campaign.status} />
+        </div>
         <p className="mt-1 text-xs text-muted">
-          {campaign.creator} · {campaign.niche}
+          {campaign.creator} · {campaign.category || campaign.niche}
         </p>
-        <p className="mt-2 line-clamp-2 text-sm text-muted">{campaign.brief}</p>
-        <div className="mt-3 flex items-center justify-between text-xs text-muted">
+        <div className="mt-2 flex items-center gap-3 text-xs text-muted">
+          <span className="flex items-center gap-1">
+            <PlatformIcon p={campaign.platform} size={12} />
+            {campaign.platform}
+          </span>
           <span className="font-mono text-amber">{rup(campaign.payout)}/1K</span>
+        </div>
+        <div className="mt-2 flex items-center justify-between text-xs text-muted">
+          <span>Budget: {rup(remaining)} left</span>
           <span>{campaign.daysLeft}d left</span>
         </div>
+        {campaign.viewRules?.minViews != null && campaign.viewRules.minViews > 0 && (
+          <p className="mt-1 text-xs text-muted">
+            Min views: {campaign.viewRules.minViews.toLocaleString()}
+          </p>
+        )}
       </div>
       <div className="mt-auto flex items-center justify-between border-t px-4 py-3">
         <span className="text-xs text-muted">{clippersIn} clippers in</span>

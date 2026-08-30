@@ -27,13 +27,14 @@ import type {
   Appeal,
   TeamMember,
   ProfileStatus,
+  RiskFlag,
   SocialAccount,
   SocialAccountStatus,
   SiteSettings,
   StoreState,
 } from "./types";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
-import { EARNED_STATUSES } from "@/lib/finance";
+import { EARNED_STATUSES, isEarned, financeOf } from "@/lib/finance";
 
 const isoDaysAgo = (n: number) => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
 const isoInDays = (n: number) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
@@ -915,6 +916,7 @@ const seed: StoreState = {
     featuredIds: [],
     razorpayKey: "",
   },
+  savedCampaigns: [],
 };
 
 interface StoreActions {
@@ -962,6 +964,7 @@ interface StoreActions {
   }) => string;
   updateSocialAccount: (id: string, patch: Partial<SocialAccount>) => void;
   setSiteSettings: (s: SiteSettings) => void;
+  toggleSaveCampaign: (id: string) => void;
 }
 
 // Maps Campaign model keys to DB columns for `updateCampaign`. Only keys
@@ -1125,6 +1128,7 @@ function mapClip(r: Record<string, unknown>): Clip {
     audit: Array.isArray(r.audit)
       ? (r.audit as AuditEntry[])
       : undefined,
+    riskFlags: Array.isArray(r.risk_flags) ? (r.risk_flags as RiskFlag[]) : undefined,
   };
 }
 
@@ -1665,6 +1669,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             }),
         );
       },
+      toggleSaveCampaign: (id) => {
+        setState((s) => ({
+          ...s,
+          savedCampaigns: s.savedCampaigns.includes(id)
+            ? s.savedCampaigns.filter((x) => x !== id)
+            : [...s.savedCampaigns, id],
+        }));
+      },
     };
   }, []);
 
@@ -1677,3 +1689,153 @@ export function useStore() {
   if (!ctx) throw new Error("useStore must be used within StoreProvider");
   return ctx;
 }
+
+// Reputation calculation functions
+
+// Calculate per-clipper reputation metrics from clips
+function calculateClipperReputation(clips: Clip[], userId: string): {
+  totalApproved: number;
+  totalRejected: number;
+  approvalRate: number;
+  totalVerifiedViews: number;
+  successfulCampaigns: number;
+  totalEarned: number;
+  completedPayouts: number;
+  accountAge: number;
+  verifiedSocialAccounts: number;
+} {
+  const clipperClips = clips.filter((k) => k.userId === userId || k.clipper === userId);
+  
+  const totalApproved = clipperClips.filter((k) => EARNED_STATUSES.includes(k.status)).length;
+  const totalRejected = clipperClips.filter((k) => k.status === "rejected").length;
+  const approvalRate = totalApproved > 0 ? (totalApproved / (totalApproved + totalRejected) * 100) : 0;
+  
+  const verifiedClips = clipperClips.filter((k) => isEarned(k.status));
+  const totalVerifiedViews = verifiedClips.reduce((sum, k) => sum + k.views, 0);
+  
+  // Successful campaigns = campaigns with status "open" or "open" that have approved clips
+  const successfulCampaigns = new Set(
+    clipperClips.map((k) => k.campaignId)
+  ).size;
+  
+  const totalEarned = financeOf(clipperClips, [])?.earned ?? 0;
+  
+  // Completed payouts = paid clips
+  const completedPayouts = clipperClips.filter((k) => k.status === "paid").length;
+  
+  // Account age - use the earliest submitted clip date
+  const submittedDates = clipperClips.map((k) => k.submittedAt);
+  const accountAge = submittedDates.length > 0 
+    ? Math.floor((Date.now() - Math.min(...submittedDates)) / (1000 * 60 * 60 * 24))
+    : 0;
+  
+  // Verified social accounts - count clips with verified status
+  const verifiedSocialAccounts = clipperClips.filter((k) => k.verified).length;
+  
+  return {
+    totalApproved: totalApproved,
+    totalRejected: totalRejected,
+    approvalRate: approvalRate,
+    totalVerifiedViews: totalVerifiedViews,
+    successfulCampaigns: successfulCampaigns,
+    totalEarned: totalEarned,
+    completedPayouts: completedPayouts,
+    accountAge: accountAge,
+    verifiedSocialAccounts: verifiedSocialAccounts,
+  };
+}
+
+// Calculate overall reputation score (0-100) using transparent rules
+function calculateReputationScore(metrics: {
+  totalApproved: number;
+  totalRejected: number;
+  approvalRate: number;
+  totalVerifiedViews: number;
+  successfulCampaigns: number;
+  totalEarned: number;
+  completedPayouts: number;
+  accountAge: number;
+  verifiedSocialAccounts: number;
+}): number {
+  let score = 0;
+  
+  // Approval rate component (40% weight)
+  score += metrics.approvalRate * 0.4;
+  
+  // Success rate component (30% weight) - ratio of successful campaigns to total
+  const successRate = metrics.successfulCampaigns > 0 
+    ? Math.min(metrics.successfulCampaigns / Math.max(metrics.successfulCampaigns + 1, 1), 1) * 100
+    : 0;
+  score += successRate * 0.3;
+  
+  // Payout success component (20% weight) - ratio of completed payouts to total approved
+  const payoutSuccessRate = metrics.totalApproved > 0
+    ? Math.min(metrics.completedPayouts / metrics.totalApproved, 1) * 100
+    : 0;
+  score += payoutSuccessRate * 0.2;
+  
+  // Verified accounts component (10% weight)
+  score += Math.min(metrics.verifiedSocialAccounts / 10, 1) * 100 * 0.1;
+  
+  // Account activity component (optional, 0% weight but included for future use)
+  // const activityScore = Math.min(metrics.accountAge / 365, 1) * 100 * 0;
+  
+  return Math.round(Math.max(0, Math.min(100, score)));
+}
+
+// Determine badges based on reputation metrics
+function determineBadges(metrics: {
+  totalApproved: number;
+  approvalRate: number;
+  verifiedViews: number;
+  successfulCampaigns: number;
+  completedPayouts: number;
+  accountAge: number;
+  verifiedSocialAccounts: number;
+}): string[] {
+  const badges: string[] = [];
+  
+  // Verified Clipper: has verified clips
+  if (metrics.verifiedViews > 0) {
+    badges.push("Verified Clipper");
+  }
+  
+  // Top Performer: high approval rate and successful campaigns
+  if (metrics.approvalRate > 80 && metrics.successfulCampaigns > 2) {
+    badges.push("Top Performer");
+  }
+  
+  // High Approval Rate
+  if (metrics.approvalRate > 90) {
+    badges.push("High Approval Rate");
+  }
+  
+  // Consistent Creator - consistent activity over time
+  if (metrics.accountAge > 90 && metrics.totalApproved > 5) {
+    badges.push("Consistent Creator");
+  }
+  
+  return badges;
+}
+
+// Calculate reputation score and badges for a clipper
+function getClipperReputation(clips: Clip[], userId: string) {
+  const metrics = calculateClipperReputation(clips, userId);
+  const score = calculateReputationScore(metrics);
+  const badges = determineBadges({
+    totalApproved: metrics.totalApproved,
+    approvalRate: metrics.approvalRate,
+    verifiedViews: metrics.totalVerifiedViews,
+    successfulCampaigns: metrics.successfulCampaigns,
+    completedPayouts: metrics.completedPayouts,
+    accountAge: metrics.accountAge,
+    verifiedSocialAccounts: metrics.verifiedSocialAccounts,
+  });
+  
+  return {
+    score,
+    metrics,
+    badges,
+  };
+}
+
