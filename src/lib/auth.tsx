@@ -19,79 +19,6 @@ export interface UserProfile {
   permissions?: string[];
 }
 
-// Per-tab logout flag. Unlike Supabase's global signOut (which clears the
-// shared localStorage session and logs out every tab), this lets "logout"
-// apply to only the current tab while other tabs stay signed in.
-const TAB_LOGOUT_KEY = "cliptwo_tab_logged_out";
-const TAB_UID_KEY = "cliptwo_tab_uid";
-const LOCAL_SESSION_KEY = "cliptwo_local_session";
-
-function isTabLoggedOut() {
-  return (
-    typeof window !== "undefined" &&
-    sessionStorage.getItem(TAB_LOGOUT_KEY) === "1"
-  );
-}
-
-function tabUid() {
-  return typeof window !== "undefined"
-    ? sessionStorage.getItem(TAB_UID_KEY)
-    : null;
-}
-
-function markTabSession(id: string) {
-  if (typeof window !== "undefined") {
-    sessionStorage.setItem(TAB_UID_KEY, id);
-    sessionStorage.removeItem(TAB_LOGOUT_KEY);
-  }
-}
-
-function saveLocalSession(profile: UserProfile) {
-  if (typeof window !== "undefined") {
-    sessionStorage.setItem(LOCAL_SESSION_KEY, JSON.stringify(profile));
-  }
-}
-
-function loadLocalSession(): UserProfile | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = sessionStorage.getItem(LOCAL_SESSION_KEY);
-    return raw ? (JSON.parse(raw) as UserProfile) : null;
-  } catch {
-    return null;
-  }
-}
-
-function clearLocalSession() {
-  if (typeof window !== "undefined") {
-    sessionStorage.removeItem(LOCAL_SESSION_KEY);
-  }
-}
-
-const LOCAL_PROFILES_KEY = "cliptwo_local_profiles";
-
-function getLocalProfiles(): UserProfile[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(LOCAL_PROFILES_KEY);
-    return raw ? (JSON.parse(raw) as UserProfile[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveLocalProfile(profile: UserProfile) {
-  if (typeof window === "undefined") return;
-  const profiles = getLocalProfiles();
-  const idx = profiles.findIndex((p) => p.email === profile.email);
-  if (idx >= 0) {
-    profiles[idx] = profile;
-  } else {
-    profiles.push(profile);
-  }
-  localStorage.setItem(LOCAL_PROFILES_KEY, JSON.stringify(profiles));
-}
-
 interface AuthValue {
   isSignedIn: boolean;
   role: Role | null;
@@ -99,10 +26,14 @@ interface AuthValue {
   loading: boolean;
   error: string | null;
   signIn: (
-    role: Role,
-    creds: { email: string; password: string; name?: string },
+    creds: { email: string; password: string },
   ) => Promise<UserProfile | null>;
-  signUp: (data: UserProfile & { password: string }) => Promise<void>;
+  signUp: (data: {
+    email: string;
+    password: string;
+    name: string;
+    role: Role;
+  }) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -138,8 +69,7 @@ function profileFromUser(user: {
   return { id: user.id ?? "", name, email: user.email ?? "", role };
 }
 
-// Backfill a public `profiles` row for any signed-in user. This lets the admin
-// panel list and manage accounts even for users created before profiles existed.
+// Backfill a public `profiles` row for any signed-in user.
 async function ensureProfile(u: UserProfile) {
   if (!isSupabaseConfigured) return;
   try {
@@ -170,18 +100,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!isSupabaseConfigured) {
+      // Supabase not configured — auth is unavailable. Loading finishes
+      // immediately so the UI can render a "configure Supabase" message.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLoading(false);
+      return;
+    }
+
     let active = true;
 
     const apply = (u: UserProfile | null) => {
       if (!active) return;
-      if (u && !isTabLoggedOut()) {
+      if (u) {
         setUser(u);
         setRole(u.role);
         setIsSignedIn(true);
         ensureProfile(u);
-        // Load this admin's fine-grained permissions so the UI matches the
-        // database RLS enforcement (the super-admin needs no rows).
-        if (u.role === "admin" && isSupabaseConfigured) {
+        // Load admin permissions from the database.
+        if (u.role === "admin") {
           void (async () => {
             try {
               const { data } = await supabase
@@ -191,7 +128,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               if (!active) return;
               if (data && data.length) {
                 const perms = data.map((d) => String(d.permission));
-                setUser((prev) => (prev ? { ...prev, permissions: perms } : prev));
+                setUser((prev) =>
+                  prev ? { ...prev, permissions: perms } : prev,
+                );
               }
             } catch {
               /* non-fatal */
@@ -206,17 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     };
 
-    // ── Local mode: restore session from sessionStorage ──
-    if (!isSupabaseConfigured) {
-      const local = loadLocalSession();
-      if (local && !isTabLoggedOut()) {
-        apply(local);
-      } else {
-        apply(null);
-      }
-      return () => { active = false; };
-    }
-
+    // Initialize from the current Supabase Auth session.
     supabase.auth
       .getSession()
       .then(({ data }) => apply(profileFromUser(data.session?.user ?? null)))
@@ -227,76 +156,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       });
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      const incoming = profileFromUser(session?.user ?? null);
-      // Ignore cross-tab session changes that switch this tab to a different
-      // user, so each tab keeps its own identity (e.g. a tab signed in as
-      // creator won't flip to clipper when another tab signs in as clipper).
-      if (incoming && tabUid() && incoming.id !== tabUid()) return;
-      apply(incoming);
+    // Keep state in sync with Supabase Auth events (sign-in, sign-out,
+    // token refresh, password recovery, etc.).
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      apply(profileFromUser(session?.user ?? null));
     });
 
     return () => {
       active = false;
-      sub.subscription.unsubscribe();
+      subscription.unsubscribe();
     };
   }, []);
 
-  const signIn: AuthValue["signIn"] = async (r, creds) => {
+  const signIn: AuthValue["signIn"] = async (creds) => {
     setError(null);
 
-    // ── Local mode: simulate auth when Supabase is not configured ──
     if (!isSupabaseConfigured) {
-      const email = creds.email.toLowerCase().trim();
-      // Look up stored profile to get the role
-      const stored = getLocalProfiles().find((p) => p.email === email);
-      const role: Role =
-        email === "workclip11@gmail.com"
-          ? "admin"
-          : stored?.role === "creator"
-            ? "creator"
-            : "clipper";
-      const profile: UserProfile = {
-        id: stored?.id ?? `local-${email.replace(/[^a-z0-9]/g, "-")}`,
-        name: stored?.name || creds.name || email.split("@")[0],
-        email,
-        role,
-      };
-      markTabSession(profile.id);
-      saveLocalSession(profile);
-      setUser(profile);
-      setRole(profile.role);
-      setIsSignedIn(true);
-      return profile;
+      const msg = "Authentication requires Supabase. Please configure your environment.";
+      setError(msg);
+      throw new Error(msg);
     }
 
-    const first = await supabase.auth.signInWithPassword({
-      email: creds.email,
-      password: creds.password,
-    });
+    const { data, error: signInError } =
+      await supabase.auth.signInWithPassword({
+        email: creds.email,
+        password: creds.password,
+      });
 
-    // Do NOT fall back to a shared session on failure. Reusing getSession()
-    // here would silently log a failed login in as whatever account is already
-    // in storage (e.g. admin) — a privilege-escalation bug.
-    if (first.error || !first.data.session) {
+    if (signInError || !data.session) {
       const msg = mapError(
-        first.error ?? { message: "Unable to sign in. Please try again." },
+        signInError ?? { message: "Unable to sign in. Please try again." },
       );
       setError(msg);
       throw new Error(msg);
     }
-    const session = first.data.session;
 
-    const base = profileFromUser(session.user ?? null);
+    const base = profileFromUser(data.session.user ?? null);
     if (base) {
-      markTabSession(base.id);
-      setUser(base);
-      setRole(base.role);
-      setIsSignedIn(true);
       ensureProfile(base);
       return base;
     }
-    setIsSignedIn(true);
     return null;
   };
 
@@ -305,33 +206,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // SECURITY: Never allow self-assigning admin role via signup.
     const safeRole = data.role === "admin" ? "clipper" : data.role;
 
-    // ── Local mode: simulate auth when Supabase is not configured ──
     if (!isSupabaseConfigured) {
-      const profile: UserProfile = {
-        id: `local-${data.email.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
-        name: data.name,
-        email: data.email,
-        role: safeRole as Role,
-      };
-      if (typeof window !== "undefined")
-        sessionStorage.removeItem(TAB_LOGOUT_KEY);
-      markTabSession(profile.id);
-      saveLocalSession(profile);
-      saveLocalProfile(profile);
-      setUser(profile);
-      setRole(profile.role);
-      setIsSignedIn(true);
-      ensureProfile(profile);
-      return;
+      const msg = "Authentication requires Supabase. Please configure your environment.";
+      setError(msg);
+      throw new Error(msg);
     }
 
-    const { data: res, error } = await supabase.auth.signUp({
+    const { data: res, error: signUpError } = await supabase.auth.signUp({
       email: data.email,
       password: data.password,
       options: { data: { name: data.name, role: safeRole } },
     });
-    if (error) {
-      const msg = mapError(error);
+    if (signUpError) {
+      const msg = mapError(signUpError);
       setError(msg);
       throw new Error(msg);
     }
@@ -340,32 +227,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(msg);
       throw new Error(msg);
     }
-    if (typeof window !== "undefined")
-      sessionStorage.removeItem(TAB_LOGOUT_KEY);
-    markTabSession(res.user?.id ?? data.email);
-    setUser({
-      id: res.user?.id ?? "",
-      name: data.name,
-      email: data.email,
-      role: safeRole as Role,
-    });
-    setRole(safeRole as Role);
-    setIsSignedIn(true);
-    ensureProfile({
-      id: res.user?.id ?? "",
-      name: data.name,
-      email: data.email,
-      role: safeRole as Role,
-    });
+    const base = profileFromUser(res.user ?? null);
+    if (base) ensureProfile(base);
   };
 
   const signOut: AuthValue["signOut"] = async () => {
-    // Per-tab logout: flag this tab only. We deliberately do NOT call
-    // supabase.auth.signOut() because that clears the shared session and
-    // would log out every tab.
-    if (typeof window !== "undefined")
-      sessionStorage.setItem(TAB_LOGOUT_KEY, "1");
-    clearLocalSession();
+    setError(null);
+    if (isSupabaseConfigured) {
+      await supabase.auth.signOut();
+    }
     setUser(null);
     setRole(null);
     setIsSignedIn(false);

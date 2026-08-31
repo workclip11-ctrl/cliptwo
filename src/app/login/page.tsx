@@ -28,15 +28,21 @@ function AuthForm() {
 
     const emailOk = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
     if (!emailOk) return setError("Enter a valid email address.");
-    if (password.length < 6) return setError("Password must be at least 6 characters.");
+    if (password.length < 6)
+      return setError("Password must be at least 6 characters.");
 
     setLoading(true);
     try {
       if (mode === "signup") {
-        await signUp({ id: "", name: name.trim() || "Clipper", email, role: "clipper", password });
+        await signUp({
+          email,
+          password,
+          name: name.trim() || email.split("@")[0],
+          role: "clipper",
+        });
         router.push("/clipper");
       } else {
-        const u = await signIn("clipper", { email, password, name });
+        const u = await signIn({ email, password });
         router.push(
           u?.role === "admin"
             ? "/admin"
@@ -47,9 +53,16 @@ function AuthForm() {
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Authentication failed.";
-      if (mode === "signin" && msg === "Invalid email or password." && isSupabaseConfigured) {
+      // If the account doesn't exist, switch to sign-up with a friendly note.
+      if (
+        mode === "signin" &&
+        msg === "Invalid email or password." &&
+        isSupabaseConfigured
+      ) {
         try {
-          const { data } = await supabase.rpc("user_exists", { target_email: email });
+          const { data } = await supabase.rpc("user_exists", {
+            target_email: email,
+          });
           if (data === false) {
             setMode("signup");
             setError("You're new here — create your account below.");
@@ -85,8 +98,8 @@ function AuthForm() {
             </h1>
             <p className="mt-1 text-sm text-muted">
               {mode === "signin"
-                ? "Sign in to keep clipping and earning."
-                : "Join India's clipping marketplace in seconds."}
+                ? "Log in to keep clipping and earning."
+                : "Join cliptwo in seconds."}
             </p>
           </div>
 
@@ -103,7 +116,9 @@ function AuthForm() {
               </div>
             )}
             <div>
-              <label className="mb-1.5 block text-sm font-medium">Email</label>
+              <label className="mb-1.5 block text-sm font-medium">
+                Email
+              </label>
               <input
                 type="email"
                 required
@@ -114,7 +129,9 @@ function AuthForm() {
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium">Password</label>
+              <label className="mb-1.5 block text-sm font-medium">
+                Password
+              </label>
               <input
                 type="password"
                 required
@@ -136,7 +153,11 @@ function AuthForm() {
               disabled={loading}
               className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
             >
-              {loading ? "Please wait…" : mode === "signin" ? "Log in" : "Create account"}
+              {loading
+                ? "Please wait…"
+                : mode === "signin"
+                  ? "Log in"
+                  : "Create account"}
               {!loading && <ArrowRight size={15} />}
             </button>
           </form>
@@ -155,6 +176,10 @@ function AuthForm() {
             </button>
           </p>
         </div>
+
+        <p className="mt-6 text-center text-xs text-muted">
+          Secure authentication powered by Supabase.
+        </p>
       </div>
     </main>
   );
