@@ -224,6 +224,20 @@ export default function FAQPage() {
           </Link>
         </div>
       </section>
+
+      {/* Still have questions */}
+      <section className="mx-auto mt-16 max-w-2xl rounded-2xl border bg-card p-8 text-center">
+        <h2 className="text-xl font-semibold tracking-tight">Still have questions?</h2>
+        <p className="mt-2 text-sm text-muted">
+          Can&apos;t find what you&apos;re looking for? Reach out to our support team and we&apos;ll get back to you.
+        </p>
+        <a
+          href="mailto:support@cliptwo.com"
+          className="mt-5 inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
+        >
+          Contact Support
+        </a>
+      </section>
     </main>
   );
 }
