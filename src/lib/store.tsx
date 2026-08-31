@@ -110,7 +110,7 @@ const seed: StoreState = {
       creator: "FitForm",
       created_by: "u_fitform",
       brief: "Turn the 12-min session into 3 separate 30s reels. Vertical only.",
-      platform: "Reels",
+      platform: "Instagram",
       payout: 160,
       status: "open",
       createdAt: Date.now() - 1000 * 60 * 60 * 24,
@@ -121,7 +121,7 @@ const seed: StoreState = {
       daysLeft: 26,
       sourceLink: "https://drive.google.com/drive/folders/workout-routine",
       rules: "Turn the 12-min session into 3 separate 30s reels. Vertical only. Upbeat music.",
-      platforms: ["Reels", "Instagram"],
+      platforms: ["Instagram"],
       verified: true,
       objective:
         "Repurpose our 12-minute workout into snackable reels that people actually finish and save.",
@@ -232,7 +232,7 @@ const seed: StoreState = {
       creator: "Kabir Sethi",
       created_by: "u_kabir",
       brief: "Punchline-first cuts, 20-40s max. Keep crowd reactions in.",
-      platform: "Reels",
+      platform: "Instagram",
       payout: 190,
       status: "open",
       createdAt: Date.now() - 1000 * 60 * 60 * 24 * 3,
@@ -243,7 +243,7 @@ const seed: StoreState = {
       daysLeft: 14,
       sourceLink: "https://drive.google.com/drive/folders/delhi-live",
       rules: "No profanity in captions. 20-40s clips. Add a hook in the first 3 seconds.",
-      platforms: ["Reels", "Instagram"],
+      platforms: ["Instagram"],
       verified: false,
       objective:
         "Turn the Delhi live set into viral punchline cuts that grow the comic's following.",
@@ -443,7 +443,7 @@ const seed: StoreState = {
       status: "approved",
       views: 18000,
       submittedAt: Date.now() - 1000 * 60 * 60 * 24 * 4,
-      platform: "Reels",
+      platform: "Instagram",
       engagement: { likes: 2100, comments: 130, shares: 260 },
       audit: [
         { action: "submitted", by: "arjun.cuts", at: Date.now() - 1000 * 60 * 60 * 24 * 4 },
@@ -544,7 +544,7 @@ const seed: StoreState = {
       status: "pending",
       views: 0,
       submittedAt: Date.now() - 1000 * 60 * 60 * 24 * 1,
-      platform: "Reels",
+      platform: "Instagram",
       audit: [
         { action: "submitted", by: "simran.m", at: Date.now() - 1000 * 60 * 60 * 24 * 1 },
       ],
@@ -905,7 +905,7 @@ const seed: StoreState = {
     {
       id: "sa_simran_re",
       userId: "u_simran",
-      platform: "Reels",
+      platform: "Instagram",
       handle: "@simran.m",
       status: "connecting",
       verified: false,

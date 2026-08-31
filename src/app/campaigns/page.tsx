@@ -220,7 +220,7 @@ export default function CampaignsPage() {
                   <option value="">All platforms</option>
                   <option value="YouTube">YouTube</option>
                   <option value="Instagram">Instagram</option>
-                  <option value="Reels">Reels</option>
+                  <option value="Kick">Kick</option>
                 </select>
               </div>
 
