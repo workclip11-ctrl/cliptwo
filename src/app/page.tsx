@@ -266,31 +266,31 @@ function HeroVisual() {
             </div>
 
             {/* Video info overlay */}
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background/90 to-transparent p-4 pt-12">
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1 rounded-full bg-green/20 px-2 py-0.5 text-[10px] font-semibold text-green">
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background/90 to-transparent p-5 pt-16">
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center gap-1 rounded-full bg-green/20 px-2.5 py-1 text-[10px] font-semibold text-green">
                   <Zap size={8} /> Live
                 </span>
-                <span className="font-mono text-[10px] text-muted">CPM ₹220</span>
+                <span className="font-mono text-[11px] text-muted">CPM ₹220</span>
               </div>
-              <p className="mt-2 text-sm font-semibold">The Grind Podcast — Ep. 142</p>
-              <p className="text-[11px] text-muted">by Rohan Malhotra</p>
-              <div className="mt-3 grid grid-cols-3 gap-2">
+              <p className="mt-3 text-sm font-semibold">The Grind Podcast — Ep. 142</p>
+              <p className="mt-1 text-[11px] text-muted">by Rohan Malhotra</p>
+              <div className="mt-4 grid grid-cols-3 gap-2.5">
                 {[
                   ["Clips", "14"],
                   ["Views", "1.8L"],
                   ["Paid", "₹18.4K"],
                 ].map(([l, v]) => (
-                  <div key={l} className="rounded-lg bg-background/60 px-2 py-1.5 text-center backdrop-blur-sm">
-                    <p className="text-[9px] text-muted">{l}</p>
-                    <p className="font-mono text-xs font-semibold">{v}</p>
+                  <div key={l} className="rounded-xl bg-background/60 px-2.5 py-2 text-center backdrop-blur-sm">
+                    <p className="text-[10px] text-muted">{l}</p>
+                    <p className="mt-0.5 font-mono text-xs font-bold">{v}</p>
                   </div>
                 ))}
               </div>
-              <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-muted/30">
+              <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-muted/30">
                 <div className="h-full w-[46%] rounded-full bg-accent" />
               </div>
-              <p className="mt-1 font-mono text-[9px] text-muted">₹18,400 / ₹40,000</p>
+              <p className="mt-1.5 font-mono text-[10px] text-muted">₹18,400 / ₹40,000</p>
             </div>
           </div>
         </div>
