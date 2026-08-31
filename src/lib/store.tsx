@@ -1337,8 +1337,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         (async () => {
           const { data: u } = await supabase.auth.getUser();
           const handle =
-            (u.user?.user_metadata?.name as string) ||
-            u.user?.email ||
+            (u?.user?.user_metadata?.name as string) ||
+            u?.user?.email ||
             c.creator;
           const { data } = await supabase
             .from("campaigns")
@@ -1355,7 +1355,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               status,
               source_link: c.sourceLink ?? null,
               rules: c.rules ?? null,
-              created_by: u.user?.id ?? null,
+              created_by: u?.user?.id ?? null,
               category: c.category ?? null,
               platforms: c.platforms ?? null,
               verified: c.verified ?? null,

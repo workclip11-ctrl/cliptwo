@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase/client";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
 
 export interface Notification {
   id: string;
@@ -11,6 +11,7 @@ export interface Notification {
 }
 
 export async function getNotifications(userId: string) {
+  if (!isSupabaseConfigured) return [];
   const { data, error } = await supabase
     .from("notifications")
     .select("*")
@@ -21,6 +22,7 @@ export async function getNotifications(userId: string) {
 }
 
 export async function markRead(id: string, userId: string) {
+  if (!isSupabaseConfigured) return;
   const { error } = await supabase
     .from("notifications")
     .update({ read: true })
@@ -42,6 +44,7 @@ export async function createNotification({
   relatedId?: string;
   userId: string;
 }) {
+  if (!isSupabaseConfigured) return;
   const { error } = await supabase
     .from("notifications")
     .insert({ title, message, type, related_id: relatedId, user_id: userId });

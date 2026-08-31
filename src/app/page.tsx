@@ -872,7 +872,7 @@ export default function Home() {
                 India&apos;s clipping marketplace — connect creators with clippers, paid per verified view and settled straight to UPI.
               </p>
               <div className="mt-4 flex items-center gap-2">
-                {["ig", "yt", "tt"].map((p) => (
+                {(["Instagram", "YouTube"] as const).map((p) => (
                   <span key={p} className="flex h-8 w-8 items-center justify-center rounded-lg border bg-background text-muted">
                     <PlatformIcon p={p} size={15} />
                   </span>

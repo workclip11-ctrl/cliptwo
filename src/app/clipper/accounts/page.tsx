@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Link2,
   RefreshCw,
@@ -68,6 +68,13 @@ export default function SocialAccountsPage() {
   const [connecting, setConnecting] = useState<string | null>(null);
   const [modal, setModal] = useState<Platform | null>(null);
   const [handle, setHandle] = useState("");
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
 
   function submitConnect() {
     if (!modal) return;
@@ -83,7 +90,7 @@ export default function SocialAccountsPage() {
       status: "connecting",
       verified: false,
     });
-    setTimeout(() => {
+    timeoutRef.current = setTimeout(() => {
       updateSocialAccount(id, {
         status: "connected",
         connectedAt: new Date().getTime(),
@@ -96,7 +103,7 @@ export default function SocialAccountsPage() {
   function reconnect(acc: SocialAccount) {
     setConnecting(acc.id);
     updateSocialAccount(acc.id, { status: "connecting", error: undefined });
-    setTimeout(() => {
+    timeoutRef.current = setTimeout(() => {
       updateSocialAccount(acc.id, {
         status: "connected",
         connectedAt: acc.connectedAt ?? new Date().getTime(),

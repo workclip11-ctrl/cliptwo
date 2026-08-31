@@ -15,5 +15,5 @@ export function clipEarnings(clip: Clip, campaigns: Campaign[]) {
   // Any earned clip (approved and beyond) earns money; pending/rejected do not.
   if (!isEarned(clip.status)) return 0;
   const camp = campaigns.find((c) => c.id === clip.campaignId);
-  return camp ? (clip.views / 1000) * camp.payout : 0;
+  return camp ? Math.round((clip.views / 1000) * camp.payout) : 0;
 }

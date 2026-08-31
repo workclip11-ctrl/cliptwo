@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -74,45 +74,16 @@ function Row({ label, value }: { label: string; value: ReactNode }) {
 export default function CampaignDetailPage() {
   const params = useParams<{ campaignId: string }>();
   const id = params.campaignId as string;
-  const { campaigns, clips, addClip } = useStore();
+  const { campaigns, clips, addClip, savedCampaigns, toggleSaveCampaign } = useStore();
   const { isSignedIn, user } = useAuth();
   const router = useRouter();
   const [active, setActive] = useState(false);
   const [reported, setReported] = useState(false);
 
-  const saved = useSyncExternalStore(
-    (cb) => {
-      if (typeof window === "undefined") return () => {};
-      window.addEventListener("cliptwo:saved", cb);
-      return () => window.removeEventListener("cliptwo:saved", cb);
-    },
-    () => {
-      try {
-        const raw = localStorage.getItem("cliptwo:saved-campaigns");
-        const arr: string[] = raw ? JSON.parse(raw) : [];
-        return arr.includes(id);
-      } catch {
-        return false;
-      }
-    },
-    () => false,
-  );
+  const saved = savedCampaigns.includes(id);
 
   const campaign = campaigns.find((c) => c.id === id);
   const campClips = clips.filter((k) => k.campaignId === id);
-
-  function toggleSave() {
-    try {
-      const raw = localStorage.getItem("cliptwo:saved-campaigns");
-      const arr: string[] = raw ? JSON.parse(raw) : [];
-      const next = saved ? arr.filter((x) => x !== id) : [...new Set([...arr, id])];
-      localStorage.setItem("cliptwo:saved-campaigns", JSON.stringify(next));
-      if (typeof window !== "undefined")
-        window.dispatchEvent(new Event("cliptwo:saved"));
-    } catch {
-      /* ignore */
-    }
-  }
 
   function join() {
     if (!isSignedIn) {
@@ -125,7 +96,7 @@ export default function CampaignDetailPage() {
   if (!campaign) {
     return (
       <main className="min-h-screen">
-        <TopBar active="clipper" />
+        <TopBar active={user?.role === "admin" ? "admin" : user?.role === "creator" ? "creator" : "clipper"} />
         <div className="mx-auto max-w-3xl px-6 py-20 text-center">
           <h1 className="text-2xl font-semibold">Campaign not found</h1>
           <p className="mt-2 text-sm text-muted">
@@ -157,7 +128,7 @@ export default function CampaignDetailPage() {
 
   return (
     <main className="min-h-screen">
-      <TopBar active="clipper" />
+      <TopBar active={user?.role === "admin" ? "admin" : user?.role === "creator" ? "creator" : "clipper"} />
       <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
         <div className="flex items-center gap-3 text-sm text-muted">
           <button
@@ -220,7 +191,7 @@ export default function CampaignDetailPage() {
         {/* Secondary actions */}
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button
-            onClick={toggleSave}
+            onClick={() => toggleSaveCampaign(id)}
             className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-accent-soft ${saved ? "text-accent" : ""}`}
           >
             <Bookmark size={14} className={saved ? "fill-accent" : ""} />{" "}
