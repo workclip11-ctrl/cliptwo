@@ -20,7 +20,7 @@ const map: Record<AnyStatus, { label: string; cls: string }> = {
 };
 
 export function StatusPill({ status }: { status: AnyStatus }) {
-  const s = map[status];
+  const s = map[status] ?? { label: status ?? "Unknown", cls: "bg-muted/10 text-muted border-muted/20" };
   return (
     <span
       className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${s.cls}`}

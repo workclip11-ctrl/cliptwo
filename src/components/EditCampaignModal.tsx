@@ -128,6 +128,7 @@ export function EditCampaignModal({
       objective: objective.trim() || undefined,
       brief: brief.trim(),
       platforms,
+      payout: Number(payout) || campaign.payout,
       budget: b,
       maxPayoutPerClip: maxPerClip ? Number(maxPerClip) : undefined,
       spendCap: spendCap ? Number(spendCap) : undefined,

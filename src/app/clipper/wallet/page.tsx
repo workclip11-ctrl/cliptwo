@@ -179,7 +179,7 @@ export default function ClipperWalletPage() {
                             href={`/clip/${k.id}`}
                             className="inline-flex items-center gap-1.5 hover:text-accent"
                           >
-                            <PlatformIcon p={k.platform || camp?.platform || ""} size={14} />
+                            <PlatformIcon p={k.platform || camp?.platform || "Instagram"} size={14} />
                             <span className="line-clamp-1">{k.caption}</span>
                           </Link>
                         </td>

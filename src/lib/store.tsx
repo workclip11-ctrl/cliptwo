@@ -948,7 +948,7 @@ interface StoreActions {
     actor?: string,
     reason?: string,
   ) => void;
-  deleteProfile: (id: string) => void;
+  deleteProfile: (id: string) => Promise<void>;
   verifyProfile: (id: string, actor: string, verified: boolean) => void;
   setProfileRisk: (id: string, actor: string, flagged: boolean, note?: string) => void;
   saveAdminNotes: (id: string, notes: string, actor: string) => void;
@@ -1794,7 +1794,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         });
       },
 
-      deleteProfile: (id) => {
+      deleteProfile: async (id) => {
+        // SECURITY: Only admins can delete profiles.
+        const me = await getCurrentUser();
+        if (!me || !isUserAdmin(me)) {
+          console.error(`Authorization: user ${me?.id ?? "anonymous"} cannot delete profile ${id}`);
+          return;
+        }
         setState((s) => ({ ...s, profiles: s.profiles.filter((p) => p.id !== id) }));
         if (!isSupabaseConfigured) return;
         ignore(supabase.from("profiles").delete().eq("id", id));

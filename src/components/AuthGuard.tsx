@@ -19,10 +19,12 @@ export function AuthGuard({ role, children }: { role: Role; children: ReactNode 
     if (!isSignedIn) {
       router.replace("/login");
     } else if (current && current !== role) {
+      // Admins can access any role's pages. Non-admins get redirected to their own dashboard.
+      if (current === "admin") return;
       router.replace(current === "clipper" ? "/clipper" : "/creator");
     }
   }, [mounted, loading, isSignedIn, current, role, router]);
 
-  if (!mounted || loading || !isSignedIn || (current && current !== role)) return null;
+  if (!mounted || loading || !isSignedIn || (current && current !== role && current !== "admin")) return null;
   return <>{children}</>;
 }

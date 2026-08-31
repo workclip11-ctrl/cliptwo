@@ -22,9 +22,9 @@ import { rup, fmtViews } from "@/lib/format";
 import { financeOf, campaignSpent, payoutSplit } from "@/lib/finance";
 
 const ACCOUNTS = [
-  { platform: "Instagram", handle: "@maya.cuts", status: "verified" },
-  { platform: "YouTube", handle: "@mayacuts", status: "verified" },
-  { platform: "Instagram", handle: "@maya.in", status: "connecting" },
+  { id: "ig-1", platform: "Instagram", handle: "@maya.cuts", status: "verified" },
+  { id: "yt-1", platform: "YouTube", handle: "@mayacuts", status: "verified" },
+  { id: "ig-2", platform: "Instagram", handle: "@maya.in", status: "connecting" },
 ];
 
 export default function ClipperPage() {
@@ -172,12 +172,12 @@ export default function ClipperPage() {
             <div className="rounded-2xl border bg-card p-5">
               <h3 className="text-sm font-semibold">Connected accounts</h3>
               <p className="mt-1 text-xs text-muted">
-                Views are tracked automatically from linked accounts.
+                Connect your social accounts for campaign matching.
               </p>
               <div className="mt-4 space-y-2">
                 {ACCOUNTS.map((a) => (
                   <div
-                    key={a.platform}
+                    key={a.id}
                     className="flex items-center justify-between rounded-lg border bg-background px-3 py-2.5"
                   >
                     <span className="flex items-center gap-2 text-sm">
@@ -258,7 +258,7 @@ export default function ClipperPage() {
                           {k.views ? fmtViews(k.views) : "—"}
                         </td>
                         <td className="px-4 py-3 text-right font-mono">
-                          {rup(payoutSplit(k, campaigns).net) || "—"}
+                          {payoutSplit(k, campaigns).net > 0 ? rup(payoutSplit(k, campaigns).net) : "—"}
                         </td>
                         <td className="px-4 py-3 text-right">
                           <StatusPill status={k.status} />

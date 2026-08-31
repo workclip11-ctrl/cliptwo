@@ -186,10 +186,6 @@ const CAMPAIGN_PREVIEW = [
   { title: "Money Mindset Series", niche: "Finance", cpm: 280 },
 ];
 
-function fmtINR(n: number) {
-  return "₹" + Math.round(n).toLocaleString("en-IN");
-}
-
 function fmtNum(n: number) {
   if (n >= 100000) return (n / 100000).toFixed(1) + "L";
   if (n >= 1000) return (n / 1000).toFixed(1) + "K";
@@ -205,7 +201,7 @@ function HeroVisual() {
           <span className="inline-flex items-center gap-1.5 rounded-full bg-green/10 px-2.5 py-1 text-xs font-medium text-green">
             <Zap size={11} /> Live
           </span>
-          <span className="font-mono text-xs text-muted">CPM {fmtINR(220)}</span>
+          <span className="font-mono text-xs text-muted">CPM {rup(220)}</span>
         </div>
         <div className="mt-4 flex h-32 items-center justify-center rounded-xl bg-accent-soft">
           <Play />
@@ -243,7 +239,7 @@ function JourneyVisual({ stageKey }: { stageKey: string }) {
               <span className="inline-flex items-center gap-1 rounded-full bg-green/10 px-2 py-0.5 text-[10px] font-medium text-green">
                 <Zap size={9} /> 12d left
               </span>
-              <span className="font-mono text-sm font-medium text-amber">{fmtINR(c.cpm)}</span>
+              <span className="font-mono text-sm font-medium text-amber">{rup(c.cpm)}</span>
             </div>
             <p className="mt-2 text-sm font-medium">{c.title}</p>
             <p className="text-xs text-muted">{c.niche}</p>
@@ -329,7 +325,7 @@ function JourneyVisual({ stageKey }: { stageKey: string }) {
                 <td className="px-4 py-2.5">
                   <span className={`text-xs font-medium ${s === "paid" ? "text-green" : "text-amber"}`}>{s}</span>
                 </td>
-                <td className="px-4 py-2.5 text-right font-mono">{fmtINR(a as number)}</td>
+                <td className="px-4 py-2.5 text-right font-mono">{rup(a as number)}</td>
               </tr>
             ))}
           </tbody>
@@ -459,7 +455,7 @@ function Journey() {
 function FAQ() {
   const [tab, setTab] = useState(FAQ_CATEGORIES[0].title);
   const [open, setOpen] = useState<string | null>(null);
-  const cat = FAQ_CATEGORIES.find((c) => c.title === tab)!;
+  const cat = FAQ_CATEGORIES.find((c) => c.title === tab) ?? FAQ_CATEGORIES[0];
   return (
     <div>
       <div className="mx-auto mb-6 flex w-fit rounded-full border bg-card p-1">
@@ -540,15 +536,15 @@ function EarningsCalculator() {
       <div className="mt-5 grid grid-cols-3 gap-3">
         <div className="rounded-xl bg-accent-soft p-3 text-center">
           <p className="text-[11px] text-muted">Gross earnings</p>
-          <p className="font-mono text-lg font-semibold">{fmtINR(gross)}</p>
+          <p className="font-mono text-lg font-semibold">{rup(gross)}</p>
         </div>
         <div className="rounded-xl bg-accent-soft p-3 text-center">
           <p className="text-[11px] text-muted">Platform fee ({Math.round(PLATFORM_FEE_RATE * 100)}%)</p>
-          <p className="font-mono text-lg font-semibold text-muted">{fmtINR(fee)}</p>
+          <p className="font-mono text-lg font-semibold text-muted">{rup(fee)}</p>
         </div>
         <div className="rounded-xl bg-accent-soft p-3 text-center">
           <p className="text-[11px] text-muted">You receive</p>
-          <p className="font-mono text-lg font-semibold text-green">{fmtINR(net)}</p>
+          <p className="font-mono text-lg font-semibold text-green">{rup(net)}</p>
         </div>
       </div>
       <p className="mt-3 text-xs text-muted">
