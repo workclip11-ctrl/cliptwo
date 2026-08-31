@@ -219,32 +219,48 @@ function HeroVisual() {
 
             {/* Video preview */}
             <div className="mx-4 mt-2 overflow-hidden rounded-2xl">
-              <div className="relative flex aspect-[9/14] items-center justify-center bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500">
-                {/* Decorative elements */}
-                <div className="absolute left-4 top-4 h-20 w-20 rounded-full bg-white/10 blur-xl" />
-                <div className="absolute bottom-20 right-4 h-16 w-16 rounded-full bg-yellow-400/20 blur-lg" />
-                <div className="absolute left-8 top-1/3 h-3 w-3 rounded-full bg-white/30" />
-                <div className="absolute right-12 top-1/4 h-2 w-2 rounded-full bg-white/40" />
-                {/* Microphone icon */}
-                <div className="relative z-10 flex h-20 w-20 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-sm">
-                  <svg className="h-10 w-10 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                    <line x1="12" y1="19" x2="12" y2="23" />
-                    <line x1="8" y1="23" x2="16" y2="23" />
+              <div className="relative flex aspect-[9/14] items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700">
+                {/* Video timeline effect */}
+                <div className="absolute inset-x-4 top-1/2 h-px bg-white/20" />
+                <div className="absolute left-4 top-1/2 h-3 w-1 -translate-y-1/2 rounded-full bg-white/30" />
+                <div className="absolute right-4 top-1/2 h-3 w-1 -translate-y-1/2 rounded-full bg-white/30" />
+
+                {/* Timeline markers */}
+                <div className="absolute left-8 right-8 top-1/2 flex justify-between">
+                  {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+                    <div key={i} className={`h-1.5 w-0.5 rounded-full ${i < 5 ? "bg-accent" : "bg-white/20"}`} />
+                  ))}
+                </div>
+
+                {/* Progress bar */}
+                <div className="absolute left-8 right-8 top-[55%] h-1 overflow-hidden rounded-full bg-white/10">
+                  <div className="h-full w-[62%] rounded-full bg-gradient-to-r from-accent to-accent/60" />
+                </div>
+
+                {/* Playhead */}
+                <div className="absolute left-[62%] top-[55%] h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-lg" />
+
+                {/* Center scissors icon */}
+                <div className="relative z-10 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-md">
+                  <svg className="h-8 w-8 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="6" cy="6" r="3" />
+                    <circle cx="6" cy="18" r="3" />
+                    <line x1="20" y1="4" x2="8.12" y2="15.88" />
+                    <line x1="14.47" y1="14.48" x2="20" y2="20" />
+                    <line x1="8.12" y1="8.12" x2="12" y2="12" />
                   </svg>
                 </div>
-                {/* Play button overlay */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm shadow-2xl transition-transform hover:scale-110">
-                    <Play size={24} className="ml-1 text-white" fill="white" />
-                  </div>
+
+                {/* Video frames */}
+                <div className="absolute left-4 top-6 flex gap-1.5">
+                  <div className="h-8 w-12 rounded bg-gradient-to-br from-accent/40 to-accent/20" />
+                  <div className="h-8 w-12 rounded bg-gradient-to-br from-purple-400/40 to-purple-400/20" />
+                  <div className="h-8 w-12 rounded bg-gradient-to-br from-pink-400/40 to-pink-400/20" />
                 </div>
-                {/* Waveform decoration */}
-                <div className="absolute bottom-6 left-0 right-0 flex items-end justify-center gap-1 px-8">
-                  {[40, 65, 45, 80, 55, 70, 35, 60, 50, 75, 42, 58].map((h, i) => (
-                    <div key={i} className="w-1 rounded-full bg-white/40" style={{ height: `${h}%` }} />
-                  ))}
+
+                {/* Duration badge */}
+                <div className="absolute right-4 top-6 rounded bg-black/40 px-2 py-0.5 text-[9px] font-mono text-white/80">
+                  0:42
                 </div>
               </div>
             </div>
