@@ -728,7 +728,8 @@ export default function Home() {
         <HeroVisual />
       </section>
 
-      {/* ── Real platform statistics ── */}
+      {/* ── Real platform statistics (hidden) ── */}
+      {false && (
       <section className="mx-auto max-w-6xl px-6 pb-4">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {[
@@ -744,6 +745,7 @@ export default function Home() {
           ))}
         </div>
       </section>
+      )}
 
       <div className="mt-6 border-y bg-card">
         <div className="overflow-hidden">
@@ -830,7 +832,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Earnings calculator ── */}
+      {/* ── Earnings calculator (hidden) ── */}
+      {false && (
       <section className="mx-auto max-w-6xl px-6 py-20">
         <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
           <div>
@@ -854,9 +857,10 @@ export default function Home() {
           <EarningsCalculator />
         </div>
       </section>
+      )}
 
-      {/* ── Success stories (real data only) ── */}
-      {topEarners.length > 0 && (
+      {/* ── Success stories (hidden) ── */}
+      {false && topEarners.length > 0 && (
         <section className="border-y bg-card">
           <div className="mx-auto max-w-6xl px-6 py-20">
             <p className="text-xs font-semibold uppercase tracking-widest text-muted">Success stories</p>
