@@ -70,7 +70,7 @@ const clipperFAQ = [
   },
   {
     q: "When do I get paid?",
-    a: "Earnings move through: Pending → Approved → Payable → Processing → Paid. Once your clip reaches the payable threshold and the admin initiates payout, the money is sent to your UPI account. [PLACEHOLDER: Specific payout schedule to be confirmed.]",
+    a: "Earnings move through: Pending → Processing → Paid. Once your clip is approved and the admin initiates payout, the money is sent to your UPI account.",
   },
   {
     q: "What happens if my clip is rejected?",

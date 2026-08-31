@@ -19,10 +19,9 @@ import type { Clip } from "@/lib/types";
 const TABS = [
   { key: "all", label: "All" },
   { key: "pending", label: "Pending" },
-  { key: "approved", label: "Approved" },
-  { key: "rejected", label: "Rejected" },
+  { key: "processing", label: "Processing" },
   { key: "paid", label: "Paid" },
-  { key: "held", label: "Held/Disputed" },
+  { key: "rejected", label: "Rejected" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -72,7 +71,11 @@ export default function ClipperSubmissionsPage() {
   }, {});
 
   const filtered =
-    tab === "all" ? myClips : myClips.filter((k) => k.status === tab);
+    tab === "all"
+      ? myClips
+      : tab === "processing"
+        ? myClips.filter((k) => ["approved", "payable", "processing"].includes(k.status))
+        : myClips.filter((k) => k.status === tab);
 
   const sorted = [...filtered].sort((a, b) => b.submittedAt - a.submittedAt);
   const visible = sorted.slice(0, page * PAGE_SIZE);

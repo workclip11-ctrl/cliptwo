@@ -44,11 +44,10 @@ function fmtDateTime(t: number) {
 }
 
 const TABS: Array<{ key: string; label: string; statuses: ClipStatus[] }> = [
-  { key: "review", label: "Pending Review", statuses: ["pending"] },
-  { key: "payable", label: "Payable", statuses: ["approved", "payable"] },
-  { key: "processing", label: "Processing", statuses: ["processing"] },
+  { key: "pending", label: "Pending", statuses: ["pending"] },
+  { key: "processing", label: "Processing", statuses: ["approved", "payable", "processing"] },
   { key: "paid", label: "Paid", statuses: ["paid"] },
-  { key: "failed", label: "Failed / Held", statuses: ["failed", "held"] },
+  { key: "issues", label: "Issues", statuses: ["failed", "held", "rejected"] },
 ];
 
 function txnIdOf(k: Clip) {

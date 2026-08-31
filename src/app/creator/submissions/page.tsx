@@ -27,12 +27,8 @@ import type { ClipStatus } from "@/lib/types";
 const FILTERS: Array<{ key: ClipStatus | "all"; label: string }> = [
   { key: "all", label: "All" },
   { key: "pending", label: "Pending" },
-  { key: "approved", label: "Approved" },
-  { key: "payable", label: "Payable" },
   { key: "processing", label: "Processing" },
   { key: "paid", label: "Paid" },
-  { key: "failed", label: "Failed" },
-  { key: "held", label: "Held" },
   { key: "rejected", label: "Rejected" },
 ];
 
@@ -58,7 +54,13 @@ export default function CreatorSubmissionsPage() {
   const all = clips.filter((k) => myCampaignIds.has(k.campaignId));
 
   const filtered = all.filter((k) => {
-    if (filter !== "all" && k.status !== filter) return false;
+    if (filter !== "all") {
+      if (filter === "processing") {
+        if (!["approved", "payable", "processing"].includes(k.status)) return false;
+      } else if (k.status !== filter) {
+        return false;
+      }
+    }
     if (query.trim()) {
       const q = query.trim().toLowerCase();
       const camp = campaigns.find((c) => c.id === k.campaignId);

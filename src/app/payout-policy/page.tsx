@@ -36,11 +36,9 @@ export default function PayoutPolicyPage() {
         <h2 className="text-xl font-semibold tracking-tight">When Earnings Are Payable</h2>
         <p>Earnings move through these stages:</p>
         <ol className="list-decimal pl-5 mt-2 space-y-1">
-          <li><strong>Pending</strong> — clip submitted, awaiting review.</li>
-          <li><strong>Approved</strong> — clip approved by creator/admin, views counting.</li>
-          <li><strong>Payable</strong> — minimum view threshold met, eligible for payout.</li>
-          <li><strong>Processing</strong> — payout initiated by admin.</li>
-          <li><strong>Paid</strong> — payout confirmed by payment provider.</li>
+          <li><strong>Pending</strong> — clip submitted, awaiting review and approval.</li>
+          <li><strong>Processing</strong> — clip approved and payout initiated by admin.</li>
+          <li><strong>Paid</strong> — payout confirmed and sent to your UPI.</li>
         </ol>
       </Section>
 
