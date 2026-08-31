@@ -54,19 +54,19 @@ function Category({
 const clipperFAQ = [
   {
     q: "How do I make money?",
-    a: "Browse open campaigns, create a short-form clip from the source material, and post it on your social account. You earn money for every 1,000 verified views your clip receives, at the campaign's CPM rate. A 15% platform fee is deducted from gross earnings.",
+    a: "Browse open campaigns, create a short-form clip from the source material, and post it on your social account. You earn money for every 1,000 views your clip receives, at the campaign's CPM rate. A 10% platform fee is deducted from gross earnings.",
   },
   {
     q: "Do I need followers?",
     a: "No. There is no minimum follower count. Your earnings depend on clip quality and view count, not your follower count. A clip from a new account can earn just as much as one from a large account.",
   },
   {
-    q: "How are views verified?",
-    a: "Views are tracked through platform APIs (Instagram, YouTube) where available. Only unique, legitimate views count. Bot traffic, repeat views from the same device, and engagement manipulation are filtered out automatically.",
+    q: "How are views counted?",
+    a: "When you submit a clip, you paste the link to your post. Our team reviews each submission for quality and authenticity. View counts are tracked from the linked post — you report the URL, we verify the content meets campaign guidelines.",
   },
   {
     q: "What is CPM?",
-    a: "CPM stands for Cost Per Mille (per 1,000 views). If a campaign pays ₹200 CPM and your clip gets 5,000 verified views, you earn ₹1,000 gross. After the 15% platform fee, you receive ₹850 net.",
+    a: "CPM stands for Cost Per Mille (per 1,000 views). If a campaign pays ₹200 CPM and your clip gets 5,000 views, you earn ₹1,000 gross. After the 10% platform fee, you receive ₹900 net.",
   },
   {
     q: "When do I get paid?",
@@ -89,15 +89,15 @@ const creatorFAQ = [
   },
   {
     q: "How much does it cost?",
-    a: "You set your own budget (total spend) and CPM rate (per 1,000 views). You only pay for verified views your clips receive. There are no upfront fees — you pay as clips earn.",
+    a: "You set your own budget (total spend) and CPM rate (per 1,000 views). You only pay for approved views your clips receive. There are no upfront fees — you pay as clips earn.",
   },
   {
     q: "How is CPM determined?",
     a: "You choose the CPM rate when creating the campaign. Higher CPMs attract more clippers and better-quality clips. Industry benchmarks vary by niche — [PLACEHOLDER: CPM guidance by niche to be added.]",
   },
   {
-    q: "How are views verified?",
-    a: "Views are verified through platform APIs where available. Only unique, legitimate views count toward your campaign's cost. Filtered traffic (bots, duplicates, manipulation) is excluded.",
+    q: "How are views counted?",
+    a: "When a clipper submits a clip, they paste the link to their post. Our team reviews each submission for quality and authenticity. View counts are tracked from the linked post — clippers report the URL, we verify the content meets your campaign guidelines.",
   },
   {
     q: "Can I approve/reject clips?",
@@ -120,7 +120,7 @@ const paymentFAQ = [
   },
   {
     q: "What are the fees?",
-    a: "ClipTwo charges a 15% platform fee on gross earnings. This covers payment processing, fraud detection, platform maintenance, and support. There are no additional hidden fees.",
+    a: "ClipTwo charges a 10% platform fee on gross earnings. This covers payment processing, platform maintenance, and support. There are no additional hidden fees.",
   },
   {
     q: "What is the minimum payout?",
@@ -139,7 +139,7 @@ const paymentFAQ = [
 const safetyFAQ = [
   {
     q: "How do you detect fake views?",
-    a: "We use a combination of platform API data, device fingerprinting, IP analysis, and behavioral patterns to detect bot traffic, view farms, and coordinated inauthentic activity.",
+    a: "Every clip submission is reviewed by our team. We check that the content matches the campaign brief, the link is valid, and the post is genuine. Suspicious or low-quality submissions are rejected.",
   },
   {
     q: "What happens to suspicious earnings?",

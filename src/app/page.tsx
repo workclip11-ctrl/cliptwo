@@ -37,8 +37,8 @@ const TICKER = ["Find campaigns", "Cut clips", "Post online", "Get paid over UPI
 const TRUST = [
   {
     icon: ShieldCheck,
-    title: "Verified views",
-    body: "View counts are pulled from platform APIs — Instagram, YouTube — not self-reported. Only unique, legitimate views count.",
+    title: "Admin-reviewed clips",
+    body: "Every clip is reviewed by our team before it's marked approved. No auto-approval, no self-reported metrics — each submission is checked against campaign guidelines.",
   },
   {
     icon: TrendingUp,
@@ -58,7 +58,7 @@ const TRUST = [
   {
     icon: AlertTriangle,
     title: "Fraud protection",
-    body: "Automated systems detect bot traffic, view farms, and manipulation. Suspicious earnings are frozen before they're paid out.",
+    body: "Admins review clips for quality and authenticity. Suspicious earnings are frozen and held for investigation before payout.",
   },
 ];
 
@@ -68,19 +68,19 @@ const FAQ_CATEGORIES = [
     items: [
       {
         q: "How do I make money?",
-        a: "Browse open campaigns, create a short-form clip from the source material, and post it on your social account. You earn money for every 1,000 verified views your clip receives, at the campaign's CPM rate. A 15% platform fee is deducted from gross earnings.",
+        a: "Browse open campaigns, create a short-form clip from the source material, and post it on your social account. You earn money for every 1,000 views your clip receives, at the campaign's CPM rate. A 10% platform fee is deducted from gross earnings.",
       },
       {
         q: "Do I need followers?",
         a: "No. There is no minimum follower count. Your earnings depend on clip quality and view count, not your follower count.",
       },
       {
-        q: "How are views verified?",
-        a: "Views are tracked through platform APIs (Instagram, YouTube) where available. Only unique, legitimate views count. Bot traffic, repeat views, and engagement manipulation are filtered out.",
+        q: "How are views counted?",
+        a: "When you submit a clip, you paste the link to your post. Our team reviews each submission for quality and authenticity. View counts are tracked from the linked post — you report the URL, we verify the content meets campaign guidelines.",
       },
       {
         q: "What is CPM?",
-        a: "CPM stands for Cost Per Mille (per 1,000 views). If a campaign pays ₹200 CPM and your clip gets 5,000 verified views, you earn ₹1,000 gross. After the 15% platform fee, you receive ₹850 net.",
+        a: "CPM stands for Cost Per Mille (per 1,000 views). If a campaign pays ₹200 CPM and your clip gets 5,000 views, you earn ₹1,000 gross. After the 10% platform fee, you receive ₹900 net.",
       },
       {
         q: "When do I get paid?",
@@ -105,7 +105,7 @@ const FAQ_CATEGORIES = [
       },
       {
         q: "How much does it cost?",
-        a: "You set your own budget and CPM rate. You only pay for verified views your clips receive. There are no upfront fees — you pay as clips earn.",
+        a: "You set your own budget and CPM rate. You only pay for approved views your clips receive. There are no upfront fees — you pay as clips earn.",
       },
       {
         q: "How is CPM determined?",
@@ -130,7 +130,7 @@ const FAQ_CATEGORIES = [
       },
       {
         q: "What are the fees?",
-        a: "ClipTwo charges a 15% platform fee on gross earnings. This covers payment processing, fraud detection, platform maintenance, and support.",
+        a: "ClipTwo charges a 10% platform fee on gross earnings. This covers payment processing, platform maintenance, and support.",
       },
       {
         q: "How long do payouts take?",
@@ -147,7 +147,7 @@ const FAQ_CATEGORIES = [
     items: [
       {
         q: "How do you detect fake views?",
-        a: "We use platform API data, device fingerprinting, IP analysis, and behavioral patterns to detect bot traffic, view farms, and coordinated inauthentic activity.",
+        a: "Every clip submission is reviewed by our team. We check that the content matches the campaign brief, the link is valid, and the post is genuine. Suspicious or low-quality submissions are rejected.",
       },
       {
         q: "What happens to suspicious earnings?",
@@ -167,17 +167,17 @@ const FAQ_CATEGORIES = [
 
 const CLIPPER_JOURNEY = [
   { num: "01", label: "Pick a campaign", title: "Browse live campaigns", body: "See the exact rate, platforms, and minimum views up front. No applications, no waiting to get accepted — claim it and start cutting.", visual: "campaigns" },
-  { num: "02", label: "Connect accounts", title: "Link where you post", body: "Connect your Instagram or YouTube once. Every view on a linked account gets tracked back to you automatically — nothing to self-report.", visual: "connect" },
+  { num: "02", label: "Connect accounts", title: "Link where you post", body: "Connect your Instagram or YouTube account so we can verify your clip is posted. Your handle is stored for campaign matching.", visual: "connect" },
   { num: "03", label: "Add your UPI ID", title: "Set up your payout", body: "Add the UPI ID you want earnings sent to. One-time setup, verified in seconds, used for every campaign after.", visual: "payout" },
-  { num: "04", label: "Post & submit", title: "Drop your clip, paste the link", body: "Cut the clip, post it from your linked account, then paste the link back. Views start counting straight away.", visual: "submit" },
-  { num: "05", label: "Cash out", title: "Get paid per verified view", body: "When the payout cycle closes, verified earnings settle straight to your UPI ID — no invoices, no chasing anyone down.", visual: "cashout" },
+  { num: "04", label: "Post & submit", title: "Drop your clip, paste the link", body: "Cut the clip, post it from your linked account, then paste the link back. Our team reviews each submission.", visual: "submit" },
+  { num: "05", label: "Cash out", title: "Get paid per view", body: "When the payout cycle closes, approved earnings settle straight to your UPI ID — no invoices, no chasing anyone down.", visual: "cashout" },
 ];
 
 const CREATOR_JOURNEY = [
   { num: "01", label: "Launch a campaign", title: "Set your rate and budget", body: "Pick a CPM, set a total budget, upload your source footage and guidelines. The campaign goes live for clippers immediately.", visual: "launch" },
   { num: "02", label: "Clippers claim it", title: "Watch submissions come in", body: "Clippers browse by niche and CPM, claim your brief, and start cutting — no vetting queue on your end unless you want one.", visual: "submissions" },
-  { num: "03", label: "Approve what fits", title: "Review before anything is payable", body: "Every submitted link is checked against your guidelines. Approve the ones that fit — nothing gets paid until views are verified.", visual: "review" },
-  { num: "04", label: "Pay only for real views", title: "Budget spends only on verified reach", body: "Your budget only depletes as views are verified. If a clip underperforms, you simply don't pay for it.", visual: "budget" },
+  { num: "03", label: "Approve what fits", title: "Review before anything is payable", body: "Every submitted link is checked against your guidelines. Approve the ones that fit — nothing gets paid until you review.", visual: "review" },
+  { num: "04", label: "Pay only for real views", title: "Budget spends only on approved clips", body: "Your budget only depletes as clips are approved and views accumulate. If a clip underperforms, you simply don't pay for it.", visual: "budget" },
 ];
 
 const CAMPAIGN_PREVIEW = [
@@ -393,7 +393,7 @@ function JourneyVisual({ stageKey }: { stageKey: string }) {
           <div className="h-full w-[46%] rounded-full bg-accent" />
         </div>
         <p className="mt-1.5 font-mono text-[11px] text-muted">₹18,400 / ₹40,000 spent</p>
-        <p className="mt-3 text-xs text-muted">Only verified views draw down your budget — nothing pays out on a guess.</p>
+        <p className="mt-3 text-xs text-muted">Only approved clips draw down your budget — nothing pays out on a guess.</p>
       </div>
     );
   }
@@ -668,7 +668,7 @@ export default function Home() {
       {/* ── Real platform statistics ── */}
       <section className="mx-auto grid max-w-5xl grid-cols-2 gap-4 px-6 pb-4 sm:grid-cols-4">
         {[
-          { num: fmtNum(stats.totalViews), label: "verified views tracked" },
+          { num: fmtNum(stats.totalViews), label: "views tracked" },
           { num: String(stats.clippers), label: "active clippers" },
           { num: String(stats.openCampaigns), label: "live campaigns" },
           { num: rup(stats.paidOut), label: "paid out to clippers" },
@@ -770,13 +770,13 @@ export default function Home() {
             <p className="text-xs font-semibold uppercase tracking-widest text-muted">Earnings</p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight">See what you could earn.</h2>
             <p className="mt-3 max-w-md text-[15px] leading-relaxed text-muted">
-              Enter the number of verified views and the campaign CPM rate. The
+              Enter the number of views and the campaign CPM rate. The
               calculator shows your gross earnings, the platform fee, and your
               net payout.
             </p>
             <div className="mt-5 space-y-2 text-sm text-muted">
               <p className="flex items-center gap-2"><Check size={14} className="text-green shrink-0" /> Views × CPM ÷ 1,000 = gross earnings</p>
-              <p className="flex items-center gap-2"><Check size={14} className="text-green shrink-0" /> 15% platform fee deducted from gross</p>
+              <p className="flex items-center gap-2"><Check size={14} className="text-green shrink-0" /> 10% platform fee deducted from gross</p>
               <p className="flex items-center gap-2"><Check size={14} className="text-green shrink-0" /> Net amount paid to your UPI</p>
             </div>
             <p className="mt-4 text-xs text-muted">

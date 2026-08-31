@@ -23,7 +23,7 @@ export default function CreatorRulesPage() {
           <li>A clear, detailed brief describing what clippers should create.</li>
           <li>Source material (video links, assets, brand guidelines).</li>
           <li>A budget (total amount you&apos;re willing to spend).</li>
-          <li>A CPM rate (what you pay per 1,000 verified views).</li>
+          <li>A CPM rate (what you pay per 1,000 views).</li>
           <li>Campaign rules (duration limits, hashtags, CTAs, dos and don&apos;ts).</li>
         </ul>
       </Section>

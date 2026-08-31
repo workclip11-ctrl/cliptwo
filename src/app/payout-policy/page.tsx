@@ -13,21 +13,21 @@ export default function PayoutPolicyPage() {
           Clippers browse open campaigns, watch the source material, and create
           short-form clips (typically 15–60 seconds). Each clip is submitted for
           review. Once approved, the clip goes live and starts earning based on
-          verified views.
+          views.
         </p>
       </Section>
 
       <Section>
         <h2 className="text-xl font-semibold tracking-tight">How Earnings Are Calculated</h2>
         <p>
-          Earnings = (Verified Views ÷ 1,000) × Campaign CPM Rate.
+          Earnings = (Views ÷ 1,000) × Campaign CPM Rate.
         </p>
         <p>
           For example, if a campaign pays ₹200 CPM and your clip gets 5,000
-          verified views, you earn ₹1,000 gross.
+          views, you earn ₹1,000 gross.
         </p>
         <p>
-          A platform fee (currently 15%) is deducted from gross earnings. The
+          A platform fee (currently 10%) is deducted from gross earnings. The
           net amount is what you receive. See the breakdown on your wallet page.
         </p>
       </Section>
@@ -47,19 +47,18 @@ export default function PayoutPolicyPage() {
       <Section>
         <h2 className="text-xl font-semibold tracking-tight">View Verification</h2>
         <p>
-          Views are verified through platform APIs (Instagram, YouTube)
-          where available. Only unique, legitimate views count toward earnings.
-          [PLACEHOLDER: Specific verification methodology and update frequency
-          to be documented.]
+          Every clip submission is reviewed by our team. We check that the
+          content matches the campaign brief, the link is valid, and the post
+          is genuine. View counts are tracked from the linked post.
         </p>
         <p>
-          Views may be adjusted downward if our system detects:
+          Submissions may be rejected if:
         </p>
         <ul className="list-disc pl-5 mt-2 space-y-1">
-          <li>Bot or automated traffic.</li>
-          <li>Repeat views from the same device/account.</li>
-          <li>Views from prohibited regions or sources.</li>
-          <li>Engagement manipulation (view farms, click bots).</li>
+          <li>The content does not match the campaign brief.</li>
+          <li>The link is invalid or points to deleted content.</li>
+          <li>The clip appears to use artificial view tactics.</li>
+          <li>The clip violates platform terms of service.</li>
         </ul>
       </Section>
 
@@ -80,8 +79,8 @@ export default function PayoutPolicyPage() {
         <h2 className="text-xl font-semibold tracking-tight">Platform Fee</h2>
         <p>
           ClipTwo charges a platform fee on all earnings. This fee covers
-          payment processing, fraud detection, platform maintenance, and
-          support. The current fee is 15% of gross earnings.
+          payment processing, platform maintenance, and support. The current
+          fee is 10% of gross earnings.
         </p>
         <p>
           [PLACEHOLDER: Fee changes, volume discounts, or tiered pricing to be

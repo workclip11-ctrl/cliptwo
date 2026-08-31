@@ -26,7 +26,7 @@ export default function ClipperRulesPage() {
           <li>Submit your clip with a caption and the platform where you&apos;ll post it.</li>
           <li>Wait for review (creator or admin approves/rejects).</li>
           <li>Once approved, post the clip on your social account.</li>
-          <li>Views are tracked automatically and you earn per 1,000 verified views.</li>
+          <li>Views are counted from your linked post and you earn per 1,000 views.</li>
         </ol>
       </Section>
 

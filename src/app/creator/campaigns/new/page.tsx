@@ -554,7 +554,7 @@ export default function NewCampaignWizard() {
         {/* STEP 4 */}
         {step === 3 && (
           <div className="space-y-4">
-            <Field label="CPM — payout per 1,000 verified views" hint="₹">
+            <Field label="CPM — payout per 1,000 views" hint="₹">
               <input
                 className={inputCls}
                 value={payout}
@@ -586,7 +586,7 @@ export default function NewCampaignWizard() {
                 inputMode="numeric"
               />
             </Field>
-            <Field label="Minimum verified views" hint="optional">
+            <Field label="Minimum views" hint="optional">
               <input
                 className={inputCls}
                 value={minViews}
@@ -610,7 +610,7 @@ export default function NewCampaignWizard() {
                   Budget <span className="font-mono text-foreground">{rup(bud)}</span>
                 </div>
                 <div>
-                  → Potential verified views{" "}
+                  → Potential views{" "}
                   <span className="font-mono text-foreground">
                     {potentialViews.toLocaleString("en-IN")}
                   </span>

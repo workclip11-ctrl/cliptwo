@@ -21,12 +21,12 @@ export default function TermsPage() {
         <p>
           ClipTwo is a two-sided marketplace that connects creators (who post
           long-form video campaigns) with clippers (who cut those videos into
-          short-form clips). Clippers earn money based on verified views their
+          short-form clips). Clippers earn money based on views their
           clips receive.
         </p>
         <ul className="list-disc pl-5 mt-2 space-y-1">
           <li>Creators post campaigns with a brief, budget, and CPM rate.</li>
-          <li>Clippers browse campaigns, submit clips, and earn per 1,000 verified views.</li>
+          <li>Clippers browse campaigns, submit clips, and earn per 1,000 views.</li>
           <li>ClipTwo manages review, payout processing, and campaign analytics.</li>
         </ul>
       </Section>
@@ -59,7 +59,7 @@ export default function TermsPage() {
       <Section>
         <h2 className="text-xl font-semibold tracking-tight">5. Payments</h2>
         <p>
-          Clippers earn money when their clips receive verified views. Earnings
+          Clippers earn money when their clips receive views. Earnings
           are calculated at the campaign&apos;s CPM rate. A platform fee is
           deducted from gross earnings before payout. See the{" "}
           <a href="/payout-policy" className="text-accent hover:underline">

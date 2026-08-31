@@ -52,7 +52,7 @@ export default function RefundPolicyPage() {
         <h2 className="text-xl font-semibold tracking-tight">Platform Fees</h2>
         <p>
           Platform fees are non-refundable once a clip has been approved and has
-          received verified views. Fees for clips that are rejected before
+          received views. Fees for clips that are rejected before
           going live are not charged.
         </p>
       </Section>

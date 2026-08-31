@@ -29,7 +29,7 @@ export default function CommunityGuidelinesPage() {
         <ul className="list-disc pl-5 mt-2 space-y-1">
           <li><strong>Creators</strong> post campaigns with source material, a brief, and a budget.</li>
           <li><strong>Clippers</strong> watch the source material and create short-form clips that match the brief.</li>
-          <li>Approved clips earn money based on verified views at the campaign&apos;s CPM rate.</li>
+          <li>Approved clips earn money based on views at the campaign&apos;s CPM rate.</li>
         </ul>
         <p className="mt-2">
           Every user agrees to follow these guidelines when using the platform.

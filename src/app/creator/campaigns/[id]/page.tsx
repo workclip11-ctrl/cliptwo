@@ -264,7 +264,7 @@ export default function CreatorCampaignDetailPage() {
           rows={[
             ["Campaign rules", camp.rules],
             [
-              "Min verified views",
+              "Min views",
               camp.viewRules?.minViews != null ? String(camp.viewRules.minViews) : undefined,
             ],
             ["Max payout / clip", camp.maxPayoutPerClip != null ? rup(camp.maxPayoutPerClip) : undefined],

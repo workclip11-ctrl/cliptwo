@@ -203,7 +203,7 @@ export default function CampaignDetailPage() {
           </div>
           <div className="text-right">
             <p className="font-mono text-2xl font-medium text-amber">{rup(campaign.payout)}</p>
-            <p className="text-[11px] text-muted">per 1,000 verified views</p>
+            <p className="text-[11px] text-muted">per 1,000 views</p>
           </div>
         </div>
 
