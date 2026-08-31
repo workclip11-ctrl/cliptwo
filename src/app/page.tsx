@@ -1001,10 +1001,8 @@ export default function Home() {
               <h5 className="text-sm font-bold">Company</h5>
               <ul className="mt-4 space-y-2.5 text-sm text-muted">
                 <li><Link href="/login" className="transition-colors hover:text-foreground">Log in</Link></li>
-                <li><a href="#" className="transition-colors hover:text-foreground">About</a></li>
-                <li><a href="#" className="transition-colors hover:text-foreground">Careers</a></li>
-                <li><a href="#" className="transition-colors hover:text-foreground">Blog</a></li>
-                <li><a href="#" className="transition-colors hover:text-foreground">Contact</a></li>
+                <li><Link href="/faq" className="transition-colors hover:text-foreground">FAQ</Link></li>
+                <li><a href="mailto:support@cliptwo.com" className="transition-colors hover:text-foreground">Contact</a></li>
               </ul>
             </div>
 
