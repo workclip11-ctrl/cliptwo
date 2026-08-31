@@ -176,7 +176,7 @@ const CLIPPER_JOURNEY = [
 const CREATOR_JOURNEY = [
   { num: "01", label: "Launch a campaign", title: "Set your rate and budget", body: "Pick a CPM, set a total budget, upload your source footage and guidelines. The campaign goes live for clippers immediately.", visual: "launch" },
   { num: "02", label: "Clippers claim it", title: "Watch submissions come in", body: "Clippers browse by niche and CPM, claim your brief, and start cutting — no vetting queue on your end unless you want one.", visual: "submissions" },
-  { num: "03", label: "Approve what fits", title: "Review before anything is payable", body: "Every submitted link is checked against your guidelines. Approve the ones that fit — nothing gets paid until you review.", visual: "review" },
+  { num: "03", label: "Approve what fits", title: "Admin reviews every clip", body: "Every submitted clip is reviewed by our admin team against your guidelines. Nothing gets paid until admin approval — no auto-approvals, no self-reported metrics.", visual: "review" },
   { num: "04", label: "Pay only for real views", title: "Budget spends only on approved clips", body: "Your budget only depletes as clips are approved and views accumulate. If a clip underperforms, you simply don't pay for it.", visual: "budget" },
 ];
 
