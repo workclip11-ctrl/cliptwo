@@ -62,7 +62,7 @@ const clipperFAQ = [
   },
   {
     q: "How are views verified?",
-    a: "Views are tracked through platform APIs (Instagram, YouTube, TikTok) where available. Only unique, legitimate views count. Bot traffic, repeat views from the same device, and engagement manipulation are filtered out automatically.",
+    a: "Views are tracked through platform APIs (Instagram, YouTube) where available. Only unique, legitimate views count. Bot traffic, repeat views from the same device, and engagement manipulation are filtered out automatically.",
   },
   {
     q: "What is CPM?",

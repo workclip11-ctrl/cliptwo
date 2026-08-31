@@ -47,7 +47,7 @@ export default function PayoutPolicyPage() {
       <Section>
         <h2 className="text-xl font-semibold tracking-tight">View Verification</h2>
         <p>
-          Views are verified through platform APIs (Instagram, YouTube, TikTok)
+          Views are verified through platform APIs (Instagram, YouTube)
           where available. Only unique, legitimate views count toward earnings.
           [PLACEHOLDER: Specific verification methodology and update frequency
           to be documented.]

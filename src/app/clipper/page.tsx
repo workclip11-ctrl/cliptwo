@@ -24,7 +24,7 @@ import { financeOf, campaignSpent, payoutSplit } from "@/lib/finance";
 const ACCOUNTS = [
   { platform: "Instagram", handle: "@maya.cuts", status: "verified" },
   { platform: "YouTube", handle: "@mayacuts", status: "verified" },
-  { platform: "TikTok", handle: "@maya.in", status: "connecting" },
+  { platform: "Instagram", handle: "@maya.in", status: "connecting" },
 ];
 
 export default function ClipperPage() {

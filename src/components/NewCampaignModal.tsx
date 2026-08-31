@@ -5,7 +5,7 @@ import { BadgeCheck, Upload, Film } from "lucide-react";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import type { Platform } from "@/lib/types";
 
-const PLATFORMS: Platform[] = ["TikTok", "YouTube", "Instagram", "Reels"];
+const PLATFORMS: Platform[] = ["YouTube", "Instagram", "Reels"];
 const NICHES = ["Tech", "Gaming", "Finance", "Comedy", "Fitness", "Podcast"];
 
 export interface NewCampaignExtra {

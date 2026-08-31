@@ -14,7 +14,7 @@ export default function PrivacyPage() {
           <li><strong>Account info:</strong> name, email, profile details.</li>
           <li><strong>Payment info:</strong> UPI ID or payment handle for payouts.</li>
           <li><strong>Content:</strong> clips, captions, video URLs you submit.</li>
-          <li><strong>Connected accounts:</strong> social platform handles (Instagram, YouTube, TikTok) for verification.</li>
+          <li><strong>Connected accounts:</strong> social platform handles (Instagram, YouTube) for verification.</li>
         </ul>
         <p className="mt-2">
           We also collect usage data automatically: browser type, pages visited,

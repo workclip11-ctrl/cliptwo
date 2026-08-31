@@ -6,7 +6,7 @@ import { CampaignCard } from "@/components/CampaignCard";
 import { useStore } from "@/lib/store";
 import type { Platform } from "@/lib/types";
 
-const PLATFORMS: Platform[] = ["Instagram", "YouTube", "TikTok"];
+const PLATFORMS: Platform[] = ["Instagram", "YouTube"];
 const SORT_OPTIONS = [
   { value: "cpm", label: "Highest CPM" },
   { value: "newest", label: "Newest" },

@@ -12,7 +12,6 @@ function derivePlatform(url: string): Platform {
   const u = url.toLowerCase();
   if (u.includes("instagram")) return "Instagram";
   if (u.includes("youtube") || u.includes("youtu.be")) return "YouTube";
-  if (u.includes("tiktok")) return "TikTok";
   return "Instagram";
 }
 
@@ -82,7 +81,7 @@ export function SubmitClipModal({
 
         <label className="mt-4 block text-sm font-medium">Platform</label>
         <div className="mt-1.5 flex gap-2">
-          {(["Instagram", "YouTube", "TikTok"] as Platform[]).map((p) => (
+          {(["Instagram", "YouTube"] as Platform[]).map((p) => (
             <button
               key={p}
               type="button"

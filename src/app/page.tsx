@@ -38,7 +38,7 @@ const TRUST = [
   {
     icon: ShieldCheck,
     title: "Verified views",
-    body: "View counts are pulled from platform APIs — Instagram, YouTube, TikTok — not self-reported. Only unique, legitimate views count.",
+    body: "View counts are pulled from platform APIs — Instagram, YouTube — not self-reported. Only unique, legitimate views count.",
   },
   {
     icon: TrendingUp,
@@ -76,7 +76,7 @@ const FAQ_CATEGORIES = [
       },
       {
         q: "How are views verified?",
-        a: "Views are tracked through platform APIs (Instagram, YouTube, TikTok) where available. Only unique, legitimate views count. Bot traffic, repeat views, and engagement manipulation are filtered out.",
+        a: "Views are tracked through platform APIs (Instagram, YouTube) where available. Only unique, legitimate views count. Bot traffic, repeat views, and engagement manipulation are filtered out.",
       },
       {
         q: "What is CPM?",
@@ -167,7 +167,7 @@ const FAQ_CATEGORIES = [
 
 const CLIPPER_JOURNEY = [
   { num: "01", label: "Pick a campaign", title: "Browse live campaigns", body: "See the exact rate, platforms, and minimum views up front. No applications, no waiting to get accepted — claim it and start cutting.", visual: "campaigns" },
-  { num: "02", label: "Connect accounts", title: "Link where you post", body: "Connect your Instagram, YouTube, or TikTok once. Every view on a linked account gets tracked back to you automatically — nothing to self-report.", visual: "connect" },
+  { num: "02", label: "Connect accounts", title: "Link where you post", body: "Connect your Instagram or YouTube once. Every view on a linked account gets tracked back to you automatically — nothing to self-report.", visual: "connect" },
   { num: "03", label: "Add your UPI ID", title: "Set up your payout", body: "Add the UPI ID you want earnings sent to. One-time setup, verified in seconds, used for every campaign after.", visual: "payout" },
   { num: "04", label: "Post & submit", title: "Drop your clip, paste the link", body: "Cut the clip, post it from your linked account, then paste the link back. Views start counting straight away.", visual: "submit" },
   { num: "05", label: "Cash out", title: "Get paid per verified view", body: "When the payout cycle closes, verified earnings settle straight to your UPI ID — no invoices, no chasing anyone down.", visual: "cashout" },
@@ -258,7 +258,7 @@ function JourneyVisual({ stageKey }: { stageKey: string }) {
         {[
           ["@thegrindclips", "Instagram", "verified"],
           ["@editzbypriya", "YouTube", "verified"],
-          ["@clipsdaily.in", "TikTok", "connecting"],
+          ["@clipsdaily.in", "Instagram", "connecting"],
         ].map(([h, p, s]) => (
           <div key={h} className="flex items-center justify-between px-4 py-3 text-sm">
             <span className="flex items-center gap-2">
@@ -292,7 +292,7 @@ function JourneyVisual({ stageKey }: { stageKey: string }) {
     return (
       <div className="space-y-3">
         <div className="flex gap-2">
-          {["Instagram", "YouTube", "TikTok"].map((n, i) => (
+          {["Instagram", "YouTube"].map((n, i) => (
             <span key={n} className={`rounded-full border px-3 py-1 text-xs font-medium ${i === 0 ? "border-accent bg-accent text-white" : "text-muted"}`}>
               {n}
             </span>
@@ -704,7 +704,7 @@ export default function Home() {
           ))}
           <span className="flex items-center gap-1.5 text-sm font-semibold text-muted"><PlatformIcon p="Instagram" size={15} /> Reels</span>
           <span className="flex items-center gap-1.5 text-sm font-semibold text-muted"><PlatformIcon p="YouTube" size={15} /> Shorts</span>
-          <span className="flex items-center gap-1.5 text-sm font-semibold text-muted"><PlatformIcon p="TikTok" size={15} /> TikTok</span>
+          <span className="flex items-center gap-1.5 text-sm font-semibold text-muted"><PlatformIcon p="Instagram" size={15} /> Instagram</span>
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-export type Platform = "TikTok" | "YouTube" | "Instagram" | "Reels";
+export type Platform = "YouTube" | "Instagram" | "Reels";
 
 export type CampaignStatus =
   | "open"
