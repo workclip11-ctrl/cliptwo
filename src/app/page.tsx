@@ -194,36 +194,103 @@ function fmtNum(n: number) {
 
 function HeroVisual() {
   return (
-    <div className="relative">
-      <div className="absolute -inset-8 -z-10 rounded-3xl bg-gradient-to-br from-accent-soft to-card" />
-      <div className="rounded-2xl border bg-card p-5 shadow-sm">
-        <div className="flex items-center justify-between">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-green/10 px-2.5 py-1 text-xs font-medium text-green">
-            <Zap size={11} /> Live
-          </span>
-          <span className="font-mono text-xs text-muted">CPM {rup(220)}</span>
-        </div>
-        <div className="mt-4 flex h-32 items-center justify-center rounded-xl bg-accent-soft">
-          <Play />
-        </div>
-        <p className="mt-4 font-medium">The Grind Podcast — Ep. 142</p>
-        <p className="text-xs text-muted">Podcast · by Rohan Malhotra</p>
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          {[
-            ["Clips", "14"],
-            ["Views", "1.8L"],
-            ["Paid", "₹18.4K"],
-          ].map(([l, v]) => (
-            <div key={l} className="rounded-lg bg-accent-soft p-2.5 text-center">
-              <p className="text-[10px] text-muted">{l}</p>
-              <p className="font-mono text-sm font-medium">{v}</p>
+    <div className="relative mx-auto w-full max-w-md lg:max-w-lg">
+      {/* Background glow */}
+      <div className="absolute -inset-12 -z-20 rounded-full bg-gradient-to-br from-accent/20 via-transparent to-purple-500/10 blur-3xl" />
+
+      {/* Main phone frame */}
+      <div className="relative mx-auto w-[280px] sm:w-[320px]">
+        {/* Phone body */}
+        <div className="relative overflow-hidden rounded-[2.5rem] border border-border/50 bg-card shadow-2xl shadow-black/10">
+          {/* Notch */}
+          <div className="absolute left-1/2 top-0 z-10 h-6 w-28 -translate-x-1/2 rounded-b-2xl bg-card" />
+
+          {/* Screen content */}
+          <div className="relative aspect-[9/19] overflow-hidden bg-gradient-to-b from-background to-accent-soft/30">
+            {/* Status bar */}
+            <div className="flex items-center justify-between px-6 pt-8 pb-2">
+              <span className="text-[10px] font-medium text-muted">9:41</span>
+              <div className="flex gap-1">
+                <div className="h-1 w-1 rounded-full bg-muted" />
+                <div className="h-1 w-1 rounded-full bg-muted" />
+                <div className="h-1 w-1 rounded-full bg-muted" />
+              </div>
             </div>
-          ))}
+
+            {/* Video preview */}
+            <div className="mx-4 mt-2 overflow-hidden rounded-2xl bg-muted/30">
+              <div className="flex aspect-[9/14] items-center justify-center bg-gradient-to-br from-muted/40 to-muted/20">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-background/80 backdrop-blur-sm shadow-lg">
+                  <Play size={24} className="ml-1 text-foreground" />
+                </div>
+              </div>
+            </div>
+
+            {/* Video info overlay */}
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background/90 to-transparent p-4 pt-12">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 rounded-full bg-green/20 px-2 py-0.5 text-[10px] font-semibold text-green">
+                  <Zap size={8} /> Live
+                </span>
+                <span className="font-mono text-[10px] text-muted">CPM ₹220</span>
+              </div>
+              <p className="mt-2 text-sm font-semibold">The Grind Podcast — Ep. 142</p>
+              <p className="text-[11px] text-muted">by Rohan Malhotra</p>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {[
+                  ["Clips", "14"],
+                  ["Views", "1.8L"],
+                  ["Paid", "₹18.4K"],
+                ].map(([l, v]) => (
+                  <div key={l} className="rounded-lg bg-background/60 px-2 py-1.5 text-center backdrop-blur-sm">
+                    <p className="text-[9px] text-muted">{l}</p>
+                    <p className="font-mono text-xs font-semibold">{v}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-muted/30">
+                <div className="h-full w-[46%] rounded-full bg-accent" />
+              </div>
+              <p className="mt-1 font-mono text-[9px] text-muted">₹18,400 / ₹40,000</p>
+            </div>
+          </div>
         </div>
-        <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-accent-soft">
-          <div className="h-full w-[46%] rounded-full bg-accent" />
+
+        {/* Floating card - left */}
+        <div className="absolute -left-16 top-12 w-32 rotate-[-6deg] rounded-xl border bg-card p-3 shadow-xl shadow-black/5 sm:-left-20 sm:w-36">
+          <div className="flex items-center gap-1.5">
+            <span className="flex h-5 w-5 items-center justify-center rounded bg-amber/10">
+              <IndianRupee size={10} className="text-amber" />
+            </span>
+            <span className="text-[9px] font-medium text-muted">Earned</span>
+          </div>
+          <p className="mt-1.5 font-mono text-sm font-bold">₹12,400</p>
+          <div className="mt-1 h-0.5 w-full overflow-hidden rounded-full bg-muted/20">
+            <div className="h-full w-3/4 rounded-full bg-amber" />
+          </div>
         </div>
-        <p className="mt-1.5 font-mono text-[11px] text-muted">₹18,400 / ₹40,000 spent</p>
+
+        {/* Floating card - right */}
+        <div className="absolute -right-16 top-28 w-32 rotate-[6deg] rounded-xl border bg-card p-3 shadow-xl shadow-black/5 sm:-right-20 sm:w-36">
+          <div className="flex items-center gap-1.5">
+            <span className="flex h-5 w-5 items-center justify-center rounded bg-green/10">
+              <TrendingUp size={10} className="text-green" />
+            </span>
+            <span className="text-[9px] font-medium text-muted">Views</span>
+          </div>
+          <p className="mt-1.5 font-mono text-sm font-bold">1.8L</p>
+          <div className="mt-1 h-0.5 w-full overflow-hidden rounded-full bg-muted/20">
+            <div className="h-full w-full rounded-full bg-green" />
+          </div>
+        </div>
+
+        {/* Floating badge - bottom */}
+        <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 rounded-full border bg-card px-4 py-1.5 shadow-lg">
+          <div className="flex items-center gap-2">
+            <BadgeCheck size={14} className="text-green" />
+            <span className="text-[11px] font-medium">Verified & Paid</span>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -634,46 +701,48 @@ export default function Home() {
       </header>
 
       {/* ── Hero ── */}
-      <section className="mx-auto grid max-w-5xl gap-12 px-6 py-16 lg:grid-cols-2 lg:items-center">
+      <section className="mx-auto grid max-w-6xl gap-12 px-6 py-20 lg:grid-cols-2 lg:items-center">
         <div>
-          <span className="inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1 text-xs font-medium text-muted">
+          <span className="inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1 text-xs font-medium text-muted shadow-sm">
             <Sparkles size={13} /> India&apos;s clipping marketplace
           </span>
-          <h1 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
+          <h1 className="mt-6 text-4xl font-bold tracking-tight sm:text-5xl lg:text-[3.5rem] lg:leading-[1.1]">
             {heroTitle}
           </h1>
-          <p className="mt-4 max-w-md text-[17px] leading-relaxed text-muted">
+          <p className="mt-5 max-w-md text-lg leading-relaxed text-muted">
             {heroSubtitle}
           </p>
-          <div className="mt-7 flex flex-wrap gap-3">
-            <Link href="/clipper" className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:opacity-90">
-              <Scissors size={14} /> For Clippers — Start clipping
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link href="/clipper" className="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-accent/25 transition-all hover:scale-[1.02] hover:shadow-xl hover:shadow-accent/30">
+              <Scissors size={15} /> For Clippers
             </Link>
-            <Link href="/creator" className="inline-flex items-center gap-1.5 rounded-lg border px-4 py-2.5 text-sm font-medium hover:bg-accent-soft">
-              <Film size={14} /> For Creators — Launch a campaign
+            <Link href="/creator" className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-6 py-3 text-sm font-semibold transition-all hover:scale-[1.02] hover:shadow-lg">
+              <Film size={15} /> For Creators
             </Link>
           </div>
-          <div className="mt-7 flex flex-wrap items-center gap-5 text-xs text-muted">
-            <span className="flex items-center gap-1.5"><ShieldCheck size={14} className="text-green" /> Verified before payable</span>
-            <span className="flex items-center gap-1.5"><IndianRupee size={14} className="text-amber" /> UPI-native payouts</span>
+          <div className="mt-8 flex flex-wrap items-center gap-6 text-sm text-muted">
+            <span className="flex items-center gap-2"><ShieldCheck size={16} className="text-green" /> Admin-reviewed clips</span>
+            <span className="flex items-center gap-2"><IndianRupee size={16} className="text-amber" /> UPI-native payouts</span>
           </div>
         </div>
         <HeroVisual />
       </section>
 
       {/* ── Real platform statistics ── */}
-      <section className="mx-auto grid max-w-5xl grid-cols-2 gap-4 px-6 pb-4 sm:grid-cols-4">
-        {[
-          { num: fmtNum(stats.totalViews), label: "views tracked" },
-          { num: String(stats.clippers), label: "active clippers" },
-          { num: String(stats.openCampaigns), label: "live campaigns" },
-          { num: rup(stats.paidOut), label: "paid out to clippers" },
-        ].map((s) => (
-          <div key={s.label} className="rounded-2xl border bg-card p-5 text-center">
-            <p className="font-mono text-2xl font-medium">{s.num}</p>
-            <p className="mt-1 text-xs text-muted">{s.label}</p>
-          </div>
-        ))}
+      <section className="mx-auto max-w-6xl px-6 pb-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {[
+            { num: fmtNum(stats.totalViews), label: "views tracked" },
+            { num: String(stats.clippers), label: "active clippers" },
+            { num: String(stats.openCampaigns), label: "live campaigns" },
+            { num: rup(stats.paidOut), label: "paid out to clippers" },
+          ].map((s) => (
+            <div key={s.label} className="rounded-2xl border bg-card p-6 text-center shadow-sm">
+              <p className="font-mono text-3xl font-bold tracking-tight">{s.num}</p>
+              <p className="mt-1.5 text-xs font-medium text-muted">{s.label}</p>
+            </div>
+          ))}
+        </div>
       </section>
 
       <div className="mt-6 border-y bg-card">
@@ -705,33 +774,33 @@ export default function Home() {
       </div>
 
       {/* ── How it works ── */}
-      <section id="how" className="mx-auto max-w-5xl px-6 py-16">
+      <section id="how" className="mx-auto max-w-6xl px-6 py-20">
         <p className="text-center text-xs font-semibold uppercase tracking-widest text-muted">How it works</p>
-        <h2 className="mx-auto mt-3 max-w-xl text-center text-3xl font-semibold tracking-tight">One loop, two sides.</h2>
-        <p className="mx-auto mt-3 max-w-lg text-center text-[15px] leading-relaxed text-muted">
+        <h2 className="mx-auto mt-4 max-w-xl text-center text-3xl font-bold tracking-tight sm:text-4xl">One loop, two sides.</h2>
+        <p className="mx-auto mt-4 max-w-lg text-center text-lg leading-relaxed text-muted">
           The platform&apos;s only job is to run this loop reliably — without either side chasing the other for money or footage.
         </p>
-        <div className="mt-10">
+        <div className="mt-12">
           <Journey />
         </div>
       </section>
 
       {/* ── Live campaigns ── */}
       {featured.length > 0 && (
-        <section className="mx-auto max-w-5xl px-6 py-16">
+        <section className="mx-auto max-w-6xl px-6 py-20">
           <div className="flex items-end justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-widest text-muted">Live now</p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight">Active campaigns</h2>
+              <h2 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">Active campaigns</h2>
             </div>
             <button
               onClick={() => router.push("/campaigns")}
-              className="inline-flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent-soft"
+              className="inline-flex items-center gap-1.5 rounded-xl border bg-card px-5 py-2.5 text-sm font-semibold transition-all hover:scale-[1.02] hover:shadow-lg"
             >
               Browse all <ArrowRight size={15} />
             </button>
           </div>
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {featured.map((c, i) => (
               <CampaignCard key={c.id} campaign={c} index={i} onView={setActive} />
             ))}
@@ -741,18 +810,20 @@ export default function Home() {
 
       {/* ── Why ClipTwo ── */}
       <section id="why" className="border-y bg-card">
-        <div className="mx-auto max-w-5xl px-6 py-16">
+        <div className="mx-auto max-w-6xl px-6 py-20">
           <p className="text-xs font-semibold uppercase tracking-widest text-muted">Why cliptwo</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight">Trust is the product.</h2>
-          <p className="mt-3 max-w-lg text-[15px] leading-relaxed text-muted">
+          <h2 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">Trust is the product.</h2>
+          <p className="mt-4 max-w-lg text-lg leading-relaxed text-muted">
             Clipping platforms live or die on whether clippers believe they&apos;ll actually get paid. These are the mechanics that make that a promise, not a claim.
           </p>
-          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {TRUST.map((t) => (
-              <div key={t.title} className="rounded-2xl border bg-background p-5">
-                <t.icon size={22} className="text-green" />
-                <h4 className="mt-3 text-[15px] font-medium">{t.title}</h4>
-                <p className="mt-2 text-[13px] leading-relaxed text-muted">{t.body}</p>
+              <div key={t.title} className="rounded-2xl border bg-background p-6 shadow-sm transition-all hover:shadow-md">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-soft">
+                  <t.icon size={20} className="text-accent" />
+                </div>
+                <h4 className="mt-4 text-lg font-semibold">{t.title}</h4>
+                <p className="mt-2 text-sm leading-relaxed text-muted">{t.body}</p>
               </div>
             ))}
           </div>
@@ -760,22 +831,22 @@ export default function Home() {
       </section>
 
       {/* ── Earnings calculator ── */}
-      <section className="mx-auto max-w-5xl px-6 py-16">
-        <div className="grid gap-8 lg:grid-cols-2 lg:items-center">
+      <section className="mx-auto max-w-6xl px-6 py-20">
+        <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-muted">Earnings</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight">See what you could earn.</h2>
-            <p className="mt-3 max-w-md text-[15px] leading-relaxed text-muted">
+            <h2 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">See what you could earn.</h2>
+            <p className="mt-4 max-w-md text-lg leading-relaxed text-muted">
               Enter the number of views and the campaign CPM rate. The
               calculator shows your gross earnings, the platform fee, and your
               net payout.
             </p>
-            <div className="mt-5 space-y-2 text-sm text-muted">
-              <p className="flex items-center gap-2"><Check size={14} className="text-green shrink-0" /> Views × CPM ÷ 1,000 = gross earnings</p>
-              <p className="flex items-center gap-2"><Check size={14} className="text-green shrink-0" /> 10% platform fee deducted from gross</p>
-              <p className="flex items-center gap-2"><Check size={14} className="text-green shrink-0" /> Net amount paid to your UPI</p>
+            <div className="mt-6 space-y-3 text-sm text-muted">
+              <p className="flex items-center gap-3"><Check size={16} className="text-green shrink-0" /> Views × CPM ÷ 1,000 = gross earnings</p>
+              <p className="flex items-center gap-3"><Check size={16} className="text-green shrink-0" /> 10% platform fee deducted from gross</p>
+              <p className="flex items-center gap-3"><Check size={16} className="text-green shrink-0" /> Net amount paid to your UPI</p>
             </div>
-            <p className="mt-4 text-xs text-muted">
+            <p className="mt-5 text-xs text-muted">
               Actual payout depends on campaign rules, view verification, and
               approval status. This calculator is for illustration only.
             </p>
@@ -787,33 +858,33 @@ export default function Home() {
       {/* ── Success stories (real data only) ── */}
       {topEarners.length > 0 && (
         <section className="border-y bg-card">
-          <div className="mx-auto max-w-5xl px-6 py-16">
+          <div className="mx-auto max-w-6xl px-6 py-20">
             <p className="text-xs font-semibold uppercase tracking-widest text-muted">Success stories</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight">Top earners on ClipTwo</h2>
-            <p className="mt-3 max-w-lg text-[15px] leading-relaxed text-muted">
+            <h2 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">Top earners on ClipTwo</h2>
+            <p className="mt-4 max-w-lg text-lg leading-relaxed text-muted">
               Real clippers, real earnings. These numbers come directly from
               verified payouts on the platform.
             </p>
-            <div className="mt-8 grid gap-4 sm:grid-cols-3">
+            <div className="mt-10 grid gap-5 sm:grid-cols-3">
               {topEarners.map((e) => (
-                <div key={e.name} className="rounded-2xl border bg-background p-5">
+                <div key={e.name} className="rounded-2xl border bg-background p-6 shadow-sm transition-all hover:shadow-md">
                   <div className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-accent-soft text-sm font-semibold text-foreground">
+                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft text-base font-bold text-foreground">
                       {e.name.charAt(0).toUpperCase()}
                     </span>
                     <div>
-                      <p className="font-medium">@{e.name}</p>
+                      <p className="font-semibold">@{e.name}</p>
                       <p className="text-xs text-muted">{e.clips} clip{e.clips === 1 ? "" : "s"}</p>
                     </div>
                   </div>
-                  <div className="mt-4 grid grid-cols-2 gap-3">
-                    <div className="rounded-lg bg-accent-soft p-2.5 text-center">
-                      <p className="text-[10px] text-muted">Earned</p>
-                      <p className="font-mono text-sm font-semibold">{rup(e.earned)}</p>
+                  <div className="mt-5 grid grid-cols-2 gap-3">
+                    <div className="rounded-xl bg-accent-soft p-3 text-center">
+                      <p className="text-[10px] font-medium text-muted">Earned</p>
+                      <p className="mt-0.5 font-mono text-base font-bold">{rup(e.earned)}</p>
                     </div>
-                    <div className="rounded-lg bg-accent-soft p-2.5 text-center">
-                      <p className="text-[10px] text-muted">Views</p>
-                      <p className="font-mono text-sm font-semibold">{fmtNum(e.views)}</p>
+                    <div className="rounded-xl bg-accent-soft p-3 text-center">
+                      <p className="text-[10px] font-medium text-muted">Views</p>
+                      <p className="mt-0.5 font-mono text-base font-bold">{fmtNum(e.views)}</p>
                     </div>
                   </div>
                 </div>
@@ -824,34 +895,34 @@ export default function Home() {
       )}
 
       {/* ── FAQ ── */}
-      <section id="faq" className="mx-auto max-w-5xl px-6 py-16">
+      <section id="faq" className="mx-auto max-w-6xl px-6 py-20">
         <p className="text-center text-xs font-semibold uppercase tracking-widest text-muted">FAQ</p>
-        <h2 className="mx-auto mt-3 max-w-xl text-center text-3xl font-semibold tracking-tight">Frequently asked</h2>
-        <div className="mt-10">
+        <h2 className="mx-auto mt-4 max-w-xl text-center text-3xl font-bold tracking-tight sm:text-4xl">Frequently asked</h2>
+        <div className="mt-12">
           <FAQ />
         </div>
       </section>
 
       {/* ── Final CTA ── */}
       <section className="border-y bg-card">
-        <div className="mx-auto max-w-5xl px-6 py-16 text-center">
-          <h2 className="text-3xl font-semibold tracking-tight">Ready to start?</h2>
-          <p className="mx-auto mt-3 max-w-md text-[15px] leading-relaxed text-muted">
+        <div className="mx-auto max-w-6xl px-6 py-20 text-center">
+          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Ready to start?</h2>
+          <p className="mx-auto mt-4 max-w-md text-lg leading-relaxed text-muted">
             Whether you want to earn by clipping or grow your brand through
             creator content, ClipTwo is where it happens.
           </p>
-          <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
             <Link
               href="/clipper"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-white hover:opacity-90"
+              className="inline-flex items-center gap-2 rounded-xl bg-accent px-7 py-3 text-sm font-semibold text-white shadow-lg shadow-accent/25 transition-all hover:scale-[1.02] hover:shadow-xl hover:shadow-accent/30"
             >
-              <Scissors size={14} /> Start clipping
+              <Scissors size={15} /> Start clipping
             </Link>
             <Link
               href="/creator"
-              className="inline-flex items-center gap-1.5 rounded-lg border px-5 py-2.5 text-sm font-medium hover:bg-accent-soft"
+              className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-7 py-3 text-sm font-semibold transition-all hover:scale-[1.02] hover:shadow-lg"
             >
-              <Film size={14} /> Launch a campaign
+              <Film size={15} /> Launch a campaign
             </Link>
           </div>
         </div>
@@ -859,61 +930,61 @@ export default function Home() {
 
       {/* ── Footer ── */}
       <footer className="border-t bg-card">
-        <div className="mx-auto max-w-5xl px-6 py-14">
-          <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
+        <div className="mx-auto max-w-6xl px-6 py-16">
+          <div className="grid gap-12 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
             <div>
-              <div className="flex items-center gap-2 font-semibold tracking-tight">
-                <span className="flex h-6 w-6 items-center justify-center rounded-md bg-accent text-xs text-white">
-                  <Scissors size={13} />
+              <div className="flex items-center gap-2.5 font-bold tracking-tight">
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent text-sm text-white">
+                  <Scissors size={15} />
                 </span>
-                cliptwo
+                <span className="text-lg">cliptwo</span>
               </div>
-              <p className="mt-3 max-w-xs text-sm leading-relaxed text-muted">
-                India&apos;s clipping marketplace — connect creators with clippers, paid per verified view and settled straight to UPI.
+              <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted">
+                India&apos;s clipping marketplace — connect creators with clippers, paid per view and settled straight to UPI.
               </p>
-              <div className="mt-4 flex items-center gap-2">
+              <div className="mt-5 flex items-center gap-2">
                 {(["Instagram", "YouTube"] as const).map((p) => (
-                  <span key={p} className="flex h-8 w-8 items-center justify-center rounded-lg border bg-background text-muted">
-                    <PlatformIcon p={p} size={15} />
+                  <span key={p} className="flex h-9 w-9 items-center justify-center rounded-xl border bg-background text-muted transition-colors hover:bg-accent-soft">
+                    <PlatformIcon p={p} size={16} />
                   </span>
                 ))}
               </div>
             </div>
 
             <div>
-              <h5 className="text-sm font-semibold">Product</h5>
-              <ul className="mt-3 space-y-2 text-sm text-muted">
-                <li><Link href="/clipper" className="hover:text-foreground">For clippers</Link></li>
-                <li><Link href="/creator" className="hover:text-foreground">For creators</Link></li>
-                <li><a href="#how" className="hover:text-foreground">How it works</a></li>
-                <li><a href="#faq" className="hover:text-foreground">FAQ</a></li>
+              <h5 className="text-sm font-bold">Product</h5>
+              <ul className="mt-4 space-y-2.5 text-sm text-muted">
+                <li><Link href="/clipper" className="transition-colors hover:text-foreground">For clippers</Link></li>
+                <li><Link href="/creator" className="transition-colors hover:text-foreground">For creators</Link></li>
+                <li><a href="#how" className="transition-colors hover:text-foreground">How it works</a></li>
+                <li><a href="#faq" className="transition-colors hover:text-foreground">FAQ</a></li>
               </ul>
             </div>
 
             <div>
-              <h5 className="text-sm font-semibold">Company</h5>
-              <ul className="mt-3 space-y-2 text-sm text-muted">
-                <li><Link href="/login" className="hover:text-foreground">Log in</Link></li>
-                <li><a href="#" className="hover:text-foreground">About</a></li>
-                <li><a href="#" className="hover:text-foreground">Careers</a></li>
-                <li><a href="#" className="hover:text-foreground">Blog</a></li>
-                <li><a href="#" className="hover:text-foreground">Contact</a></li>
+              <h5 className="text-sm font-bold">Company</h5>
+              <ul className="mt-4 space-y-2.5 text-sm text-muted">
+                <li><Link href="/login" className="transition-colors hover:text-foreground">Log in</Link></li>
+                <li><a href="#" className="transition-colors hover:text-foreground">About</a></li>
+                <li><a href="#" className="transition-colors hover:text-foreground">Careers</a></li>
+                <li><a href="#" className="transition-colors hover:text-foreground">Blog</a></li>
+                <li><a href="#" className="transition-colors hover:text-foreground">Contact</a></li>
               </ul>
             </div>
 
             <div>
-              <h5 className="text-sm font-semibold">Legal</h5>
-              <ul className="mt-3 space-y-2 text-sm text-muted">
-                <li><Link href="/terms" className="hover:text-foreground">Terms</Link></li>
-                <li><Link href="/privacy" className="hover:text-foreground">Privacy</Link></li>
-                <li><Link href="/payout-policy" className="hover:text-foreground">Payout policy</Link></li>
-                <li><Link href="/content-policy" className="hover:text-foreground">Content policy</Link></li>
-                <li><Link href="/community-guidelines" className="hover:text-foreground">Community guidelines</Link></li>
+              <h5 className="text-sm font-bold">Legal</h5>
+              <ul className="mt-4 space-y-2.5 text-sm text-muted">
+                <li><Link href="/terms" className="transition-colors hover:text-foreground">Terms</Link></li>
+                <li><Link href="/privacy" className="transition-colors hover:text-foreground">Privacy</Link></li>
+                <li><Link href="/payout-policy" className="transition-colors hover:text-foreground">Payout policy</Link></li>
+                <li><Link href="/content-policy" className="transition-colors hover:text-foreground">Content policy</Link></li>
+                <li><Link href="/community-guidelines" className="transition-colors hover:text-foreground">Community guidelines</Link></li>
               </ul>
             </div>
           </div>
 
-          <div className="mt-10 flex flex-col items-start justify-between gap-3 border-t pt-6 text-xs text-muted sm:flex-row sm:items-center">
+          <div className="mt-12 flex flex-col items-start justify-between gap-3 border-t pt-8 text-xs text-muted sm:flex-row sm:items-center">
             <p>&copy; {new Date().getFullYear()} cliptwo.</p>
             <p>Made for creators &amp; clippers across India.</p>
           </div>
