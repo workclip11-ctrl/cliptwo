@@ -59,7 +59,7 @@ export default function AdminWebsite() {
             dirty.current = true;
             setHeroTitle(e.target.value);
           }}
-          placeholder="Get paid to post for India's biggest creators"
+          placeholder="Turn creator content into clips. Get paid for the views."
           className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
         />
         <label className="mt-4 block text-sm font-medium">Subtitle</label>

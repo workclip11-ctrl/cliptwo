@@ -565,7 +565,7 @@ export default function Home() {
   const [active, setActive] = useState<Campaign | null>(null);
 
   const heroTitle =
-    siteSettings.heroTitle || "Get paid to post for India's biggest creators";
+    siteSettings.heroTitle || "Turn creator content into clips. Get paid for the views.";
   const heroSubtitle =
     siteSettings.heroSubtitle ||
     "cliptwo connects creators who have long-form content with clippers who cut it into clips — paid per verified view, settled straight to UPI.";
