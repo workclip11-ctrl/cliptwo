@@ -800,7 +800,7 @@ export default function Home() {
 
       <div className="mx-auto max-w-5xl px-6 py-10 text-center">
         <p className="text-[11px] font-semibold uppercase tracking-widest text-muted">
-          Built for these niches, and every platform that matters
+          Built for every niches, and every platform that matters
         </p>
         <div className="mt-5 flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
           {NICHES.map((n) => (
