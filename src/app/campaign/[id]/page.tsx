@@ -50,7 +50,7 @@ export default function CampaignDetail() {
   if (!campaign) {
     return (
       <main className="min-h-screen">
-        <TopBar active="clipper" />
+        <TopBar />
         <div className="mx-auto max-w-3xl px-6 py-20 text-center">
           <h1 className="text-2xl font-semibold">Campaign not found</h1>
           <p className="mt-2 text-sm text-muted">
@@ -73,7 +73,7 @@ export default function CampaignDetail() {
 
   return (
     <main className="min-h-screen">
-      <TopBar active="clipper" />
+      <TopBar />
       <div className="mx-auto max-w-3xl px-6 py-8">
         <div className="flex items-center gap-3 text-sm text-muted">
           <button

@@ -25,7 +25,7 @@ export default function ClipDetail() {
   if (!clip) {
     return (
       <main className="min-h-screen">
-        <TopBar active={isAdmin ? "admin" : isClipper ? "clipper" : "creator"} />
+        <TopBar />
         <div className="mx-auto max-w-3xl px-6 py-20 text-center">
           <h1 className="text-2xl font-semibold">Clip not found</h1>
           <Link
@@ -45,7 +45,7 @@ export default function ClipDetail() {
 
   return (
     <main className="min-h-screen">
-      <TopBar active={isAdmin ? "admin" : isClipper ? "clipper" : "creator"} />
+      <TopBar />
       <div className="mx-auto max-w-3xl px-6 py-8">
         <div className="flex items-center gap-3 text-sm text-muted">
           <button

@@ -144,7 +144,7 @@ export default function CampaignsPage() {
 
   return (
     <main className="min-h-screen bg-background">
-      <TopBar active="campaigns" />
+      <TopBar />
       <section className="mx-auto max-w-5xl px-6 py-12">
         <p className="text-xs font-semibold uppercase tracking-widest text-muted">Browse</p>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight">All campaigns</h1>

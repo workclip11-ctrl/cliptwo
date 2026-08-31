@@ -108,11 +108,7 @@ function NotificationBell({ userId }: { userId: string }) {
   );
 }
 
-export function TopBar({
-  active,
-}: {
-  active?: "home" | "clipper" | "creator" | "campaigns" | "admin";
-}) {
+export function TopBar() {
   const { isSignedIn, user, signOut } = useAuth();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -151,47 +147,7 @@ export function TopBar({
           cliptwo
         </Link>
 
-        <nav className="flex items-center gap-1 rounded-lg border bg-card p-1">
-          {isAdmin ? (
-            <Link
-              href="/admin"
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                active === "admin"
-                  ? "bg-accent-soft text-foreground"
-                  : "text-muted hover:text-foreground"
-              }`}
-            >
-              Admin
-            </Link>
-          ) : (
-            <>
-              {!isCreator && (
-                <Link
-                  href={isSignedIn ? "/clipper" : "/login?role=clipper"}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                    active === "clipper"
-                      ? "bg-accent-soft text-foreground"
-                      : "text-muted hover:text-foreground"
-                  }`}
-                >
-                  Clipper
-                </Link>
-              )}
-              {!isClipper && (
-                <Link
-                  href={isSignedIn ? "/creator" : "/login?role=creator"}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                    active === "creator"
-                      ? "bg-accent-soft text-foreground"
-                      : "text-muted hover:text-foreground"
-                  }`}
-                >
-                  Creator
-                </Link>
-              )}
-            </>
-          )}
-        </nav>
+
 
         {isSignedIn ? (
           <div className="flex items-center gap-2">

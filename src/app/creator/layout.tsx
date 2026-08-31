@@ -25,7 +25,7 @@ export default function CreatorLayout({ children }: { children: ReactNode }) {
   return (
     <AuthGuard role="creator">
       <main className="min-h-screen bg-background">
-        <TopBar active="creator" />
+        <TopBar />
         <div className="mx-auto flex max-w-6xl gap-8 px-4 py-6 sm:px-6 sm:py-8">
           {/* Mobile hamburger */}
           <button

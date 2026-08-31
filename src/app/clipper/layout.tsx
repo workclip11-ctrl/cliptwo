@@ -33,7 +33,7 @@ export default function ClipperLayout({ children }: { children: ReactNode }) {
   return (
     <AuthGuard role="clipper">
       <main className="min-h-screen bg-background">
-        <TopBar active="clipper" />
+        <TopBar />
         <div className="mx-auto flex max-w-6xl gap-8 px-4 py-6 sm:px-6 sm:py-8">
           {/* Mobile hamburger */}
           <button

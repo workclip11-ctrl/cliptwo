@@ -96,7 +96,7 @@ export default function CampaignDetailPage() {
   if (!campaign) {
     return (
       <main className="min-h-screen">
-        <TopBar active={user?.role === "admin" ? "admin" : user?.role === "creator" ? "creator" : "clipper"} />
+        <TopBar />
         <div className="mx-auto max-w-3xl px-6 py-20 text-center">
           <h1 className="text-2xl font-semibold">Campaign not found</h1>
           <p className="mt-2 text-sm text-muted">
@@ -128,7 +128,7 @@ export default function CampaignDetailPage() {
 
   return (
     <main className="min-h-screen">
-      <TopBar active={user?.role === "admin" ? "admin" : user?.role === "creator" ? "creator" : "clipper"} />
+      <TopBar />
       <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
         <div className="flex items-center gap-3 text-sm text-muted">
           <button
