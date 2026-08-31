@@ -217,7 +217,7 @@ function HeroVisual() {
               </div>
             </div>
 
-            {/* Video preview */}
+            {/* Video thumbnail - no text overlay */}
             <div className="mx-4 mt-2 overflow-hidden rounded-2xl">
               <div className="relative flex aspect-[9/14] items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700">
                 {/* Video timeline effect */}
@@ -265,8 +265,8 @@ function HeroVisual() {
               </div>
             </div>
 
-            {/* Video info overlay */}
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background/90 to-transparent p-5 pt-16">
+            {/* Info below thumbnail */}
+            <div className="px-5 pt-4 pb-4">
               <div className="flex items-center gap-3">
                 <span className="inline-flex items-center gap-1 rounded-full bg-green/20 px-2.5 py-1 text-[10px] font-semibold text-green">
                   <Zap size={8} /> Live
@@ -281,7 +281,7 @@ function HeroVisual() {
                   ["Views", "1.8L"],
                   ["Paid", "₹18.4K"],
                 ].map(([l, v]) => (
-                  <div key={l} className="rounded-xl bg-background/60 px-2.5 py-2 text-center backdrop-blur-sm">
+                  <div key={l} className="rounded-xl bg-accent-soft px-2.5 py-2 text-center">
                     <p className="text-[10px] text-muted">{l}</p>
                     <p className="mt-0.5 font-mono text-xs font-bold">{v}</p>
                   </div>
