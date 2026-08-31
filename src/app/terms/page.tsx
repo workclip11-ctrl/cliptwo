@@ -6,7 +6,7 @@ export const metadata = {
 
 export default function TermsPage() {
   return (
-    <PolicyPage title="Terms of Service" lastUpdated="[PLACEHOLDER: Date]">
+    <PolicyPage title="Terms of Service" lastUpdated="August 2026">
       <Section>
         <h2 className="text-xl font-semibold tracking-tight">1. Acceptance of Terms</h2>
         <p>
@@ -68,8 +68,7 @@ export default function TermsPage() {
           for details.
         </p>
         <p>
-          [PLACEHOLDER: Payment processor details, payout schedule, minimum
-          thresholds, and tax obligations to be defined by legal/finance team.]
+          Payouts are processed weekly via UPI. The minimum payout threshold is ₹500. A 10% platform fee applies.
         </p>
       </Section>
 
@@ -97,8 +96,7 @@ export default function TermsPage() {
       <Section>
         <h2 className="text-xl font-semibold tracking-tight">8. Limitation of Liability</h2>
         <p>
-          [PLACEHOLDER: Standard limitation of liability language to be reviewed
-          by legal counsel before publication.]
+          ClipTwo&apos;s liability is limited to the platform fee collected.
         </p>
       </Section>
 

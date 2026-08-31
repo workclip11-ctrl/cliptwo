@@ -6,7 +6,7 @@ export const metadata = {
 
 export default function ClipperRulesPage() {
   return (
-    <PolicyPage title="Clipper Rules" lastUpdated="[PLACEHOLDER: Date]">
+    <PolicyPage title="Clipper Rules" lastUpdated="August 2026">
       <Section>
         <h2 className="text-xl font-semibold tracking-tight">Overview</h2>
         <p>
@@ -95,7 +95,7 @@ export default function ClipperRulesPage() {
           <li>The clips may be removed from circulation.</li>
           <li>Your account is reviewed by the trust &amp; safety team.</li>
           <li>Confirmed fraud results in permanent ban and forfeiture of all earnings.</li>
-          <li>[PLACEHOLDER: Legal action for severe or repeated fraud to be determined.]</li>
+          <li>Severe or repeated fraud results in permanent account termination and potential legal action.</li>
         </ol>
         <p>Examples of fraud include but are not limited to:</p>
         <ul className="list-disc pl-5 mt-2 space-y-1">

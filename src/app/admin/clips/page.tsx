@@ -63,7 +63,7 @@ export default function AdminClips() {
   const { user } = useAuth();
   const actor = user?.email ?? user?.name ?? "Admin";
 
-  const [tab, setTab] = useState("review");
+  const [tab, setTab] = useState("pending");
   const [q, setQ] = useState("");
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
@@ -81,7 +81,7 @@ export default function AdminClips() {
     .filter((k) => k.status === "paid")
     .reduce((s, k) => s + payoutSplit(k, campaigns).net, 0);
 
-  const tabStatuses = TABS.find((t) => t.key === tab)!.statuses;
+  const tabStatuses = TABS.find((t) => t.key === tab)?.statuses ?? [];
 
   const list = useMemo(() => {
     const matched = clips.filter(

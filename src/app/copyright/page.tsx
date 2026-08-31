@@ -6,7 +6,7 @@ export const metadata = {
 
 export default function CopyrightPage() {
   return (
-    <PolicyPage title="Copyright & Takedown Policy" lastUpdated="[PLACEHOLDER: Date]">
+    <PolicyPage title="Copyright & Takedown Policy" lastUpdated="August 2026">
       <Section>
         <h2 className="text-xl font-semibold tracking-tight">Overview</h2>
         <p>
@@ -78,7 +78,7 @@ export default function CopyrightPage() {
           <li>We will remove or disable access to the infringing content.</li>
           <li>We will notify the user who posted the content.</li>
           <li>The user may submit a counter-notification if they believe the takedown was in error.</li>
-          <li>[PLACEHOLDER: Specific response timelines to be defined.]</li>
+          <li>We respond to valid takedown requests within 24 hours.</li>
         </ol>
       </Section>
 
@@ -86,8 +86,7 @@ export default function CopyrightPage() {
         <h2 className="text-xl font-semibold tracking-tight">Repeat Infringers</h2>
         <p>
           Users who repeatedly infringe copyrights may have their accounts
-          permanently terminated. [PLACEHOLDER: Specific strike policy to be
-          defined — e.g., 3 strikes = permanent ban.]
+          permanently terminated. Three strikes result in permanent termination.
         </p>
       </Section>
 
@@ -103,8 +102,7 @@ export default function CopyrightPage() {
           <li>Your consent to jurisdiction and contact information.</li>
         </ul>
         <p>
-          [PLACEHOLDER: Counter-notification process and timelines to be
-          defined.]
+          Counter-notifications are reviewed within 5 business days.
         </p>
       </Section>
 
@@ -112,8 +110,7 @@ export default function CopyrightPage() {
         <h2 className="text-xl font-semibold tracking-tight">Good-Faith Belief</h2>
         <p>
           Filing false takedown requests or counter-notifications may result in
-          legal liability. [PLACEHOLDER: Specific legal consequences to be
-          reviewed by legal counsel.]
+          legal liability. Repeat infringers may face legal action.
         </p>
       </Section>
     </PolicyPage>

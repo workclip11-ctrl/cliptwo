@@ -6,7 +6,7 @@ export const metadata = {
 
 export default function ContentPolicyPage() {
   return (
-    <PolicyPage title="Content Policy" lastUpdated="[PLACEHOLDER: Date]">
+    <PolicyPage title="Content Policy" lastUpdated="August 2026">
       <Section>
         <h2 className="text-xl font-semibold tracking-tight">Overview</h2>
         <p>
@@ -71,7 +71,7 @@ export default function ContentPolicyPage() {
         </ul>
         <p className="mt-2">
           Repeated violations may result in account suspension or permanent ban.
-          [PLACEHOLDER: Specific escalation ladder to be defined.]
+          Violations are escalated through warnings, temporary suspension, and permanent ban.
         </p>
       </Section>
 

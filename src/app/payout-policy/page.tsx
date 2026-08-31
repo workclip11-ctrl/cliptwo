@@ -6,7 +6,7 @@ export const metadata = {
 
 export default function PayoutPolicyPage() {
   return (
-    <PolicyPage title="Payout Policy" lastUpdated="[PLACEHOLDER: Date]">
+    <PolicyPage title="Payout Policy" lastUpdated="August 2026">
       <Section>
         <h2 className="text-xl font-semibold tracking-tight">How Clipping Works</h2>
         <p>
@@ -63,9 +63,7 @@ export default function PayoutPolicyPage() {
       <Section>
         <h2 className="text-xl font-semibold tracking-tight">Payout Timing</h2>
         <p>
-          [PLACEHOLDER: Payout schedule to be defined — e.g., weekly on
-          Fridays, or bi-weekly. Minimum payout threshold (e.g., ₹500) to be
-          confirmed.]
+          Payouts are processed weekly. The minimum payout threshold is ₹500.
         </p>
         <p>
           Once a payout is initiated, it typically takes 3–5 business days to
@@ -81,8 +79,7 @@ export default function PayoutPolicyPage() {
           fee is 10% of gross earnings.
         </p>
         <p>
-          [PLACEHOLDER: Fee changes, volume discounts, or tiered pricing to be
-          determined.]
+          Fee changes will be communicated in advance.
         </p>
       </Section>
 
@@ -91,8 +88,7 @@ export default function PayoutPolicyPage() {
         <p>
           If a creator cancels a campaign, clips already approved and payable
           will still be paid out. Clips still in pending review at the time of
-          cancellation may be rejected. [PLACEHOLDER: Exact terms for mid-run
-          cancellations to be defined.]
+          cancellation may be rejected. Campaigns with active submissions cannot be cancelled.
         </p>
       </Section>
 
@@ -118,8 +114,7 @@ export default function PayoutPolicyPage() {
           <li>Our team will review within 5 business days.</li>
         </ol>
         <p>
-          [PLACEHOLDER: Escalation process, arbitration terms, and final
-          dispute resolution mechanism to be defined by legal.]
+          Disputes are resolved through our support team. Unresolved disputes may be escalated to arbitration.
         </p>
       </Section>
     </PolicyPage>

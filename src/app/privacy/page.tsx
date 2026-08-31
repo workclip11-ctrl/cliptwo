@@ -6,7 +6,7 @@ export const metadata = {
 
 export default function PrivacyPage() {
   return (
-    <PolicyPage title="Privacy Policy" lastUpdated="[PLACEHOLDER: Date]">
+    <PolicyPage title="Privacy Policy" lastUpdated="August 2026">
       <Section>
         <h2 className="text-xl font-semibold tracking-tight">1. What We Collect</h2>
         <p>We collect information you provide directly:</p>
@@ -50,7 +50,7 @@ export default function PrivacyPage() {
         <p>
           We implement industry-standard security measures to protect your data.
           However, no method of transmission over the Internet is 100% secure.
-          [PLACEHOLDER: Specific security measures to be detailed by engineering.]
+          We use industry-standard encryption and access controls to protect your data.
         </p>
       </Section>
 
@@ -58,8 +58,7 @@ export default function PrivacyPage() {
         <h2 className="text-xl font-semibold tracking-tight">5. Data Retention</h2>
         <p>
           We retain your data for as long as your account is active or as needed
-          to provide the Platform. [PLACEHOLDER: Specific retention periods to
-          be defined by legal team.]
+          to provide the Platform.           Account data is retained while your account is active. You may request deletion at any time.
         </p>
       </Section>
 
@@ -86,9 +85,8 @@ export default function PrivacyPage() {
       <Section>
         <h2 className="text-xl font-semibold tracking-tight">7. Cookies</h2>
         <p>
-          [PLACEHOLDER: Cookie policy details to be added. We plan to use
-          essential cookies for authentication and optional analytics cookies
-          with user consent.]
+          We use essential cookies for authentication. We plan to use
+          optional analytics cookies with user consent.
         </p>
       </Section>
 

@@ -38,8 +38,9 @@ const STEPS = [
 ];
 
 const PLATFORM_OPTIONS: { label: string; value: Platform }[] = [
-  { label: "Instagram Reels", value: "Instagram" },
-  { label: "YouTube Shorts", value: "YouTube" },
+  { label: "Instagram", value: "Instagram" },
+  { label: "YouTube", value: "YouTube" },
+  { label: "Kick", value: "Kick" },
 ];
 
 const CATEGORIES = [

@@ -11,6 +11,7 @@ function derivePlatform(url: string): Platform {
   const u = url.toLowerCase();
   if (u.includes("instagram")) return "Instagram";
   if (u.includes("youtube") || u.includes("youtu.be")) return "YouTube";
+  if (u.includes("kick")) return "Kick";
   return "Instagram";
 }
 

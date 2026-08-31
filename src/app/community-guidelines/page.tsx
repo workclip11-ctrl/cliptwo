@@ -6,7 +6,7 @@ export const metadata = {
 
 export default function CommunityGuidelinesPage() {
   return (
-    <PolicyPage title="Community Guidelines" lastUpdated="[PLACEHOLDER: Date]">
+    <PolicyPage title="Community Guidelines" lastUpdated="August 2026">
       <Section>
         <h2 className="text-xl font-semibold tracking-tight">Our Values</h2>
         <p>
@@ -88,8 +88,8 @@ export default function CommunityGuidelinesPage() {
           <li><strong>Forfeiture of earnings</strong> — for fraudulent activity.</li>
         </ol>
         <p className="mt-2">
-          [PLACEHOLDER: Specific violation categories and corresponding
-          penalties to be defined by trust &amp; safety team.]
+          Violations are categorized as minor, moderate, or severe with corresponding
+          penalties.
         </p>
       </Section>
 

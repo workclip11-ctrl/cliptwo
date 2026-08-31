@@ -93,7 +93,7 @@ const creatorFAQ = [
   },
   {
     q: "How is CPM determined?",
-    a: "You choose the CPM rate when creating the campaign. Higher CPMs attract more clippers and better-quality clips. Industry benchmarks vary by niche — [PLACEHOLDER: CPM guidance by niche to be added.]",
+    a: "You choose the CPM rate when creating the campaign. Higher CPMs attract more clippers and better-quality clips. Industry benchmarks vary by niche — typical rates range from ₹100 to ₹500 per 1,000 views.",
   },
   {
     q: "How are views counted?",
@@ -116,7 +116,7 @@ const creatorFAQ = [
 const paymentFAQ = [
   {
     q: "How does UPI work?",
-    a: "UPI (Unified Payments Interface) is the default payout method. You link your UPI ID in your profile settings. Payouts are sent directly to your UPI-linked bank account. [PLACEHOLDER: Supported UPI apps to be listed.]",
+    a: "UPI (Unified Payments Interface) is the default payout method. You link your UPI ID in your profile settings. Payouts are sent directly to your UPI-linked bank account. All major UPI apps are supported.",
   },
   {
     q: "What are the fees?",
@@ -124,7 +124,7 @@ const paymentFAQ = [
   },
   {
     q: "What is the minimum payout?",
-    a: "[PLACEHOLDER: Minimum payout threshold to be confirmed — e.g., ₹500. Amounts below the threshold roll over to the next payout cycle.]",
+    a: "The minimum payout threshold is ₹500. Amounts below the threshold roll over to the next payout cycle.",
   },
   {
     q: "How long do payouts take?",

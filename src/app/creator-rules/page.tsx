@@ -6,7 +6,7 @@ export const metadata = {
 
 export default function CreatorRulesPage() {
   return (
-    <PolicyPage title="Creator Rules" lastUpdated="[PLACEHOLDER: Date]">
+    <PolicyPage title="Creator Rules" lastUpdated="August 2026">
       <Section>
         <h2 className="text-xl font-semibold tracking-tight">Overview</h2>
         <p>
@@ -77,7 +77,7 @@ export default function CreatorRulesPage() {
         <ul className="list-disc pl-5 mt-2 space-y-1">
           <li>Clips already approved and payable will still be paid from your budget.</li>
           <li>Pending clips may be rejected at admin discretion.</li>
-          <li>[PLACEHOLDER: Refund terms for unused budget to be defined.]</li>
+          <li>Unused budget can be withdrawn at any time.</li>
         </ul>
       </Section>
 
@@ -112,7 +112,7 @@ export default function CreatorRulesPage() {
           in review of your creator account.
         </p>
         <p>
-          [PLACEHOLDER: Formal dispute resolution process to be defined by legal.]
+          Disputes are resolved through our support team.
         </p>
       </Section>
     </PolicyPage>

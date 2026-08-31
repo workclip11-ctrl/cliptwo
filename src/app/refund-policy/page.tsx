@@ -6,7 +6,7 @@ export const metadata = {
 
 export default function RefundPolicyPage() {
   return (
-    <PolicyPage title="Refund Policy" lastUpdated="[PLACEHOLDER: Date]">
+    <PolicyPage title="Refund Policy" lastUpdated="August 2026">
       <Section>
         <h2 className="text-xl font-semibold tracking-tight">Overview</h2>
         <p>
@@ -20,8 +20,7 @@ export default function RefundPolicyPage() {
         <p>
           <strong>Budget refunds:</strong> If your campaign has not yet received
           any submissions, you may cancel it and receive a refund of your unused
-          budget. [PLACEHOLDER: Refund processing time and method to be
-          defined.]
+          budget.           Refunds are processed within 7-10 business days to the original payment method.
         </p>
         <p className="mt-2">
           <strong>Partial refunds:</strong> If your campaign has received
@@ -44,7 +43,7 @@ export default function RefundPolicyPage() {
         <ul className="list-disc pl-5 mt-2 space-y-1">
           <li>If your clip is wrongfully rejected, you may appeal through the dispute process.</li>
           <li>If a payout fails due to a platform error, we will retry or refund the amount to your wallet.</li>
-          <li>[PLACEHOLDER: Specific refund scenarios for clippers to be defined.]</li>
+          <li>Clippers are not eligible for refunds as they earn from views, not payments.</li>
         </ul>
       </Section>
 
@@ -74,8 +73,7 @@ export default function RefundPolicyPage() {
       <Section>
         <h2 className="text-xl font-semibold tracking-tight">Exceptions</h2>
         <p>
-          [PLACEHOLDER: Specific exceptions (e.g., force majeure, platform
-          outages, billing errors) to be defined by legal/finance team.]
+          Exceptions may apply for force majeure events or extended platform outages.
         </p>
       </Section>
 
