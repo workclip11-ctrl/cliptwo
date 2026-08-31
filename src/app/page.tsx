@@ -628,7 +628,7 @@ export default function Home() {
           </nav>
           <div className="flex items-center gap-2">
             <Link href="/login" className="rounded-lg border px-3.5 py-1.5 text-sm font-medium hover:bg-accent-soft">
-              Sign in
+              Log in
             </Link>
             <Link href="/login?mode=signup" className="rounded-lg bg-accent px-3.5 py-1.5 text-sm font-medium text-white hover:opacity-90">
               Get started
@@ -897,7 +897,7 @@ export default function Home() {
             <div>
               <h5 className="text-sm font-semibold">Company</h5>
               <ul className="mt-3 space-y-2 text-sm text-muted">
-                <li><Link href="/login" className="hover:text-foreground">Sign in</Link></li>
+                <li><Link href="/login" className="hover:text-foreground">Log in</Link></li>
                 <li><a href="#" className="hover:text-foreground">About</a></li>
                 <li><a href="#" className="hover:text-foreground">Careers</a></li>
                 <li><a href="#" className="hover:text-foreground">Blog</a></li>
