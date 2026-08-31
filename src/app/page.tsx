@@ -808,9 +808,9 @@ export default function Home() {
               <Sparkles size={13} className="text-muted" /> {n}
             </span>
           ))}
-          <span className="flex items-center gap-1.5 text-sm font-semibold text-muted"><PlatformIcon p="Instagram" size={15} /> Reels</span>
-          <span className="flex items-center gap-1.5 text-sm font-semibold text-muted"><PlatformIcon p="YouTube" size={15} /> Shorts</span>
           <span className="flex items-center gap-1.5 text-sm font-semibold text-muted"><PlatformIcon p="Instagram" size={15} /> Instagram</span>
+          <span className="flex items-center gap-1.5 text-sm font-semibold text-muted"><PlatformIcon p="YouTube" size={15} /> YouTube</span>
+          <span className="flex items-center gap-1.5 text-sm font-semibold text-muted"><PlatformIcon p="Kick" size={15} /> Kick</span>
         </div>
       </div>
 

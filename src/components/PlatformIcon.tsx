@@ -26,6 +26,15 @@ export function PlatformIcon({ p, size = 14 }: { p: string; size?: number }) {
       </svg>
     );
   }
+  if (p === "Kick" || p === "kick") {
+    return (
+      <svg {...common}>
+        <path d="M4 4h16v12H4z" />
+        <path d="M8 20h8" />
+        <path d="M12 16v4" />
+      </svg>
+    );
+  }
   return (
     <svg {...common}>
       <path d="M16.6 5.82a4.28 4.28 0 0 1-1.06-2.82h-3.2v12.4a2.59 2.59 0 1 1-2.59-2.59c.27 0 .53.04.78.12v-3.24a5.84 5.84 0 1 0 5.2 5.83V8.93a7.45 7.45 0 0 0 4.41 1.43V7.16a4.28 4.28 0 0 1-3.54-1.34z" />
