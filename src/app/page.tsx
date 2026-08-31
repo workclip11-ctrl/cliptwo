@@ -750,7 +750,7 @@ export default function Home() {
       <div className="mt-6 border-y bg-card">
         <div className="overflow-hidden">
           <div className="flex w-max animate-ticker">
-            {[...TICKER, ...TICKER].map((t, i) => (
+            {[...TICKER, ...TICKER, ...TICKER, ...TICKER, ...TICKER, ...TICKER].map((t, i) => (
               <span key={i} className="flex items-center gap-2 px-8 text-xs font-semibold uppercase tracking-wide text-muted">
                 <span className="text-accent">●</span> {t}
               </span>

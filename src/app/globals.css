@@ -58,5 +58,5 @@ body {
 }
 
 .animate-ticker {
-  animation: ticker-scroll 26s linear infinite;
+  animation: ticker-scroll 20s linear infinite;
 }
