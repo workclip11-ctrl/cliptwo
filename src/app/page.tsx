@@ -167,7 +167,7 @@ const FAQ_CATEGORIES = [
 
 const CLIPPER_JOURNEY = [
   { num: "01", label: "Pick a campaign", title: "Browse live campaigns", body: "See the exact rate, platforms, and minimum views up front. No applications, no waiting to get accepted — claim it and start cutting.", visual: "campaigns" },
-  { num: "02", label: "Connect accounts", title: "Link where you post", body: "Connect your Instagram or YouTube account so we can verify your clip is posted. Your handle is stored for campaign matching.", visual: "connect" },
+  { num: "02", label: "Connect accounts", title: "Link where you post", body: "Connect your accounts so we can verify your clip is posted. Your handle is stored for campaign matching.", visual: "connect" },
   { num: "03", label: "Add your UPI ID", title: "Set up your payout", body: "Add the UPI ID you want earnings sent to. One-time setup, verified in seconds, used for every campaign after.", visual: "payout" },
   { num: "04", label: "Post & submit", title: "Drop your clip, paste the link", body: "Cut the clip, post it from your linked account, then paste the link back. Our team reviews each submission.", visual: "submit" },
   { num: "05", label: "Cash out", title: "Get paid per view", body: "When the payout cycle closes, approved earnings settle straight to your UPI ID — no invoices, no chasing anyone down.", visual: "cashout" },
