@@ -68,6 +68,30 @@ function clearLocalSession() {
   }
 }
 
+const LOCAL_PROFILES_KEY = "cliptwo_local_profiles";
+
+function getLocalProfiles(): UserProfile[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(LOCAL_PROFILES_KEY);
+    return raw ? (JSON.parse(raw) as UserProfile[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalProfile(profile: UserProfile) {
+  if (typeof window === "undefined") return;
+  const profiles = getLocalProfiles();
+  const idx = profiles.findIndex((p) => p.email === profile.email);
+  if (idx >= 0) {
+    profiles[idx] = profile;
+  } else {
+    profiles.push(profile);
+  }
+  localStorage.setItem(LOCAL_PROFILES_KEY, JSON.stringify(profiles));
+}
+
 interface AuthValue {
   isSignedIn: boolean;
   role: Role | null;
@@ -224,15 +248,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // ── Local mode: simulate auth when Supabase is not configured ──
     if (!isSupabaseConfigured) {
       const email = creds.email.toLowerCase().trim();
+      // Look up stored profile to get the role
+      const stored = getLocalProfiles().find((p) => p.email === email);
       const role: Role =
-        r === "admin" || email === "workclip11@gmail.com"
+        email === "workclip11@gmail.com"
           ? "admin"
-          : r === "creator"
+          : stored?.role === "creator"
             ? "creator"
             : "clipper";
       const profile: UserProfile = {
-        id: `local-${email.replace(/[^a-z0-9]/g, "-")}`,
-        name: creds.name || email.split("@")[0],
+        id: stored?.id ?? `local-${email.replace(/[^a-z0-9]/g, "-")}`,
+        name: stored?.name || creds.name || email.split("@")[0],
         email,
         role,
       };
@@ -291,6 +317,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         sessionStorage.removeItem(TAB_LOGOUT_KEY);
       markTabSession(profile.id);
       saveLocalSession(profile);
+      saveLocalProfile(profile);
       setUser(profile);
       setRole(profile.role);
       setIsSignedIn(true);

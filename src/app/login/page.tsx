@@ -8,7 +8,6 @@ import { useAuth } from "@/lib/auth";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
 
 type Mode = "signin" | "signup";
-type Role = "clipper" | "creator";
 
 function AuthForm() {
   const router = useRouter();
@@ -17,7 +16,6 @@ function AuthForm() {
   const [mode, setMode] = useState<Mode>(
     searchParams.get("mode") === "signup" ? "signup" : "signin",
   );
-  const [role, setRole] = useState<Role>("clipper");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,10 +33,10 @@ function AuthForm() {
     setLoading(true);
     try {
       if (mode === "signup") {
-        await signUp({ id: "", name: name.trim() || "Clipper", email, role, password });
-        router.push(role === "clipper" ? "/clipper" : "/creator");
+        await signUp({ id: "", name: name.trim() || "Clipper", email, role: "clipper", password });
+        router.push("/clipper");
       } else {
-        const u = await signIn(role, { email, password, name });
+        const u = await signIn("clipper", { email, password, name });
         router.push(
           u?.role === "admin"
             ? "/admin"
@@ -49,8 +47,6 @@ function AuthForm() {
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Authentication failed.";
-      // A failed sign-in could mean "wrong password" or "no such account".
-      // If the account doesn't exist, switch to sign-up with a friendly note.
       if (mode === "signin" && msg === "Invalid email or password." && isSupabaseConfigured) {
         try {
           const { data } = await supabase.rpc("user_exists", { target_email: email });
@@ -92,22 +88,6 @@ function AuthForm() {
                 ? "Sign in to keep clipping and earning."
                 : "Join India's clipping marketplace in seconds."}
             </p>
-          </div>
-
-          {/* role switch */}
-          <div className="mt-6 grid grid-cols-3 gap-2 rounded-xl border bg-background p-1">
-            {(["clipper", "creator", "admin"] as Role[]).map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setRole(r)}
-                className={`rounded-lg py-2 text-sm font-medium capitalize transition-colors ${
-                  role === r ? "bg-accent text-white" : "text-muted"
-                }`}
-              >
-                {r === "clipper" ? "Clipper" : r === "creator" ? "Creator" : "Admin"}
-              </button>
-            ))}
           </div>
 
           <form onSubmit={submit} className="mt-6 space-y-4">
@@ -156,7 +136,7 @@ function AuthForm() {
               disabled={loading}
               className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
             >
-              {loading ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
+              {loading ? "Please wait…" : mode === "signin" ? "Log in" : "Create account"}
               {!loading && <ArrowRight size={15} />}
             </button>
           </form>
@@ -171,14 +151,10 @@ function AuthForm() {
               }}
               className="font-medium text-foreground underline-offset-4 hover:underline"
             >
-              {mode === "signin" ? "Create an account" : "Sign in"}
+              {mode === "signin" ? "Create an account" : "Log in"}
             </button>
           </p>
         </div>
-
-        <p className="mt-6 text-center text-xs text-muted">
-          Prototype build — accounts are stored in your browser session via Supabase.
-        </p>
       </div>
     </main>
   );
