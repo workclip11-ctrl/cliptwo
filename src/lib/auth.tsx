@@ -24,6 +24,7 @@ export interface UserProfile {
 // apply to only the current tab while other tabs stay signed in.
 const TAB_LOGOUT_KEY = "cliptwo_tab_logged_out";
 const TAB_UID_KEY = "cliptwo_tab_uid";
+const LOCAL_SESSION_KEY = "cliptwo_local_session";
 
 function isTabLoggedOut() {
   return (
@@ -42,6 +43,28 @@ function markTabSession(id: string) {
   if (typeof window !== "undefined") {
     sessionStorage.setItem(TAB_UID_KEY, id);
     sessionStorage.removeItem(TAB_LOGOUT_KEY);
+  }
+}
+
+function saveLocalSession(profile: UserProfile) {
+  if (typeof window !== "undefined") {
+    sessionStorage.setItem(LOCAL_SESSION_KEY, JSON.stringify(profile));
+  }
+}
+
+function loadLocalSession(): UserProfile | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(LOCAL_SESSION_KEY);
+    return raw ? (JSON.parse(raw) as UserProfile) : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearLocalSession() {
+  if (typeof window !== "undefined") {
+    sessionStorage.removeItem(LOCAL_SESSION_KEY);
   }
 }
 
@@ -159,6 +182,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     };
 
+    // ── Local mode: restore session from sessionStorage ──
+    if (!isSupabaseConfigured) {
+      const local = loadLocalSession();
+      if (local && !isTabLoggedOut()) {
+        apply(local);
+      } else {
+        apply(null);
+      }
+      return () => { active = false; };
+    }
+
     supabase.auth
       .getSession()
       .then(({ data }) => apply(profileFromUser(data.session?.user ?? null)))
@@ -191,7 +225,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!isSupabaseConfigured) {
       const email = creds.email.toLowerCase().trim();
       const role: Role =
-        email === "workclip11@gmail.com"
+        r === "admin" || email === "workclip11@gmail.com"
           ? "admin"
           : r === "creator"
             ? "creator"
@@ -203,6 +237,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role,
       };
       markTabSession(profile.id);
+      saveLocalSession(profile);
       setUser(profile);
       setRole(profile.role);
       setIsSignedIn(true);
@@ -255,6 +290,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (typeof window !== "undefined")
         sessionStorage.removeItem(TAB_LOGOUT_KEY);
       markTabSession(profile.id);
+      saveLocalSession(profile);
       setUser(profile);
       setRole(profile.role);
       setIsSignedIn(true);
@@ -302,6 +338,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // would log out every tab.
     if (typeof window !== "undefined")
       sessionStorage.setItem(TAB_LOGOUT_KEY, "1");
+    clearLocalSession();
     setUser(null);
     setRole(null);
     setIsSignedIn(false);
