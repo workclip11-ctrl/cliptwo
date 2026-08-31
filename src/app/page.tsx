@@ -393,13 +393,6 @@ function JourneyVisual({ stageKey }: { stageKey: string }) {
   if (stageKey === "submit") {
     return (
       <div className="space-y-3">
-        <div className="flex gap-2">
-          {["Instagram", "YouTube"].map((n, i) => (
-            <span key={n} className={`rounded-full border px-3 py-1 text-xs font-medium ${i === 0 ? "border-accent bg-accent text-white" : "text-muted"}`}>
-              {n}
-            </span>
-          ))}
-        </div>
         <div className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm text-muted">
           instagram.com/reel/xk29a
         </div>
