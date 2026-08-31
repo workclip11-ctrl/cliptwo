@@ -30,6 +30,7 @@ export async function updateSession(request: NextRequest) {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   // If Supabase isn't configured yet (e.g. placeholder env), just pass through.
+  // Client-side guards (AdminGuard / AuthGuard) handle auth in local mode.
   if (!isValidUrl(url)) {
     return NextResponse.next({ request });
   }
@@ -55,60 +56,16 @@ export async function updateSession(request: NextRequest) {
 
   // IMPORTANT: do not run code between createServerClient and getUser().
   // A simple mistake here can break the session refresh.
-  let user: { id: string; user_metadata?: Record<string, unknown> } | null = null;
   try {
-    const { data } = await supabase.auth.getUser();
-    user = data.user;
+    await supabase.auth.getUser();
   } catch {
     // Ignore session errors (e.g. misconfigured env) so the request still proceeds.
   }
 
-  const pathname = request.nextUrl.pathname;
-
-  // ── Public routes that never need auth ──
-  const isPublic =
-    pathname === "/" ||
-    pathname === "/login" ||
-    pathname === "/faq" ||
-    pathname === "/campaigns" ||
-    pathname.startsWith("/campaigns/") ||
-    pathname.startsWith("/campaign/") ||
-    pathname.startsWith("/clip/") ||
-    pathname === "/terms" ||
-    pathname === "/privacy" ||
-    pathname === "/payout-policy" ||
-    pathname === "/refund-policy" ||
-    pathname === "/content-policy" ||
-    pathname === "/community-guidelines" ||
-    pathname === "/copyright" ||
-    pathname === "/clipper-rules" ||
-    pathname === "/creator-rules" ||
-    pathname.startsWith("/_next") ||
-    pathname.startsWith("/favicon");
-
-  if (isPublic) return response;
-
-  // ── Protected route: must be signed in ──
-  if (!user) {
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = "/login";
-    return NextResponse.redirect(loginUrl);
-  }
-
-  // Read the user's role from user_metadata.
-  const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
-  const role: string =
-    meta.role === "clipper" || meta.role === "creator" || meta.role === "admin"
-      ? (meta.role as string)
-      : "clipper";
-
-  // ── Role-based route check ──
-  const needed = requiredRole(pathname);
-  if (needed && role !== needed) {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = ROLE_DASHBOARD[needed] ?? "/login";
-    return NextResponse.redirect(redirectUrl);
-  }
+  // NOTE: Role-based route protection is handled client-side by AdminGuard /
+  // AuthGuard in layout files. Server-side role checks are not possible when
+  // the browser client stores sessions in sessionStorage (not cookies), so
+  // the middleware only refreshes the session here.
 
   return response;
 }
