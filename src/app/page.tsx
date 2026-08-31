@@ -744,10 +744,10 @@ export default function Home() {
             {heroSubtitle}
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link href="/clipper" className="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-accent/25 transition-all hover:scale-[1.02] hover:shadow-xl hover:shadow-accent/30">
+            <Link href="/login?role=clipper" className="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-accent/25 transition-all hover:scale-[1.02] hover:shadow-xl hover:shadow-accent/30">
               <Scissors size={15} /> For Clippers
             </Link>
-            <Link href="/creator" className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-6 py-3 text-sm font-semibold transition-all hover:scale-[1.02] hover:shadow-lg">
+            <Link href="/login?role=creator" className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-6 py-3 text-sm font-semibold transition-all hover:scale-[1.02] hover:shadow-lg">
               <Film size={15} /> For Creators
             </Link>
           </div>
@@ -960,13 +960,13 @@ export default function Home() {
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
             <Link
-              href="/clipper"
+              href="/login?role=clipper"
               className="inline-flex items-center gap-2 rounded-xl bg-accent px-7 py-3 text-sm font-semibold text-white shadow-lg shadow-accent/25 transition-all hover:scale-[1.02] hover:shadow-xl hover:shadow-accent/30"
             >
               <Scissors size={15} /> Start clipping
             </Link>
             <Link
-              href="/creator"
+              href="/login?role=creator"
               className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-7 py-3 text-sm font-semibold transition-all hover:scale-[1.02] hover:shadow-lg"
             >
               <Film size={15} /> Launch a campaign

@@ -16,6 +16,7 @@ function AuthForm() {
   const [mode, setMode] = useState<Mode>(
     searchParams.get("mode") === "signup" ? "signup" : "signin",
   );
+  const desiredRole = searchParams.get("role") === "creator" ? "creator" : "clipper";
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -38,15 +39,15 @@ function AuthForm() {
           email,
           password,
           name: name.trim() || email.split("@")[0],
-          role: "clipper",
+          role: desiredRole,
         });
-        router.push("/clipper");
+        router.push(desiredRole === "creator" ? "/creator" : "/clipper");
       } else {
         const u = await signIn({ email, password });
         router.push(
           u?.role === "admin"
             ? "/admin"
-            : u?.role === "creator"
+            : desiredRole === "creator"
               ? "/creator"
               : "/clipper",
         );
