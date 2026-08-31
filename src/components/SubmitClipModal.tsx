@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Send, AlertTriangle } from "lucide-react";
-import { PlatformIcon } from "@/components/PlatformIcon";
 import { useStore } from "@/lib/store";
 import { campaignBudget } from "@/lib/finance";
 import { rup } from "@/lib/format";
@@ -78,20 +77,6 @@ export function SubmitClipModal({
             </div>
           </div>
         )}
-
-        <label className="mt-4 block text-sm font-medium">Platform</label>
-        <div className="mt-1.5 flex gap-2">
-          {(["Instagram", "YouTube"] as Platform[]).map((p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => setPlatform(p)}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 py-2.5 text-sm font-medium sm:flex-initial ${platform === p ? "border-accent bg-accent-soft" : "text-muted"}`}
-            >
-              <PlatformIcon p={p} size={14} /> {p}
-            </button>
-          ))}
-        </div>
 
         <label className="mt-4 block text-sm font-medium">Video URL</label>
         <input
