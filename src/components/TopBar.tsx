@@ -167,7 +167,7 @@ export function TopBar({
             <>
               {!isCreator && (
                 <Link
-                  href="/clipper"
+                  href={isSignedIn ? "/clipper" : "/login?role=clipper"}
                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                     active === "clipper"
                       ? "bg-accent-soft text-foreground"
@@ -179,7 +179,7 @@ export function TopBar({
               )}
               {!isClipper && (
                 <Link
-                  href="/creator"
+                  href={isSignedIn ? "/creator" : "/login?role=creator"}
                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                     active === "creator"
                       ? "bg-accent-soft text-foreground"

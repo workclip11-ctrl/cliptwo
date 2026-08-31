@@ -16,7 +16,9 @@ function AuthForm() {
   const [mode, setMode] = useState<Mode>(
     searchParams.get("mode") === "signup" ? "signup" : "signin",
   );
-  const desiredRole = searchParams.get("role") === "creator" ? "creator" : "clipper";
+  const [desiredRole, setDesiredRole] = useState<"clipper" | "creator">(
+    searchParams.get("role") === "creator" ? "creator" : "clipper",
+  );
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -100,21 +102,52 @@ function AuthForm() {
             <p className="mt-1 text-sm text-muted">
               {mode === "signin"
                 ? "Log in to keep clipping and earning."
-                : "Join cliptwo in seconds."}
+                : desiredRole === "creator"
+                  ? "Launch campaigns and grow your brand."
+                  : "Join cliptwo as a clipper and start earning."}
             </p>
           </div>
 
           <form onSubmit={submit} className="mt-6 space-y-4">
             {mode === "signup" && (
-              <div>
-                <label className="mb-1.5 block text-sm font-medium">Name</label>
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Your name"
-                  className="w-full rounded-lg border bg-background px-3 py-2.5 text-sm outline-none focus:border-foreground"
-                />
-              </div>
+              <>
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">Name</label>
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Your name"
+                    className="w-full rounded-lg border bg-background px-3 py-2.5 text-sm outline-none focus:border-foreground"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">I want to join as</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDesiredRole("clipper")}
+                      className={`flex-1 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors ${
+                        desiredRole === "clipper"
+                          ? "border-accent bg-accent-soft text-foreground"
+                          : "text-muted hover:bg-accent-soft/50"
+                      }`}
+                    >
+                      Clipper
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDesiredRole("creator")}
+                      className={`flex-1 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors ${
+                        desiredRole === "creator"
+                          ? "border-accent bg-accent-soft text-foreground"
+                          : "text-muted hover:bg-accent-soft/50"
+                      }`}
+                    >
+                      Creator
+                    </button>
+                  </div>
+                </div>
+              </>
             )}
             <div>
               <label className="mb-1.5 block text-sm font-medium">
