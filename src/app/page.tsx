@@ -937,6 +937,18 @@ export default function Home() {
         <div className="mt-12">
           <FAQ />
         </div>
+        <div className="mx-auto mt-12 max-w-2xl rounded-2xl border bg-card p-8 text-center">
+          <h3 className="text-xl font-semibold tracking-tight">Still have questions?</h3>
+          <p className="mt-2 text-sm text-muted">
+            Can&apos;t find what you&apos;re looking for? Reach out to our support team and we&apos;ll get back to you.
+          </p>
+          <a
+            href="mailto:support@cliptwo.com"
+            className="mt-5 inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
+          >
+            Contact Support
+          </a>
+        </div>
       </section>
 
       {/* ── Final CTA ── */}
@@ -1001,7 +1013,6 @@ export default function Home() {
               <h5 className="text-sm font-bold">Company</h5>
               <ul className="mt-4 space-y-2.5 text-sm text-muted">
                 <li><Link href="/login" className="transition-colors hover:text-foreground">Log in</Link></li>
-                <li><Link href="/faq" className="transition-colors hover:text-foreground">FAQ</Link></li>
                 <li><a href="mailto:support@cliptwo.com" className="transition-colors hover:text-foreground">Contact</a></li>
               </ul>
             </div>
