@@ -4,7 +4,7 @@ import { clipEarnings } from "./format";
 // Platform commission taken from each approved payout. This is the only place
 // the rate lives, so every payout view derives fee/net from it (single source
 // of truth). "Net clipper amount" = gross - fee is what the clipper receives.
-export const PLATFORM_FEE_RATE = 0.15;
+export const PLATFORM_FEE_RATE = 0.10;
 
 export function platformFee(gross: number): number {
   return Math.round(gross * PLATFORM_FEE_RATE);
@@ -12,6 +12,15 @@ export function platformFee(gross: number): number {
 
 export function netClipper(gross: number): number {
   return gross - platformFee(gross);
+}
+
+// Creator-side platform fee: 10% on campaign spend.
+export function creatorFee(amount: number): number {
+  return Math.round(amount * PLATFORM_FEE_RATE);
+}
+
+export function netCreator(amount: number): number {
+  return amount - creatorFee(amount);
 }
 
 export interface PayoutSplit {

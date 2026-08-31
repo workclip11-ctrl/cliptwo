@@ -21,7 +21,7 @@ import {
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup, fmtViews, clipEarnings } from "@/lib/format";
-import { financeOf, isEarned } from "@/lib/finance";
+import { financeOf, isEarned, creatorFee, PLATFORM_FEE_RATE } from "@/lib/finance";
 import { seriesByDay } from "@/lib/analytics";
 import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
@@ -177,8 +177,9 @@ export default function CreatorCampaignDetailPage() {
       </div>
 
       {/* Budget strip */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
         <HeaderStat label="Budget" value={rup(budget)} />
+        <HeaderStat label="Platform fee" value={rup(creatorFee(currentSpend))} />
         <HeaderStat label="Remaining budget" value={rup(remaining)} accent={remaining <= 0} />
         <HeaderStat label="Start" value={camp.startDate ?? "—"} />
         <HeaderStat label="End" value={camp.endDate ?? "—"} />
@@ -335,7 +336,7 @@ export default function CreatorCampaignDetailPage() {
       <Section title="Budget & transactions">
         <p className="mb-3 text-sm text-muted">
           Transactions are derived from the clip ledger — a campaign can never spend
-          beyond its configured budget ({rup(budget)}).
+          beyond its configured budget ({rup(budget)}). A {Math.round(PLATFORM_FEE_RATE * 100)}% platform fee applies to all payouts.
         </p>
         <div className="overflow-hidden rounded-xl border">
           <table className="w-full text-sm">
@@ -344,28 +345,36 @@ export default function CreatorCampaignDetailPage() {
                 <th className="px-4 py-3 font-medium">Date</th>
                 <th className="px-4 py-3 font-medium">Clipper</th>
                 <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 text-right font-medium">Amount</th>
+                <th className="px-4 py-3 text-right font-medium">Gross</th>
+                <th className="px-4 py-3 text-right font-medium">Fee</th>
+                <th className="px-4 py-3 text-right font-medium">Net</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {campClips
                 .filter((k) => isEarned(k.status))
                 .sort((a, b) => b.submittedAt - a.submittedAt)
-                .map((k) => (
-                  <tr key={k.id}>
-                    <td className="px-4 py-3 text-muted">{fmtDateTime(k.submittedAt)}</td>
-                    <td className="px-4 py-3 font-medium">@{k.clipper}</td>
-                    <td className="px-4 py-3">
-                      <StatusPill status={k.status} />
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono font-semibold">
-                      {rup(clipEarnings(k, campaigns))}
-                    </td>
-                  </tr>
-                ))}
+                .map((k) => {
+                  const gross = clipEarnings(k, campaigns);
+                  const fee = creatorFee(gross);
+                  return (
+                    <tr key={k.id}>
+                      <td className="px-4 py-3 text-muted">{fmtDateTime(k.submittedAt)}</td>
+                      <td className="px-4 py-3 font-medium">@{k.clipper}</td>
+                      <td className="px-4 py-3">
+                        <StatusPill status={k.status} />
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono">{rup(gross)}</td>
+                      <td className="px-4 py-3 text-right font-mono text-muted">{rup(fee)}</td>
+                      <td className="px-4 py-3 text-right font-mono font-semibold">
+                        {rup(gross - fee)}
+                      </td>
+                    </tr>
+                  );
+                })}
               {campClips.filter((k) => isEarned(k.status)).length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-6 text-center text-muted">
+                  <td colSpan={6} className="px-4 py-6 text-center text-muted">
                     No payouts yet.
                   </td>
                 </tr>

@@ -5,7 +5,7 @@ import { Wallet } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup, fmtViews, clipEarnings } from "@/lib/format";
-import { financeOf, isEarned } from "@/lib/finance";
+import { financeOf, isEarned, creatorFee, PLATFORM_FEE_RATE } from "@/lib/finance";
 
 export default function CreatorWalletPage() {
   const { campaigns, clips } = useStore();
@@ -17,7 +17,8 @@ export default function CreatorWalletPage() {
   const myCampaignIds = new Set(myCampaigns.map((c) => c.id));
   const received = clips.filter((k) => myCampaignIds.has(k.campaignId));
   const fin = financeOf(received, campaigns);
-  const totalSpent = fin.paid; // paid out = completed payouts only
+  const totalSpent = fin.paid;
+  const totalFee = creatorFee(totalSpent);
 
   const topClips = [...received]
     .filter((k) => isEarned(k.status))
@@ -33,10 +34,14 @@ export default function CreatorWalletPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <div className="rounded-2xl border bg-card p-5">
           <p className="text-xs text-muted">Total earned</p>
           <p className="mt-1 font-mono text-2xl font-semibold">{rup(fin.earned)}</p>
+        </div>
+        <div className="rounded-2xl border bg-card p-5">
+          <p className="text-xs text-muted">Platform fee ({Math.round(PLATFORM_FEE_RATE * 100)}%)</p>
+          <p className="mt-1 font-mono text-2xl font-semibold text-muted">{rup(totalFee)}</p>
         </div>
         <div className="rounded-2xl border bg-card p-5">
           <p className="text-xs text-muted">Paid out</p>
@@ -58,31 +63,43 @@ export default function CreatorWalletPage() {
               <tr className="border-b text-left text-xs text-muted">
                 <th className="px-4 py-3 font-medium">Clipper</th>
                 <th className="px-4 py-3 text-right font-medium">Views</th>
-                <th className="px-4 py-3 text-right font-medium">Earned</th>
+                <th className="px-4 py-3 text-right font-medium">Gross</th>
+                <th className="px-4 py-3 text-right font-medium">Fee</th>
+                <th className="px-4 py-3 text-right font-medium">Net</th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {topClips.map((k) => (
-                <tr key={k.id}>
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/clip/${k.id}`}
-                      className="font-medium hover:underline underline-offset-2"
-                    >
-                      @{k.clipper}
-                    </Link>
-                    <p className="text-xs text-muted">
-                      {campaigns.find((c) => c.id === k.campaignId)?.title}
-                    </p>
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono">
-                    {fmtViews(k.views)}
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono">
-                    {rup(clipEarnings(k, campaigns))}
-                  </td>
-                </tr>
-              ))}
+              {topClips.map((k) => {
+                const gross = clipEarnings(k, campaigns);
+                const fee = creatorFee(gross);
+                return (
+                  <tr key={k.id}>
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/clip/${k.id}`}
+                        className="font-medium hover:underline underline-offset-2"
+                      >
+                        @{k.clipper}
+                      </Link>
+                      <p className="text-xs text-muted">
+                        {campaigns.find((c) => c.id === k.campaignId)?.title}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono">
+                      {fmtViews(k.views)}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono">
+                      {rup(gross)}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono text-muted">
+                      {rup(fee)}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono font-semibold text-green">
+                      {rup(gross - fee)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           {topClips.length === 0 && (
@@ -97,7 +114,7 @@ export default function CreatorWalletPage() {
         <Wallet size={16} className="mt-0.5 shrink-0" />
         <p>
           Payouts are settled to your registered UPI after clips are approved and
-          views are verified.
+          views are verified. A {Math.round(PLATFORM_FEE_RATE * 100)}% platform fee applies to all earnings.
         </p>
       </div>
     </div>
