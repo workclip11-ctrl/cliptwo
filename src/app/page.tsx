@@ -112,8 +112,8 @@ const FAQ_CATEGORIES = [
         a: "You choose the CPM rate when creating the campaign. Higher CPMs attract more clippers and better-quality clips.",
       },
       {
-        q: "Can I approve/reject clips?",
-        a: "Yes. You review each submitted clip and approve or reject it with a reason. Approved clips go live and start earning.",
+        q: "How are clips reviewed?",
+        a: "Our admin team reviews each submitted clip and approves or rejects it with a reason. Approved clips go live and start earning.",
       },
       {
         q: "What happens when the budget is exhausted?",

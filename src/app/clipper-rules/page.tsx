@@ -24,7 +24,7 @@ export default function ClipperRulesPage() {
           <li>Read the campaign brief, rules, and source material links.</li>
           <li>Create a short-form clip (15–60 seconds) following the brief.</li>
           <li>Submit your clip with a caption and the platform where you&apos;ll post it.</li>
-          <li>Wait for review (creator or admin approves/rejects).</li>
+          <li>Wait for review (admin approves/rejects).</li>
           <li>Once approved, post the clip on your social account.</li>
           <li>Views are counted from your linked post and you earn per 1,000 views.</li>
         </ol>

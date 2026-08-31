@@ -100,8 +100,8 @@ const creatorFAQ = [
     a: "When a clipper submits a clip, they paste the link to their post. Our team reviews each submission for quality and authenticity. View counts are tracked from the linked post — clippers report the URL, we verify the content meets your campaign guidelines.",
   },
   {
-    q: "Can I approve/reject clips?",
-    a: "Yes. You review each submitted clip and approve or reject it with a reason. Approved clips go live and start earning. Rejected clips don't earn, and the clipper receives feedback.",
+    q: "How are clips reviewed?",
+    a: "Our admin team reviews each submitted clip and approves or rejects it with a reason. Approved clips go live and start earning. Rejected clips don't earn, and the clipper receives feedback.",
   },
   {
     q: "What happens when the budget is exhausted?",
