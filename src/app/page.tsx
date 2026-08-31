@@ -717,8 +717,6 @@ export default function Home() {
             <a href="#how" className="hover:text-foreground">How it works</a>
             <a href="#why" className="hover:text-foreground">Why cliptwo</a>
             <a href="#faq" className="hover:text-foreground">FAQ</a>
-            <Link href="/clipper" className="hover:text-foreground">Clipper</Link>
-            <Link href="/creator" className="hover:text-foreground">Creator</Link>
           </nav>
           <div className="flex items-center gap-2">
             <Link href="/login" className="rounded-lg border px-3.5 py-1.5 text-sm font-medium hover:bg-accent-soft">
