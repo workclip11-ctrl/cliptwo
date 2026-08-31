@@ -186,6 +186,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn: AuthValue["signIn"] = async (r, creds) => {
     setError(null);
+
+    // ── Local mode: simulate auth when Supabase is not configured ──
+    if (!isSupabaseConfigured) {
+      const email = creds.email.toLowerCase().trim();
+      const role: Role =
+        email === "workclip11@gmail.com"
+          ? "admin"
+          : r === "creator"
+            ? "creator"
+            : "clipper";
+      const profile: UserProfile = {
+        id: `local-${email.replace(/[^a-z0-9]/g, "-")}`,
+        name: creds.name || email.split("@")[0],
+        email,
+        role,
+      };
+      markTabSession(profile.id);
+      setUser(profile);
+      setRole(profile.role);
+      setIsSignedIn(true);
+      return profile;
+    }
+
     const first = await supabase.auth.signInWithPassword({
       email: creds.email,
       password: creds.password,
@@ -220,6 +243,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     // SECURITY: Never allow self-assigning admin role via signup.
     const safeRole = data.role === "admin" ? "clipper" : data.role;
+
+    // ── Local mode: simulate auth when Supabase is not configured ──
+    if (!isSupabaseConfigured) {
+      const profile: UserProfile = {
+        id: `local-${data.email.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
+        name: data.name,
+        email: data.email,
+        role: safeRole as Role,
+      };
+      if (typeof window !== "undefined")
+        sessionStorage.removeItem(TAB_LOGOUT_KEY);
+      markTabSession(profile.id);
+      setUser(profile);
+      setRole(profile.role);
+      setIsSignedIn(true);
+      ensureProfile(profile);
+      return;
+    }
+
     const { data: res, error } = await supabase.auth.signUp({
       email: data.email,
       password: data.password,
