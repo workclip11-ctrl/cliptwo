@@ -110,7 +110,7 @@ export type ClipStatus =
   | "rejected";
 
 export type ProfileRole = "clipper" | "creator" | "admin";
-export type ProfileStatus = "active" | "suspended";
+export type ProfileStatus = "active" | "suspended" | "deactivated";
 
 export interface ClipEngagement {
   likes?: number;
@@ -207,6 +207,8 @@ export interface Profile {
   riskNote?: string;
   adminNotes?: string;
   suspendedReason?: string;
+  deactivatedAt?: string;
+  deactivatedBy?: string;
   appeals?: Appeal[];
   audit?: AuditEntry[];
 }
@@ -281,6 +283,8 @@ export type AuditAction =
   | "appeal_response"
   | "risk_flagged"
   | "risk_cleared"
+  | "user_deactivated"
+  | "user_self_deactivated"
   | "other";
 
 export interface AuditLog {

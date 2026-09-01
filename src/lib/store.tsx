@@ -995,6 +995,8 @@ interface StoreActions {
     reason?: string,
   ) => void;
   deleteProfile: (id: string) => Promise<void>;
+  deactivateProfile: (id: string, reason?: string) => Promise<void>;
+  deactivateOwnAccount: () => Promise<void>;
   verifyProfile: (id: string, actor: string, verified: boolean) => void;
   setProfileRisk: (id: string, actor: string, flagged: boolean, note?: string) => void;
   saveAdminNotes: (id: string, notes: string, actor: string) => void;
@@ -1203,6 +1205,8 @@ function mapProfile(r: Record<string, unknown>): Profile {
     riskNote: r.risk_note ? String(r.risk_note) : undefined,
     adminNotes: r.admin_notes ? String(r.admin_notes) : undefined,
     suspendedReason: r.suspended_reason ? String(r.suspended_reason) : undefined,
+    deactivatedAt: r.deactivated_at ? String(r.deactivated_at) : undefined,
+    deactivatedBy: r.deactivated_by ? String(r.deactivated_by) : undefined,
     appeals: Array.isArray(r.appeals) ? (r.appeals as Appeal[]) : undefined,
     audit: Array.isArray(r.audit) ? (r.audit as AuditEntry[]) : undefined,
   };
@@ -1870,10 +1874,78 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           p_action: "delete",
         });
         if (error) {
-          console.error("RPC admin_user_action failed:", error.message);
+          console.error("RPC admin_user_action (delete) failed:", error.message);
           return;
         }
         setState((s) => ({ ...s, profiles: s.profiles.filter((p) => p.id !== id) }));
+      },
+
+      deactivateProfile: async (id, reason) => {
+        const me = await getCurrentUser();
+        if (!me || !await isUserAdmin(me.id)) {
+          console.error(`Authorization: user ${me?.id ?? "anonymous"} cannot deactivate profile ${id}`);
+          return;
+        }
+        if (!isSupabaseConfigured) {
+          setState((s) => ({
+            ...s,
+            profiles: s.profiles.map((p) =>
+              p.id === id
+                ? { ...p, status: "deactivated" as const, deactivatedAt: new Date().toISOString(), deactivatedBy: me.id }
+                : p,
+            ),
+          }));
+          return;
+        }
+        const { error } = await supabase.rpc("admin_user_action", {
+          p_user_id: id,
+          p_action: "deactivate",
+          p_reason: reason,
+        });
+        if (error) {
+          console.error("RPC admin_user_action (deactivate) failed:", error.message);
+          return;
+        }
+        setState((s) => ({
+          ...s,
+          profiles: s.profiles.map((p) =>
+            p.id === id
+              ? { ...p, status: "deactivated" as const, deactivatedAt: new Date().toISOString(), deactivatedBy: me.id }
+              : p,
+          ),
+        }));
+      },
+
+      deactivateOwnAccount: async () => {
+        const me = await getCurrentUser();
+        if (!me) {
+          console.error("Not authenticated");
+          return;
+        }
+        if (!isSupabaseConfigured) {
+          setState((s) => ({
+            ...s,
+            profiles: s.profiles.map((p) =>
+              p.id === me.id
+                ? { ...p, status: "deactivated" as const, deactivatedAt: new Date().toISOString() }
+                : p,
+            ),
+          }));
+          return;
+        }
+        const { error } = await supabase.rpc("deactivate_own_account");
+        if (error) {
+          console.error("RPC deactivate_own_account failed:", error.message);
+          return;
+        }
+        setState((s) => ({
+          ...s,
+          profiles: s.profiles.map((p) =>
+            p.id === me.id
+              ? { ...p, status: "deactivated" as const, deactivatedAt: new Date().toISOString() }
+              : p,
+          ),
+        }));
       },
 
       updateProfile: async (id, patch) => {

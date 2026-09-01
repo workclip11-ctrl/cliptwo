@@ -16,6 +16,8 @@ import {
   ChevronRight,
   Users,
   AlertTriangle,
+  Archive,
+  Trash2,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
@@ -306,9 +308,10 @@ function CreatorDrawer({
   actor?: string;
   onClose: () => void;
 }) {
-  const { verifyProfile, updateProfileStatus, saveAdminNotes, deleteProfile } = useStore();
+  const { verifyProfile, updateProfileStatus, saveAdminNotes, deactivateProfile, deleteProfile } = useStore();
   const stats = creatorStats(profile, campaigns, clips);
   const suspended = profile.status === "suspended";
+  const deactivated = profile.status === "deactivated";
   const [notes, setNotes] = useState(profile.adminNotes ?? "");
   const [showSuspend, setShowSuspend] = useState(false);
   const [suspendReason, setSuspendReason] = useState("");
@@ -674,16 +677,33 @@ function CreatorDrawer({
             )}
           </Section>
 
-          <div className="border-t pt-4">
-            <button
-              onClick={() => {
-                if (confirm(`Delete creator ${profile.name}? This cannot be undone.`))
-                  deleteProfile(profile.id);
-              }}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-red/30 px-3 py-1.5 text-sm font-medium text-red hover:bg-red/10"
-            >
-              <Ban size={14} /> Delete creator
-            </button>
+          <div className="border-t pt-4 space-y-2">
+            {deactivated ? (
+              <p className="text-sm text-muted">
+                This account was deactivated. Profile data has been anonymized and login is blocked.
+              </p>
+            ) : (
+              <>
+                <button
+                  onClick={() => {
+                    if (confirm(`Deactivate creator ${profile.name}?\n\nThis will anonymize their profile data and block future logins. All financial and audit records will be preserved.`))
+                      deactivateProfile(profile.id, "Admin deactivation from creator dashboard");
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/30 px-3 py-1.5 text-sm font-medium text-amber-600 hover:bg-amber-500/10"
+                >
+                  <Archive size={14} /> Deactivate account
+                </button>
+                <button
+                  onClick={() => {
+                    if (confirm(`PERMANENTLY delete creator ${profile.name}?\n\nThis will remove their auth account and all associated data. This cannot be undone.\n\nNote: If the user has financial records, the deletion will be blocked.`))
+                      deleteProfile(profile.id);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-red/30 px-3 py-1.5 text-sm font-medium text-red hover:bg-red/10"
+                >
+                  <Trash2 size={14} /> Delete account
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>

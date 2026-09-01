@@ -30,6 +30,8 @@ alter table public.profiles add column if not exists appeals jsonb;
 alter table public.profiles add column if not exists audit jsonb;
 alter table public.profiles add column if not exists company text;
 alter table public.profiles add column if not exists team jsonb;
+alter table public.profiles add column if not exists deactivated_at timestamptz;
+alter table public.profiles add column if not exists deactivated_by uuid references auth.users (id) on delete set null;
 
 -- Payout ledger columns on clips (no-op if present).
 alter table public.clips add column if not exists txn_id text;
@@ -553,7 +555,13 @@ grant execute on function public.admin_clip_action(uuid, text, text, text) to au
 
 -- ---------------------------------------------------------------------------
 -- RPC: admin_user_action -- all sensitive user/profile operations
--- Actions: suspend, reactivate, verify, unverify, set_risk, clear_risk, save_notes, delete
+-- Actions: suspend, reactivate, verify, unverify, set_risk, clear_risk,
+--          save_notes, deactivate, delete
+--
+-- deactivate: Anonymizes profile, bans auth account. Preserves all financial
+--             and audit records. Preferred for users with history.
+-- delete:     Hard-deletes auth user (cascades). Only allowed when NO
+--             financial records exist (wallet_ledger, payouts, earnings).
 -- ---------------------------------------------------------------------------
 create or replace function public.admin_user_action(
   p_user_id uuid,
@@ -572,12 +580,13 @@ declare
   v_old_status text;
   v_new_value text;
   v_perm text;
+  v_financial_count integer;
 begin
   v_actor := auth.uid();
   if v_actor is null then raise exception 'Not authenticated'; end if;
   if not public.is_admin() then raise exception 'Only admins can perform user actions'; end if;
 
-  if p_action not in ('suspend','reactivate','verify','unverify','set_risk','clear_risk','save_notes','delete') then
+  if p_action not in ('suspend','reactivate','verify','unverify','set_risk','clear_risk','save_notes','deactivate','delete') then
     raise exception 'Invalid action: %', p_action;
   end if;
 
@@ -585,7 +594,7 @@ begin
   if p_action in ('verify','unverify') then v_perm := 'clipper.verify'; end if;
   if p_action in ('set_risk','clear_risk') then v_perm := 'clipper.risk'; end if;
   if p_action = 'save_notes' then v_perm := 'clipper.notes'; end if;
-  if p_action = 'delete' then v_perm := 'clipper.delete'; end if;
+  if p_action in ('deactivate','delete') then v_perm := 'clipper.delete'; end if;
 
   if not public.admin_has_perm(v_perm) then
     raise exception 'Missing permission: %', v_perm;
@@ -617,8 +626,69 @@ begin
     when 'save_notes' then
       update public.profiles set admin_notes = p_details where id = p_user_id;
       v_new_value := 'updated';
+
+    -- DEACTIVATE: Anonymize profile data, ban auth account, preserve all records.
+    -- This is the preferred action for users with financial/history records.
+    when 'deactivate' then
+      -- Anonymize profile: strip all PII, mark as deactivated
+      update public.profiles set
+        name = 'Deleted user',
+        email = 'deleted-' || p_user_id::text || '@removed.local',
+        username = null,
+        upi = null,
+        bio = null,
+        company = null,
+        team = null,
+        status = 'deactivated',
+        verified = false,
+        verified_at = null,
+        risk_flag = false,
+        risk_note = null,
+        admin_notes = coalesce(p_reason, 'Account deactivated by admin'),
+        suspended_reason = null,
+        appeals = null,
+        deactivated_at = now(),
+        deactivated_by = v_actor
+      where id = p_user_id;
+
+      -- Ban auth account to prevent future logins (banned for 100 years)
+      update auth.users set
+        banned_until = now() + interval '100 years',
+        raw_app_meta_data = raw_app_meta_data - 'provider'
+      where id = p_user_id;
+
+      -- Disconnect all social accounts (revoke tokens)
+      delete from public.social_connections where user_id = p_user_id;
+      delete from public.social_accounts where user_id = p_user_id;
+      delete from public.social_oauth_states where user_id = p_user_id;
+
+      v_new_value := 'deactivated';
+
+    -- DELETE: Hard-delete from auth.users (cascades to profiles, clips, etc.)
+    -- Only allowed when NO financial records exist.
     when 'delete' then
-      delete from public.profiles where id = p_user_id;
+      -- Check for financial records that would be orphaned or lost
+      select count(*) into v_financial_count
+      from (
+        select 1 from public.wallet_ledger where user_id = p_user_id
+        union all
+        select 1 from public.payouts where user_id = p_user_id
+        union all
+        select 1 from public.earnings where clipper_id = p_user_id
+      ) financial;
+
+      if v_financial_count > 0 then
+        raise exception 'Cannot delete user with % financial records. Use deactivate instead.', v_financial_count;
+      end if;
+
+      -- Delete social connections first (not cascaded from auth.users)
+      delete from public.social_connections where user_id = p_user_id;
+      delete from public.social_accounts where user_id = p_user_id;
+      delete from public.social_oauth_states where user_id = p_user_id;
+
+      -- Hard delete from auth.users (cascades to profiles, clips, notifications, admin_permissions)
+      delete from auth.users where id = p_user_id;
+
       v_new_value := 'deleted';
   end case;
 
@@ -636,6 +706,76 @@ end;
 $$;
 
 grant execute on function public.admin_user_action(uuid, text, text, text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- RPC: deactivate_own_account -- self-service account deactivation
+-- Allows any authenticated user to deactivate their own account.
+-- Anonymizes profile, bans auth account, preserves all records.
+-- ---------------------------------------------------------------------------
+create or replace function public.deactivate_own_account()
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user uuid;
+  v_profile record;
+begin
+  v_user := auth.uid();
+  if v_user is null then raise exception 'Not authenticated'; end if;
+
+  select * into v_profile from public.profiles where id = v_user;
+  if not found then raise exception 'Profile not found'; end if;
+  if v_profile.status = 'deactivated' then
+    raise exception 'Account is already deactivated';
+  end if;
+
+  -- Anonymize profile
+  update public.profiles set
+    name = 'Deleted user',
+    email = 'deleted-' || v_user::text || '@removed.local',
+    username = null,
+    upi = null,
+    bio = null,
+    company = null,
+    team = null,
+    status = 'deactivated',
+    verified = false,
+    verified_at = null,
+    risk_flag = false,
+    risk_note = null,
+    suspended_reason = null,
+    appeals = null,
+    deactivated_at = now(),
+    deactivated_by = v_user
+  where id = v_user;
+
+  -- Ban auth account to prevent future logins
+  update auth.users set
+    banned_until = now() + interval '100 years',
+    raw_app_meta_data = raw_app_meta_data - 'provider'
+  where id = v_user;
+
+  -- Disconnect all social accounts
+  delete from public.social_connections where user_id = v_user;
+  delete from public.social_accounts where user_id = v_user;
+  delete from public.social_oauth_states where user_id = v_user;
+
+  perform public.write_admin_audit(
+    'user_self_deactivate', 'user', v_user::text,
+    coalesce(v_profile.name, v_profile.email, v_user::text),
+    jsonb_build_object('status', v_profile.status),
+    jsonb_build_object('status', 'deactivated'),
+    jsonb_build_object('reason', 'Self-service account deactivation'),
+    'user-' || v_user::text || '-self-deactivate'
+  );
+
+  return jsonb_build_object('success', true, 'action', 'deactivate', 'user_id', v_user, 'to', 'deactivated');
+end;
+$$;
+
+grant execute on function public.deactivate_own_account() to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- RPC: admin_campaign_action -- all sensitive campaign operations

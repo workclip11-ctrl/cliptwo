@@ -7,7 +7,7 @@ import {
   Save,
   Bell,
   Eye,
-  Trash2,
+  Archive,
   ToggleLeft,
   ToggleRight,
 } from "lucide-react";
@@ -18,7 +18,7 @@ import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
 export default function CreatorSettingsPage() {
   const router = useRouter();
   const { user, signOut } = useAuth();
-  const { profiles, updateProfile } = useStore();
+  const { profiles, updateProfile, deactivateOwnAccount } = useStore();
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
   const [emailNotifs, setEmailNotifs] = useState(true);
@@ -152,13 +152,22 @@ export default function CreatorSettingsPage() {
       </section>
 
       {/* Danger zone */}
-      <section className="rounded-2xl border border-red/20 bg-card p-6">
-        <h2 className="text-sm font-semibold text-red">Danger zone</h2>
+      <section className="rounded-2xl border border-amber-500/20 bg-card p-6">
+        <h2 className="text-sm font-semibold text-amber-600">Deactivate account</h2>
         <p className="mt-1 text-sm text-muted">
-          Permanently delete your account and all associated data.
+          Deactivating your account will anonymize your profile data and block future logins.
+          Your financial and audit records will be preserved for compliance purposes.
         </p>
-        <button className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-red/30 px-4 py-2 text-sm font-medium text-red hover:bg-red/5">
-          <Trash2 size={14} /> Delete account
+        <button
+          onClick={async () => {
+            if (!confirm("Deactivate your account?\n\nThis will:\n- Anonymize your profile (name, email, etc.)\n- Block future logins\n- Preserve financial records for compliance\n\nThis action cannot be undone.")) return;
+            await deactivateOwnAccount();
+            await signOut();
+            router.push("/");
+          }}
+          className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-amber-500/30 px-4 py-2 text-sm font-medium text-amber-600 hover:bg-amber-500/5"
+        >
+          <Archive size={14} /> Deactivate account
         </button>
       </section>
 

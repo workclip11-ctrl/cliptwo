@@ -184,6 +184,8 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   user_clear_risk: "Risk cleared",
   user_save_notes: "Admin notes",
   user_delete: "User deleted",
+  user_deactivate: "User deactivated",
+  user_self_deactivate: "Self-service deactivation",
   campaign_created: "Campaign created",
   campaign_edited: "Campaign edited",
   campaign_paused: "Campaign paused",

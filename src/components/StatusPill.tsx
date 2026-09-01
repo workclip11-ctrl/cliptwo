@@ -1,6 +1,6 @@
-import type { CampaignStatus, ClipStatus } from "@/lib/types";
+import type { CampaignStatus, ClipStatus, ProfileStatus } from "@/lib/types";
 
-type AnyStatus = ClipStatus | CampaignStatus;
+type AnyStatus = ClipStatus | CampaignStatus | ProfileStatus;
 
 const map: Record<AnyStatus, { label: string; cls: string }> = {
   pending: { label: "Pending", cls: "bg-amber/10 text-amber border-amber/20" },
@@ -18,6 +18,9 @@ const map: Record<AnyStatus, { label: string; cls: string }> = {
   archived: { label: "Archived", cls: "bg-amber-500/10 text-amber-600 border-amber-500/20" },
   budget_reached: { label: "Budget Reached", cls: "bg-red/10 text-red border-red/20" },
   near_budget: { label: "Near Budget", cls: "bg-amber/10 text-amber border-amber/20" },
+  active: { label: "Active", cls: "bg-green/10 text-green border-green/20" },
+  suspended: { label: "Suspended", cls: "bg-red/10 text-red border-red/20" },
+  deactivated: { label: "Deactivated", cls: "bg-muted/10 text-muted border-muted/20" },
 };
 
 export function StatusPill({ status }: { status: AnyStatus }) {
