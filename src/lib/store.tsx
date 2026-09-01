@@ -1396,56 +1396,48 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
         if (!isSupabaseConfigured) return;
         (async () => {
-          const { data: u } = await supabase.auth.getUser();
-          const handle =
-            (u?.user?.user_metadata?.name as string) ||
-            u?.user?.email ||
-            c.creator;
-          const { data } = await supabase
-            .from("campaigns")
-            .insert({
-              title: c.title,
-              creator: handle,
-              brief: c.brief,
-              platform: c.platform,
-              payout: c.payout,
-              niche: c.niche ?? null,
-              budget: c.budget ?? 0,
-              spent: 0,
-              days_left: c.daysLeft ?? 30,
-              status,
-              source_link: c.sourceLink ?? null,
-              rules: c.rules ?? null,
-              created_by: u?.user?.id ?? null,
-              category: c.category ?? null,
-              platforms: c.platforms ?? null,
-              verified: c.verified ?? null,
-              objective: c.objective ?? null,
-              start_date: c.startDate ?? null,
-              end_date: c.endDate ?? null,
-              max_payout_per_clip: c.maxPayoutPerClip ?? null,
-              recommended_duration: c.recommendedDuration ?? null,
-              hook: c.hook ?? null,
-              caption_req: c.captionReq ?? null,
-              aspect_ratio: c.aspectRatio ?? null,
-              cta: c.cta ?? null,
-              branding: c.branding ?? null,
-              do_list: c.doList ?? null,
-              dont_list: c.dontList ?? null,
-              source_assets: c.sourceAssets ?? null,
-              example_clips: c.exampleClips ?? null,
-              view_rules: c.viewRules ?? null,
-              approval: c.approval ?? null,
-              thumbnails: c.thumbnails ?? null,
-              brand_assets: c.brandAssets ?? null,
-              spend_cap: c.spendCap ?? null,
-              timezone: c.timezone ?? null,
-              what_to_make: c.whatToMake ?? null,
-              style: c.style ?? null,
-              rights: c.rights ?? null,
-            })
-            .select()
-            .single();
+          // SECURITY: Use RPC for server-side creator role validation
+          const { data, error } = await supabase.rpc("create_campaign", {
+            p_title: c.title,
+            p_brief: c.brief,
+            p_platform: c.platform,
+            p_payout: c.payout,
+            p_creator: c.creator,
+            p_niche: c.niche ?? null,
+            p_budget: c.budget ?? 0,
+            p_days_left: c.daysLeft ?? 30,
+            p_source_link: c.sourceLink ?? null,
+            p_rules: c.rules ?? null,
+            p_category: c.category ?? null,
+            p_platforms: c.platforms ?? null,
+            p_objective: c.objective ?? null,
+            p_start_date: c.startDate ?? null,
+            p_end_date: c.endDate ?? null,
+            p_max_payout_per_clip: c.maxPayoutPerClip ?? null,
+            p_recommended_duration: c.recommendedDuration ?? null,
+            p_hook: c.hook ?? null,
+            p_caption_req: c.captionReq ?? null,
+            p_aspect_ratio: c.aspectRatio ?? null,
+            p_cta: c.cta ?? null,
+            p_branding: c.branding ?? null,
+            p_do_list: c.doList ?? null,
+            p_dont_list: c.dontList ?? null,
+            p_source_assets: c.sourceAssets ?? null,
+            p_example_clips: c.exampleClips ?? null,
+            p_view_rules: c.viewRules ?? null,
+            p_approval: c.approval ?? null,
+            p_thumbnails: c.thumbnails ?? null,
+            p_brand_assets: c.brandAssets ?? null,
+            p_spend_cap: c.spendCap ?? null,
+            p_timezone: c.timezone ?? null,
+            p_what_to_make: c.whatToMake ?? null,
+            p_style: c.style ?? null,
+            p_rights: c.rights ?? null,
+          });
+          if (error) {
+            console.error("RPC create_campaign failed:", error.message);
+            return;
+          }
           if (data) {
             setState((s) => ({
               ...s,

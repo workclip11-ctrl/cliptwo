@@ -217,15 +217,149 @@ values (1, '', '', '{}', '')
 on conflict (id) do nothing;
 
 -- ---------------------------------------------------------------------------
--- let admins also manage campaigns (close / delete) + clips
+-- CAMPAIGNS: Strict creator-only authorization with server-side enforcement
 -- ---------------------------------------------------------------------------
+
+-- SELECT: world-readable (clippers need to browse campaigns)
+drop policy if exists "campaigns_select" on public.campaigns;
+create policy "campaigns_select" on public.campaigns
+  for select using (true);
+
+-- INSERT: only users with role='creator' can create campaigns
+-- created_by is ALWAYS set to auth.uid() by the trigger (cannot be spoofed)
+drop policy if exists "campaigns_insert" on public.campaigns;
+create policy "campaigns_insert" on public.campaigns
+  for insert with check (
+    auth.uid() = created_by
+    and exists (
+      select 1 from public.profiles p
+      where p.id = auth.uid() and p.role = 'creator' and p.status = 'active'
+    )
+  );
+
+-- UPDATE: only campaign owner or admin
 drop policy if exists "campaigns_update" on public.campaigns;
 create policy "campaigns_update" on public.campaigns
   for update using (auth.uid() = created_by or public.is_admin());
 
+-- DELETE: only campaign owner or admin
 drop policy if exists "campaigns_delete" on public.campaigns;
 create policy "campaigns_delete" on public.campaigns
   for delete using (auth.uid() = created_by or public.is_admin());
+
+-- Trigger: force created_by = auth.uid() on INSERT (prevents spoofing)
+create or replace function public.set_campaign_created_by()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  NEW.created_by := auth.uid();
+  return NEW;
+end;
+$$;
+
+drop trigger if exists set_created_by on public.campaigns;
+create trigger set_created_by
+  before insert on public.campaigns
+  for each row
+  execute function public.set_campaign_created_by();
+
+-- ---------------------------------------------------------------------------
+-- RPC: Secure campaign creation (creator-only)
+-- Server-side role check + created_by from auth.uid()
+-- ---------------------------------------------------------------------------
+create or replace function public.create_campaign(
+  p_title text,
+  p_brief text,
+  p_platform text,
+  p_payout numeric,
+  p_creator text,
+  p_niche text default null,
+  p_budget numeric default 0,
+  p_days_left integer default 30,
+  p_source_link text default null,
+  p_rules text default null,
+  p_category text default null,
+  p_platforms jsonb default null,
+  p_objective text default null,
+  p_start_date date default null,
+  p_end_date date default null,
+  p_max_payout_per_clip numeric default null,
+  p_recommended_duration text default null,
+  p_hook text default null,
+  p_caption_req text default null,
+  p_aspect_ratio text default null,
+  p_cta text default null,
+  p_branding text default null,
+  p_do_list jsonb default null,
+  p_dont_list jsonb default null,
+  p_source_assets jsonb default null,
+  p_example_clips jsonb default null,
+  p_view_rules jsonb default null,
+  p_approval jsonb default null,
+  p_thumbnails jsonb default null,
+  p_brand_assets jsonb default null,
+  p_spend_cap numeric default null,
+  p_timezone text default null,
+  p_what_to_make text default null,
+  p_style text default null,
+  p_rights jsonb default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_id uuid;
+  v_is_creator boolean;
+  v_campaign jsonb;
+begin
+  -- Get authenticated user
+  v_user_id := auth.uid();
+  if v_user_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  -- Verify creator role
+  v_is_creator := exists (
+    select 1 from public.profiles
+    where id = v_user_id and role = 'creator' and status = 'active'
+  );
+  if not v_is_creator then
+    raise exception 'Only creators can create campaigns';
+  end if;
+
+  -- Insert campaign (created_by is set by trigger to auth.uid())
+  insert into public.campaigns (
+    title, brief, platform, payout, creator, niche, budget, days_left,
+    source_link, rules, category, platforms, objective, start_date, end_date,
+    max_payout_per_clip, recommended_duration, hook, caption_req, aspect_ratio,
+    cta, branding, do_list, dont_list, source_assets, example_clips,
+    view_rules, approval, thumbnails, brand_assets, spend_cap, timezone,
+    what_to_make, style, rights
+  ) values (
+    p_title, p_brief, p_platform, p_payout, p_creator, p_niche, p_budget, p_days_left,
+    p_source_link, p_rules, p_category, p_platforms, p_objective, p_start_date, p_end_date,
+    p_max_payout_per_clip, p_recommended_duration, p_hook, p_caption_req, p_aspect_ratio,
+    p_cta, p_branding, p_do_list, p_dont_list, p_source_assets, p_example_clips,
+    p_view_rules, p_approval, p_thumbnails, p_brand_assets, p_spend_cap, p_timezone,
+    p_what_to_make, p_style, p_rights
+  )
+  returning to_jsonb(campaigns.*) into v_campaign;
+
+  return v_campaign;
+end;
+$$;
+
+grant execute on function public.create_campaign(
+  text, text, text, numeric, text, text, numeric, integer, text, text, text,
+  jsonb, text, date, date, numeric, text, text, text, text, text, text,
+  jsonb, jsonb, jsonb, jsonb, jsonb, jsonb, jsonb, jsonb, numeric, text,
+  text, text, jsonb
+) to authenticated;
 
 -- Clips: only the owner (or an admin) may edit / delete a clip. The base
 -- schema used `auth.role() = 'authenticated'`, which let ANY signed-in user
