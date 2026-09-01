@@ -13,7 +13,6 @@ import {
   Info,
   Pencil,
   Save,
-  X,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
@@ -240,6 +239,68 @@ export default function ClipperWalletPage() {
         </div>
       </section>
 
+      {/* UPI details */}
+      <section className="rounded-2xl border bg-card p-6">
+        <h2 className="text-sm font-semibold uppercase tracking-widest text-muted">
+          Payment details
+        </h2>
+        <p className="mt-1 text-sm text-muted">
+          Enter your UPI ID to receive payouts directly to your bank account.
+        </p>
+
+        <div className="mt-4 rounded-xl border border-dashed p-4">
+          <label className="block text-sm">
+            <span className="text-muted">UPI ID</span>
+            <div className="mt-1.5 flex items-center gap-2">
+              {editingUpi ? (
+                <>
+                  <input
+                    value={upiInput}
+                    onChange={(e) => setUpiInput(e.target.value)}
+                    placeholder="yourname@upi"
+                    autoFocus
+                    className="flex-1 rounded-lg border bg-background px-3 py-2.5 font-mono text-sm outline-none focus:border-foreground sm:max-w-xs"
+                  />
+                  <button
+                    onClick={() => {
+                      if (upiInput.trim()) {
+                        updateProfile(user!.id, { upi: upiInput.trim() });
+                        setEditingUpi(false);
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 text-sm font-medium text-white hover:opacity-90"
+                  >
+                    <Save size={14} /> Save
+                  </button>
+                  <button
+                    onClick={() => { setEditingUpi(false); setUpiInput(profile?.upi ?? ""); }}
+                    className="rounded-lg border px-3 py-2.5 text-sm font-medium hover:bg-accent-soft"
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="flex-1 font-mono text-sm">
+                    {profile?.upi ? profile.upi : <span className="text-muted italic">Not set</span>}
+                  </span>
+                  <button
+                    onClick={() => setEditingUpi(true)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-accent-soft"
+                  >
+                    <Pencil size={13} /> {profile?.upi ? "Change" : "Add UPI"}
+                  </button>
+                </>
+              )}
+            </div>
+          </label>
+          <p className="mt-2 flex items-center gap-1.5 text-xs text-muted">
+            <ShieldCheck size={12} className="text-green" />
+            Your UPI ID is verified by our team before payouts are enabled.
+          </p>
+        </div>
+      </section>
+
       <section>
         <h2 className="text-sm font-semibold uppercase tracking-widest text-muted">
           Payouts
@@ -249,47 +310,9 @@ export default function ClipperWalletPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-muted">Current payment method</p>
-                {editingUpi ? (
-                  <div className="mt-1 flex items-center gap-2">
-                    <input
-                      value={upiInput}
-                      onChange={(e) => setUpiInput(e.target.value)}
-                      placeholder="name@upi"
-                      autoFocus
-                      className="w-full rounded-lg border bg-background px-3 py-1.5 font-mono text-sm outline-none focus:border-foreground sm:max-w-[200px]"
-                    />
-                    <button
-                      onClick={() => {
-                        if (upiInput.trim()) {
-                          updateProfile(user!.id, { upi: upiInput.trim() });
-                          setEditingUpi(false);
-                        }
-                      }}
-                      className="rounded-lg bg-accent p-1.5 text-white hover:opacity-90"
-                    >
-                      <Save size={14} />
-                    </button>
-                    <button
-                      onClick={() => { setEditingUpi(false); setUpiInput(profile?.upi ?? ""); }}
-                      className="rounded-lg border p-1.5 hover:bg-accent-soft"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="mt-1 flex items-center gap-2">
-                    <p className="flex items-center gap-2 font-mono text-sm font-medium">
-                      <Wallet size={14} className="text-muted" /> {upi}
-                    </p>
-                    <button
-                      onClick={() => setEditingUpi(true)}
-                      className="rounded-md p-1 text-muted hover:text-foreground"
-                      aria-label="Edit UPI"
-                    >
-                      <Pencil size={13} />
-                    </button>
-                  </div>
-                )}
+                <p className="mt-1 flex items-center gap-2 font-mono text-sm font-medium">
+                  <Wallet size={14} className="text-muted" /> {upi}
+                </p>
               </div>
               <span
                 className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium ${
