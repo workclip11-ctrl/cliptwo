@@ -17,6 +17,7 @@ import {
   TrendingUp,
   Heart,
   History,
+  RotateCcw,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
@@ -109,6 +110,10 @@ export default function CreatorCampaignDetailPage() {
     if (confirm("End this campaign? It will stop accepting new submissions."))
       updateCampaign(camp.id, { status: "closed" }, actor, "ended", "Ended campaign");
   };
+  const handleReopen = () => {
+    if (confirm("Reopen this campaign? It will start accepting submissions again."))
+      updateCampaign(camp.id, { status: "open" }, actor, "reopened", "Reopened campaign");
+  };
 
   return (
     <div className="space-y-8">
@@ -134,14 +139,12 @@ export default function CreatorCampaignDetailPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {!isClosed && (
-            <button
-              onClick={() => setEditing(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-accent-soft"
-            >
-              <Pencil size={14} /> Edit
-            </button>
-          )}
+          <button
+            onClick={() => setEditing(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-accent-soft"
+          >
+            <Pencil size={14} /> Edit
+          </button>
           {camp.status === "open" && (
             <button
               onClick={handlePause}
@@ -164,6 +167,14 @@ export default function CreatorCampaignDetailPage() {
               className="inline-flex items-center gap-1.5 rounded-lg border border-red/30 px-3 py-2 text-sm font-medium text-red hover:bg-red/5"
             >
               <Ban size={14} /> End
+            </button>
+          )}
+          {isClosed && (
+            <button
+              onClick={handleReopen}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-green/30 px-3 py-2 text-sm font-medium text-green hover:bg-green/5"
+            >
+              <RotateCcw size={14} /> Reopen
             </button>
           )}
           {!isClosed && (
