@@ -800,9 +800,19 @@ create policy "payouts_update" on public.payouts
   for update using (public.is_admin());
 
 -- ---------------------------------------------------------------------------
--- RPC: Create immutable earning record AND wallet ledger entry.
--- Locks the CPM at time of approval. All calculations in INTEGER paise.
--- The ledger entry is the authoritative source for wallet balance.
+-- RPC: create_earning — ATOMIC earning creation with budget enforcement.
+--
+-- All financial logic runs inside a single PostgreSQL transaction:
+--   1. Lock the campaign row (SELECT ... FOR UPDATE) to serialize concurrent
+--      approvals. Two simultaneous approvals cannot both pass the budget check.
+--   2. Sum existing reserved budget from committed earnings.
+--   3. Calculate the new earning amount (with maxPayoutPerClip cap).
+--   4. Verify it does not exceed the campaign budget.
+--   5. Insert the earning record + wallet ledger entry.
+--   6. Everything commits atomically. If budget exceeded, entire txn rolls back.
+--
+-- Idempotent: if an earning already exists for this clip, returns it without
+-- creating duplicates.
 -- ---------------------------------------------------------------------------
 create or replace function public.create_earning(
   p_clip_id uuid,
@@ -823,6 +833,9 @@ declare
   v_net integer;
   v_creator_fee integer;
   v_max_payout integer;
+  v_budget numeric;
+  v_reserved numeric;
+  v_new_total numeric;
   v_earning jsonb;
   v_ledger_id uuid;
   v_idempotency_key text;
@@ -832,14 +845,27 @@ begin
     raise exception 'Only admins can create earnings';
   end if;
 
-  -- Get clip
+  -- Get clip (no lock needed — clip is read-only here)
   select * into v_clip from public.clips where id = p_clip_id;
   if not found then
     raise exception 'Clip not found';
   end if;
 
-  -- Get campaign and lock the CPM
-  select * into v_campaign from public.campaigns where id = v_clip.campaign_id;
+  -- Idempotency: skip if earning already exists for this clip
+  if exists (select 1 from public.earnings where clip_id = p_clip_id) then
+    select to_jsonb(e.*) into v_earning from public.earnings e where clip_id = p_clip_id;
+    return v_earning;
+  end if;
+
+  -- ── LOCK the campaign row to serialize concurrent approvals ──
+  -- SELECT ... FOR UPDATE blocks other transactions from modifying this
+  -- campaign until our transaction commits or rolls back. This prevents
+  -- two simultaneous approvals from both passing the budget check.
+  select * into v_campaign
+  from public.campaigns
+  where id = v_clip.campaign_id
+  for update;
+
   if not found then
     raise exception 'Campaign not found';
   end if;
@@ -869,13 +895,34 @@ begin
   -- Creator fee: 10% of gross (charged to creator)
   v_creator_fee := round(v_gross * 0.10)::integer;
 
-  -- Idempotency: skip if earning already exists for this clip
-  if exists (select 1 from public.earnings where clip_id = p_clip_id) then
-    select to_jsonb(e.*) into v_earning from public.earnings e where clip_id = p_clip_id;
-    return v_earning;
+  -- ── BUDGET ENFORCEMENT (atomic) ──
+  -- Budget is stored in rupees (numeric). Convert new earning to rupees for comparison.
+  v_budget := v_campaign.budget;
+
+  -- Only enforce budget if budget > 0 (0 or null means unlimited)
+  if v_budget is not null and v_budget > 0 then
+    -- Sum all existing approved/reserved earnings for this campaign.
+    -- This is the committed budget usage — no other transaction can add to this
+    -- while we hold the FOR UPDATE lock on the campaign row.
+    select coalesce(sum(gross_amount), 0) into v_reserved
+    from public.earnings
+    where campaign_id = v_clip.campaign_id
+      and status in ('approved', 'payable', 'processing', 'failed');
+
+    -- Calculate new total: existing reserved + this new earning (in paise → rupees)
+    v_new_total := v_reserved + v_gross;
+
+    -- Check budget ceiling
+    -- Both v_budget (rupees) and v_new_total (paise) need consistent units.
+    -- v_reserved is in paise, v_budget is in rupees. Convert budget to paise.
+    if v_new_total > (v_budget * 100) then
+      raise exception 'Campaign budget exceeded: reserved ₹% + new ₹% > budget ₹% (all in paise: % + % > %)',
+        v_reserved / 100, v_gross / 100, v_budget,
+        v_reserved, v_gross, (v_budget * 100);
+    end if;
   end if;
 
-  -- Insert earning record (immutable snapshot)
+  -- ── INSERT earning record (immutable snapshot) ──
   insert into public.earnings (
     clip_id, campaign_id, clipper_id, locked_cpm, verified_views,
     gross_amount, platform_fee, net_amount, creator_fee,
@@ -889,10 +936,9 @@ begin
   )
   returning to_jsonb(earnings.*) into v_earning;
 
-  -- Generate idempotency key for ledger entry
+  -- ── INSERT wallet ledger entry ──
   v_idempotency_key := 'earning-credit-' || p_clip_id::text;
 
-  -- Insert ledger entry (only for positive net amounts and only once)
   if v_net > 0 and not exists (
     select 1 from public.wallet_ledger where idempotency_key = v_idempotency_key
   ) then
