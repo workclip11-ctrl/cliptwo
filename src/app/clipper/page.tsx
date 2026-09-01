@@ -21,18 +21,13 @@ import { useAuth } from "@/lib/auth";
 import { rup, fmtViews } from "@/lib/format";
 import { financeOf, campaignSpent, payoutSplit } from "@/lib/finance";
 
-const ACCOUNTS = [
-  { id: "ig-1", platform: "Instagram", handle: "@maya.cuts", status: "verified" },
-  { id: "yt-1", platform: "YouTube", handle: "@mayacuts", status: "verified" },
-  { id: "ig-2", platform: "Instagram", handle: "@maya.in", status: "connecting" },
-];
-
 export default function ClipperPage() {
-  const { campaigns, clips } = useStore();
+  const { campaigns, clips, socialAccounts } = useStore();
   const { user } = useAuth();
   const router = useRouter();
 
   const myClips = clips.filter((k) => k.userId === user?.id || !k.userId);
+  const myAccounts = socialAccounts.filter((a) => a.userId === user?.id || !a.userId);
   const fin = financeOf(myClips, campaigns);
   const openCampaigns = campaigns.filter((c) => c.status === "open");
   const earnings = fin.earned;
@@ -175,25 +170,37 @@ export default function ClipperPage() {
                 Connect your social accounts for campaign matching.
               </p>
               <div className="mt-4 space-y-2">
-                {ACCOUNTS.map((a) => (
-                  <div
-                    key={a.id}
-                    className="flex items-center justify-between rounded-lg border bg-background px-3 py-2.5"
-                  >
-                    <span className="flex items-center gap-2 text-sm">
-                      <PlatformIcon p={a.platform} size={15} />
-                      <span className="font-mono text-xs">{a.handle}</span>
-                    </span>
-                    <span
-                      className={`text-xs font-medium ${a.status === "verified" ? "text-green" : "text-amber"}`}
+                {myAccounts.length === 0 ? (
+                  <p className="rounded-lg border border-dashed p-3 text-center text-xs text-muted">
+                    No accounts connected yet.
+                  </p>
+                ) : (
+                  myAccounts.map((a) => (
+                    <div
+                      key={a.id}
+                      className="flex items-center justify-between rounded-lg border bg-background px-3 py-2.5"
                     >
-                      {a.status === "verified" ? "Verified" : "Connecting…"}
-                    </span>
-                  </div>
-                ))}
+                      <span className="flex items-center gap-2 text-sm">
+                        <PlatformIcon p={a.platform} size={15} />
+                        <span className="font-mono text-xs">{a.handle}</span>
+                      </span>
+                      <span
+                        className={`text-xs font-medium ${a.status === "verified" || a.status === "connected" ? "text-green" : a.status === "connecting" ? "text-amber" : "text-muted"}`}
+                      >
+                        {a.status === "verified"
+                          ? "Verified"
+                          : a.status === "connected"
+                            ? "Connected"
+                            : a.status === "connecting"
+                              ? "Connecting…"
+                              : "Not connected"}
+                      </span>
+                    </div>
+                  ))
+                )}
               </div>
               <Link
-                href="/clipper/settings"
+                href="/clipper/accounts"
                 className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-accent-soft"
               >
                 <Link2 size={14} /> Manage accounts

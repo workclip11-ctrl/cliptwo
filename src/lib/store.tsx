@@ -959,7 +959,7 @@ interface StoreActions {
     status: "reviewing" | "approved" | "rejected",
     actor: string,
   ) => void;
-  updateProfile: (id: string, patch: Partial<Pick<Profile, "name" | "upi">>) => void;
+  updateProfile: (id: string, patch: Partial<Pick<Profile, "name" | "upi" | "bio">>) => void;
   addSocialAccount: (a: Omit<SocialAccount, "id" | "connectedAt" | "lastSyncAt"> & {
     connectedAt?: number;
     lastSyncAt?: number;

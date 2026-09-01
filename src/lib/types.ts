@@ -196,6 +196,7 @@ export interface Profile {
   verifiedAt?: number;
   createdAt: number;
   upi?: string;
+  bio?: string;
   company?: string;
   team?: TeamMember[];
   riskFlag?: boolean;

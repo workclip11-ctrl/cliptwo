@@ -11,6 +11,9 @@ import {
   ShieldCheck,
   CalendarClock,
   Info,
+  Pencil,
+  Save,
+  X,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
@@ -45,7 +48,7 @@ function fmtDate(ts: number): string {
 }
 
 export default function ClipperWalletPage() {
-  const { campaigns, clips, profiles } = useStore();
+  const { campaigns, clips, profiles, updateProfile } = useStore();
   const { user } = useAuth();
   const myClips = clips.filter((k) => k.userId === user?.id || !k.userId);
   // A clipper receives the NET amount (gross minus the platform fee), so every
@@ -73,6 +76,8 @@ export default function ClipperWalletPage() {
 
   const [requested, setRequested] = useState(false);
   const [page, setPage] = useState(1);
+  const [editingUpi, setEditingUpi] = useState(false);
+  const [upiInput, setUpiInput] = useState(profile?.upi ?? "");
 
   const txns = [...myClips].sort((a, b) => b.submittedAt - a.submittedAt);
   const visible = txns.slice(0, page * PAGE);
@@ -206,7 +211,7 @@ export default function ClipperWalletPage() {
                               </p>
                               <div className="mt-2 flex gap-2">
                                 <Link
-                                  href="/clipper/settings"
+                                  href="/clipper/wallet"
                                   className="inline-flex items-center gap-1 rounded-md bg-accent px-2 py-1 text-[11px] font-medium text-white"
                                 >
                                   <Link2 size={12} /> Update payment
@@ -244,9 +249,47 @@ export default function ClipperWalletPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-muted">Current payment method</p>
-                <p className="mt-1 flex items-center gap-2 font-mono text-sm font-medium">
-                  <Wallet size={14} className="text-muted" /> {upi}
-                </p>
+                {editingUpi ? (
+                  <div className="mt-1 flex items-center gap-2">
+                    <input
+                      value={upiInput}
+                      onChange={(e) => setUpiInput(e.target.value)}
+                      placeholder="name@upi"
+                      autoFocus
+                      className="w-full rounded-lg border bg-background px-3 py-1.5 font-mono text-sm outline-none focus:border-foreground sm:max-w-[200px]"
+                    />
+                    <button
+                      onClick={() => {
+                        if (upiInput.trim()) {
+                          updateProfile(user!.id, { upi: upiInput.trim() });
+                          setEditingUpi(false);
+                        }
+                      }}
+                      className="rounded-lg bg-accent p-1.5 text-white hover:opacity-90"
+                    >
+                      <Save size={14} />
+                    </button>
+                    <button
+                      onClick={() => { setEditingUpi(false); setUpiInput(profile?.upi ?? ""); }}
+                      className="rounded-lg border p-1.5 hover:bg-accent-soft"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-1 flex items-center gap-2">
+                    <p className="flex items-center gap-2 font-mono text-sm font-medium">
+                      <Wallet size={14} className="text-muted" /> {upi}
+                    </p>
+                    <button
+                      onClick={() => setEditingUpi(true)}
+                      className="rounded-md p-1 text-muted hover:text-foreground"
+                      aria-label="Edit UPI"
+                    >
+                      <Pencil size={13} />
+                    </button>
+                  </div>
+                )}
               </div>
               <span
                 className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium ${
@@ -308,9 +351,9 @@ export default function ClipperWalletPage() {
               <p className="mt-2 flex items-center gap-1.5 text-xs text-muted">
                 <Info size={12} />
                 {!profile?.upi ? (
-                  <Link href="/clipper/settings" className="text-accent hover:underline">
-                    Add a verified payment method
-                  </Link>
+                  <span className="text-accent">
+                    Add your UPI ID above to enable payouts
+                  </span>
                 ) : (
                   "Only released (paid) balance can be withdrawn — pending, held, or disputed earnings are not payable."
                 )}
