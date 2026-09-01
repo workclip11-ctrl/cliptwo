@@ -60,7 +60,7 @@ export default function ClipperSubmissionsPage() {
     setPage(1);
   }
 
-  const myClips = clips.filter((k) => k.userId === user?.id || !k.userId);
+  const myClips = clips.filter((k) => k.userId && k.userId === user?.id);
 
   const counts = TABS.reduce<Record<string, number>>((acc, t) => {
     acc[t.key] =

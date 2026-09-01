@@ -26,8 +26,8 @@ export default function ClipperPage() {
   const { user } = useAuth();
   const router = useRouter();
 
-  const myClips = clips.filter((k) => k.userId === user?.id || !k.userId);
-  const myAccounts = socialAccounts.filter((a) => a.userId === user?.id || !a.userId);
+  const myClips = clips.filter((k) => k.userId && k.userId === user?.id);
+  const myAccounts = socialAccounts.filter((a) => a.userId && a.userId === user?.id);
   const fin = financeOf(myClips, campaigns);
   const openCampaigns = campaigns.filter((c) => c.status === "open");
   const earnings = fin.earned;

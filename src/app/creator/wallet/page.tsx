@@ -19,7 +19,7 @@ export default function CreatorWalletPage() {
   const { user } = useAuth();
 
   const myCampaigns = campaigns.filter(
-    (c) => !c.created_by || c.created_by === user?.id,
+    (c) => c.created_by && c.created_by === user?.id,
   );
 
   const totalBudget = myCampaigns.reduce((s, c) => s + (c.budget ?? 0), 0);

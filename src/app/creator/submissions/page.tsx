@@ -48,7 +48,7 @@ export default function CreatorSubmissionsPage() {
   const [rulesId, setRulesId] = useState<string | null>(null);
 
   const myCampaigns = campaigns.filter(
-    (c) => !c.created_by || c.created_by === user?.id,
+    (c) => c.created_by && c.created_by === user?.id,
   );
   const myCampaignIds = new Set(myCampaigns.map((c) => c.id));
   const all = clips.filter((k) => myCampaignIds.has(k.campaignId));

@@ -13,7 +13,7 @@ export function creatorReceived(
 ): Clip[] {
   const myCampaignIds = new Set(
     campaigns
-      .filter((c) => !c.created_by || c.created_by === userId)
+      .filter((c) => c.created_by && c.created_by === userId)
       .map((c) => c.id),
   );
   return clips.filter((k) => myCampaignIds.has(k.campaignId));

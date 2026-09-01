@@ -67,7 +67,7 @@ function fmtDate(ts: number): string {
 export default function ClipperWalletPage() {
   const { campaigns, clips, profiles, updateProfile } = useStore();
   const { user } = useAuth();
-  const myClips = clips.filter((k) => k.userId === user?.id || !k.userId);
+  const myClips = clips.filter((k) => k.userId && k.userId === user?.id);
   // A clipper receives the NET amount (gross minus the platform fee), so every
   // wallet figure is derived from payoutSplit(...).net — never gross clipEarnings.
   const netOf = (k: Clip) => payoutSplit(k, campaigns).net;

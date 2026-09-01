@@ -16,7 +16,7 @@ export default function CreatorCampaignsPage() {
   const [open, setOpen] = useState(false);
 
   const myCampaigns = campaigns.filter(
-    (c) => !c.created_by || c.created_by === user?.id,
+    (c) => c.created_by && c.created_by === user?.id,
   );
 
   return (
@@ -154,6 +154,7 @@ export default function CreatorCampaignsPage() {
             addCampaign({
               title,
               creator: user?.name ?? user?.email ?? "Creator",
+              created_by: user?.id,
               brief,
               platform: platform as Platform,
               payout,

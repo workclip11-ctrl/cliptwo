@@ -69,7 +69,7 @@ export default function SocialAccountsPage() {
   const { socialAccounts, addSocialAccount, updateSocialAccount } = useStore();
   const { user } = useAuth();
   const myAccounts = socialAccounts.filter(
-    (a) => a.userId === user?.id || !a.userId,
+    (a) => a.userId && a.userId === user?.id,
   );
 
   const [connecting, setConnecting] = useState<string | null>(null);

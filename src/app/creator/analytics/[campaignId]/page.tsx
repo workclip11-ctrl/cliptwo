@@ -34,7 +34,7 @@ export default function CampaignAnalyticsPage() {
   const { user } = useAuth();
 
   const myCampaigns = campaigns.filter(
-    (c) => !c.created_by || c.created_by === user?.id,
+    (c) => c.created_by && c.created_by === user?.id,
   );
   const camp = myCampaigns.find((c) => c.id === id);
 

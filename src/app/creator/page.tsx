@@ -28,7 +28,7 @@ export default function CreatorPage() {
   const [selected, setSelected] = useState<Campaign | null>(null);
 
   const myCampaigns = campaigns.filter(
-    (c) => !c.created_by || c.created_by === user?.id,
+    (c) => c.created_by && c.created_by === user?.id,
   );
   const myCampaignIds = new Set(myCampaigns.map((c) => c.id));
   const received = clips.filter((k) => myCampaignIds.has(k.campaignId));
@@ -257,6 +257,7 @@ export default function CreatorPage() {
             addCampaign({
               title,
               creator: user?.name ?? user?.email ?? "Creator",
+              created_by: user?.id,
               brief,
               platform: platform as Platform,
               payout,

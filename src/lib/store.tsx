@@ -294,6 +294,7 @@ const seed: StoreState = {
       id: "k1",
       campaignId: "c1",
       clipper: "maya.cuts",
+      userId: "u_maya",
       videoUrl: "https://instagram.com/reel/xk29a",
       caption: "This app is unhinged 🔥 #tech",
       status: "paid",
@@ -315,6 +316,7 @@ const seed: StoreState = {
       id: "k2",
       campaignId: "c1",
       clipper: "devon.edits",
+      userId: "u_devon",
       videoUrl: "https://youtube.com/shorts/8kd92",
       caption: "The keynote moment everyone missed",
         status: "pending",
@@ -330,6 +332,7 @@ const seed: StoreState = {
       id: "k3",
       campaignId: "c2",
       clipper: "maya.cuts",
+      userId: "u_maya",
       videoUrl: "https://instagram.com/reel/pw001",
       caption: "3 moves that fixed my posture",
         status: "pending",
@@ -345,6 +348,7 @@ const seed: StoreState = {
       id: "k4",
       campaignId: "c1",
       clipper: "maya.cuts",
+      userId: "u_maya",
       videoUrl: "https://instagram.com/reel/xk44b",
       caption: "The keynote but with a loud soundtrack",
       status: "rejected",
@@ -369,6 +373,7 @@ const seed: StoreState = {
       id: "k5",
       campaignId: "c1",
       clipper: "maya.cuts",
+      userId: "u_maya",
       videoUrl: "https://instagram.com/reel/xk51p",
       caption: "3 quick takes from the keynote",
       status: "failed",
@@ -395,6 +400,7 @@ const seed: StoreState = {
       id: "kp1",
       campaignId: "c1",
       clipper: "priya.viral",
+      userId: "u_priya",
       videoUrl: "https://instagram.com/reel/priya01",
       caption: "This app actually fixed my screen-time 😭",
       status: "approved",
@@ -412,6 +418,7 @@ const seed: StoreState = {
       id: "kp2",
       campaignId: "c1",
       clipper: "priya.viral",
+      userId: "u_priya",
       videoUrl: "https://instagram.com/reel/priya02",
       caption: "3 features you missed",
       status: "approved",
@@ -429,6 +436,7 @@ const seed: StoreState = {
       id: "kp3",
       campaignId: "c1",
       clipper: "priya.viral",
+      userId: "u_priya",
       videoUrl: "https://youtube.com/shorts/priya03",
       caption: "The aha moment",
       status: "payable",
@@ -447,6 +455,7 @@ const seed: StoreState = {
       id: "kar1",
       campaignId: "c2",
       clipper: "arjun.cuts",
+      userId: "u_arjun",
       videoUrl: "https://instagram.com/reel/arjun01",
       caption: "Posture fix in 30s",
       status: "approved",
@@ -464,6 +473,7 @@ const seed: StoreState = {
       id: "kr1",
       campaignId: "c1",
       clipper: "rahul.bot",
+      userId: "u_rahul",
       videoUrl: "https://instagram.com/reel/xyz789",
       caption: "Viral hack!!",
       status: "rejected",
@@ -488,6 +498,7 @@ const seed: StoreState = {
       id: "kr2",
       campaignId: "c1",
       clipper: "rahul.bot",
+      userId: "u_rahul",
       videoUrl: "https://instagram.com/reel/abc456",
       caption: "Another one",
       status: "approved",
@@ -505,6 +516,7 @@ const seed: StoreState = {
       id: "kb1",
       campaignId: "c1",
       clipper: "banned.user",
+      userId: "u_banned",
       videoUrl: "https://instagram.com/reel/spam01",
       caption: "Buy followers",
       status: "rejected",
@@ -529,6 +541,7 @@ const seed: StoreState = {
       id: "kb2",
       campaignId: "c1",
       clipper: "banned.user",
+      userId: "u_banned",
       videoUrl: "https://youtube.com/shorts/spam02",
       caption: "Spam reel",
       status: "failed",
@@ -553,6 +566,7 @@ const seed: StoreState = {
       id: "ksb1",
       campaignId: "c2",
       clipper: "simran.m",
+      userId: "u_simran",
       videoUrl: "https://instagram.com/reel/simran01",
       caption: "My first cut",
       status: "pending",
@@ -568,6 +582,7 @@ const seed: StoreState = {
       id: "kl1",
       campaignId: "c1",
       clipper: "leo.edits",
+      userId: "u_leo",
       videoUrl: "https://instagram.com/reel/leo01",
       caption: "Smooth transition edit",
       status: "approved",
@@ -585,6 +600,7 @@ const seed: StoreState = {
       id: "kl2",
       campaignId: "c1",
       clipper: "leo.edits",
+      userId: "u_leo",
       videoUrl: "https://instagram.com/reel/leo02",
       caption: "Off-brief try",
       status: "rejected",
@@ -609,6 +625,7 @@ const seed: StoreState = {
       id: "kc3a",
       campaignId: "c3",
       clipper: "priya.viral",
+      userId: "u_priya",
       videoUrl: "https://instagram.com/reel/maker01",
       caption: "Maker House — assembly reel",
       status: "approved",
@@ -630,6 +647,7 @@ const seed: StoreState = {
       id: "kc3b",
       campaignId: "c3",
       clipper: "maya.cuts",
+      userId: "u_maya",
       videoUrl: "https://youtube.com/shorts/maker02",
       caption: "Maker House — top 5 tools",
       status: "payable",
@@ -646,6 +664,7 @@ const seed: StoreState = {
       id: "kc4a",
       campaignId: "c4",
       clipper: "devon.edits",
+      userId: "u_devon",
       videoUrl: "https://instagram.com/reel/kabir01",
       caption: "Stand-up — Delhi Live highlight",
       status: "approved",
@@ -667,6 +686,7 @@ const seed: StoreState = {
       id: "kh1",
       campaignId: "c1",
       clipper: "simran.k",
+      userId: "u_simran",
       videoUrl: "https://instagram.com/reel/hold01",
       caption: "Teaser with unlicensed audio",
       status: "held",
@@ -1383,12 +1403,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
     return {
       addCampaign: (c, status = "open") => {
+        // SECURITY: Every campaign must have a creator (created_by).
+        // The caller must provide created_by. If missing, the campaign is
+        // rejected in production (Supabase enforces NOT NULL via RPC).
         const optimistic: Campaign = {
           ...c,
           id: `c${Date.now()}`,
           createdAt: Date.now(),
           status,
-           created_by: c.created_by ?? stateRef.current.profiles.find((p) => p.id === c.created_by)?.id,
+          created_by: c.created_by,
         };
         setState((s) => ({ ...s, campaigns: [optimistic, ...s.campaigns] }));
 
@@ -1625,7 +1648,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       closeCampaign: async (id) => {
         const me = await getCurrentUser();
         const existingCamp = stateRef.current.campaigns.find((c) => c.id === id);
-        if (me && existingCamp && existingCamp.created_by !== me.id && !await isUserAdmin(me.id)) {
+        // Deny if campaign has no owner or user is not owner/admin
+        if (me && existingCamp && (!existingCamp.created_by || (existingCamp.created_by !== me.id && !await isUserAdmin(me.id)))) {
           console.error(`Authorization: user ${me.id} cannot close campaign ${id}`);
           return;
         }
@@ -1660,7 +1684,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       deleteCampaign: async (id) => {
         const me = await getCurrentUser();
         const camp = stateRef.current.campaigns.find((c) => c.id === id);
-        if (isSupabaseConfigured && me && camp && camp.created_by && camp.created_by !== me.id && !await isUserAdmin(me.id)) {
+        // Deny if campaign has no owner (production requires created_by) or user is not owner/admin
+        if (isSupabaseConfigured && me && camp && (!camp.created_by || (camp.created_by !== me.id && !await isUserAdmin(me.id)))) {
           console.error(`Authorization: user ${me.id} cannot delete campaign ${id}`);
           return;
         }
@@ -1683,7 +1708,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         // SECURITY: Only campaign creator or admins can update campaigns.
         const me = await getCurrentUser();
         const camp = stateRef.current.campaigns.find((c) => c.id === id);
-        if (isSupabaseConfigured && me && camp && camp.created_by && camp.created_by !== me.id && !await isUserAdmin(me.id)) {
+        // Deny if campaign has no owner (production requires created_by) or user is not owner/admin
+        if (isSupabaseConfigured && me && camp && (!camp.created_by || (camp.created_by !== me.id && !await isUserAdmin(me.id)))) {
           console.error(`Authorization: user ${me.id} cannot update campaign ${id}`);
           return;
         }
