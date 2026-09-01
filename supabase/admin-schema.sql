@@ -120,22 +120,70 @@ create policy "profiles_insert" on public.profiles
 drop policy if exists "profiles_update" on public.profiles;
 create policy "profiles_update" on public.profiles
   for update using (auth.uid() = id or public.is_admin())
-  with check (
-    (OLD.role IS NOT DISTINCT FROM NEW.role OR public.is_admin())
-    AND (OLD.status IS NOT DISTINCT FROM NEW.status OR public.admin_has_perm('clipper.suspend'))
-    AND (OLD.suspended_reason IS NOT DISTINCT FROM NEW.suspended_reason OR public.admin_has_perm('clipper.suspend'))
-    AND (OLD.verified IS NOT DISTINCT FROM NEW.verified OR public.admin_has_perm('clipper.verify'))
-    AND (OLD.verified_at IS NOT DISTINCT FROM NEW.verified_at OR public.admin_has_perm('clipper.verify'))
-    AND (OLD.risk_flag IS NOT DISTINCT FROM NEW.risk_flag OR public.admin_has_perm('clipper.review_risk'))
-    AND (OLD.risk_note IS NOT DISTINCT FROM NEW.risk_note OR public.admin_has_perm('clipper.review_risk'))
-    AND (OLD.admin_notes IS NOT DISTINCT FROM NEW.admin_notes OR public.admin_has_perm('clipper.notes'))
-    AND (OLD.appeals IS NOT DISTINCT FROM NEW.appeals OR public.admin_has_perm('clipper.appeals'))
-    AND (OLD.audit IS NOT DISTINCT FROM NEW.audit OR public.is_admin())
-  );
+  with check (auth.uid() = id or public.is_admin());
 
 drop policy if exists "profiles_delete" on public.profiles;
 create policy "profiles_delete" on public.profiles
   for delete using (public.is_admin());
+
+-- ---------------------------------------------------------------------------
+-- Trigger: enforce field-level permissions on profiles updates.
+-- Non-admins can only change name, upi, username, company, team.
+-- Admin-only fields: role, status, verified, risk_flag, admin_notes, etc.
+-- ---------------------------------------------------------------------------
+create or replace function public.enforce_profile_field_permissions()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  -- Admins can change anything (skip checks)
+  if public.is_admin() then
+    return NEW;
+  end if;
+
+  -- Non-admins: block changes to privileged fields
+  if (OLD.role IS DISTINCT FROM NEW.role) then
+    raise exception 'Only admins can change role';
+  end if;
+  if (OLD.status IS DISTINCT FROM NEW.status) then
+    raise exception 'Only admins can change status';
+  end if;
+  if (OLD.verified IS DISTINCT FROM NEW.verified) then
+    raise exception 'Only admins can change verified status';
+  end if;
+  if (OLD.verified_at IS DISTINCT FROM NEW.verified_at) then
+    raise exception 'Only admins can change verified_at';
+  end if;
+  if (OLD.risk_flag IS DISTINCT FROM NEW.risk_flag) then
+    raise exception 'Only admins can change risk_flag';
+  end if;
+  if (OLD.risk_note IS DISTINCT FROM NEW.risk_note) then
+    raise exception 'Only admins can change risk_note';
+  end if;
+  if (OLD.admin_notes IS DISTINCT FROM NEW.admin_notes) then
+    raise exception 'Only admins can change admin_notes';
+  end if;
+  if (OLD.suspended_reason IS DISTINCT FROM NEW.suspended_reason) then
+    raise exception 'Only admins can change suspended_reason';
+  end if;
+  if (OLD.appeals IS DISTINCT FROM NEW.appeals) then
+    raise exception 'Only admins can change appeals';
+  end if;
+  if (OLD.audit IS DISTINCT FROM NEW.audit) then
+    raise exception 'Only admins can change audit';
+  end if;
+
+  return NEW;
+end;
+$$;
+
+drop trigger if exists enforce_profile_fields on public.profiles;
+create trigger enforce_profile_fields
+  before update on public.profiles
+  for each row
+  execute function public.enforce_profile_field_permissions();
 
 -- ---------------------------------------------------------------------------
 -- site_settings (single row, id = 1)
