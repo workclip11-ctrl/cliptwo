@@ -422,6 +422,7 @@ declare
   v_clip record;
   v_actor uuid;
   v_is_admin boolean;
+  v_earning_status text;
 begin
   -- Get current user
   v_actor := auth.uid();
@@ -466,6 +467,20 @@ begin
     )
   where id = p_clip_id
   returning to_jsonb(clips.*) into v_clip;
+
+  -- When clip becomes financially approved, create immutable earning record
+  if p_status in ('approved', 'payable', 'processing', 'paid') then
+    -- Check if earning already exists for this clip
+    if not exists (select 1 from public.earnings where clip_id = p_clip_id) then
+      -- Create earning with locked CPM
+      v_earning_status := case
+        when p_status = 'paid' then 'paid'
+        when p_status in ('processing', 'payable') then 'approved'
+        else p_status
+      end;
+      perform public.create_earning(p_clip_id, v_earning_status);
+    end if;
+  end if;
 
   return v_clip;
 end;
@@ -618,6 +633,228 @@ create policy "notifications_update" on public.notifications
 drop policy if exists "notifications_delete" on public.notifications;
 create policy "notifications_delete" on public.notifications
   for delete using (auth.uid() = user_id or public.is_admin());
+
+-- ---------------------------------------------------------------------------
+-- EARNINGS TABLE — immutable financial records with locked CPM
+-- When a clip becomes financially approved, the CPM is locked in.
+-- Historical earnings NEVER change when campaign CPM/budget/rules are edited.
+-- All monetary values in INTEGER minor units (paise for INR) to avoid float errors.
+-- ---------------------------------------------------------------------------
+create table if not exists public.earnings (
+  id              uuid primary key default gen_random_uuid(),
+  clip_id         uuid not null references public.clips(id) on delete cascade,
+  campaign_id     uuid not null references public.campaigns(id) on delete cascade,
+  clipper_id      uuid references auth.users(id) on delete set null,
+  locked_cpm      integer not null,           -- CPM in paise (e.g., ₹220 = 22000)
+  verified_views  integer not null default 0, -- Views at time of approval
+  gross_amount    integer not null,            -- In paise: (views / 1000) * locked_cpm
+  platform_fee    integer not null,            -- In paise: 10% of gross
+  net_amount      integer not null,            -- In paise: gross - platform_fee
+  creator_fee     integer not null default 0,  -- In paise: 10% creator-side fee
+  currency        text not null default 'INR',
+  status          text not null default 'pending', -- pending, approved, paid, failed
+  created_at      timestamptz not null default now(),
+  approved_at     timestamptz,
+  paid_at         timestamptz,
+  txn_id          text,
+  payout_ref      text,
+  audit           jsonb
+);
+
+-- Indexes for performance
+create index if not exists earnings_clip_id_idx on public.earnings(clip_id);
+create index if not exists earnings_campaign_id_idx on public.earnings(campaign_id);
+create index if not exists earnings_clipper_id_idx on public.earnings(clipper_id);
+create index if not exists earnings_status_idx on public.earnings(status);
+
+-- RLS: clipper sees own earnings, creator sees earnings on their campaigns, admin sees all
+alter table public.earnings enable row level security;
+
+drop policy if exists "earnings_select" on public.earnings;
+create policy "earnings_select" on public.earnings
+  for select using (
+    auth.uid() = clipper_id
+    or public.is_admin()
+    or exists (
+      select 1 from public.campaigns c
+      where c.id = campaign_id and c.created_by = auth.uid()
+    )
+  );
+
+-- INSERT/UPDATE/DELETE: admin-only (all mutations go through RPC)
+drop policy if exists "earnings_insert" on public.earnings;
+create policy "earnings_insert" on public.earnings
+  for insert with check (public.is_admin());
+
+drop policy if exists "earnings_update" on public.earnings;
+create policy "earnings_update" on public.earnings
+  for update using (public.is_admin());
+
+drop policy if exists "earnings_delete" on public.earnings;
+create policy "earnings_delete" on public.earnings
+  for delete using (public.is_admin());
+
+-- ---------------------------------------------------------------------------
+-- RPC: Create immutable earning record when clip is approved
+-- Locks the CPM at time of approval. All calculations in INTEGER paise.
+-- ---------------------------------------------------------------------------
+create or replace function public.create_earning(
+  p_clip_id uuid,
+  p_status text default 'pending'
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_clip record;
+  v_campaign record;
+  v_locked_cpm integer;
+  v_verified_views integer;
+  v_gross integer;
+  v_platform_fee integer;
+  v_net integer;
+  v_creator_fee integer;
+  v_max_payout integer;
+  v_earning jsonb;
+begin
+  -- Only admins can create earnings
+  if not public.is_admin() then
+    raise exception 'Only admins can create earnings';
+  end if;
+
+  -- Get clip
+  select * into v_clip from public.clips where id = p_clip_id;
+  if not found then
+    raise exception 'Clip not found';
+  end if;
+
+  -- Get campaign and lock the CPM
+  select * into v_campaign from public.campaigns where id = v_clip.campaign_id;
+  if not found then
+    raise exception 'Campaign not found';
+  end if;
+
+  -- Lock CPM in paise (e.g., ₹220 = 22000 paise)
+  v_locked_cpm := round(v_campaign.payout * 100)::integer;
+  v_verified_views := v_clip.views;
+
+  -- Calculate gross: (views / 1000) * CPM in paise
+  -- Using integer arithmetic: (views * CPM) / 1000
+  v_gross := (v_verified_views * v_locked_cpm) / 1000;
+
+  -- Apply maxPayoutPerClip if set (also in paise)
+  if v_campaign.max_payout_per_clip is not null and v_campaign.max_payout_per_clip > 0 then
+    v_max_payout := round(v_campaign.max_payout_per_clip * 100)::integer;
+    if v_gross > v_max_payout then
+      v_gross := v_max_payout;
+    end if;
+  end if;
+
+  -- Platform fee: 10% of gross
+  v_platform_fee := round(v_gross * 0.10)::integer;
+
+  -- Net to clipper: gross - platform fee
+  v_net := v_gross - v_platform_fee;
+
+  -- Creator fee: 10% of gross (charged to creator)
+  v_creator_fee := round(v_gross * 0.10)::integer;
+
+  -- Insert earning record
+  insert into public.earnings (
+    clip_id, campaign_id, clipper_id, locked_cpm, verified_views,
+    gross_amount, platform_fee, net_amount, creator_fee,
+    status, approved_at, txn_id
+  ) values (
+    p_clip_id, v_clip.campaign_id, v_clip.user_id, v_locked_cpm, v_verified_views,
+    v_gross, v_platform_fee, v_net, v_creator_fee,
+    p_status, case when p_status = 'approved' then now() else null end,
+    case when p_status in ('approved', 'payable', 'processing', 'paid')
+         then 'TXN-' || upper(p_clip_id::text) else null end
+  )
+  returning to_jsonb(earnings.*) into v_earning;
+
+  return v_earning;
+end;
+$$;
+
+grant execute on function public.create_earning(uuid, text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- RPC: Update earning status (approve, pay, fail)
+-- Immutable: locked_cpm, gross_amount, platform_fee, net_amount never change
+-- ---------------------------------------------------------------------------
+create or replace function public.update_earning_status(
+  p_earning_id uuid,
+  p_status text,
+  p_payout_ref text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_earning jsonb;
+begin
+  -- Only admins can update earnings
+  if not public.is_admin() then
+    raise exception 'Only admins can update earnings';
+  end if;
+
+  -- Validate status
+  if p_status not in ('pending', 'approved', 'paid', 'failed') then
+    raise exception 'Invalid earning status: %', p_status;
+  end if;
+
+  -- Update earning (only status and payment fields, NOT financial amounts)
+  update public.earnings set
+    status = p_status,
+    paid_at = case when p_status = 'paid' then now() else paid_at end,
+    payout_ref = coalesce(p_payout_ref, payout_ref),
+    audit = coalesce(audit, '[]'::jsonb) || jsonb_build_object(
+      'action', 'status_changed',
+      'by', (select email from public.profiles where id = auth.uid()),
+      'at', now(),
+      'from', status,
+      'to', p_status
+    )
+  where id = p_earning_id
+  returning to_jsonb(earnings.*) into v_earning;
+
+  return v_earning;
+end;
+$$;
+
+grant execute on function public.update_earning_status(uuid, text, text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- RPC: Get earnings summary for a clipper (immutable, from earnings table)
+-- ---------------------------------------------------------------------------
+create or replace function public.get_clipper_earnings(p_clipper_id uuid)
+returns jsonb
+language sql
+security definer
+set search_path = public
+as $$
+  select jsonb_build_object(
+    'total_gross', coalesce(sum(gross_amount), 0),
+    'total_fees', coalesce(sum(platform_fee), 0),
+    'total_net', coalesce(sum(net_amount), 0),
+    'total_creator_fees', coalesce(sum(creator_fee), 0),
+    'currency', 'INR',
+    'earning_count', count(*),
+    'paid_count', count(*) filter (where status = 'paid'),
+    'pending_count', count(*) filter (where status in ('pending', 'approved')),
+    'paid_amount', coalesce(sum(net_amount) filter (where status = 'paid'), 0),
+    'pending_amount', coalesce(sum(net_amount) filter (where status in ('pending', 'approved')), 0)
+  )
+  from public.earnings
+  where clipper_id = p_clipper_id;
+$$;
+
+grant execute on function public.get_clipper_earnings(uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Audit Log — append-only record of all admin actions
