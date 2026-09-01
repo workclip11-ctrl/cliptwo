@@ -748,33 +748,43 @@ create policy "ledger_delete" on public.wallet_ledger
 -- ===========================================================================
 -- PAYOUTS — tracks payout requests and disbursements.
 -- A payout groups one or more earnings for batch disbursement.
+-- Statuses: requested → processing → paid/failed → reversed
 -- ===========================================================================
 create table if not exists public.payouts (
   id              uuid primary key default gen_random_uuid(),
   user_id         uuid not null references auth.users(id) on delete cascade,
   amount          integer not null,  -- total payout amount in paise (net to clipper)
+  net_amount      integer not null,  -- net after any fees, in paise
   currency        text not null default 'INR',
   status          text not null default 'requested' check (status in (
     'requested',    -- clipper requested payout
-    'processing',   -- admin is processing
-    'completed',    -- payout sent
-    'failed'        -- payout failed
+    'processing',   -- admin/provider is processing
+    'paid',         -- payout sent successfully
+    'failed',       -- payout failed
+    'reversed'      -- payout reversed/charged back
   )),
   method          text,              -- 'upi', 'bank_transfer', etc.
   upi_id          text,              -- UPI ID used for this payout
-  payout_ref      text,              -- external payment reference
+  provider        text default 'mock', -- payment provider name
+  provider_ref    text,              -- external payment/provider reference
+  idempotency_key text unique not null, -- prevents duplicate requests
   requested_at    timestamptz not null default now(),
   processed_at    timestamptz,
-  completed_at    timestamptz,
+  paid_at         timestamptz,
   failed_at       timestamptz,
+  reversed_at     timestamptz,
   failure_reason  text,
+  retry_count     integer not null default 0,
+  metadata        jsonb,
   audit           jsonb
 );
 
 create index if not exists payouts_user_idx on public.payouts(user_id);
 create index if not exists payouts_status_idx on public.payouts(status);
+create index if not exists payouts_idempotency_idx on public.payouts(idempotency_key);
 
--- RLS: clipper sees own, admin sees all. Mutations admin-only.
+-- RLS: clipper sees own, admin sees all. Clipper can insert (request).
+-- UPDATE is admin-only — users can never change payout status directly.
 alter table public.payouts enable row level security;
 
 drop policy if exists "payouts_select" on public.payouts;
@@ -1197,8 +1207,370 @@ $$;
 
 grant execute on function public.get_clipper_earnings(uuid) to authenticated;
 
+-- ===========================================================================
+-- PAYOUT RPCs — server-side only. Users request, server processes.
+-- ===========================================================================
+
 -- ---------------------------------------------------------------------------
--- RPC: Test maxPayoutPerClip enforcement (admin-only, for verification)
+-- RPC: request_payout — clipper requests a payout.
+-- 1. Authenticated via auth.uid()
+-- 2. Reads verified UPI from profiles
+-- 3. Calculates balance from wallet_ledger (authoritative)
+-- 4. Enforces minimum threshold (100 INR = 10000 paise)
+-- 5. Checks no duplicate processing payout exists
+-- 6. Creates payout record + debit ledger entry atomically
+-- ---------------------------------------------------------------------------
+create or replace function public.request_payout()
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_id uuid;
+  v_balance integer;
+  v_upi text;
+  v_payout_id uuid;
+  v_payout jsonb;
+  v_idempotency_key text;
+  v_min_withdrawal constant integer := 10000; -- ₹100 in paise
+begin
+  -- 1. Get authenticated user
+  v_user_id := auth.uid();
+  if v_user_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  -- 2. Read verified UPI from profiles
+  select upi into v_upi
+  from public.profiles
+  where id = v_user_id and status = 'active';
+
+  if v_upi is null or trim(v_upi) = '' then
+    raise exception 'No verified UPI ID on file. Add a UPI ID first.';
+  end if;
+
+  -- 3. Calculate authoritative balance from ledger
+  select coalesce(sum(amount), 0) into v_balance
+  from public.wallet_ledger
+  where user_id = v_user_id;
+
+  -- 4. Enforce minimum withdrawal
+  if v_balance < v_min_withdrawal then
+    raise exception 'Minimum withdrawal is ₹100. Current balance: ₹%', v_balance / 100;
+  end if;
+
+  -- 5. Check no equivalent payout is already processing/requested
+  if exists (
+    select 1 from public.payouts
+    where user_id = v_user_id
+      and status in ('requested', 'processing')
+  ) then
+    raise exception 'A payout is already in progress. Please wait for it to complete.';
+  end if;
+
+  -- 6. Generate idempotency key (one per user per hour window)
+  v_idempotency_key := 'payout-' || v_user_id::text || '-' || to_char(now(), 'YYYY-MM-DD-HH24');
+
+  -- Check idempotency
+  if exists (select 1 from public.payouts where idempotency_key = v_idempotency_key) then
+    select to_jsonb(p.*) into v_payout
+    from public.payouts p
+    where idempotency_key = v_idempotency_key;
+    return v_payout;
+  end if;
+
+  -- 7. Create payout record
+  insert into public.payouts (
+    user_id, amount, net_amount, currency, status, method, upi_id,
+    idempotency_key, metadata
+  ) values (
+    v_user_id, v_balance, v_balance, 'INR', 'requested', 'upi', v_upi,
+    v_idempotency_key,
+    jsonb_build_object(
+      'requested_by', (select email from public.profiles where id = v_user_id),
+      'balance_at_request', v_balance
+    )
+  )
+  returning id into v_payout_id;
+
+  -- 8. Debit the wallet ledger (creates negative entry to reserve funds)
+  insert into public.wallet_ledger (
+    user_id, type, amount, currency, reference_type, reference_id,
+    idempotency_key, metadata
+  ) values (
+    v_user_id, 'payout_debit', -v_balance, 'INR', 'payout', v_payout_id,
+    'payout-debit-' || v_payout_id::text,
+    jsonb_build_object(
+      'payout_id', v_payout_id,
+      'reason', 'Payout requested, funds reserved'
+    )
+  );
+
+  -- Return the payout record
+  select to_jsonb(p.*) into v_payout
+  from public.payouts p
+  where id = v_payout_id;
+
+  return v_payout;
+end;
+$$;
+
+grant execute on function public.request_payout() to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- RPC: process_payout — admin marks payout as processing.
+-- Only admins can call this.
+-- ---------------------------------------------------------------------------
+create or replace function public.process_payout(
+  p_payout_id uuid,
+  p_provider text default 'mock'
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_payout jsonb;
+begin
+  if not public.is_admin() then
+    raise exception 'Only admins can process payouts';
+  end if;
+
+  update public.payouts set
+    status = 'processing',
+    provider = p_provider,
+    processed_at = now(),
+    audit = coalesce(audit, '[]'::jsonb) || jsonb_build_object(
+      'action', 'processing',
+      'by', (select email from public.profiles where id = auth.uid()),
+      'at', now()
+    )
+  where id = p_payout_id and status = 'requested'
+  returning to_jsonb(payouts.*) into v_payout;
+
+  if v_payout is null then
+    raise exception 'Payout not found or not in requested status';
+  end if;
+
+  return v_payout;
+end;
+$$;
+
+grant execute on function public.process_payout(uuid, text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- RPC: complete_payout — admin/provider marks payout as paid.
+-- Updates the payout status and metadata.
+-- ---------------------------------------------------------------------------
+create or replace function public.complete_payout(
+  p_payout_id uuid,
+  p_provider_ref text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_payout record;
+  v_result jsonb;
+begin
+  if not public.is_admin() then
+    raise exception 'Only admins can complete payouts';
+  end if;
+
+  select * into v_payout
+  from public.payouts
+  where id = p_payout_id and status = 'processing';
+
+  if not found then
+    raise exception 'Payout not found or not in processing status';
+  end if;
+
+  update public.payouts set
+    status = 'paid',
+    paid_at = now(),
+    provider_ref = coalesce(p_provider_ref, provider_ref),
+    audit = coalesce(audit, '[]'::jsonb) || jsonb_build_object(
+      'action', 'paid',
+      'by', (select email from public.profiles where id = auth.uid()),
+      'at', now(),
+      'provider_ref', p_provider_ref
+    )
+  where id = p_payout_id
+  returning to_jsonb(payouts.*) into v_result;
+
+  return v_result;
+end;
+$$;
+
+grant execute on function public.complete_payout(uuid, text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- RPC: fail_payout — admin/provider marks payout as failed.
+-- Refunds the debited amount back to the wallet ledger.
+-- ---------------------------------------------------------------------------
+create or replace function public.fail_payout(
+  p_payout_id uuid,
+  p_reason text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_payout record;
+  v_result jsonb;
+begin
+  if not public.is_admin() then
+    raise exception 'Only admins can fail payouts';
+  end if;
+
+  select * into v_payout
+  from public.payouts
+  where id = p_payout_id and status in ('requested', 'processing');
+
+  if not found then
+    raise exception 'Payout not found or not in a failable status';
+  end if;
+
+  -- Update payout status
+  update public.payouts set
+    status = 'failed',
+    failed_at = now(),
+    failure_reason = p_reason,
+    audit = coalesce(audit, '[]'::jsonb) || jsonb_build_object(
+      'action', 'failed',
+      'by', (select email from public.profiles where id = auth.uid()),
+      'at', now(),
+      'reason', p_reason
+    )
+  where id = p_payout_id
+  returning to_jsonb(payouts.*) into v_result;
+
+  -- Refund: create a refund ledger entry to reverse the payout_debit
+  if not exists (
+    select 1 from public.wallet_ledger
+    where idempotency_key = 'payout-refund-' || p_payout_id::text
+  ) then
+    insert into public.wallet_ledger (
+      user_id, type, amount, currency, reference_type, reference_id,
+      idempotency_key, metadata
+    ) values (
+      v_payout.user_id, 'refund', v_payout.net_amount, 'INR', 'payout', p_payout_id,
+      'payout-refund-' || p_payout_id::text,
+      jsonb_build_object(
+        'payout_id', p_payout_id,
+        'reason', coalesce(p_reason, 'Payout failed, funds returned to wallet')
+      )
+    );
+  end if;
+
+  return v_result;
+end;
+$$;
+
+grant execute on function public.fail_payout(uuid, text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- RPC: reverse_payout — admin reverses a completed payout.
+-- Creates a reversal entry in the wallet ledger.
+-- ---------------------------------------------------------------------------
+create or replace function public.reverse_payout(
+  p_payout_id uuid,
+  p_reason text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_payout record;
+  v_result jsonb;
+begin
+  if not public.is_admin() then
+    raise exception 'Only admins can reverse payouts';
+  end if;
+
+  select * into v_payout
+  from public.payouts
+  where id = p_payout_id and status = 'paid';
+
+  if not found then
+    raise exception 'Payout not found or not in paid status';
+  end if;
+
+  -- Update payout status
+  update public.payouts set
+    status = 'reversed',
+    reversed_at = now(),
+    metadata = coalesce(metadata, '{}'::jsonb) || jsonb_build_object(
+      'reversal_reason', p_reason
+    ),
+    audit = coalesce(audit, '[]'::jsonb) || jsonb_build_object(
+      'action', 'reversed',
+      'by', (select email from public.profiles where id = auth.uid()),
+      'at', now(),
+      'reason', p_reason
+    )
+  where id = p_payout_id
+  returning to_jsonb(payouts.*) into v_result;
+
+  -- Debit the wallet (user owes money back)
+  if not exists (
+    select 1 from public.wallet_ledger
+    where idempotency_key = 'payout-reversal-' || p_payout_id::text
+  ) then
+    insert into public.wallet_ledger (
+      user_id, type, amount, currency, reference_type, reference_id,
+      idempotency_key, metadata
+    ) values (
+      v_payout.user_id, 'reversal', -v_payout.net_amount, 'INR', 'payout', p_payout_id,
+      'payout-reversal-' || p_payout_id::text,
+      jsonb_build_object(
+        'payout_id', p_payout_id,
+        'reason', coalesce(p_reason, 'Payout reversed')
+      )
+    );
+  end if;
+
+  return v_result;
+end;
+$$;
+
+grant execute on function public.reverse_payout(uuid, text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- RPC: get_user_payouts — get payout history for a user.
+-- ---------------------------------------------------------------------------
+create or replace function public.get_user_payouts(
+  p_user_id uuid,
+  p_limit integer default 20,
+  p_offset integer default 0
+)
+returns jsonb
+language sql
+security definer
+set search_path = public
+as $$
+  select coalesce(jsonb_agg(row_to_json(p)), '[]'::jsonb)
+  from (
+    select id, user_id, amount, net_amount, currency, status, method,
+           upi_id, provider, provider_ref, idempotency_key,
+           requested_at, processed_at, paid_at, failed_at, reversed_at,
+           failure_reason, retry_count, metadata
+    from public.payouts
+    where user_id = p_user_id
+    order by requested_at desc
+    limit p_limit offset p_offset
+  ) p;
+$$;
+
+grant execute on function public.get_user_payouts(uuid, integer, integer) to authenticated;
 -- Returns test results as JSON array with pass/fail for each case.
 -- ---------------------------------------------------------------------------
 create or replace function public.test_max_payout_enforcement()

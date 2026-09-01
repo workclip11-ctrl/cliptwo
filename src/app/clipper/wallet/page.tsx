@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   Wallet,
@@ -13,11 +13,13 @@ import {
   Info,
   Pencil,
   Save,
+  Loader2,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup, fmtViews } from "@/lib/format";
 import { isEarned, payoutSplit } from "@/lib/finance";
+import { supabase } from "@/lib/supabase/client";
 import type { Clip } from "@/lib/types";
 import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
@@ -25,6 +27,22 @@ import { PlatformIcon } from "@/components/PlatformIcon";
 const UPI_ID = "maya.cuts@upi";
 const MIN_WITHDRAWAL = 100;
 const PAGE = 8;
+
+interface PayoutRecord {
+  id: string;
+  amount: number;
+  net_amount: number;
+  status: string;
+  method?: string;
+  upi_id?: string;
+  provider?: string;
+  provider_ref?: string;
+  requested_at: string;
+  paid_at?: string;
+  failed_at?: string;
+  reversed_at?: string;
+  failure_reason?: string;
+}
 
 function nextPayoutDate(): string {
   const d = new Date();
@@ -66,17 +84,75 @@ export default function ClipperWalletPage() {
   const totalEarned = myClips
     .filter((k) => isEarned(k.status))
     .reduce((s, k) => s + netOf(k), 0);
-  const totalPaid = available;
 
   const profile = profiles.find((p) => p.id === user?.id);
   const upi = profile?.upi || UPI_ID;
   const verified = !!profile?.upi;
   const canWithdraw = available >= MIN_WITHDRAWAL && !!profile?.upi;
 
-  const [requested, setRequested] = useState(false);
+  const [payouts, setPayouts] = useState<PayoutRecord[]>([]);
+  const [loadingPayouts, setLoadingPayouts] = useState(true);
+  const [requesting, setRequesting] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const [requestSuccess, setRequestSuccess] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [editingUpi, setEditingUpi] = useState(false);
   const [upiInput, setUpiInput] = useState(profile?.upi ?? "");
+
+  // Fetch real payout history from database
+  const fetchPayouts = useCallback(async () => {
+    if (!user?.id) return;
+    setLoadingPayouts(true);
+    try {
+      const { data } = await supabase
+        .from("payouts")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("requested_at", { ascending: false })
+        .limit(20);
+      setPayouts((data as PayoutRecord[]) ?? []);
+    } catch {
+      // Silently fail — payouts section will show empty
+    } finally {
+      setLoadingPayouts(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    fetchPayouts();
+  }, [fetchPayouts]);
+
+  // Handle real payout request via server-side API
+  const handleRequestPayout = async () => {
+    if (!canWithdraw || requesting) return;
+    setRequesting(true);
+    setRequestError(null);
+    setRequestSuccess(null);
+
+    try {
+      const res = await fetch("/api/payout/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      const body = await res.json();
+
+      if (!res.ok) {
+        setRequestError(body.error ?? "Payout request failed");
+        return;
+      }
+
+      setRequestSuccess(
+        `Payout of ${rup(available)} requested. It will be processed shortly.`,
+      );
+      // Refresh payout list
+      fetchPayouts();
+    } catch {
+      setRequestError("Network error. Please try again.");
+    } finally {
+      setRequesting(false);
+    }
+  };
 
   const txns = [...myClips].sort((a, b) => b.submittedAt - a.submittedAt);
   const visible = txns.slice(0, page * PAGE);
@@ -90,6 +166,11 @@ export default function ClipperWalletPage() {
     );
   }
 
+  // Check if user has any in-progress payout
+  const hasInProgress = payouts.some(
+    (p) => p.status === "requested" || p.status === "processing",
+  );
+
   return (
     <div className="space-y-6">
       <div>
@@ -99,7 +180,7 @@ export default function ClipperWalletPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-2xl border bg-card p-4">
           <p className="text-xs text-muted">Available balance</p>
           <p className="mt-1 font-mono text-xl font-semibold text-green">
@@ -125,13 +206,6 @@ export default function ClipperWalletPage() {
           <p className="text-xs text-muted">Total earned</p>
           <p className="mt-1 font-mono text-xl font-semibold">{rup(totalEarned)}</p>
           <p className="mt-1 text-[11px] text-muted">All time</p>
-        </div>
-        <div className="rounded-2xl border bg-card p-4">
-          <p className="text-xs text-muted">Total paid</p>
-          <p className="mt-1 font-mono text-xl font-semibold text-green">
-            {rup(totalPaid)}
-          </p>
-          <p className="mt-1 text-[11px] text-muted">Released to you</p>
         </div>
       </div>
 
@@ -349,28 +423,45 @@ export default function ClipperWalletPage() {
               </div>
             </div>
 
-            {requested ? (
+            {/* Success/error messages */}
+            {requestSuccess && (
               <div className="mt-4 flex items-start gap-2 rounded-xl border border-green/30 bg-accent-soft p-3 text-sm text-green">
                 <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
-                <p>
-                  Payout of <span className="font-mono">{rup(available)}</span>{" "}
-                  requested. It will be released in the next payout cycle.
-                </p>
+                <p>{requestSuccess}</p>
               </div>
-            ) : (
+            )}
+            {requestError && (
+              <div className="mt-4 flex items-start gap-2 rounded-xl border border-red/30 bg-red/5 p-3 text-sm text-red">
+                <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                <p>{requestError}</p>
+              </div>
+            )}
+
+            {/* Payout request button */}
+            {!requestSuccess && (
               <button
                 type="button"
-                disabled={!canWithdraw}
-                onClick={() => setRequested(true)}
+                disabled={!canWithdraw || requesting || hasInProgress}
+                onClick={handleRequestPayout}
                 className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <ArrowDownToLine size={16} />
-                {available >= MIN_WITHDRAWAL
-                  ? `Request payout · ${rup(available)}`
-                  : `Needs ${rup(MIN_WITHDRAWAL)} to withdraw`}
+                {requesting ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" /> Processing...
+                  </>
+                ) : hasInProgress ? (
+                  "Payout in progress"
+                ) : (
+                  <>
+                    <ArrowDownToLine size={16} />
+                    {available >= MIN_WITHDRAWAL
+                      ? `Request payout · ${rup(available)}`
+                      : `Needs ${rup(MIN_WITHDRAWAL)} to withdraw`}
+                  </>
+                )}
               </button>
             )}
-            {!canWithdraw && (
+            {!canWithdraw && !hasInProgress && (
               <p className="mt-2 flex items-center gap-1.5 text-xs text-muted">
                 <Info size={12} />
                 {!profile?.upi ? (
@@ -387,33 +478,53 @@ export default function ClipperWalletPage() {
           <div className="rounded-2xl border bg-card p-5">
             <h3 className="text-sm font-semibold">Payout history</h3>
             <div className="mt-3 divide-y">
-              {paidTxns.length === 0 ? (
+              {loadingPayouts ? (
+                <p className="py-4 text-sm text-muted">Loading...</p>
+              ) : payouts.length === 0 ? (
                 <p className="py-4 text-sm text-muted">No payouts yet.</p>
               ) : (
-                paidTxns.map((k) => {
-                  const camp = campaigns.find((c) => c.id === k.campaignId);
-                  return (
-                    <div
-                      key={k.id}
-                      className="flex items-center justify-between py-3 text-sm"
-                    >
-                      <div>
-                        <Link
-                          href={`/clip/${k.id}`}
-                          className="font-medium hover:text-accent"
-                        >
-                          {camp?.title ?? k.campaignId}
-                        </Link>
-                        <p className="text-xs text-muted">
-                          {fmtDate(k.submittedAt)} · Paid
+                payouts.map((p) => (
+                  <div
+                    key={p.id}
+                    className="flex items-center justify-between py-3 text-sm"
+                  >
+                    <div>
+                      <p className="font-medium">
+                        {rup(p.net_amount / 100)}
+                      </p>
+                      <p className="text-xs text-muted">
+                        {fmtDate(new Date(p.requested_at).getTime())}
+                        {p.paid_at && " · Paid"}
+                        {p.failed_at && " · Failed"}
+                        {p.status === "processing" && " · Processing"}
+                        {p.status === "reversed" && " · Reversed"}
+                      </p>
+                      {p.failure_reason && (
+                        <p className="mt-1 text-xs text-red">{p.failure_reason}</p>
+                      )}
+                      {p.provider_ref && (
+                        <p className="mt-0.5 text-[11px] text-muted font-mono">
+                          Ref: {p.provider_ref}
                         </p>
-                      </div>
-                       <span className="font-mono font-medium text-green">
-                         +{rup(netOf(k))}
-                       </span>
+                      )}
                     </div>
-                  );
-                })
+                    <span
+                      className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                        p.status === "paid"
+                          ? "bg-green/10 text-green"
+                          : p.status === "failed"
+                            ? "bg-red/10 text-red"
+                            : p.status === "processing"
+                              ? "bg-blue-500/10 text-blue-500"
+                              : p.status === "reversed"
+                                ? "bg-amber/10 text-amber"
+                                : "bg-muted/10 text-muted"
+                      }`}
+                    >
+                      {p.status}
+                    </span>
+                  </div>
+                ))
               )}
             </div>
           </div>
