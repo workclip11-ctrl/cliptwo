@@ -1,15 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   LogOut,
   Save,
   Bell,
   Eye,
-  Shield,
-  Link2,
   Trash2,
   ToggleLeft,
   ToggleRight,
@@ -151,29 +148,6 @@ export default function CreatorSettingsPage() {
               </button>
             </div>
           ))}
-        </div>
-      </section>
-
-      {/* Quick links */}
-      <section className="rounded-2xl border bg-card p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-widest text-muted">
-          Quick links
-        </h2>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <Link
-            href="/creator/accounts"
-            className="flex items-center gap-3 rounded-xl border bg-background px-4 py-3 text-sm font-medium hover:bg-accent-soft"
-          >
-            <Link2 size={16} className="text-muted" />
-            Connected accounts
-          </Link>
-          <Link
-            href="/creator/wallet"
-            className="flex items-center gap-3 rounded-xl border bg-background px-4 py-3 text-sm font-medium hover:bg-accent-soft"
-          >
-            <Shield size={16} className="text-muted" />
-            Wallet &amp; payouts
-          </Link>
         </div>
       </section>
 
