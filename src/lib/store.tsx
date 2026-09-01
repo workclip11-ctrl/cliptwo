@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -1207,27 +1208,31 @@ function saveLocalState(state: StoreState) {
 }
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<StoreState>(seed);
+  const [state, _setState] = useState<StoreState>(seed);
   const stateRef = useRef(state);
   const loadedRef = useRef(false);
   useEffect(() => {
     stateRef.current = state;
   });
 
-  // Persist to localStorage in local mode
-  useEffect(() => {
-    if (!isSupabaseConfigured) saveLocalState(state);
-  }, [state]);
-
-  // Load saved state from localStorage on client mount (after hydration)
-  useEffect(() => {
-    if (isSupabaseConfigured || loadedRef.current) return;
-    loadedRef.current = true;
-    const saved = loadLocalState();
-    if (saved) {
-      setState((s) => ({ ...s, ...saved }));
-    }
+  const setState = useCallback((updater: StoreState | ((s: StoreState) => StoreState)) => {
+    _setState((prev) => {
+      const next = typeof updater === "function" ? (updater as (s: StoreState) => StoreState)(prev) : updater;
+      if (!isSupabaseConfigured && loadedRef.current) saveLocalState(next);
+      return next;
+    });
   }, []);
+
+  // Load saved state from localStorage on client mount
+  useEffect(() => {
+    if (isSupabaseConfigured) {
+      loadedRef.current = true;
+      return;
+    }
+    const saved = loadLocalState();
+    loadedRef.current = true;
+    if (saved) setState((s) => ({ ...s, ...saved }));
+  }, [setState]);
 
   // Initialize audit log store from localStorage on mount
   useEffect(() => {
