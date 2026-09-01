@@ -38,6 +38,11 @@ alter table public.clips add column if not exists held_reason text;
 alter table public.clips add column if not exists updated_at timestamptz;
 alter table public.clips add column if not exists payout_date timestamptz;
 
+-- Verified metrics column (no-op if present).
+-- This is the ONLY view count used for earnings calculations.
+-- Only set by ingest_clip_metrics() RPC — client cannot modify it.
+alter table public.clips add column if not exists verified_views integer not null default 0;
+
 -- Helper: is the current user an admin? (reads the public.profiles table)
 create or replace function public.is_admin()
 returns boolean
@@ -825,6 +830,132 @@ $$;
 grant execute on function public.update_clip_status(uuid, text, text, text, text, text, text, text) to authenticated;
 grant execute on function public.update_clip_views(uuid, integer, jsonb) to authenticated;
 
+-- ---------------------------------------------------------------------------
+-- RPC: Ingest verified metrics for a clip (server-only)
+--
+-- This is the ONLY function that can update clips.verified_views.
+-- Called by the metric sync backend after fetching from platform APIs.
+-- Stores an immutable snapshot in clip_metrics and updates the clip's
+-- verified_views to the latest verified count.
+--
+-- Security: service_role only (backend jobs). The client cannot call this.
+-- ---------------------------------------------------------------------------
+create or replace function public.ingest_clip_metrics(
+  p_clip_id uuid,
+  p_views integer,
+  p_likes integer default 0,
+  p_comments integer default 0,
+  p_shares integer default 0,
+  p_source text default 'platform_api',
+  p_verification_status text default 'verified'
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_clip record;
+  v_metric_id uuid;
+  v_metric jsonb;
+begin
+  -- Get clip
+  select * into v_clip from public.clips where id = p_clip_id;
+  if not found then
+    raise exception 'Clip not found: %', p_clip_id;
+  end if;
+
+  -- Validate source
+  if p_source not in ('platform_api', 'manual', 'mock', 'admin_override') then
+    raise exception 'Invalid source: %', p_source;
+  end if;
+
+  -- Validate verification_status
+  if p_verification_status not in ('pending', 'verified', 'failed', 'disputed') then
+    raise exception 'Invalid verification_status: %', p_verification_status;
+  end if;
+
+  -- Validate views are non-negative
+  if p_views < 0 then
+    raise exception 'Views cannot be negative: %', p_views;
+  end if;
+
+  -- Insert immutable metric snapshot
+  insert into public.clip_metrics (
+    clip_id, campaign_id, platform, views, likes, comments, shares,
+    source, verification_status, captured_at
+  ) values (
+    p_clip_id, v_clip.campaign_id, v_clip.platform,
+    p_views, p_likes, p_comments, p_shares,
+    p_source, p_verification_status, now()
+  )
+  returning id into v_metric_id;
+
+  -- Only update verified_views if the metric is verified
+  if p_verification_status = 'verified' then
+    update public.clips set
+      verified_views = p_views,
+      updated_at = now()
+    where id = p_clip_id;
+  end if;
+
+  -- Return the created metric
+  select to_jsonb(cm.*) into v_metric
+  from public.clip_metrics cm
+  where id = v_metric_id;
+
+  return v_metric;
+end;
+$$;
+
+grant execute on function public.ingest_clip_metrics(uuid, integer, integer, integer, integer, text, text) to service_role;
+
+-- ---------------------------------------------------------------------------
+-- RPC: Get latest verified metrics for a clip
+-- Returns the most recent verified metric snapshot for display/earnings.
+-- ---------------------------------------------------------------------------
+create or replace function public.get_latest_verified_metrics(
+  p_clip_id uuid
+)
+returns jsonb
+language sql
+security definer
+set search_path = public
+as $$
+  select to_jsonb(cm.*
+  ) from public.clip_metrics cm
+  where cm.clip_id = p_clip_id
+    and cm.verification_status = 'verified'
+  order by cm.captured_at desc
+  limit 1;
+$$;
+
+grant execute on function public.get_latest_verified_metrics(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- RPC: Get metric history for a clip
+-- Returns all metric snapshots (verified and pending) for a clip.
+-- ---------------------------------------------------------------------------
+create or replace function public.get_clip_metrics(
+  p_clip_id uuid,
+  p_limit integer default 50
+)
+returns jsonb
+language sql
+security definer
+set search_path = public
+as $$
+  select coalesce(jsonb_agg(cm.*), '[]'::jsonb)
+  from (
+    select * from public.clip_metrics
+    where clip_id = p_clip_id
+    order by captured_at desc
+    limit p_limit
+  ) cm;
+$$;
+
+grant execute on function public.get_clip_metrics(uuid, integer) to authenticated;
+
 -- Additive columns for engagement metrics + an audit trail of every status
 -- change (who did what, when, optional note). Idempotent on re-run.
 alter table public.clips add column if not exists engagement jsonb;
@@ -1234,10 +1365,11 @@ begin
 
   -- Lock CPM in paise (e.g., ₹220 = 22000 paise)
   v_locked_cpm := round(v_campaign.payout * 100)::integer;
-  v_verified_views := v_clip.views;
+  v_verified_views := v_clip.verified_views;
 
   -- Calculate gross: (views / 1000) * CPM in paise
   -- Using integer arithmetic: (views * CPM) / 1000
+  -- NOTE: Uses verified_views (platform-confirmed), NOT submitted views.
   v_gross := (v_verified_views * v_locked_cpm) / 1000;
 
   -- Apply maxPayoutPerClip if set (also in paise)

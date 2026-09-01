@@ -152,6 +152,7 @@ export interface Clip {
   caption: string;
   status: ClipStatus;
   views: number;
+  verifiedViews?: number;
   submittedAt: number;
   platform?: Platform;
   userId?: string;

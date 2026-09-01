@@ -16,7 +16,11 @@ export function clipEarnings(clip: Clip, campaigns: Campaign[]) {
   if (!isEarned(clip.status)) return 0;
   const camp = campaigns.find((c) => c.id === clip.campaignId);
   if (!camp) return 0;
-  const raw = Math.round((clip.views / 1000) * camp.payout);
+  // Earnings use verifiedViews (platform-confirmed), NOT submitted views.
+  // This is a display-only estimate — the authoritative calculation is in
+  // create_earning() which runs server-side in integer paise.
+  const verifiedViews = clip.verifiedViews ?? 0;
+  const raw = Math.round((verifiedViews / 1000) * camp.payout);
   if (camp.maxPayoutPerClip != null && camp.maxPayoutPerClip > 0) {
     return Math.min(raw, camp.maxPayoutPerClip);
   }

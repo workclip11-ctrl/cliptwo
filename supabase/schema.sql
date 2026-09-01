@@ -6,6 +6,8 @@
 drop table if exists public.payouts cascade;
 drop table if exists public.wallet_ledger cascade;
 drop table if exists public.earnings cascade;
+drop table if exists public.clip_metrics cascade;
+drop table if exists public.metrics_sync_jobs cascade;
 drop table if exists public.clips cascade;
 drop table if exists public.campaigns cascade;
 
@@ -63,6 +65,7 @@ create table public.clips (
   video_url    text not null,
   platform     text not null,
   views        integer not null default 0,
+  verified_views integer not null default 0,
   status       text not null default 'pending',
   submitted_at timestamptz not null default now(),
   rejection_reason text,
@@ -71,6 +74,88 @@ create table public.clips (
   engagement    jsonb,
   audit         jsonb
 );
+
+-- ---------------------------------------------------------------------------
+-- clip_metrics — time-series snapshots of platform metrics for each clip.
+-- Each row is an immutable snapshot captured at a point in time.
+-- Only rows with verification_status = 'verified' may be used for earnings.
+-- The client NEVER sets verified_views directly — only ingest_clip_metrics()
+-- (server-only RPC) can promote a snapshot to verified.
+-- ---------------------------------------------------------------------------
+create table public.clip_metrics (
+  id                uuid primary key default gen_random_uuid(),
+  clip_id           uuid not null references public.clips (id) on delete cascade,
+  campaign_id       uuid not null references public.campaigns (id) on delete cascade,
+  platform          text not null,
+  views             integer not null default 0,
+  likes             integer not null default 0,
+  comments          integer not null default 0,
+  shares            integer not null default 0,
+  source            text not null default 'manual',
+  verification_status text not null default 'pending',
+  captured_at       timestamptz not null default now(),
+  created_at        timestamptz not null default now()
+);
+
+alter table public.clip_metrics enable row level security;
+
+-- Users can read their own metrics
+drop policy if exists "clip_metrics_select" on public.clip_metrics;
+create policy "clip_metrics_select" on public.clip_metrics
+  for select using (
+    exists (
+      select 1 from public.clips c
+      where c.id = clip_id and c.user_id = auth.uid()
+    )
+  );
+
+-- Only service_role (backend) can insert metrics — no browser INSERT
+drop policy if exists "clip_metrics_insert_service" on public.clip_metrics;
+create policy "clip_metrics_insert_service" on public.clip_metrics
+  for insert with check (true);
+
+-- Nobody can update metrics — they are immutable snapshots
+drop policy if exists "clip_metrics_no_update" on public.clip_metrics;
+create policy "clip_metrics_no_update" on public.clip_metrics
+  for update using (false);
+
+-- Nobody can delete metrics
+drop policy if exists "clip_metrics_no_delete" on public.clip_metrics;
+create policy "clip_metrics_no_delete" on public.clip_metrics
+  for delete using (false);
+
+-- ---------------------------------------------------------------------------
+-- metrics_sync_jobs — tracks scheduled metric synchronization runs.
+-- Each row represents one sync attempt for a clip or batch of clips.
+-- ---------------------------------------------------------------------------
+create table public.metrics_sync_jobs (
+  id            uuid primary key default gen_random_uuid(),
+  clip_id       uuid references public.clips (id) on delete cascade,
+  campaign_id   uuid references public.campaigns (id) on delete cascade,
+  platform      text not null,
+  status        text not null default 'pending',
+  metrics_captured integer default 0,
+  error         text,
+  started_at    timestamptz,
+  completed_at  timestamptz,
+  created_at    timestamptz not null default now()
+);
+
+alter table public.metrics_sync_jobs enable row level security;
+
+-- Admins can read sync jobs
+drop policy if exists "metrics_sync_jobs_select" on public.metrics_sync_jobs;
+create policy "metrics_sync_jobs_select" on public.metrics_sync_jobs
+  for select using (public.is_admin());
+
+-- Only backend can insert/update sync jobs
+drop policy if exists "metrics_sync_jobs_insert" on public.metrics_sync_jobs;
+create policy "metrics_sync_jobs_insert" on public.metrics_sync_jobs
+  for insert with check (true);
+
+drop policy if exists "metrics_sync_jobs_update" on public.metrics_sync_jobs;
+create policy "metrics_sync_jobs_update" on public.metrics_sync_jobs
+  for update using (true);
 
 -- ---------------------------------------------------------------------------
 -- social_accounts — a clipper's connected publishing platforms.
@@ -222,10 +307,10 @@ values
   ('33333333-3333-3333-3333-333333333333', 'Founder story short', 'Maker House', 'Finance', 'Use the intro monologue.', 'YouTube', 280, 'open', 60000, 0, 9, 'https://drive.google.com/drive/folders/founder-story', 'Vertical 9:16 only.', 'Finance', '["YouTube","Instagram","TikTok"]'::jsonb, false, 'Make our founder''s origin story land with first-time founders and builders.', '2026-08-16', '2026-09-09', 8000, '30–60s', 'Start on the emotional line, not the logo.', 'English subtitles required. Keep monologue intact.', '9:16 vertical', 'Follow Maker House for build diaries.', 'Subtle Maker House lower-third, no outro splash.', '["Keep the monologue intact","Cinematic grade, stable shots","Burn-in English subtitles"]'::jsonb, '["Don''t cut the monologue","No fake subtitles","No stock footage"]'::jsonb, '[{"label":"Founder interview (Drive)","url":"https://drive.google.com/drive/folders/founder-story"}]'::jsonb, '[]'::jsonb, '{"verifiedView":"Unique viewer past 10s.","whenCounted":"Counted 72h after posting.","updateFrequency":"Every 24h.","minViews":2000,"maxPayout":8000,"deletedPolicy":"Deleted posts reverse all earnings.","payableWhen":"Payable 72h after approval."}'::jsonb, '{"afterSubmission":"Ticket created, reviewed by brand team.","reviewTime":"Within 72 hours.","criteria":"Cinematic, intact monologue, correct subtitles.","rejectionReasons":["Cut monologue","No subtitles","Reused stock"],"appeal":"Email founders@makerhouse within 7 days."}'::jsonb),
   ('44444444-4444-4444-4444-444444444444', 'Stand-up Set — Delhi Live', 'Kabir Sethi', 'Comedy', 'Punchline-first cuts, 20-40s max.', 'Reels', 190, 'open', 30000, 0, 14, 'https://drive.google.com/drive/folders/delhi-live', 'No profanity in captions.', 'Comedy', '["Reels","Instagram","TikTok"]'::jsonb, false, 'Turn the Delhi live set into viral punchline cuts that grow the comic''s following.', '2026-08-19', '2026-09-12', 4000, '20–40s', 'Lead with the punchline, keep the crowd laugh.', 'No profanity in captions. Add #standup.', '9:16 vertical', 'Follow Kabir Sethi for tour dates.', 'Keep ''Kabir Sethi'' tag for 2s.', '["Punchline-first edits","Keep crowd reactions","20–40s clips"]'::jsonb, '["No profanity in captions","No long setups","No other comic tags"]'::jsonb, '[{"label":"Full set (Drive)","url":"https://drive.google.com/drive/folders/delhi-live"}]'::jsonb, '[]'::jsonb, '{"verifiedView":"Unique view past 5s.","whenCounted":"Counted 48h after posting.","updateFrequency":"Every 24h.","minViews":1000,"maxPayout":4000,"deletedPolicy":"Deleted or private posts forfeit earnings.","payableWhen":"Payable 48h after approval."}'::jsonb, '{"afterSubmission":"Ticket created under your profile.","reviewTime":"Within 48 hours.","criteria":"Funny, punchline-first, clean captions.","rejectionReasons":["Profanity","Too long","No laugh"],"appeal":"Help ticket within 5 days."}'::jsonb);
 
-insert into public.clips (campaign_id, clipper, caption, video_url, platform, views, status, rejection_reason, rejection_details, failure_reason)
+insert into public.clips (campaign_id, clipper, caption, video_url, platform, views, verified_views, status, rejection_reason, rejection_details, failure_reason)
 values
-  ('11111111-1111-1111-1111-111111111111', 'maya.cuts', 'This app is unhinged #tech', 'https://instagram.com/reel/xk29a', 'Instagram', 18400, 'paid', null, null, null),
-  ('11111111-1111-1111-1111-111111111111', 'devon.edits', 'The keynote moment everyone missed', 'https://youtube.com/shorts/8kd92', 'YouTube', 0, 'pending', null, null, null),
-  ('22222222-2222-2222-2222-222222222222', 'maya.cuts', '3 moves that fixed my posture', 'https://instagram.com/reel/pw001', 'Instagram', 0, 'pending', null, null, null),
-  ('11111111-1111-1111-1111-111111111111', 'maya.cuts', 'The keynote but with a loud soundtrack', 'https://instagram.com/reel/xk44b', 'Instagram', 6200, 'rejected', 'Campaign rule violation', 'Background music was not allowed for this campaign.', null),
-  ('11111111-1111-1111-1111-111111111111', 'maya.cuts', '3 quick takes from the keynote', 'https://instagram.com/reel/xk51p', 'Instagram', 9100, 'failed', null, null, 'UPI verification failed — the UPI ID could not be verified. Update your payment method and retry.');
+  ('11111111-1111-1111-1111-111111111111', 'maya.cuts', 'This app is unhinged #tech', 'https://instagram.com/reel/xk29a', 'Instagram', 18400, 16560, 'paid', null, null, null),
+  ('11111111-1111-1111-1111-111111111111', 'devon.edits', 'The keynote moment everyone missed', 'https://youtube.com/shorts/8kd92', 'YouTube', 0, 0, 'pending', null, null, null),
+  ('22222222-2222-2222-2222-222222222222', 'maya.cuts', '3 moves that fixed my posture', 'https://instagram.com/reel/pw001', 'Instagram', 0, 0, 'pending', null, null, null),
+  ('11111111-1111-1111-1111-111111111111', 'maya.cuts', 'The keynote but with a loud soundtrack', 'https://instagram.com/reel/xk44b', 'Instagram', 6200, 5580, 'rejected', 'Campaign rule violation', 'Background music was not allowed for this campaign.', null),
+  ('11111111-1111-1111-1111-111111111111', 'maya.cuts', '3 quick takes from the keynote', 'https://instagram.com/reel/xk51p', 'Instagram', 9100, 8190, 'failed', null, null, 'UPI verification failed — the UPI ID could not be verified. Update your payment method and retry.');
