@@ -230,13 +230,149 @@ create policy "campaigns_delete" on public.campaigns
 -- Clips: only the owner (or an admin) may edit / delete a clip. The base
 -- schema used `auth.role() = 'authenticated'`, which let ANY signed-in user
 -- tamper with anyone's clip (e.g. mark another clipper's clip as paid).
+
+-- SELECT: clippers see own clips, creators see clips on their campaigns, admins see all
+drop policy if exists "clips_select" on public.clips;
+create policy "clips_select" on public.clips
+  for select using (
+    auth.uid() = user_id
+    or public.is_admin()
+    or exists (
+      select 1 from public.campaigns c
+      where c.id = campaign_id and c.created_by = auth.uid()
+    )
+  );
+
+-- INSERT: only clippers can create clips, and only for their own user_id
+drop policy if exists "clips_insert" on public.clips;
+create policy "clips_insert" on public.clips
+  for insert with check (
+    auth.uid() = user_id
+    and exists (
+      select 1 from public.profiles p
+      where p.id = auth.uid() and p.role = 'clipper' and p.status = 'active'
+    )
+  );
+
+-- UPDATE: only admins can update clips (status, views, financial fields)
+-- Clippers cannot update any fields after submission
 drop policy if exists "clips_update" on public.clips;
 create policy "clips_update" on public.clips
-  for update using (auth.uid() = user_id or public.is_admin());
+  for update using (public.is_admin());
 
+-- DELETE: only admins can delete clips
 drop policy if exists "clips_delete" on public.clips;
 create policy "clips_delete" on public.clips
-  for delete using (auth.uid() = user_id or public.is_admin());
+  for delete using (public.is_admin());
+
+-- ---------------------------------------------------------------------------
+-- RPC: Secure clip status update (admin-only)
+-- All status transitions go through this function, never direct UPDATE.
+-- ---------------------------------------------------------------------------
+create or replace function public.update_clip_status(
+  p_clip_id uuid,
+  p_status text,
+  p_rejection_reason text default null,
+  p_rejection_details text default null,
+  p_failure_reason text default null,
+  p_held_reason text default null,
+  p_txn_id text default null,
+  p_payout_ref text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_clip record;
+  v_actor uuid;
+  v_is_admin boolean;
+begin
+  -- Get current user
+  v_actor := auth.uid();
+  if v_actor is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  -- Verify admin role
+  v_is_admin := public.is_admin();
+  if not v_is_admin then
+    raise exception 'Only admins can update clip status';
+  end if;
+
+  -- Validate status
+  if p_status not in ('pending', 'approved', 'rejected', 'held', 'processing', 'paid', 'failed', 'payable') then
+    raise exception 'Invalid status: %', p_status;
+  end if;
+
+  -- Get current clip
+  select * into v_clip from public.clips where id = p_clip_id;
+  if not found then
+    raise exception 'Clip not found';
+  end if;
+
+  -- Update the clip
+  update public.clips set
+    status = p_status,
+    rejection_reason = coalesce(p_rejection_reason, rejection_reason),
+    rejection_details = coalesce(p_rejection_details, rejection_details),
+    failure_reason = coalesce(p_failure_reason, failure_reason),
+    held_reason = coalesce(p_held_reason, held_reason),
+    txn_id = coalesce(p_txn_id, txn_id),
+    payout_ref = coalesce(p_payout_ref, payout_ref),
+    payout_date = case when p_status = 'paid' then now() else payout_date end,
+    updated_at = now(),
+    audit = coalesce(audit, '[]'::jsonb) || jsonb_build_object(
+      'action', 'status_changed',
+      'by', (select email from public.profiles where id = v_actor),
+      'at', now(),
+      'from', v_clip.status,
+      'to', p_status
+    )
+  where id = p_clip_id
+  returning to_jsonb(clips.*) into v_clip;
+
+  return v_clip;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- RPC: Secure clip view update (admin-only)
+-- Views and engagement metrics are updated through this function.
+-- ---------------------------------------------------------------------------
+create or replace function public.update_clip_views(
+  p_clip_id uuid,
+  p_views integer,
+  p_engagement jsonb default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_clip record;
+begin
+  -- Only admins can update views
+  if not public.is_admin() then
+    raise exception 'Only admins can update clip views';
+  end if;
+
+  update public.clips set
+    views = p_views,
+    engagement = coalesce(p_engagement, engagement),
+    updated_at = now()
+  where id = p_clip_id
+  returning to_jsonb(clips.*) into v_clip;
+
+  return v_clip;
+end;
+$$;
+
+-- Grant execute to authenticated users (RLS still applies within the function)
+grant execute on function public.update_clip_status(uuid, text, text, text, text, text, text, text) to authenticated;
+grant execute on function public.update_clip_views(uuid, integer, jsonb) to authenticated;
 
 -- Additive columns for engagement metrics + an audit trail of every status
 -- change (who did what, when, optional note). Idempotent on re-run.

@@ -1632,41 +1632,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           });
 
          if (!isSupabaseConfigured) return;
-         const update: Record<string, unknown> = { status };
-         if (patch?.rejectionReason !== undefined)
-           update.rejection_reason = patch.rejectionReason;
-         else if (status !== "rejected") update.rejection_reason = null;
-         if (patch?.rejectionDetails !== undefined)
-           update.rejection_details = patch.rejectionDetails;
-         else if (status !== "rejected") update.rejection_details = null;
-         if (patch?.failureReason !== undefined)
-           update.failure_reason = patch.failureReason;
-         else if (status !== "failed") update.failure_reason = null;
-         if (patch?.heldReason !== undefined) update.held_reason = patch.heldReason;
-         else if (status !== "held") update.held_reason = null;
+         // SECURITY: Use RPC function for server-side validation
          const existing = stateRef.current.clips.find((k) => k.id === id);
-         const at = Date.now();
-         update.txn_id =
-           existing && EARNED_STATUSES.includes(status)
-             ? (existing.txnId ?? `TXN-${id.toUpperCase()}`)
-             : existing?.txnId ?? null;
-         update.updated_at = new Date(at).toISOString();
-         if (status === "paid") {
-           update.payout_date = new Date(at).toISOString();
-           update.payout_ref =
-             existing?.payoutRef ?? `PAY-${id.toUpperCase()}-${at}`;
+         const { error } = await supabase.rpc("update_clip_status", {
+           p_clip_id: id,
+           p_status: status,
+           p_rejection_reason: patch?.rejectionReason ?? null,
+           p_rejection_details: patch?.rejectionDetails ?? null,
+           p_failure_reason: patch?.failureReason ?? null,
+           p_held_reason: patch?.heldReason ?? null,
+           p_txn_id: existing?.txnId ?? null,
+           p_payout_ref: existing?.payoutRef ?? null,
+         });
+         if (error) {
+           console.error("RPC update_clip_status failed:", error.message);
          }
-         update.audit = [
-           ...(existing?.audit ?? []),
-           {
-             action: status,
-             by: actor,
-             at,
-             note:
-               patch?.rejectionReason ?? patch?.failureReason ?? patch?.heldReason,
-           },
-         ];
-           ignore(supabase.from("clips").update(update).eq("id", id));
          },
 
       closeCampaign: async (id) => {
