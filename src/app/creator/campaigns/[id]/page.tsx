@@ -101,6 +101,14 @@ export default function CreatorCampaignDetailPage() {
     updateCampaign(camp.id, patch, actor, "edited", note);
   const handleBudget = (b: number, note: string) =>
     updateCampaign(camp.id, { budget: b }, actor, "budget", note);
+  const handlePause = () =>
+    updateCampaign(camp.id, { status: "paused" }, actor, "paused", "Paused campaign");
+  const handleResume = () =>
+    updateCampaign(camp.id, { status: "open" }, actor, "resumed", "Resumed campaign");
+  const handleEnd = () => {
+    if (confirm("End this campaign? It will stop accepting new submissions."))
+      updateCampaign(camp.id, { status: "closed" }, actor, "ended", "Ended campaign");
+  };
 
   return (
     <div className="space-y-8">
@@ -136,9 +144,7 @@ export default function CreatorCampaignDetailPage() {
           )}
           {camp.status === "open" && (
             <button
-              onClick={() =>
-                updateCampaign(camp.id, { status: "paused" }, actor, "paused", "Paused campaign")
-              }
+              onClick={handlePause}
               className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-accent-soft"
             >
               <Pause size={14} /> Pause
@@ -146,9 +152,7 @@ export default function CreatorCampaignDetailPage() {
           )}
           {isPaused && (
             <button
-              onClick={() =>
-                updateCampaign(camp.id, { status: "open" }, actor, "resumed", "Resumed campaign")
-              }
+              onClick={handleResume}
               className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-accent-soft"
             >
               <Play size={14} /> Resume
@@ -156,10 +160,7 @@ export default function CreatorCampaignDetailPage() {
           )}
           {!isClosed && (
             <button
-              onClick={() => {
-                if (confirm("End this campaign? It will stop accepting new submissions."))
-                  updateCampaign(camp.id, { status: "closed" }, actor, "ended", "Ended campaign");
-              }}
+              onClick={handleEnd}
               className="inline-flex items-center gap-1.5 rounded-lg border border-red/30 px-3 py-2 text-sm font-medium text-red hover:bg-red/5"
             >
               <Ban size={14} /> End

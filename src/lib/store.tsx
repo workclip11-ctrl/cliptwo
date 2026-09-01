@@ -1322,6 +1322,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           id: `c${Date.now()}`,
           createdAt: Date.now(),
           status,
+          created_by: c.created_by ?? stateRef.current.profiles.find((p) => p.id === c.created_by)?.id,
         };
         setState((s) => ({ ...s, campaigns: [optimistic, ...s.campaigns] }));
         appendAuditLog({
@@ -1641,7 +1642,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         // SECURITY: Only campaign creator or admins can delete campaigns.
         const me = await getCurrentUser();
         const camp = stateRef.current.campaigns.find((c) => c.id === id);
-        if (me && camp && camp.created_by !== me.id && !isUserAdmin(me)) {
+        if (me && camp && camp.created_by && camp.created_by !== me.id && !isUserAdmin(me)) {
           console.error(`Authorization: user ${me.id} cannot delete campaign ${id}`);
           return;
         }
@@ -1654,7 +1655,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         // SECURITY: Only campaign creator or admins can update campaigns.
         const me = await getCurrentUser();
         const camp = stateRef.current.campaigns.find((c) => c.id === id);
-        if (me && camp && camp.created_by !== me.id && !isUserAdmin(me)) {
+        if (me && camp && camp.created_by && camp.created_by !== me.id && !isUserAdmin(me)) {
           console.error(`Authorization: user ${me.id} cannot update campaign ${id}`);
           return;
         }
