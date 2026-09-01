@@ -1176,12 +1176,52 @@ function ignore(p: PromiseLike<unknown>) {
   Promise.resolve(p).catch(() => {});
 }
 
+const LOCAL_STORAGE_KEY = "cliptwo_local_state";
+
+function loadLocalState(): Partial<StoreState> | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as Partial<StoreState>;
+  } catch {
+    return null;
+  }
+}
+
+function saveLocalState(state: StoreState) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(
+      LOCAL_STORAGE_KEY,
+      JSON.stringify({
+        campaigns: state.campaigns,
+        clips: state.clips,
+        profiles: state.profiles,
+        socialAccounts: state.socialAccounts,
+      }),
+    );
+  } catch {
+    /* quota exceeded or SSR */
+  }
+}
+
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<StoreState>(seed);
+  const [state, setState] = useState<StoreState>(() => {
+    if (isSupabaseConfigured) return seed;
+    const saved = loadLocalState();
+    if (!saved) return seed;
+    return { ...seed, ...saved };
+  });
   const stateRef = useRef(state);
   useEffect(() => {
     stateRef.current = state;
   });
+
+  // Persist to localStorage in local mode
+  useEffect(() => {
+    if (!isSupabaseConfigured) saveLocalState(state);
+  }, [state]);
 
   // Initialize audit log store from localStorage on mount
   useEffect(() => {
