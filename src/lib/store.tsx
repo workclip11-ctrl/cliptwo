@@ -1642,7 +1642,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         // SECURITY: Only campaign creator or admins can delete campaigns.
         const me = await getCurrentUser();
         const camp = stateRef.current.campaigns.find((c) => c.id === id);
-        if (me && camp && camp.created_by && camp.created_by !== me.id && !isUserAdmin(me)) {
+        if (isSupabaseConfigured && me && camp && camp.created_by && camp.created_by !== me.id && !isUserAdmin(me)) {
           console.error(`Authorization: user ${me.id} cannot delete campaign ${id}`);
           return;
         }
@@ -1655,7 +1655,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         // SECURITY: Only campaign creator or admins can update campaigns.
         const me = await getCurrentUser();
         const camp = stateRef.current.campaigns.find((c) => c.id === id);
-        if (me && camp && camp.created_by && camp.created_by !== me.id && !isUserAdmin(me)) {
+        if (isSupabaseConfigured && me && camp && camp.created_by && camp.created_by !== me.id && !isUserAdmin(me)) {
           console.error(`Authorization: user ${me.id} cannot update campaign ${id}`);
           return;
         }
