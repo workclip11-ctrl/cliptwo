@@ -63,23 +63,6 @@ as $$
   );
 $$;
 
--- Helper: does the current admin hold a specific fine-grained permission?
--- The super-admin implicitly holds all permissions.
-create or replace function public.admin_has_perm(perm text)
-returns boolean
-language sql
-security definer
-set search_path = public
-as $$
-  select public.is_super_admin()
-    or exists (
-      select 1
-      from public.admin_permissions ap
-      join public.profiles p on p.id = ap.admin_id
-      where p.id = auth.uid() and p.role = 'admin' and ap.permission = perm
-    );
-$$;
-
 -- Fine-grained admin permissions: which sensitive actions each admin may do.
 -- Grant/revoke rows here, e.g.
 --   insert into public.admin_permissions (admin_id, permission)
@@ -99,6 +82,23 @@ create policy "admin_perms_select" on public.admin_permissions
 drop policy if exists "admin_perms_write" on public.admin_permissions;
 create policy "admin_perms_write" on public.admin_permissions
   for all using (public.is_super_admin()) with check (public.is_super_admin());
+
+-- Helper: does the current admin hold a specific fine-grained permission?
+-- The super-admin implicitly holds all permissions.
+create or replace function public.admin_has_perm(perm text)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select public.is_super_admin()
+    or exists (
+      select 1
+      from public.admin_permissions ap
+      join public.profiles p on p.id = ap.admin_id
+      where p.id = auth.uid() and p.role = 'admin' and ap.permission = perm
+    );
+$$;
 
 alter table public.profiles enable row level security;
 
