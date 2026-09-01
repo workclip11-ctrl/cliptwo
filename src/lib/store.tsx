@@ -1513,43 +1513,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
        setClipStatus: async (id, status, patch, actor) => {
-          // SECURITY: Only admins can change clip status. Creators cannot approve/reject.
+          // SECURITY: Only admins can change clip status.
           const me = await getCurrentUser();
           if (!await isUserAdmin(me?.id)) {
             console.error(`Authorization: non-admin user cannot change clip status for ${id}`);
             return;
           }
-          // --- Server-side budget enforcement ---
-          // When transitioning to an earned status, verify the campaign budget
-          // will not be exceeded. This is the authoritative guard; frontend
-          // checks are convenience only.
-          const isTransitioningToEarned = EARNED_STATUSES.includes(status);
-          if (isTransitioningToEarned) {
-            const cur = stateRef.current;
-            const clip = cur.clips.find((k) => k.id === id);
-            if (clip) {
-              const camp = cur.campaigns.find((c) => c.id === clip.campaignId);
-              if (camp) {
-                const clipAlreadyEarned = EARNED_STATUSES.includes(clip.status);
-                if (!clipAlreadyEarned) {
-                  const additionalEarnings = clipEarnings(
-                    { ...clip, status } as Clip,
-                    cur.campaigns,
-                  );
-                  if (wouldExceedBudget(camp, cur.clips, additionalEarnings)) {
-                    const b = campaignBudget(camp, cur.clips);
-                    console.error(
-                      `Budget protection: rejecting status change for clip ${id}. ` +
-                        `Campaign "${camp.title}" would exceed budget. ` +
-                        `Remaining: ₹${b.remaining}, additional: ₹${additionalEarnings}`,
-                    );
-                    return;
-                  }
-                }
-              }
-            }
-          }
 
+          // Optimistic local state update (will be rolled back on error)
+          const isTransitioningToEarned = EARNED_STATUSES.includes(status);
           setState((s) => {
             const at = Date.now();
             const entry: AuditEntry = {
@@ -1568,9 +1540,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                   ...k,
                   status,
                   ...patch,
-                  // A clip earns a stable transaction id the moment it becomes a
-                  // financial transaction (approved and beyond). Deriving it from
-                  // the clip id keeps it unique without extra id generation.
                   txnId: earned ? (k.txnId ?? `TXN-${k.id.toUpperCase()}`) : k.txnId,
                   updatedAt: at,
                   payoutDate: status === "paid" ? at : k.payoutDate,
@@ -1580,8 +1549,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                       : k.payoutRef,
                   audit: [...(k.audit ?? []), entry],
                 };
-                // Keep local state in sync with the DB: a clip that is no
-                // longer rejected/failed should not show a stale reason.
                 if (status !== "rejected" && patch?.rejectionReason === undefined)
                   merged.rejectionReason = undefined;
                 if (status !== "failed" && patch?.failureReason === undefined)
@@ -1593,7 +1560,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             };
           });
 
-          // Auto-update campaign budget status (runs after the clip setState above).
+          // Auto-update campaign budget status
           setState((s) => {
             const changedClip = s.clips.find((k) => k.id === id);
             if (!changedClip || !isTransitioningToEarned) return s;
@@ -1612,9 +1579,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               newStatus = "open";
             }
             if (newStatus === camp.status) return s;
-            if (isSupabaseConfigured) {
-              ignore(supabase.from("campaigns").update({ status: newStatus }).eq("id", camp.id));
-            }
             return {
               ...s,
               campaigns: s.campaigns.map((x) =>
@@ -1624,63 +1588,96 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           });
 
          if (!isSupabaseConfigured) return;
-         // SECURITY: Use RPC function for server-side validation
-         const existing = stateRef.current.clips.find((k) => k.id === id);
-         const { error } = await supabase.rpc("update_clip_status", {
+         // SECURITY: Use unified admin_clip_action RPC (server-side auth + role + permission + budget + audit)
+         const { data, error } = await supabase.rpc("admin_clip_action", {
            p_clip_id: id,
-           p_status: status,
-           p_rejection_reason: patch?.rejectionReason ?? null,
-           p_rejection_details: patch?.rejectionDetails ?? null,
-           p_failure_reason: patch?.failureReason ?? null,
-           p_held_reason: patch?.heldReason ?? null,
-           p_txn_id: existing?.txnId ?? null,
-           p_payout_ref: existing?.payoutRef ?? null,
+           p_action: status === "approved" ? "approve"
+             : status === "rejected" ? "reject"
+             : status === "held" ? "hold"
+             : status === "processing" ? "processing"
+             : status === "paid" ? "paid"
+             : status === "failed" ? "failed"
+             : status === "payable" ? "payable"
+             : status,
+           p_reason: patch?.rejectionReason ?? patch?.failureReason ?? patch?.heldReason ?? null,
+           p_details: patch?.rejectionDetails ?? null,
          });
          if (error) {
-           console.error("RPC update_clip_status failed:", error.message);
+           console.error("RPC admin_clip_action failed:", error.message);
+           // Revert optimistic update on error
+           setState((s) => ({
+             ...s,
+             clips: s.clips.map((k) =>
+               k.id === id ? { ...k, status: k.status } : k
+             ),
+           }));
+           return;
+         }
+         // Update local state with server-confirmed data
+         const result = data as { clip?: Clip };
+         if (result?.clip) {
+           setState((s) => ({
+             ...s,
+             clips: s.clips.map((k) => k.id === id ? { ...k, ...result.clip } : k),
+           }));
          }
          },
 
       closeCampaign: async (id) => {
-        // SECURITY: Only campaign creator or admins can close campaigns.
         const me = await getCurrentUser();
         const existingCamp = stateRef.current.campaigns.find((c) => c.id === id);
         if (me && existingCamp && existingCamp.created_by !== me.id && !await isUserAdmin(me.id)) {
           console.error(`Authorization: user ${me.id} cannot close campaign ${id}`);
           return;
         }
-        setState((s) => ({
-          ...s,
-          campaigns: s.campaigns.map((c) =>
-            c.id === id ? { ...c, status: "closed" } : c,
-          ),
-        }));
-        appendAuditLog({
-          actor: "admin",
-          action: "campaign_closed",
-          targetType: "campaign",
-          targetId: id,
-          targetLabel: existingCamp?.title ?? id,
-          previousValue: existingCamp?.status,
-          newValue: "closed",
+        if (!isSupabaseConfigured) {
+          setState((s) => ({
+            ...s,
+            campaigns: s.campaigns.map((c) =>
+              c.id === id ? { ...c, status: "closed" } : c,
+            ),
+          }));
+          return;
+        }
+        const { data, error } = await supabase.rpc("admin_campaign_action", {
+          p_campaign_id: id,
+          p_action: "close",
         });
-        if (!isSupabaseConfigured) return;
-        ignore(
-          supabase.from("campaigns").update({ status: "closed" }).eq("id", id),
-        );
+        if (error) {
+          console.error("RPC admin_campaign_action failed:", error.message);
+          return;
+        }
+        const result = data as { to?: string };
+        if (result?.to) {
+          setState((s) => ({
+            ...s,
+            campaigns: s.campaigns.map((c) =>
+              c.id === id ? { ...c, status: result.to as CampaignStatus } : c,
+            ),
+          }));
+        }
       },
 
       deleteCampaign: async (id) => {
-        // SECURITY: Only campaign creator or admins can delete campaigns.
         const me = await getCurrentUser();
         const camp = stateRef.current.campaigns.find((c) => c.id === id);
         if (isSupabaseConfigured && me && camp && camp.created_by && camp.created_by !== me.id && !await isUserAdmin(me.id)) {
           console.error(`Authorization: user ${me.id} cannot delete campaign ${id}`);
           return;
         }
+        if (!isSupabaseConfigured) {
+          setState((s) => ({ ...s, campaigns: s.campaigns.filter((c) => c.id !== id) }));
+          return;
+        }
+        const { error } = await supabase.rpc("admin_campaign_action", {
+          p_campaign_id: id,
+          p_action: "delete",
+        });
+        if (error) {
+          console.error("RPC admin_campaign_action failed:", error.message);
+          return;
+        }
         setState((s) => ({ ...s, campaigns: s.campaigns.filter((c) => c.id !== id) }));
-        if (!isSupabaseConfigured) return;
-        ignore(supabase.from("campaigns").delete().eq("id", id));
       },
 
       updateCampaign: async (id, patch, actor, action, note) => {
@@ -1735,78 +1732,85 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ignore(supabase.from("campaigns").update(update).eq("id", id));
       },
 
-      updateProfileStatus: (id, status, actor, reason) => {
-        const patch: Partial<Profile> =
-          status === "suspended"
-            ? { status, suspendedReason: reason }
-            : { status, suspendedReason: undefined };
-        adminProfilePatch(id, patch, actor, status === "suspended" ? "suspended" : "reactivated", reason);
-        const prof = stateRef.current.profiles.find((p) => p.id === id);
-        appendAuditLog({
-          actor: actor ?? "admin",
-          action: status === "suspended" ? "user_suspended" : "user_reactivated",
-          targetType: "user",
-          targetId: id,
-          targetLabel: prof?.name ?? prof?.email ?? id,
-          previousValue: status === "suspended" ? "active" : "suspended",
-          newValue: status,
-          reason,
+      updateProfileStatus: async (id, status, actor, reason) => {
+        if (!isSupabaseConfigured) return;
+        const { error } = await supabase.rpc("admin_user_action", {
+          p_user_id: id,
+          p_action: status === "suspended" ? "suspend" : "reactivate",
+          p_reason: reason,
         });
+        if (error) {
+          console.error("RPC admin_user_action failed:", error.message);
+          return;
+        }
+        setState((s) => ({
+          ...s,
+          profiles: s.profiles.map((p) =>
+            p.id === id
+              ? { ...p, status: status as ProfileStatus, suspendedReason: status === "suspended" ? reason : undefined }
+              : p,
+          ),
+        }));
       },
 
-      verifyProfile: (id, actor, verified) => {
-        adminProfilePatch(
-          id,
-          verified
-            ? { verified: true, verifiedAt: Date.now() }
-            : { verified: false, verifiedAt: undefined },
-          actor,
-          verified ? "verified" : "unverified",
-        );
-        const prof = stateRef.current.profiles.find((p) => p.id === id);
-        appendAuditLog({
-          actor: actor ?? "admin",
-          action: verified ? "user_verified" : "user_unverified",
-          targetType: "user",
-          targetId: id,
-          targetLabel: prof?.name ?? prof?.email ?? id,
-          previousValue: verified ? "unverified" : "verified",
-          newValue: verified ? "verified" : "unverified",
+      verifyProfile: async (id, actor, verified) => {
+        if (!isSupabaseConfigured) return;
+        const { error } = await supabase.rpc("admin_user_action", {
+          p_user_id: id,
+          p_action: verified ? "verify" : "unverify",
         });
+        if (error) {
+          console.error("RPC admin_user_action failed:", error.message);
+          return;
+        }
+        setState((s) => ({
+          ...s,
+          profiles: s.profiles.map((p) =>
+            p.id === id
+              ? { ...p, verified, verifiedAt: verified ? Date.now() : undefined }
+              : p,
+          ),
+        }));
       },
 
-      setProfileRisk: (id, actor, flagged, note) => {
-        adminProfilePatch(
-          id,
-          { riskFlag: flagged, riskNote: note },
-          actor,
-          flagged ? "risk_flagged" : "risk_cleared",
-          note,
-        );
-        const prof = stateRef.current.profiles.find((p) => p.id === id);
-        appendAuditLog({
-          actor: actor ?? "admin",
-          action: flagged ? "fraud_flag_created" : "fraud_flag_cleared",
-          targetType: "fraud",
-          targetId: id,
-          targetLabel: prof?.name ?? prof?.email ?? id,
-          previousValue: flagged ? "clear" : "flagged",
-          newValue: flagged ? "flagged" : "clear",
-          reason: note,
+      setProfileRisk: async (id, actor, flagged, note) => {
+        if (!isSupabaseConfigured) return;
+        const { error } = await supabase.rpc("admin_user_action", {
+          p_user_id: id,
+          p_action: flagged ? "set_risk" : "clear_risk",
+          p_details: note,
         });
+        if (error) {
+          console.error("RPC admin_user_action failed:", error.message);
+          return;
+        }
+        setState((s) => ({
+          ...s,
+          profiles: s.profiles.map((p) =>
+            p.id === id
+              ? { ...p, riskFlag: flagged, riskNote: note }
+              : p,
+          ),
+        }));
       },
 
-      saveAdminNotes: (id, notes, actor) => {
-        adminProfilePatch(id, { adminNotes: notes }, actor, "admin_notes");
-        const prof = stateRef.current.profiles.find((p) => p.id === id);
-        appendAuditLog({
-          actor: actor ?? "admin",
-          action: "admin_notes",
-          targetType: "user",
-          targetId: id,
-          targetLabel: prof?.name ?? prof?.email ?? id,
-          reason: notes,
+      saveAdminNotes: async (id, notes, actor) => {
+        if (!isSupabaseConfigured) return;
+        const { error } = await supabase.rpc("admin_user_action", {
+          p_user_id: id,
+          p_action: "save_notes",
+          p_details: notes,
         });
+        if (error) {
+          console.error("RPC admin_user_action failed:", error.message);
+          return;
+        }
+        setState((s) => ({
+          ...s,
+          profiles: s.profiles.map((p) =>
+            p.id === id ? { ...p, adminNotes: notes } : p,
+          ),
+        }));
       },
 
       respondToAppeal: (id, appealId, response, status, actor) => {
@@ -1828,15 +1832,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
       deleteProfile: async (id) => {
-        // SECURITY: Only admins can delete profiles.
         const me = await getCurrentUser();
         if (!me || !await isUserAdmin(me.id)) {
           console.error(`Authorization: user ${me?.id ?? "anonymous"} cannot delete profile ${id}`);
           return;
         }
+        if (!isSupabaseConfigured) {
+          setState((s) => ({ ...s, profiles: s.profiles.filter((p) => p.id !== id) }));
+          return;
+        }
+        const { error } = await supabase.rpc("admin_user_action", {
+          p_user_id: id,
+          p_action: "delete",
+        });
+        if (error) {
+          console.error("RPC admin_user_action failed:", error.message);
+          return;
+        }
         setState((s) => ({ ...s, profiles: s.profiles.filter((p) => p.id !== id) }));
-        if (!isSupabaseConfigured) return;
-        ignore(supabase.from("profiles").delete().eq("id", id));
       },
 
       updateProfile: async (id, patch) => {

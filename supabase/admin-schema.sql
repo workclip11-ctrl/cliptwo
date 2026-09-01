@@ -399,6 +399,271 @@ drop policy if exists "clips_delete" on public.clips;
 create policy "clips_delete" on public.clips
   for delete using (public.is_admin());
 
+
+-- ===========================================================================
+-- UNIFIED ADMIN ACTION FRAMEWORK
+--
+-- Every sensitive admin action goes through a dedicated RPC that:
+--   1. Authenticates via auth.uid()
+--   2. Verifies admin role server-side
+--   3. Verifies the required permission (fine-grained)
+--   4. Validates the target record exists
+--   5. Performs the operation transactionally
+--   6. Writes an authoritative audit log entry
+--   7. Returns explicit success/error result
+--
+-- The UI MUST NOT show success unless the backend operation actually succeeded.
+-- ===========================================================================
+
+-- ---------------------------------------------------------------------------
+-- Helper: write audit log entry (called by all admin actions)
+-- ---------------------------------------------------------------------------
+create or replace function public.write_admin_audit(
+  p_action text,
+  p_target_type text,
+  p_target_id text,
+  p_target_label text default null,
+  p_previous_value text default null,
+  p_new_value text default null,
+  p_reason text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_id text;
+  v_actor_email text;
+begin
+  select email into v_actor_email from public.profiles where id = auth.uid();
+  v_id := 'audit-' || extract(epoch from now())::bigint || '-' || upper(md5(random()::text));
+  insert into public.audit_logs (id, actor, action, target_type, target_id, target_label, previous_value, new_value, reason)
+  values (v_id, coalesce(v_actor_email, 'unknown'), p_action, p_target_type, p_target_id, p_target_label, p_previous_value, p_new_value, p_reason);
+end;
+$$;
+
+grant execute on function public.write_admin_audit(text, text, text, text, text, text, text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- RPC: admin_clip_action -- all sensitive clip operations
+-- Actions: approve, reject, hold, payable, processing, paid, failed, retry, release, revert
+-- ---------------------------------------------------------------------------
+create or replace function public.admin_clip_action(
+  p_clip_id uuid,
+  p_action text,
+  p_reason text default null,
+  p_details text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_actor uuid;
+  v_clip record;
+  v_new_status text;
+  v_old_status text;
+  v_perm text;
+begin
+  v_actor := auth.uid();
+  if v_actor is null then raise exception 'Not authenticated'; end if;
+  if not public.is_admin() then raise exception 'Only admins can perform clip actions'; end if;
+
+  if p_action not in ('approve','reject','hold','payable','processing','paid','failed','retry','release','revert') then
+    raise exception 'Invalid action: %', p_action;
+  end if;
+
+  v_perm := 'clip.' || p_action;
+  if p_action = 'retry' then v_perm := 'clip.processing'; end if;
+  if p_action = 'release' then v_perm := 'clip.approve'; end if;
+  if p_action = 'revert' then v_perm := 'clip.payable'; end if;
+
+  if not public.admin_has_perm(v_perm) then
+    raise exception 'Missing permission: %', v_perm;
+  end if;
+
+  select * into v_clip from public.clips where id = p_clip_id;
+  if not found then raise exception 'Clip not found'; end if;
+  v_old_status := v_clip.status;
+
+  v_new_status := case p_action
+    when 'approve' then 'approved' when 'reject' then 'rejected'
+    when 'hold' then 'held' when 'payable' then 'payable'
+    when 'processing' then 'processing' when 'paid' then 'paid'
+    when 'failed' then 'failed' when 'retry' then 'processing'
+    when 'release' then 'approved' when 'revert' then 'payable'
+  end;
+
+  perform public.update_clip_status(
+    p_clip_id, v_new_status,
+    case when p_action = 'reject' then p_reason else null end,
+    case when p_action = 'reject' then p_details else null end,
+    case when p_action = 'failed' then p_reason else null end,
+    case when p_action = 'hold' then p_reason else null end,
+    null, null
+  );
+
+  perform public.write_admin_audit(
+    'clip_' || p_action, 'clip', p_clip_id::text,
+    coalesce(v_clip.caption, p_clip_id::text), v_old_status, v_new_status, p_reason
+  );
+
+  select to_jsonb(c.*) into v_clip from public.clips c where id = p_clip_id;
+  return jsonb_build_object('success', true, 'clip', v_clip, 'action', p_action, 'from', v_old_status, 'to', v_new_status);
+end;
+$$;
+
+grant execute on function public.admin_clip_action(uuid, text, text, text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- RPC: admin_user_action -- all sensitive user/profile operations
+-- Actions: suspend, reactivate, verify, unverify, set_risk, clear_risk, save_notes, delete
+-- ---------------------------------------------------------------------------
+create or replace function public.admin_user_action(
+  p_user_id uuid,
+  p_action text,
+  p_reason text default null,
+  p_details text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_actor uuid;
+  v_profile record;
+  v_old_status text;
+  v_new_value text;
+  v_perm text;
+begin
+  v_actor := auth.uid();
+  if v_actor is null then raise exception 'Not authenticated'; end if;
+  if not public.is_admin() then raise exception 'Only admins can perform user actions'; end if;
+
+  if p_action not in ('suspend','reactivate','verify','unverify','set_risk','clear_risk','save_notes','delete') then
+    raise exception 'Invalid action: %', p_action;
+  end if;
+
+  v_perm := 'clipper.' || p_action;
+  if p_action in ('verify','unverify') then v_perm := 'clipper.verify'; end if;
+  if p_action in ('set_risk','clear_risk') then v_perm := 'clipper.risk'; end if;
+  if p_action = 'save_notes' then v_perm := 'clipper.notes'; end if;
+  if p_action = 'delete' then v_perm := 'clipper.delete'; end if;
+
+  if not public.admin_has_perm(v_perm) then
+    raise exception 'Missing permission: %', v_perm;
+  end if;
+
+  select * into v_profile from public.profiles where id = p_user_id;
+  if not found then raise exception 'User not found'; end if;
+  v_old_status := v_profile.status;
+
+  case p_action
+    when 'suspend' then
+      update public.profiles set status = 'suspended', suspended_reason = p_reason where id = p_user_id;
+      v_new_value := 'suspended';
+    when 'reactivate' then
+      update public.profiles set status = 'active', suspended_reason = null where id = p_user_id;
+      v_new_value := 'active';
+    when 'verify' then
+      update public.profiles set verified = true, verified_at = now() where id = p_user_id;
+      v_new_value := 'verified';
+    when 'unverify' then
+      update public.profiles set verified = false, verified_at = null where id = p_user_id;
+      v_new_value := 'unverified';
+    when 'set_risk' then
+      update public.profiles set risk_flag = true, risk_note = p_details where id = p_user_id;
+      v_new_value := 'flagged';
+    when 'clear_risk' then
+      update public.profiles set risk_flag = false, risk_note = null where id = p_user_id;
+      v_new_value := 'cleared';
+    when 'save_notes' then
+      update public.profiles set admin_notes = p_details where id = p_user_id;
+      v_new_value := 'updated';
+    when 'delete' then
+      delete from public.profiles where id = p_user_id;
+      v_new_value := 'deleted';
+  end case;
+
+  perform public.write_admin_audit(
+    'user_' || p_action, 'user', p_user_id::text,
+    coalesce(v_profile.name, v_profile.email, p_user_id::text), v_old_status, v_new_value, p_reason
+  );
+
+  return jsonb_build_object('success', true, 'action', p_action, 'user_id', p_user_id, 'to', v_new_value);
+end;
+$$;
+
+grant execute on function public.admin_user_action(uuid, text, text, text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- RPC: admin_campaign_action -- all sensitive campaign operations
+-- Actions: pause, resume, close, reopen, delete
+-- ---------------------------------------------------------------------------
+create or replace function public.admin_campaign_action(
+  p_campaign_id uuid,
+  p_action text,
+  p_reason text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_actor uuid;
+  v_campaign record;
+  v_new_status text;
+  v_perm text;
+begin
+  v_actor := auth.uid();
+  if v_actor is null then raise exception 'Not authenticated'; end if;
+  if not public.is_admin() then raise exception 'Only admins can perform campaign actions'; end if;
+
+  if p_action not in ('pause','resume','close','reopen','delete') then
+    raise exception 'Invalid action: %', p_action;
+  end if;
+
+  v_perm := 'campaign.' || p_action;
+  if not public.admin_has_perm(v_perm) then
+    raise exception 'Missing permission: %', v_perm;
+  end if;
+
+  select * into v_campaign from public.campaigns where id = p_campaign_id;
+  if not found then raise exception 'Campaign not found'; end if;
+
+  case p_action
+    when 'pause' then
+      update public.campaigns set status = 'paused' where id = p_campaign_id;
+      v_new_status := 'paused';
+    when 'resume' then
+      update public.campaigns set status = 'open' where id = p_campaign_id;
+      v_new_status := 'open';
+    when 'close' then
+      update public.campaigns set status = 'closed' where id = p_campaign_id;
+      v_new_status := 'closed';
+    when 'reopen' then
+      update public.campaigns set status = 'open' where id = p_campaign_id;
+      v_new_status := 'open';
+    when 'delete' then
+      delete from public.campaigns where id = p_campaign_id;
+      v_new_status := 'deleted';
+  end case;
+
+  perform public.write_admin_audit(
+    'campaign_' || p_action, 'campaign', p_campaign_id::text,
+    v_campaign.title, v_campaign.status, v_new_status, p_reason
+  );
+
+  return jsonb_build_object('success', true, 'action', p_action, 'campaign_id', p_campaign_id, 'to', v_new_status);
+end;
+$$;
+
+grant execute on function public.admin_campaign_action(uuid, text, text) to authenticated;
+
 -- ---------------------------------------------------------------------------
 -- RPC: Secure clip status update (admin-only)
 -- All status transitions go through this function, never direct UPDATE.
