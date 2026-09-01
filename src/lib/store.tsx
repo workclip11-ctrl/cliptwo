@@ -1207,13 +1207,9 @@ function saveLocalState(state: StoreState) {
 }
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<StoreState>(() => {
-    if (isSupabaseConfigured) return seed;
-    const saved = loadLocalState();
-    if (!saved) return seed;
-    return { ...seed, ...saved };
-  });
+  const [state, setState] = useState<StoreState>(seed);
   const stateRef = useRef(state);
+  const loadedRef = useRef(false);
   useEffect(() => {
     stateRef.current = state;
   });
@@ -1222,6 +1218,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isSupabaseConfigured) saveLocalState(state);
   }, [state]);
+
+  // Load saved state from localStorage on client mount (after hydration)
+  useEffect(() => {
+    if (isSupabaseConfigured || loadedRef.current) return;
+    loadedRef.current = true;
+    const saved = loadLocalState();
+    if (saved) {
+      setState((s) => ({ ...s, ...saved }));
+    }
+  }, []);
 
   // Initialize audit log store from localStorage on mount
   useEffect(() => {
