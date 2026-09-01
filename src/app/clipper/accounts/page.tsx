@@ -291,10 +291,7 @@ export default function SocialAccountsPage() {
                 className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
               />
             </label>
-            <p className="mt-2 text-xs text-muted">
-              This prototype simulates the OAuth handshake. In production a
-              backend exchange issues the access token (stored server-side only).
-            </p>
+
             <div className="mt-4 flex gap-2">
               <button
                 onClick={submitConnect}
