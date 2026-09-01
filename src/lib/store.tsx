@@ -37,7 +37,7 @@ import type {
 import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
 import { EARNED_STATUSES, isEarned, financeOf, campaignBudget, wouldExceedBudget, canAcceptSubmission } from "@/lib/finance";
 import { clipEarnings } from "@/lib/format";
-import { appendAuditLog, initAuditLogs } from "@/lib/audit";
+import { initAuditLogs } from "@/lib/audit";
 
 const isoDaysAgo = (n: number) => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
 const isoInDays = (n: number) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
@@ -1277,28 +1277,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Audit log: track clip status changes
-  const prevClipsRef = useRef(state.clips);
-  useEffect(() => {
-    const prev = prevClipsRef.current;
-    const curr = state.clips;
-    for (const clip of curr) {
-      const old = prev.find((c) => c.id === clip.id);
-      if (old && old.status !== clip.status) {
-        const camp = state.campaigns.find((c) => c.id === clip.campaignId);
-        const label = camp?.title ?? clip.campaignId;
-        const base = { actor: "admin", targetType: "clip" as const, targetId: clip.id, targetLabel: label };
-        if (clip.status === "approved") appendAuditLog({ ...base, action: "clip_approved", newValue: clip.status, reason: clip.rejectionReason ?? clip.failureReason ?? clip.heldReason });
-        else if (clip.status === "rejected") appendAuditLog({ ...base, action: "clip_rejected", newValue: clip.status, reason: clip.rejectionReason });
-        else if (clip.status === "held") appendAuditLog({ ...base, action: "clip_held", newValue: clip.status, reason: clip.heldReason });
-        else if (clip.status === "processing") appendAuditLog({ ...base, action: "payout_initiated" });
-        else if (clip.status === "paid") appendAuditLog({ ...base, action: "payout_completed" });
-        else if (clip.status === "failed") appendAuditLog({ ...base, action: "payout_failed", reason: clip.failureReason });
-      }
-    }
-    prevClipsRef.current = curr;
-  });
-
   const actions = useMemo<StoreActions>(() => {
     // ── Auth helpers for ownership checks ──
     async function getCurrentUser() {
@@ -1382,17 +1360,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           id: `c${Date.now()}`,
           createdAt: Date.now(),
           status,
-          created_by: c.created_by ?? stateRef.current.profiles.find((p) => p.id === c.created_by)?.id,
+           created_by: c.created_by ?? stateRef.current.profiles.find((p) => p.id === c.created_by)?.id,
         };
         setState((s) => ({ ...s, campaigns: [optimistic, ...s.campaigns] }));
-        appendAuditLog({
-          actor: c.creator ?? "creator",
-          action: "campaign_created",
-          targetType: "campaign",
-          targetId: optimistic.id,
-          targetLabel: c.title,
-          newValue: status,
-        });
 
         if (!isSupabaseConfigured) return;
         (async () => {
@@ -1704,16 +1674,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             ),
           };
         });
-        appendAuditLog({
-          actor: actor ?? "admin",
-          action: "campaign_edited",
-          targetType: "campaign",
-          targetId: id,
-          targetLabel: camp?.title ?? id,
-          previousValue: camp ? JSON.stringify({ status: camp.status, payout: camp.payout, budget: camp.budget }) : undefined,
-          newValue: JSON.stringify(patch),
-          reason: note,
-        });
         if (!isSupabaseConfigured) return;
         const update: Record<string, unknown> = {};
         for (const [k, v] of Object.entries(patch)) {
@@ -1820,15 +1780,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           a.id === appealId ? { ...a, status, response, at: a.at } : a,
         );
         adminProfilePatch(id, { appeals }, actor, "appeal_response", response);
-        appendAuditLog({
-          actor: actor ?? "admin",
-          action: "appeal_response",
-          targetType: "user",
-          targetId: id,
-          targetLabel: profile.name ?? profile.email ?? id,
-          newValue: status,
-          reason: response,
-        });
       },
 
       deleteProfile: async (id) => {

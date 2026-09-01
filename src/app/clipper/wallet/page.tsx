@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { startTransition, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   Wallet,
@@ -100,9 +100,9 @@ export default function ClipperWalletPage() {
   const [upiInput, setUpiInput] = useState(profile?.upi ?? "");
 
   // Fetch real payout history from database
-  const fetchPayouts = useCallback(async () => {
+  const refreshPayouts = useCallback(async () => {
     if (!user?.id) return;
-    setLoadingPayouts(true);
+    startTransition(() => { setLoadingPayouts(true); });
     try {
       const { data } = await supabase
         .from("payouts")
@@ -110,17 +110,15 @@ export default function ClipperWalletPage() {
         .eq("user_id", user.id)
         .order("requested_at", { ascending: false })
         .limit(20);
-      setPayouts((data as PayoutRecord[]) ?? []);
+      startTransition(() => { setPayouts((data as PayoutRecord[]) ?? []); setLoadingPayouts(false); });
     } catch {
-      // Silently fail — payouts section will show empty
-    } finally {
-      setLoadingPayouts(false);
+      startTransition(() => { setLoadingPayouts(false); });
     }
-  }, [user?.id]);
+  }, [user]);
 
   useEffect(() => {
-    fetchPayouts();
-  }, [fetchPayouts]);
+    void refreshPayouts();
+  }, [refreshPayouts]);
 
   // Handle real payout request via server-side API
   const handleRequestPayout = async () => {
@@ -146,7 +144,7 @@ export default function ClipperWalletPage() {
         `Payout of ${rup(available)} requested. It will be processed shortly.`,
       );
       // Refresh payout list
-      fetchPayouts();
+      void refreshPayouts();
     } catch {
       setRequestError("Network error. Please try again.");
     } finally {

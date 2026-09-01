@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 import {
   Search,
   History,
@@ -10,84 +10,90 @@ import {
   Film,
   ShieldAlert,
   Settings,
+  Loader2,
 } from "lucide-react";
 import {
-  searchAuditLogs,
-  subscribeAuditLogs,
-  initAuditLogs,
+  fetchAuditLogs,
   AUDIT_ACTION_LABELS,
-  AUDIT_TARGET_TYPES,
+  AUDIT_ENTITY_TYPES,
+  type AuditLogEntry,
 } from "@/lib/audit";
-import type { AuditAction } from "@/lib/types";
-import { useEffect } from "react";
 
-const ACTION_OPTIONS: Array<{ value: AuditAction | ""; label: string }> = [
+const ACTION_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "", label: "All actions" },
-  { value: "user_created", label: "User created" },
-  { value: "user_suspended", label: "User suspended" },
-  { value: "user_reactivated", label: "User reactivated" },
-  { value: "user_verified", label: "User verified" },
-  { value: "user_unverified", label: "User unverified" },
+  { value: "clip_approve", label: "Clip approved" },
+  { value: "clip_reject", label: "Clip rejected" },
+  { value: "clip_hold", label: "Clip held" },
+  { value: "clip_processing", label: "Payout processing" },
+  { value: "clip_paid", label: "Clip paid" },
+  { value: "clip_failed", label: "Payout failed" },
+  { value: "clip_retry", label: "Payout retried" },
+  { value: "clip_release", label: "Clip released" },
+  { value: "clip_revert", label: "Clip reverted" },
+  { value: "user_suspend", label: "User suspended" },
+  { value: "user_reactivate", label: "User reactivated" },
+  { value: "user_verify", label: "User verified" },
+  { value: "user_unverify", label: "User unverified" },
+  { value: "user_set_risk", label: "Risk flagged" },
+  { value: "user_clear_risk", label: "Risk cleared" },
+  { value: "user_save_notes", label: "Admin notes" },
+  { value: "user_delete", label: "User deleted" },
+  { value: "campaign_pause", label: "Campaign paused" },
+  { value: "campaign_resume", label: "Campaign resumed" },
+  { value: "campaign_close", label: "Campaign closed" },
+  { value: "campaign_reopen", label: "Campaign reopened" },
+  { value: "campaign_delete", label: "Campaign deleted" },
   { value: "campaign_created", label: "Campaign created" },
   { value: "campaign_edited", label: "Campaign edited" },
-  { value: "campaign_paused", label: "Campaign paused" },
-  { value: "campaign_ended", label: "Campaign ended" },
-  { value: "campaign_closed", label: "Campaign closed" },
-  { value: "clip_approved", label: "Clip approved" },
-  { value: "clip_rejected", label: "Clip rejected" },
-  { value: "clip_held", label: "Clip held" },
-  { value: "earnings_adjusted", label: "Earnings adjusted" },
-  { value: "payout_initiated", label: "Payout initiated" },
-  { value: "payout_completed", label: "Payout completed" },
-  { value: "payout_failed", label: "Payout failed" },
-  { value: "fraud_flag_created", label: "Fraud flag created" },
-  { value: "fraud_flag_cleared", label: "Fraud flag cleared" },
-  { value: "account_changed", label: "Account changed" },
-  { value: "permission_changed", label: "Permission changed" },
-  { value: "admin_notes", label: "Admin notes" },
-  { value: "appeal_response", label: "Appeal response" },
-  { value: "risk_flagged", label: "Risk flagged" },
-  { value: "risk_cleared", label: "Risk cleared" },
 ];
 
-const TARGET_ICONS: Record<string, typeof User> = {
+const ENTITY_ICONS: Record<string, typeof User> = {
   user: User,
   campaign: Megaphone,
   clip: Film,
   fraud: ShieldAlert,
   system: Settings,
+  payout: ShieldAlert,
+  earning: ShieldAlert,
 };
 
 const ACTION_COLORS: Record<string, string> = {
-  user_created: "bg-green/10 text-green",
+  clip_approve: "bg-green/10 text-green",
+  clip_approved: "bg-green/10 text-green",
+  clip_reject: "bg-red/10 text-red",
+  clip_rejected: "bg-red/10 text-red",
+  clip_hold: "bg-purple-400/10 text-purple-400",
+  clip_held: "bg-purple-400/10 text-purple-400",
+  clip_processing: "bg-blue-500/10 text-blue-500",
+  clip_paid: "bg-green/10 text-green",
+  clip_failed: "bg-red/10 text-red",
+  clip_retry: "bg-blue-500/10 text-blue-500",
+  clip_release: "bg-green/10 text-green",
+  clip_revert: "bg-amber/10 text-amber",
+  user_suspend: "bg-red/10 text-red",
   user_suspended: "bg-red/10 text-red",
+  user_reactivate: "bg-green/10 text-green",
   user_reactivated: "bg-green/10 text-green",
+  user_verify: "bg-green/10 text-green",
   user_verified: "bg-green/10 text-green",
+  user_unverify: "bg-muted/10 text-muted",
   user_unverified: "bg-muted/10 text-muted",
+  user_set_risk: "bg-red/10 text-red",
+  user_clear_risk: "bg-green/10 text-green",
+  user_save_notes: "bg-muted/10 text-muted",
+  user_delete: "bg-red/10 text-red",
+  campaign_pause: "bg-amber/10 text-amber",
+  campaign_paused: "bg-amber/10 text-amber",
+  campaign_resume: "bg-green/10 text-green",
+  campaign_close: "bg-red/10 text-red",
+  campaign_closed: "bg-red/10 text-red",
+  campaign_reopen: "bg-green/10 text-green",
+  campaign_delete: "bg-red/10 text-red",
   campaign_created: "bg-green/10 text-green",
   campaign_edited: "bg-blue-500/10 text-blue-500",
-  campaign_paused: "bg-amber/10 text-amber",
-  campaign_ended: "bg-muted/10 text-muted",
-  campaign_closed: "bg-red/10 text-red",
-  clip_approved: "bg-green/10 text-green",
-  clip_rejected: "bg-red/10 text-red",
-  clip_held: "bg-purple-400/10 text-purple-400",
-  earnings_adjusted: "bg-amber/10 text-amber",
-  payout_initiated: "bg-blue-500/10 text-blue-500",
-  payout_completed: "bg-green/10 text-green",
-  payout_failed: "bg-red/10 text-red",
-  fraud_flag_created: "bg-red/10 text-red",
-  fraud_flag_cleared: "bg-green/10 text-green",
-  account_changed: "bg-blue-500/10 text-blue-500",
-  permission_changed: "bg-amber/10 text-amber",
-  admin_notes: "bg-muted/10 text-muted",
-  appeal_response: "bg-blue-500/10 text-blue-500",
-  risk_flagged: "bg-red/10 text-red",
-  risk_cleared: "bg-green/10 text-green",
-  other: "bg-muted/10 text-muted",
 };
 
-function fmtDateTime(ts: number): string {
+function fmtDateTime(ts: string): string {
   return new Date(ts).toLocaleString("en-IN", {
     day: "numeric",
     month: "short",
@@ -107,35 +113,37 @@ function fmtDate(ts: number): string {
 
 export default function AdminAuditPage() {
   const [q, setQ] = useState("");
-  const [action, setAction] = useState<AuditAction | "">("");
-  const [targetType, setTargetType] = useState("");
+  const [action, setAction] = useState("");
+  const [entityType, setEntityType] = useState("");
   const [actor, setActor] = useState("");
-  const [, setTick] = useState(0);
 
-  // Re-render when audit logs change
+  // Fetch audit logs from database whenever filters change
+  const [logs, setLogs] = useState<AuditLogEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+
   useEffect(() => {
-    initAuditLogs();
-    const unsub = subscribeAuditLogs(() => setTick((t) => t + 1));
-    return unsub;
-  }, []);
-
-  const logs = useMemo(
-    () =>
-      searchAuditLogs({
-        q,
-        action: action || undefined,
-        targetType: targetType || undefined,
-        actor: actor || undefined,
-      }),
-    [q, action, targetType, actor],
-  );
+    let cancelled = false;
+    startTransition(() => { setLoading(true); });
+    fetchAuditLogs({
+      q: q || undefined,
+      action: action || undefined,
+      entity_type: entityType || undefined,
+      actor: actor || undefined,
+      limit: 200,
+    }).then((data) => {
+      if (!cancelled) {
+        startTransition(() => { setLogs(data); setLoading(false); });
+      }
+    });
+    return () => { cancelled = true; };
+  }, [q, action, entityType, actor]);
 
   const exportCsv = () => {
-    const header = "Timestamp,Actor,Action,Target Type,Target ID,Target Label,Previous Value,New Value,Reason\n";
+    const header = "Timestamp,Actor,Action,Entity Type,Entity ID,Entity Label,Before State,After State,Metadata,Idempotency Key\n";
     const rows = logs
       .map(
         (l) =>
-          `"${fmtDateTime(l.timestamp)}","${l.actor}","${AUDIT_ACTION_LABELS[l.action] ?? l.action}","${l.targetType}","${l.targetId}","${l.targetLabel ?? ""}","${l.previousValue ?? ""}","${l.newValue ?? ""}","${l.reason ?? ""}"`,
+          `"${fmtDateTime(l.timestamp)}","${l.actor}","${AUDIT_ACTION_LABELS[l.action] ?? l.action}","${l.entity_type}","${l.entity_id}","${l.entity_label ?? ""}","${JSON.stringify(l.before_state ?? {})}","${JSON.stringify(l.after_state ?? {})}","${JSON.stringify(l.metadata ?? {})}","${l.idempotency_key ?? ""}"`,
       )
       .join("\n");
     const blob = new Blob([header + rows], { type: "text/csv" });
@@ -147,7 +155,7 @@ export default function AdminAuditPage() {
     URL.revokeObjectURL(url);
   };
 
-  const activeFilters = [action, targetType, actor, q].filter(Boolean).length;
+  const activeFilters = [action, entityType, actor, q].filter(Boolean).length;
 
   return (
     <div className="space-y-6">
@@ -189,7 +197,7 @@ export default function AdminAuditPage() {
         <div className="flex flex-wrap gap-2">
           <select
             value={action}
-            onChange={(e) => setAction(e.target.value as AuditAction | "")}
+            onChange={(e) => setAction(e.target.value)}
             className="flex-1 rounded-lg border bg-background px-3 py-2.5 text-sm outline-none focus:border-foreground sm:flex-initial"
           >
             {ACTION_OPTIONS.map((o) => (
@@ -200,12 +208,12 @@ export default function AdminAuditPage() {
           </select>
 
           <select
-            value={targetType}
-            onChange={(e) => setTargetType(e.target.value)}
+            value={entityType}
+            onChange={(e) => setEntityType(e.target.value)}
             className="flex-1 rounded-lg border bg-background px-3 py-2.5 text-sm outline-none focus:border-foreground sm:flex-initial"
           >
-            <option value="">All targets</option>
-            {AUDIT_TARGET_TYPES.map((t) => (
+            <option value="">All entities</option>
+            {AUDIT_ENTITY_TYPES.map((t) => (
               <option key={t} value={t}>
                 {t.charAt(0).toUpperCase() + t.slice(1)}
               </option>
@@ -223,16 +231,21 @@ export default function AdminAuditPage() {
 
       {/* Log entries */}
       <div className="overflow-hidden rounded-2xl border bg-card">
-        {logs.length === 0 ? (
+        {loading ? (
+          <div className="flex flex-col items-center gap-2 p-12 text-center text-muted">
+            <Loader2 size={28} className="animate-spin" />
+            <p className="text-sm">Loading audit logs...</p>
+          </div>
+        ) : logs.length === 0 ? (
           <div className="flex flex-col items-center gap-2 p-12 text-center text-muted">
             <History size={28} />
             <p className="text-sm">No audit logs found.</p>
-            {(q || action || targetType || actor) && (
+            {(q || action || entityType || actor) && (
               <button
                 onClick={() => {
                   setQ("");
                   setAction("");
-                  setTargetType("");
+                  setEntityType("");
                   setActor("");
                 }}
                 className="text-xs text-accent hover:underline"
@@ -244,8 +257,11 @@ export default function AdminAuditPage() {
         ) : (
           <div className="divide-y">
             {logs.map((log) => {
-              const Icon = TARGET_ICONS[log.targetType] ?? Settings;
+              const Icon = ENTITY_ICONS[log.entity_type] ?? Settings;
               const colorClass = ACTION_COLORS[log.action] ?? "bg-muted/10 text-muted";
+              const before = log.before_state as Record<string, unknown> | null;
+              const after = log.after_state as Record<string, unknown> | null;
+              const meta = log.metadata as Record<string, unknown> | null;
               return (
                 <div
                   key={log.id}
@@ -266,39 +282,44 @@ export default function AdminAuditPage() {
                         {AUDIT_ACTION_LABELS[log.action] ?? log.action}
                       </span>
                       <span className="text-xs text-muted">
-                        {log.targetType}
-                        {log.targetLabel ? ` · ${log.targetLabel}` : ""}
+                        {log.entity_type}
+                        {log.entity_label ? ` · ${log.entity_label}` : ""}
                       </span>
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted">
                       <span>by {log.actor}</span>
                       <span>{fmtDateTime(log.timestamp)}</span>
-                      {log.targetId && (
+                      {log.entity_id && (
                         <span className="font-mono text-[10px] text-muted/70">
-                          {log.targetId}
+                          {log.entity_id}
                         </span>
                       )}
                     </div>
-                    {(log.previousValue || log.newValue) && (
+                    {(before || after) && (
                       <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
-                        {log.previousValue && (
+                        {before && (
                           <span className="rounded bg-muted/10 px-1.5 py-0.5 font-mono text-muted">
-                            {log.previousValue}
+                            {JSON.stringify(before)}
                           </span>
                         )}
-                        {log.previousValue && log.newValue && (
+                        {before && after && (
                           <span className="text-muted">→</span>
                         )}
-                        {log.newValue && (
+                        {after && (
                           <span className="rounded bg-accent-soft px-1.5 py-0.5 font-mono">
-                            {log.newValue}
+                            {JSON.stringify(after)}
                           </span>
                         )}
                       </div>
                     )}
-                    {log.reason && (
+                    {typeof meta?.reason === "string" && meta.reason.length > 0 && (
                       <p className="mt-1 text-xs text-muted">
-                        <span className="font-medium">Reason:</span> {log.reason}
+                        <span className="font-medium">Reason:</span> {String(meta.reason)}
+                      </p>
+                    )}
+                    {log.idempotency_key && (
+                      <p className="mt-0.5 font-mono text-[10px] text-muted/50">
+                        idempotency: {log.idempotency_key}
                       </p>
                     )}
                   </div>
@@ -310,7 +331,8 @@ export default function AdminAuditPage() {
       </div>
 
       <p className="text-xs text-muted">
-        Audit logs are append-only and cannot be edited or deleted from the UI.
+        Audit logs are append-only and cannot be edited or deleted. Actor is
+        always derived from auth.uid() server-side.
       </p>
     </div>
   );

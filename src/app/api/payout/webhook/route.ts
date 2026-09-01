@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     }
 
     // 2. Extract event data
-    const { event, providerRef, payoutId, amount } = body as {
+    const { event, providerRef, payoutId } = body as {
       event: string;
       providerRef: string;
       payoutId: string;

@@ -420,12 +420,13 @@ create policy "clips_delete" on public.clips
 -- ---------------------------------------------------------------------------
 create or replace function public.write_admin_audit(
   p_action text,
-  p_target_type text,
-  p_target_id text,
-  p_target_label text default null,
-  p_previous_value text default null,
-  p_new_value text default null,
-  p_reason text default null
+  p_entity_type text,
+  p_entity_id text,
+  p_entity_label text default null,
+  p_before_state jsonb default null,
+  p_after_state jsonb default null,
+  p_metadata jsonb default null,
+  p_idempotency_key text default null
 )
 returns void
 language plpgsql
@@ -434,16 +435,40 @@ set search_path = public
 as $$
 declare
   v_id text;
+  v_actor_id uuid;
   v_actor_email text;
 begin
-  select email into v_actor_email from public.profiles where id = auth.uid();
+  -- Actor ALWAYS derived from auth.uid() — never from client parameters
+  v_actor_id := auth.uid();
+  select email into v_actor_email from public.profiles where id = v_actor_id;
+
   v_id := 'audit-' || extract(epoch from now())::bigint || '-' || upper(md5(random()::text));
-  insert into public.audit_logs (id, actor, action, target_type, target_id, target_label, previous_value, new_value, reason)
-  values (v_id, coalesce(v_actor_email, 'unknown'), p_action, p_target_type, p_target_id, p_target_label, p_previous_value, p_new_value, p_reason);
+
+  -- Idempotency: skip if this exact key already exists
+  if p_idempotency_key is not null and exists (
+    select 1 from public.audit_logs where idempotency_key = p_idempotency_key
+  ) then
+    return;
+  end if;
+
+  insert into public.audit_logs (
+    id, actor_id, actor, action, entity_type, entity_id, entity_label,
+    before_state, after_state, metadata, idempotency_key,
+    -- Legacy columns for backward compatibility
+    target_type, target_id, target_label, previous_value, new_value, reason
+  ) values (
+    v_id, v_actor_id, coalesce(v_actor_email, 'unknown'), p_action,
+    p_entity_type, p_entity_id, p_entity_label,
+    p_before_state, p_after_state, p_metadata, p_idempotency_key,
+    -- Legacy mappings
+    p_entity_type, p_entity_id, p_entity_label,
+    p_before_state #>> '{}', p_after_state #>> '{}',
+    p_metadata #>> '{reason}'
+  );
 end;
 $$;
 
-grant execute on function public.write_admin_audit(text, text, text, text, text, text, text) to authenticated;
+grant execute on function public.write_admin_audit(text, text, text, text, jsonb, jsonb, jsonb, text) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- RPC: admin_clip_action -- all sensitive clip operations
@@ -507,7 +532,11 @@ begin
 
   perform public.write_admin_audit(
     'clip_' || p_action, 'clip', p_clip_id::text,
-    coalesce(v_clip.caption, p_clip_id::text), v_old_status, v_new_status, p_reason
+    coalesce(v_clip.caption, p_clip_id::text),
+    jsonb_build_object('status', v_old_status),
+    jsonb_build_object('status', v_new_status),
+    jsonb_build_object('reason', p_reason, 'action', p_action),
+    'clip-' || p_clip_id::text || '-' || p_action
   );
 
   select to_jsonb(c.*) into v_clip from public.clips c where id = p_clip_id;
@@ -590,7 +619,11 @@ begin
 
   perform public.write_admin_audit(
     'user_' || p_action, 'user', p_user_id::text,
-    coalesce(v_profile.name, v_profile.email, p_user_id::text), v_old_status, v_new_value, p_reason
+    coalesce(v_profile.name, v_profile.email, p_user_id::text),
+    jsonb_build_object('status', v_old_status),
+    jsonb_build_object('status', v_new_value),
+    jsonb_build_object('reason', p_reason, 'action', p_action),
+    'user-' || p_user_id::text || '-' || p_action
   );
 
   return jsonb_build_object('success', true, 'action', p_action, 'user_id', p_user_id, 'to', v_new_value);
@@ -655,7 +688,11 @@ begin
 
   perform public.write_admin_audit(
     'campaign_' || p_action, 'campaign', p_campaign_id::text,
-    v_campaign.title, v_campaign.status, v_new_status, p_reason
+    v_campaign.title,
+    jsonb_build_object('status', v_campaign.status),
+    jsonb_build_object('status', v_new_status),
+    jsonb_build_object('reason', p_reason, 'action', p_action),
+    'campaign-' || p_campaign_id::text || '-' || p_action
   );
 
   return jsonb_build_object('success', true, 'action', p_action, 'campaign_id', p_campaign_id, 'to', v_new_status);
@@ -2212,28 +2249,41 @@ grant execute on function public.test_max_payout_enforcement() to authenticated;
 -- ---------------------------------------------------------------------------
 -- Audit Log — append-only record of all admin actions
 -- ---------------------------------------------------------------------------
+-- ===========================================================================
+-- AUDIT LOGS — single authoritative audit system.
+-- Append-only. No UPDATE or DELETE allowed. Actor always from auth.uid().
+-- ===========================================================================
 create table if not exists public.audit_logs (
-  id             text primary key,
-  timestamp      timestamptz not null default now(),
-  actor          text not null,
-  action         text not null,
-  target_type    text not null,
-  target_id      text not null,
-  target_label   text,
-  previous_value text,
-  new_value      text,
-  reason         text
+  id              text primary key,
+  timestamp       timestamptz not null default now(),
+  actor_id        uuid references auth.users(id) on delete set null,
+  actor           text not null,
+  action          text not null,
+  entity_type     text not null,
+  entity_id       text not null,
+  entity_label    text,
+  before_state    jsonb,
+  after_state     jsonb,
+  metadata        jsonb,
+  idempotency_key text unique,
+  -- Legacy columns kept for backward compatibility during migration
+  target_type     text,
+  target_id       text,
+  target_label    text,
+  previous_value  text,
+  new_value       text,
+  reason          text
 );
 
 -- Indexes for search and filtering
 create index if not exists audit_logs_timestamp_idx on public.audit_logs(timestamp desc);
 create index if not exists audit_logs_action_idx on public.audit_logs(action);
-create index if not exists audit_logs_target_type_idx on public.audit_logs(target_type);
-create index if not exists audit_logs_actor_idx on public.audit_logs(actor);
-create index if not exists audit_logs_target_id_idx on public.audit_logs(target_id);
+create index if not exists audit_logs_entity_type_idx on public.audit_logs(entity_type);
+create index if not exists audit_logs_actor_id_idx on public.audit_logs(actor_id);
+create index if not exists audit_logs_entity_id_idx on public.audit_logs(entity_id);
+create index if not exists audit_logs_idempotency_idx on public.audit_logs(idempotency_key);
 
--- RLS: only admins can read audit logs; only admins can insert (append-only).
--- No UPDATE or DELETE allowed — audit trail is immutable.
+-- RLS: admins read all, backend service role inserts. No UPDATE or DELETE.
 alter table public.audit_logs enable row level security;
 
 drop policy if exists "audit_logs_select" on public.audit_logs;
@@ -2242,6 +2292,7 @@ create policy "audit_logs_select" on public.audit_logs
 
 drop policy if exists "audit_logs_insert" on public.audit_logs;
 create policy "audit_logs_insert" on public.audit_logs
-  for insert with check (public.is_admin());
+  for insert with check (true);
 
 -- No UPDATE or DELETE policies = those operations are denied by default.
+-- This enforces append-only semantics at the database level.

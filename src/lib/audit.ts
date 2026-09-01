@@ -1,39 +1,105 @@
+// ---------------------------------------------------------------------------
+// Audit Log — single authoritative source: database audit_logs table.
+//
+// localStorage is NOT an authoritative audit source. All audit records live
+// in the database, written server-side by write_admin_audit() RPC.
+//
+// This module provides:
+// - Reading audit logs from the database
+// - Subscribing to changes (polling-based)
+// - Searching/filtering
+// ---------------------------------------------------------------------------
+
 import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
-import type { AuditLog, AuditAction } from "@/lib/types";
 
-const STORAGE_KEY = "cliptwo:audit-logs";
+// ── Database audit log row (matches the new audit_logs schema) ──────────────
 
-// ── In-memory store ──────────────────────────────────────────────────────────
-let _logs: AuditLog[] = [];
+export interface AuditLogEntry {
+  id: string;
+  timestamp: string;
+  actor_id: string | null;
+  actor: string;
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  entity_label: string | null;
+  before_state: Record<string, unknown> | null;
+  after_state: Record<string, unknown> | null;
+  metadata: Record<string, unknown> | null;
+  idempotency_key: string | null;
+}
+
+// ── State ───────────────────────────────────────────────────────────────────
+
+let _logs: AuditLogEntry[] = [];
 let _listeners: Array<() => void> = [];
+let _loading = false;
 
 function emit() {
   for (const fn of _listeners) fn();
 }
 
-function loadLocal(): AuditLog[] {
-  if (typeof window === "undefined") return [];
+// ── Fetch audit logs from database ──────────────────────────────────────────
+
+export async function fetchAuditLogs(opts?: {
+  q?: string;
+  action?: string;
+  entity_type?: string;
+  actor?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<AuditLogEntry[]> {
+  if (!isSupabaseConfigured) return [];
+
+  _loading = true;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as AuditLog[]) : [];
-  } catch {
-    return [];
+    let query = supabase
+      .from("audit_logs")
+      .select("*")
+      .order("timestamp", { ascending: false })
+      .limit(opts?.limit ?? 100);
+
+    if (opts?.action) {
+      query = query.eq("action", opts.action);
+    }
+    if (opts?.entity_type) {
+      query = query.eq("entity_type", opts.entity_type);
+    }
+    if (opts?.actor) {
+      query = query.ilike("actor", `%${opts.actor}%`);
+    }
+    if (opts?.q) {
+      const needle = `%${opts.q}%`;
+      query = query.or(
+        `actor.ilike.${needle},action.ilike.${needle},entity_id.ilike.${needle},entity_label.ilike.${needle}`,
+      );
+    }
+    if (opts?.offset) {
+      query = query.range(opts.offset, (opts.offset ?? 0) + (opts?.limit ?? 100) - 1);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      console.error("Failed to fetch audit logs:", error.message);
+      return [];
+    }
+
+    _logs = (data as AuditLogEntry[]) ?? [];
+    emit();
+    return _logs;
+  } finally {
+    _loading = false;
   }
 }
 
-function persistLocal() {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(_logs));
-  } catch {
-    /* quota exceeded — ignore */
-  }
-}
+// ── Public API ──────────────────────────────────────────────────────────────
 
-// ── Public API ───────────────────────────────────────────────────────────────
-
-export function getAuditLogs(): AuditLog[] {
+export function getAuditLogs(): AuditLogEntry[] {
   return _logs;
+}
+
+export function isLoading(): boolean {
+  return _loading;
 }
 
 export function subscribeAuditLogs(fn: () => void): () => void {
@@ -43,51 +109,21 @@ export function subscribeAuditLogs(fn: () => void): () => void {
   };
 }
 
-export function initAuditLogs(): void {
-  _logs = loadLocal().sort((a, b) => b.timestamp - a.timestamp);
+// Initialize: fetch from database
+export async function initAuditLogs(): Promise<void> {
+  await fetchAuditLogs();
 }
 
-export function appendAuditLog(
-  entry: Omit<AuditLog, "id" | "timestamp">,
-): AuditLog {
-  const log: AuditLog = {
-    ...entry,
-    id: `audit_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-    timestamp: Date.now(),
-  };
-  _logs = [log, ..._logs];
-  persistLocal();
-  emit();
-
-  // Persist to Supabase if configured (fire-and-forget)
-  if (isSupabaseConfigured) {
-    ignore(
-      supabase.from("audit_logs").insert({
-        id: log.id,
-        timestamp: new Date(log.timestamp).toISOString(),
-        actor: log.actor,
-        action: log.action,
-        target_type: log.targetType,
-        target_id: log.targetId,
-        target_label: log.targetLabel ?? null,
-        previous_value: log.previousValue ?? null,
-        new_value: log.newValue ?? null,
-        reason: log.reason ?? null,
-      }),
-    );
-  }
-
-  return log;
-}
+// ── Search (client-side on cached data) ─────────────────────────────────────
 
 export function searchAuditLogs(opts: {
   q?: string;
-  action?: AuditAction | "";
-  targetType?: string;
+  action?: string;
+  entity_type?: string;
   actor?: string;
   from?: number;
   to?: number;
-}): AuditLog[] {
+}): AuditLogEntry[] {
   let result = _logs;
 
   if (opts.q) {
@@ -96,11 +132,11 @@ export function searchAuditLogs(opts: {
       (l) =>
         l.actor.toLowerCase().includes(needle) ||
         l.action.toLowerCase().includes(needle) ||
-        l.targetId.toLowerCase().includes(needle) ||
-        (l.targetLabel ?? "").toLowerCase().includes(needle) ||
-        (l.reason ?? "").toLowerCase().includes(needle) ||
-        (l.previousValue ?? "").toLowerCase().includes(needle) ||
-        (l.newValue ?? "").toLowerCase().includes(needle),
+        l.entity_id.toLowerCase().includes(needle) ||
+        (l.entity_label ?? "").toLowerCase().includes(needle) ||
+        JSON.stringify(l.metadata ?? {}).toLowerCase().includes(needle) ||
+        JSON.stringify(l.before_state ?? {}).toLowerCase().includes(needle) ||
+        JSON.stringify(l.after_state ?? {}).toLowerCase().includes(needle),
     );
   }
 
@@ -108,8 +144,8 @@ export function searchAuditLogs(opts: {
     result = result.filter((l) => l.action === opts.action);
   }
 
-  if (opts.targetType) {
-    result = result.filter((l) => l.targetType === opts.targetType);
+  if (opts.entity_type) {
+    result = result.filter((l) => l.entity_type === opts.entity_type);
   }
 
   if (opts.actor) {
@@ -118,39 +154,56 @@ export function searchAuditLogs(opts: {
   }
 
   if (opts.from) {
-    result = result.filter((l) => l.timestamp >= opts.from!);
+    result = result.filter(
+      (l) => new Date(l.timestamp).getTime() >= opts.from!,
+    );
   }
 
   if (opts.to) {
-    result = result.filter((l) => l.timestamp <= opts.to!);
+    result = result.filter(
+      (l) => new Date(l.timestamp).getTime() <= opts.to!,
+    );
   }
 
   return result;
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Action label map ────────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function ignore(_: unknown) {
-  /* fire-and-forget */
-}
-
-// ── Action label map ─────────────────────────────────────────────────────────
-
-export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
+export const AUDIT_ACTION_LABELS: Record<string, string> = {
   user_created: "User created",
   user_suspended: "User suspended",
   user_reactivated: "User reactivated",
   user_verified: "User verified",
   user_unverified: "User unverified",
+  user_suspend: "User suspended",
+  user_reactivate: "User reactivated",
+  user_verify: "User verified",
+  user_unverify: "User unverified",
+  user_set_risk: "Risk flagged",
+  user_clear_risk: "Risk cleared",
+  user_save_notes: "Admin notes",
+  user_delete: "User deleted",
   campaign_created: "Campaign created",
   campaign_edited: "Campaign edited",
   campaign_paused: "Campaign paused",
-  campaign_ended: "Campaign ended",
-  campaign_closed: "Campaign closed",
+  campaign_resume: "Campaign resumed",
+  campaign_end: "Campaign ended",
+  campaign_close: "Campaign closed",
+  campaign_reopen: "Campaign reopened",
+  campaign_delete: "Campaign deleted",
   clip_approved: "Clip approved",
   clip_rejected: "Clip rejected",
   clip_held: "Clip held",
+  clip_approve: "Clip approved",
+  clip_reject: "Clip rejected",
+  clip_hold: "Clip held",
+  clip_processing: "Payout processing",
+  clip_paid: "Clip paid",
+  clip_failed: "Payout failed",
+  clip_retry: "Payout retried",
+  clip_release: "Clip released",
+  clip_revert: "Clip reverted",
   earnings_adjusted: "Earnings adjusted",
   payout_initiated: "Payout initiated",
   payout_completed: "Payout completed",
@@ -166,10 +219,12 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   other: "Other",
 };
 
-export const AUDIT_TARGET_TYPES = [
+export const AUDIT_ENTITY_TYPES = [
   "user",
   "campaign",
   "clip",
   "system",
   "fraud",
+  "payout",
+  "earning",
 ] as const;
