@@ -10,7 +10,6 @@ import {
   Eye,
   Shield,
   Link2,
-  Camera,
   Trash2,
   ToggleLeft,
   ToggleRight,
@@ -77,16 +76,10 @@ export default function ClipperSettingsPage() {
           Profile details
         </h2>
         <div className="mt-4 flex items-start gap-5">
-          <div className="relative shrink-0">
+          <div className="shrink-0">
             <span className="flex h-16 w-16 items-center justify-center rounded-full bg-accent text-xl font-semibold text-white">
               {(user?.name?.[0] ?? "C").toUpperCase()}
             </span>
-            <button
-              aria-label="Change photo"
-              className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border bg-card text-muted hover:text-foreground"
-            >
-              <Camera size={12} />
-            </button>
           </div>
           <div className="grid flex-1 gap-4 sm:grid-cols-2">
             <label className="block text-sm">
