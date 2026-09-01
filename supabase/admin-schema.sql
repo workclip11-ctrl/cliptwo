@@ -694,9 +694,105 @@ drop policy if exists "earnings_delete" on public.earnings;
 create policy "earnings_delete" on public.earnings
   for delete using (public.is_admin());
 
+-- ===========================================================================
+-- WALLET LEDGER — authoritative source of truth for all financial balances.
+-- Every money movement is an immutable ledger entry. Balances are DERIVED,
+-- never stored. Users can never insert positive entries themselves.
+-- All amounts in INTEGER minor units (paise for INR).
+-- ===========================================================================
+create table if not exists public.wallet_ledger (
+  id              uuid primary key default gen_random_uuid(),
+  user_id         uuid not null references auth.users(id) on delete cascade,
+  type            text not null check (type in (
+    'earning_credit',    -- clip earning credited to wallet
+    'adjustment',        -- admin manual adjustment (positive or negative)
+    'payout_debit',      -- payout initiated, debited from wallet
+    'reversal',          -- reverses a previous entry (negative of original)
+    'refund'             -- refund/reversal of a failed payout
+  )),
+  amount          integer not null,  -- positive = credit, negative = debit, in paise
+  currency        text not null default 'INR',
+  reference_type  text not null,     -- 'earning', 'payout', 'adjustment', etc.
+  reference_id    uuid not null,     -- ID of the related earning/payout/etc.
+  idempotency_key text unique not null, -- prevents duplicate entries
+  created_at      timestamptz not null default now(),
+  metadata        jsonb              -- flexible audit data (actor, reason, etc.)
+);
+
+-- Performance indexes
+create index if not exists ledger_user_id_idx on public.wallet_ledger(user_id);
+create index if not exists ledger_type_idx on public.wallet_ledger(type);
+create index if not exists ledger_reference_idx on public.wallet_ledger(reference_type, reference_id);
+create index if not exists ledger_created_idx on public.wallet_ledger(created_at);
+create index if not exists ledger_idempotency_idx on public.wallet_ledger(idempotency_key);
+
+-- RLS: users see own entries, admins see all. INSERT/UPDATE/DELETE admin-only.
+alter table public.wallet_ledger enable row level security;
+
+drop policy if exists "ledger_select" on public.wallet_ledger;
+create policy "ledger_select" on public.wallet_ledger
+  for select using (auth.uid() = user_id or public.is_admin());
+
+drop policy if exists "ledger_insert" on public.wallet_ledger;
+create policy "ledger_insert" on public.wallet_ledger
+  for insert with check (public.is_admin());
+
+drop policy if exists "ledger_update" on public.wallet_ledger;
+create policy "ledger_update" on public.wallet_ledger
+  for update using (public.is_admin());
+
+drop policy if exists "ledger_delete" on public.wallet_ledger;
+create policy "ledger_delete" on public.wallet_ledger
+  for delete using (public.is_admin());
+
+-- ===========================================================================
+-- PAYOUTS — tracks payout requests and disbursements.
+-- A payout groups one or more earnings for batch disbursement.
+-- ===========================================================================
+create table if not exists public.payouts (
+  id              uuid primary key default gen_random_uuid(),
+  user_id         uuid not null references auth.users(id) on delete cascade,
+  amount          integer not null,  -- total payout amount in paise (net to clipper)
+  currency        text not null default 'INR',
+  status          text not null default 'requested' check (status in (
+    'requested',    -- clipper requested payout
+    'processing',   -- admin is processing
+    'completed',    -- payout sent
+    'failed'        -- payout failed
+  )),
+  method          text,              -- 'upi', 'bank_transfer', etc.
+  upi_id          text,              -- UPI ID used for this payout
+  payout_ref      text,              -- external payment reference
+  requested_at    timestamptz not null default now(),
+  processed_at    timestamptz,
+  completed_at    timestamptz,
+  failed_at       timestamptz,
+  failure_reason  text,
+  audit           jsonb
+);
+
+create index if not exists payouts_user_idx on public.payouts(user_id);
+create index if not exists payouts_status_idx on public.payouts(status);
+
+-- RLS: clipper sees own, admin sees all. Mutations admin-only.
+alter table public.payouts enable row level security;
+
+drop policy if exists "payouts_select" on public.payouts;
+create policy "payouts_select" on public.payouts
+  for select using (auth.uid() = user_id or public.is_admin());
+
+drop policy if exists "payouts_insert" on public.payouts;
+create policy "payouts_insert" on public.payouts
+  for insert with check (auth.uid() = user_id);
+
+drop policy if exists "payouts_update" on public.payouts;
+create policy "payouts_update" on public.payouts
+  for update using (public.is_admin());
+
 -- ---------------------------------------------------------------------------
--- RPC: Create immutable earning record when clip is approved
+-- RPC: Create immutable earning record AND wallet ledger entry.
 -- Locks the CPM at time of approval. All calculations in INTEGER paise.
+-- The ledger entry is the authoritative source for wallet balance.
 -- ---------------------------------------------------------------------------
 create or replace function public.create_earning(
   p_clip_id uuid,
@@ -718,6 +814,8 @@ declare
   v_creator_fee integer;
   v_max_payout integer;
   v_earning jsonb;
+  v_ledger_id uuid;
+  v_idempotency_key text;
 begin
   -- Only admins can create earnings
   if not public.is_admin() then
@@ -761,7 +859,13 @@ begin
   -- Creator fee: 10% of gross (charged to creator)
   v_creator_fee := round(v_gross * 0.10)::integer;
 
-  -- Insert earning record
+  -- Idempotency: skip if earning already exists for this clip
+  if exists (select 1 from public.earnings where clip_id = p_clip_id) then
+    select to_jsonb(e.*) into v_earning from public.earnings e where clip_id = p_clip_id;
+    return v_earning;
+  end if;
+
+  -- Insert earning record (immutable snapshot)
   insert into public.earnings (
     clip_id, campaign_id, clipper_id, locked_cpm, verified_views,
     gross_amount, platform_fee, net_amount, creator_fee,
@@ -775,6 +879,33 @@ begin
   )
   returning to_jsonb(earnings.*) into v_earning;
 
+  -- Generate idempotency key for ledger entry
+  v_idempotency_key := 'earning-credit-' || p_clip_id::text;
+
+  -- Insert ledger entry (only for positive net amounts and only once)
+  if v_net > 0 and not exists (
+    select 1 from public.wallet_ledger where idempotency_key = v_idempotency_key
+  ) then
+    insert into public.wallet_ledger (
+      user_id, type, amount, currency, reference_type, reference_id,
+      idempotency_key, metadata
+    ) values (
+      v_clip.user_id, 'earning_credit', v_net, 'INR', 'earning',
+      (v_earning->>'id')::uuid, v_idempotency_key,
+      jsonb_build_object(
+        'clip_id', p_clip_id,
+        'campaign_id', v_clip.campaign_id,
+        'campaign_title', v_campaign.title,
+        'locked_cpm', v_locked_cpm,
+        'verified_views', v_verified_views,
+        'gross', v_gross,
+        'platform_fee', v_platform_fee,
+        'creator_fee', v_creator_fee,
+        'actor', (select email from public.profiles where id = auth.uid())
+      )
+    ) returning id into v_ledger_id;
+  end if;
+
   return v_earning;
 end;
 $$;
@@ -784,6 +915,8 @@ grant execute on function public.create_earning(uuid, text) to authenticated;
 -- ---------------------------------------------------------------------------
 -- RPC: Update earning status (approve, pay, fail)
 -- Immutable: locked_cpm, gross_amount, platform_fee, net_amount never change
+-- When paying: creates payout_debit ledger entry.
+-- When failing: creates refund ledger entry to reverse the credit.
 -- ---------------------------------------------------------------------------
 create or replace function public.update_earning_status(
   p_earning_id uuid,
@@ -796,7 +929,8 @@ security definer
 set search_path = public
 as $$
 declare
-  v_earning jsonb;
+  v_earning record;
+  v_old_status text;
 begin
   -- Only admins can update earnings
   if not public.is_admin() then
@@ -808,6 +942,13 @@ begin
     raise exception 'Invalid earning status: %', p_status;
   end if;
 
+  -- Get current earning for state tracking
+  select * into v_earning from public.earnings where id = p_earning_id;
+  if not found then
+    raise exception 'Earning not found';
+  end if;
+  v_old_status := v_earning.status;
+
   -- Update earning (only status and payment fields, NOT financial amounts)
   update public.earnings set
     status = p_status,
@@ -817,11 +958,55 @@ begin
       'action', 'status_changed',
       'by', (select email from public.profiles where id = auth.uid()),
       'at', now(),
-      'from', status,
+      'from', v_old_status,
       'to', p_status
     )
   where id = p_earning_id
   returning to_jsonb(earnings.*) into v_earning;
+
+  -- On payment: create payout_debit ledger entry
+  if p_status = 'paid' and v_old_status != 'paid' then
+    if not exists (
+      select 1 from public.wallet_ledger
+      where idempotency_key = 'payout-debit-' || p_earning_id::text
+    ) then
+      insert into public.wallet_ledger (
+        user_id, type, amount, currency, reference_type, reference_id,
+        idempotency_key, metadata
+      ) values (
+        v_earning.clipper_id, 'payout_debit', -v_earning.net_amount, 'INR',
+        'earning', p_earning_id,
+        'payout-debit-' || p_earning_id::text,
+        jsonb_build_object(
+          'earning_id', p_earning_id,
+          'payout_ref', p_payout_ref,
+          'actor', (select email from public.profiles where id = auth.uid())
+        )
+      );
+    end if;
+  end if;
+
+  -- On failure after payment: create refund ledger entry (reverses the debit)
+  if p_status = 'failed' and v_old_status = 'paid' then
+    if not exists (
+      select 1 from public.wallet_ledger
+      where idempotency_key = 'refund-' || p_earning_id::text
+    ) then
+      insert into public.wallet_ledger (
+        user_id, type, amount, currency, reference_type, reference_id,
+        idempotency_key, metadata
+      ) values (
+        v_earning.clipper_id, 'refund', v_earning.net_amount, 'INR',
+        'earning', p_earning_id,
+        'refund-' || p_earning_id::text,
+        jsonb_build_object(
+          'earning_id', p_earning_id,
+          'reason', 'Payout failed, refunding to wallet',
+          'actor', (select email from public.profiles where id = auth.uid())
+        )
+      );
+    end if;
+  end if;
 
   return v_earning;
 end;
@@ -830,7 +1015,163 @@ $$;
 grant execute on function public.update_earning_status(uuid, text, text) to authenticated;
 
 -- ---------------------------------------------------------------------------
--- RPC: Get earnings summary for a clipper (immutable, from earnings table)
+-- RPC: Get wallet balance derived from authoritative ledger records.
+-- Positive = credit, negative = debit. Never stored, always computed.
+-- ---------------------------------------------------------------------------
+create or replace function public.get_wallet_balance(p_user_id uuid)
+returns jsonb
+language sql
+security definer
+set search_path = public
+as $$
+  select jsonb_build_object(
+    'user_id', p_user_id,
+    'balance', coalesce(sum(amount), 0),
+    'currency', 'INR',
+    'total_credits', coalesce(sum(amount) filter (where amount > 0), 0),
+    'total_debits', coalesce(sum(amount) filter (where amount < 0), 0),
+    'entry_count', count(*),
+    'available', coalesce(sum(amount), 0)  -- balance = available (no separate pending bucket in ledger)
+  )
+  from public.wallet_ledger
+  where user_id = p_user_id;
+$$;
+
+grant execute on function public.get_wallet_balance(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- RPC: Get wallet ledger entries for a user (paginated).
+-- ---------------------------------------------------------------------------
+create or replace function public.get_wallet_entries(
+  p_user_id uuid,
+  p_limit integer default 50,
+  p_offset integer default 0
+)
+returns jsonb
+language sql
+security definer
+set search_path = public
+as $$
+  select coalesce(jsonb_agg(row_to_json(le)), '[]'::jsonb)
+  from (
+    select id, user_id, type, amount, currency, reference_type,
+           reference_id, idempotency_key, created_at, metadata
+    from public.wallet_ledger
+    where user_id = p_user_id
+    order by created_at desc
+    limit p_limit offset p_offset
+  ) le;
+$$;
+
+grant execute on function public.get_wallet_entries(uuid, integer, integer) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- RPC: Admin adjustment to wallet (positive or negative).
+-- Creates an adjustment ledger entry. Requires admin role.
+-- ---------------------------------------------------------------------------
+create or replace function public.adjust_wallet(
+  p_user_id uuid,
+  p_amount integer,
+  p_reason text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_entry jsonb;
+  v_idempotency_key text;
+begin
+  if not public.is_admin() then
+    raise exception 'Only admins can adjust wallets';
+  end if;
+
+  if p_amount = 0 then
+    raise exception 'Adjustment amount cannot be zero';
+  end if;
+
+  -- Idempotency key includes timestamp to allow multiple adjustments
+  v_idempotency_key := 'adjust-' || p_user_id::text || '-' || extract(epoch from now())::text;
+
+  insert into public.wallet_ledger (
+    user_id, type, amount, currency, reference_type, reference_id,
+    idempotency_key, metadata
+  ) values (
+    p_user_id, 'adjustment', p_amount, 'INR', 'adjustment',
+    gen_random_uuid(), v_idempotency_key,
+    jsonb_build_object(
+      'reason', p_reason,
+      'actor', (select email from public.profiles where id = auth.uid())
+    )
+  )
+  returning to_jsonb(wallet_ledger.*) into v_entry;
+
+  return v_entry;
+end;
+$$;
+
+grant execute on function public.adjust_wallet(uuid, integer, text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- RPC: Reverse a previous ledger entry.
+-- Creates a reversal entry with the opposite sign of the original.
+-- ---------------------------------------------------------------------------
+create or replace function public.reverse_ledger_entry(
+  p_entry_id uuid,
+  p_reason text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_original record;
+  v_entry jsonb;
+  v_idempotency_key text;
+begin
+  if not public.is_admin() then
+    raise exception 'Only admins can reverse ledger entries';
+  end if;
+
+  select * into v_original from public.wallet_ledger where id = p_entry_id;
+  if not found then
+    raise exception 'Ledger entry not found';
+  end if;
+
+  -- Check if already reversed
+  v_idempotency_key := 'reversal-' || p_entry_id::text;
+  if exists (select 1 from public.wallet_ledger where idempotency_key = v_idempotency_key) then
+    raise exception 'Entry already reversed';
+  end if;
+
+  -- Create reversal (opposite amount)
+  insert into public.wallet_ledger (
+    user_id, type, amount, currency, reference_type, reference_id,
+    idempotency_key, metadata
+  ) values (
+    v_original.user_id, 'reversal', -v_original.amount, 'INR',
+    v_original.reference_type, v_original.reference_id,
+    v_idempotency_key,
+    jsonb_build_object(
+      'reversed_entry_id', p_entry_id,
+      'original_amount', v_original.amount,
+      'original_type', v_original.type,
+      'reason', p_reason,
+      'actor', (select email from public.profiles where id = auth.uid())
+    )
+  )
+  returning to_jsonb(wallet_ledger.*) into v_entry;
+
+  return v_entry;
+end;
+$$;
+
+grant execute on function public.reverse_ledger_entry(uuid, text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- RPC: Get earnings summary for a clipper (from earnings table).
 -- ---------------------------------------------------------------------------
 create or replace function public.get_clipper_earnings(p_clipper_id uuid)
 returns jsonb
