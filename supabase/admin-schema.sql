@@ -108,16 +108,21 @@ create policy "profiles_select" on public.profiles
 
 drop policy if exists "profiles_insert" on public.profiles;
 create policy "profiles_insert" on public.profiles
-  for insert with check (auth.uid() = id);
+  for insert with check (
+    auth.uid() = id
+    AND role IN ('clipper', 'creator')
+  );
 
 -- UPDATE is gated per sensitive field. A clipper may edit their own row; an
 -- admin may change a field only if they hold the matching permission (the
 -- super-admin holds all). Non-sensitive fields (name, upi, ...) are free.
+-- SECURITY: role can ONLY be changed by admins (via adminProfilePatch).
 drop policy if exists "profiles_update" on public.profiles;
 create policy "profiles_update" on public.profiles
   for update using (auth.uid() = id or public.is_admin())
   with check (
-    (OLD.status IS NOT DISTINCT FROM NEW.status OR public.admin_has_perm('clipper.suspend'))
+    (OLD.role IS NOT DISTINCT FROM NEW.role OR public.is_admin())
+    AND (OLD.status IS NOT DISTINCT FROM NEW.status OR public.admin_has_perm('clipper.suspend'))
     AND (OLD.suspended_reason IS NOT DISTINCT FROM NEW.suspended_reason OR public.admin_has_perm('clipper.suspend'))
     AND (OLD.verified IS NOT DISTINCT FROM NEW.verified OR public.admin_has_perm('clipper.verify'))
     AND (OLD.verified_at IS NOT DISTINCT FROM NEW.verified_at OR public.admin_has_perm('clipper.verify'))

@@ -1311,10 +1311,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    function isUserAdmin(user: { user_metadata?: Record<string, unknown> } | null) {
-      if (!user) return false;
-      const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
-      return meta.role === "admin";
+    // SECURITY: Always query profiles.role (server-controlled), never trust user_metadata.
+    async function isUserAdmin(userId: string | undefined | null): Promise<boolean> {
+      if (!isSupabaseConfigured || !userId) return false;
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", userId)
+          .maybeSingle();
+        return data?.role === "admin";
+      } catch {
+        return false;
+      }
     }
 
     // Core admin profile patcher: merges a partial profile update, appends an
@@ -1329,7 +1338,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     ) => {
       // SECURITY: Only admins can use adminProfilePatch.
       const me = await getCurrentUser();
-      if (!isUserAdmin(me)) {
+      if (!await isUserAdmin(me?.id)) {
         console.error(`Authorization: non-admin user cannot admin-patch profile ${id}`);
         return;
       }
@@ -1514,7 +1523,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
        setClipStatus: async (id, status, patch, actor) => {
           // SECURITY: Only admins can change clip status. Creators cannot approve/reject.
           const me = await getCurrentUser();
-          if (!isUserAdmin(me)) {
+          if (!await isUserAdmin(me?.id)) {
             console.error(`Authorization: non-admin user cannot change clip status for ${id}`);
             return;
           }
@@ -1664,7 +1673,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         // SECURITY: Only campaign creator or admins can close campaigns.
         const me = await getCurrentUser();
         const existingCamp = stateRef.current.campaigns.find((c) => c.id === id);
-        if (me && existingCamp && existingCamp.created_by !== me.id && !isUserAdmin(me)) {
+        if (me && existingCamp && existingCamp.created_by !== me.id && !await isUserAdmin(me.id)) {
           console.error(`Authorization: user ${me.id} cannot close campaign ${id}`);
           return;
         }
@@ -1693,7 +1702,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         // SECURITY: Only campaign creator or admins can delete campaigns.
         const me = await getCurrentUser();
         const camp = stateRef.current.campaigns.find((c) => c.id === id);
-        if (isSupabaseConfigured && me && camp && camp.created_by && camp.created_by !== me.id && !isUserAdmin(me)) {
+        if (isSupabaseConfigured && me && camp && camp.created_by && camp.created_by !== me.id && !await isUserAdmin(me.id)) {
           console.error(`Authorization: user ${me.id} cannot delete campaign ${id}`);
           return;
         }
@@ -1706,7 +1715,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         // SECURITY: Only campaign creator or admins can update campaigns.
         const me = await getCurrentUser();
         const camp = stateRef.current.campaigns.find((c) => c.id === id);
-        if (isSupabaseConfigured && me && camp && camp.created_by && camp.created_by !== me.id && !isUserAdmin(me)) {
+        if (isSupabaseConfigured && me && camp && camp.created_by && camp.created_by !== me.id && !await isUserAdmin(me.id)) {
           console.error(`Authorization: user ${me.id} cannot update campaign ${id}`);
           return;
         }
@@ -1849,7 +1858,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       deleteProfile: async (id) => {
         // SECURITY: Only admins can delete profiles.
         const me = await getCurrentUser();
-        if (!me || !isUserAdmin(me)) {
+        if (!me || !await isUserAdmin(me.id)) {
           console.error(`Authorization: user ${me?.id ?? "anonymous"} cannot delete profile ${id}`);
           return;
         }
@@ -1860,10 +1869,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
       updateProfile: async (id, patch) => {
         // SECURITY: Users can only update their own profile. Admins can update any.
+        // SECURITY: Privileged fields (role, status, verified, risk_flag, admin_notes)
+        // must only be changed via adminProfilePatch, never via updateProfile.
         const me = await getCurrentUser();
-        if (me && me.id !== id && !isUserAdmin(me)) {
+        if (me && me.id !== id && !await isUserAdmin(me.id)) {
           console.error(`Authorization: user ${me.id} cannot update profile ${id}`);
           return;
+        }
+        // Block non-admins from setting privileged fields
+        if (me && !await isUserAdmin(me.id)) {
+          const { role, status, verified, verifiedAt, riskFlag, riskNote, adminNotes, suspendedReason, appeals, audit, ...safe } = patch as Record<string, unknown>;
+          void role; void status; void verified; void verifiedAt; void riskFlag; void riskNote; void adminNotes; void suspendedReason; void appeals; void audit;
+          Object.assign(patch, safe);
         }
         setState((s) => {
           const exists = s.profiles.some((p) => p.id === id);

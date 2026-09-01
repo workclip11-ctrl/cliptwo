@@ -88,6 +88,8 @@ async function enrichProfileFromDb(u: UserProfile): Promise<UserProfile> {
 }
 
 // Backfill a public `profiles` row for any signed-in user.
+// SECURITY: Never trust u.role from client. New profiles always get "clipper".
+// Role promotion is exclusively via adminProfilePatch (admin-controlled).
 async function ensureProfile(u: UserProfile) {
   if (!isSupabaseConfigured) return;
   try {
@@ -101,7 +103,7 @@ async function ensureProfile(u: UserProfile) {
         id: u.id,
         name: u.name,
         email: u.email,
-        role: u.role,
+        role: "clipper",
         status: "active",
       });
     }
@@ -131,14 +133,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const apply = (u: UserProfile | null) => {
       if (!active) return;
       if (u) {
-        // Set initial state immediately so UI renders, but keep loading=true
-        // so AdminGuard waits for DB enrichment before deciding to redirect.
+        // SECURITY: Set isSignedIn immediately, but do NOT set role yet.
+        // Role stays null until DB enrichment completes, so guards block rendering.
         setUser(u);
-        setRole(u.role);
         setIsSignedIn(true);
         ensureProfile(u);
 
-        // Enrich role from profiles table (source of truth, user_metadata can be stale)
+        // Enrich role from profiles table (source of truth, NEVER trust user_metadata)
         void (async () => {
           const enriched = await enrichProfileFromDb(u);
           if (!active) return;
@@ -223,7 +224,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const base = profileFromUser(data.session.user ?? null);
     if (base) {
       ensureProfile(base);
-      return base;
+      // SECURITY: Return enriched profile from DB, not client-trusted one
+      const enriched = await enrichProfileFromDb(base);
+      return enriched;
     }
     return null;
   };
