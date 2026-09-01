@@ -69,6 +69,24 @@ function profileFromUser(user: {
   return { id: user.id ?? "", name, email: user.email ?? "", role };
 }
 
+// Also check the profiles table for the real role (user_metadata can be stale).
+async function enrichProfileFromDb(u: UserProfile): Promise<UserProfile> {
+  if (!isSupabaseConfigured) return u;
+  try {
+    const { data } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", u.id)
+      .maybeSingle();
+    if (data?.role && (data.role === "admin" || data.role === "clipper" || data.role === "creator")) {
+      return { ...u, role: data.role as Role };
+    }
+  } catch {
+    /* non-fatal */
+  }
+  return u;
+}
+
 // Backfill a public `profiles` row for any signed-in user.
 async function ensureProfile(u: UserProfile) {
   if (!isSupabaseConfigured) return;
@@ -113,18 +131,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const apply = (u: UserProfile | null) => {
       if (!active) return;
       if (u) {
+        // Set initial state immediately so UI renders, but keep loading=true
+        // so AdminGuard waits for DB enrichment before deciding to redirect.
         setUser(u);
         setRole(u.role);
         setIsSignedIn(true);
         ensureProfile(u);
-        // Load admin permissions from the database.
-        if (u.role === "admin") {
-          void (async () => {
+
+        // Enrich role from profiles table (source of truth, user_metadata can be stale)
+        void (async () => {
+          const enriched = await enrichProfileFromDb(u);
+          if (!active) return;
+          setUser(enriched);
+          setRole(enriched.role);
+          // Load admin permissions from the database.
+          if (enriched.role === "admin") {
             try {
               const { data } = await supabase
                 .from("admin_permissions")
                 .select("permission")
-                .eq("admin_id", u.id);
+                .eq("admin_id", enriched.id);
               if (!active) return;
               if (data && data.length) {
                 const perms = data.map((d) => String(d.permission));
@@ -135,14 +161,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } catch {
               /* non-fatal */
             }
-          })();
-        }
+          }
+          setLoading(false);
+        })();
       } else {
         setUser(null);
         setRole(null);
         setIsSignedIn(false);
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     // Initialize from the current Supabase Auth session.
