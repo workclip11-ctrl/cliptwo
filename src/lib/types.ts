@@ -213,16 +213,19 @@ export type SocialAccountStatus =
   | "connected"
   | "verified"
   | "connection_error"
-  | "disconnected";
+  | "disconnected"
+  | "verification_failed";
 
 // A connected social account for a clipper. Only non-secret metadata lives here.
-// OAuth tokens / access secrets must NEVER be stored on the client or in this
-// table — they belong in a server-only secret store (see supabase/schema.sql).
+// OAuth tokens / access secrets are stored in social_connections (server-only,
+// RLS forbids browser SELECT on token columns). The client never receives them.
 export interface SocialAccount {
   id: string;
   userId?: string;
   platform: Platform;
   handle: string;
+  providerAccountId?: string;
+  avatarUrl?: string;
   status: SocialAccountStatus;
   verified: boolean;
   connectedAt?: number;

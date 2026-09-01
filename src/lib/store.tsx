@@ -848,6 +848,7 @@ const seed: StoreState = {
       userId: "u_maya",
       platform: "Instagram",
       handle: "@maya.cuts",
+      providerAccountId: "ig_17841400123456789",
       status: "connected",
       verified: false,
       connectedAt: Date.now() - 1000 * 60 * 60 * 24 * 40,
@@ -858,6 +859,7 @@ const seed: StoreState = {
       userId: "u_maya",
       platform: "YouTube",
       handle: "@mayacuts",
+      providerAccountId: "UC_abc123def456",
       status: "connected",
       verified: false,
       connectedAt: Date.now() - 1000 * 60 * 60 * 24 * 12,
@@ -868,6 +870,7 @@ const seed: StoreState = {
       userId: "u_priya",
       platform: "Instagram",
       handle: "@priyaviral",
+      providerAccountId: "ig_17841400987654321",
       status: "verified",
       verified: true,
       connectedAt: Date.now() - 1000 * 60 * 60 * 24 * 70,
@@ -878,6 +881,7 @@ const seed: StoreState = {
       userId: "u_arjun",
       platform: "Instagram",
       handle: "@arjun.cuts",
+      providerAccountId: "ig_17841405555555555",
       status: "connected",
       verified: false,
       connectedAt: Date.now() - 1000 * 60 * 60 * 24 * 50,
@@ -888,6 +892,7 @@ const seed: StoreState = {
       userId: "u_rahul",
       platform: "YouTube",
       handle: "@rahulbot",
+      providerAccountId: "UC_xyz789ghi012",
       status: "connected",
       verified: false,
       connectedAt: Date.now() - 1000 * 60 * 60 * 24 * 14,
@@ -898,6 +903,7 @@ const seed: StoreState = {
       userId: "u_leo",
       platform: "Instagram",
       handle: "@leo.edits",
+      providerAccountId: "ig_17841407777777777",
       status: "connected",
       verified: false,
       connectedAt: Date.now() - 1000 * 60 * 60 * 24 * 38,
@@ -910,7 +916,6 @@ const seed: StoreState = {
       handle: "@simran.m",
       status: "connecting",
       verified: false,
-      connectedAt: Date.now() - 1000 * 60 * 60 * 24 * 5,
     },
   ],
   siteSettings: {
@@ -1099,6 +1104,8 @@ function mapSocialAccount(r: Record<string, unknown>): SocialAccount {
     userId: r.user_id ? String(r.user_id) : undefined,
     platform: (r.platform as Platform) ?? "Instagram",
     handle: String(r.handle ?? ""),
+    providerAccountId: r.provider_account_id ? String(r.provider_account_id) : undefined,
+    avatarUrl: r.avatar_url ? String(r.avatar_url) : undefined,
     status: (r.status as SocialAccountStatus) ?? "not_connected",
     verified: r.verified != null ? Boolean(r.verified) : false,
     connectedAt: r.connected_at ? new Date(String(r.connected_at)).getTime() : undefined,
@@ -1855,6 +1862,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           userId: a.userId,
           platform: a.platform,
           handle: a.handle,
+          providerAccountId: a.providerAccountId,
+          avatarUrl: a.avatarUrl,
           status: a.status,
           verified: a.verified,
           connectedAt: a.connectedAt,
@@ -1869,6 +1878,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             user_id: a.userId,
             platform: a.platform,
             handle: a.handle,
+            provider_account_id: a.providerAccountId ?? null,
+            avatar_url: a.avatarUrl ?? null,
             status: a.status,
             verified: a.verified,
             connected_at: a.connectedAt
@@ -1896,6 +1907,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (patch.status !== undefined) payload.status = patch.status;
         if (patch.verified !== undefined) payload.verified = patch.verified;
         if (patch.error !== undefined) payload.error = patch.error;
+        if (patch.providerAccountId !== undefined)
+          payload.provider_account_id = patch.providerAccountId;
+        if (patch.avatarUrl !== undefined)
+          payload.avatar_url = patch.avatarUrl;
         if (patch.connectedAt !== undefined)
           payload.connected_at = patch.connectedAt
             ? new Date(patch.connectedAt).toISOString()

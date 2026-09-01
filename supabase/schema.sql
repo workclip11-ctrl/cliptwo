@@ -76,23 +76,26 @@ create table public.clips (
 -- social_accounts — a clipper's connected publishing platforms.
 -- SECURITY: this table stores ONLY non-secret metadata (handle, status, etc).
 -- OAuth access tokens / client secrets / service-role keys MUST NEVER be stored
--- here or exposed to the browser. Real platform credentials belong in a
--- server-only secret store (e.g. a Supabase Vault secret or encrypted column
--- with RLS forbidding SELECT) and are read exclusively by backend jobs that
--- later power view tracking. The client never receives them.
+-- here or exposed to the browser. Real platform credentials belong in
+-- social_connections (server-only, RLS forbids browser SELECT on token columns).
 -- ---------------------------------------------------------------------------
-drop table if exists public.social_accounts;
+drop table if exists public.social_connections cascade;
+drop table if exists public.social_oauth_states cascade;
+drop table if exists public.social_accounts cascade;
+
 create table public.social_accounts (
-  id            uuid primary key default gen_random_uuid(),
-  user_id       uuid references auth.users (id) on delete cascade,
-  platform      text not null,
-  handle        text not null,
-  status        text not null default 'not_connected',
-  verified      boolean not null default false,
-  connected_at  timestamptz,
-  last_sync_at  timestamptz,
-  error         text,
-  created_at    timestamptz not null default now()
+  id                  uuid primary key default gen_random_uuid(),
+  user_id             uuid references auth.users (id) on delete cascade,
+  platform            text not null,
+  handle              text not null,
+  provider_account_id text,
+  avatar_url          text,
+  status              text not null default 'not_connected',
+  verified            boolean not null default false,
+  connected_at        timestamptz,
+  last_sync_at        timestamptz,
+  error               text,
+  created_at          timestamptz not null default now()
 );
 
 alter table public.social_accounts enable row level security;
@@ -111,6 +114,78 @@ create policy "social_accounts_update" on public.social_accounts
 
 drop policy if exists "social_accounts_delete" on public.social_accounts;
 create policy "social_accounts_delete" on public.social_accounts
+  for delete using (auth.uid() = user_id);
+
+-- ---------------------------------------------------------------------------
+-- social_connections — server-only encrypted token storage.
+-- RLS: browser (anon/authenticated) CANNOT SELECT token columns.
+-- Only service_role (backend jobs) can read tokens for API calls.
+-- Tokens are AES-256-GCM encrypted before storage.
+-- ---------------------------------------------------------------------------
+create table public.social_connections (
+  id               uuid primary key default gen_random_uuid(),
+  social_account_id uuid references public.social_accounts (id) on delete cascade,
+  user_id          uuid references auth.users (id) on delete cascade,
+  platform         text not null,
+  access_token_enc text,
+  refresh_token_enc text,
+  token_type       text default 'bearer',
+  expires_at       timestamptz,
+  scope            text,
+  provider_meta    jsonb,
+  verified_at      timestamptz,
+  verification_data jsonb,
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now()
+);
+
+alter table public.social_connections enable row level security;
+
+-- Browser CANNOT read token data — only service_role can
+drop policy if exists "social_connections_no_browser_select" on public.social_connections;
+create policy "social_connections_no_browser_select" on public.social_connections
+  for select using (false);
+
+-- Backend (service_role) bypasses RLS, so it can read tokens for API calls
+-- Users can insert their own connections
+drop policy if exists "social_connections_insert" on public.social_connections;
+create policy "social_connections_insert" on public.social_connections
+  for insert with check (auth.uid() = user_id);
+
+-- Users can update non-token fields (but tokens are set by backend only)
+drop policy if exists "social_connections_update" on public.social_connections;
+create policy "social_connections_update" on public.social_connections
+  for update using (auth.uid() = user_id);
+
+-- Users can delete their own connections
+drop policy if exists "social_connections_delete" on public.social_connections;
+create policy "social_connections_delete" on public.social_connections
+  for delete using (auth.uid() = user_id);
+
+-- ---------------------------------------------------------------------------
+-- social_oauth_states — temporary OAuth state parameters for CSRF protection.
+-- Expires after 10 minutes. Cleaned up by backend.
+-- ---------------------------------------------------------------------------
+create table public.social_oauth_states (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid references auth.users (id) on delete cascade,
+  platform   text not null,
+  state      text not null unique,
+  code_verifier text,
+  redirect_to text,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null
+);
+
+-- Only backend needs to read/write states
+alter table public.social_oauth_states enable row level security;
+
+drop policy if exists "social_oauth_states_insert" on public.social_oauth_states;
+create policy "social_oauth_states_insert" on public.social_oauth_states
+  for insert with check (auth.uid() = user_id);
+
+drop policy if exists "social_oauth_states_delete" on public.social_oauth_states;
+create policy "social_oauth_states_delete" on public.social_oauth_states
   for delete using (auth.uid() = user_id);
 
 alter table public.campaigns enable row level security;

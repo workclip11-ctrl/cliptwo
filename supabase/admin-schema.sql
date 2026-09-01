@@ -871,16 +871,18 @@ alter table public.campaigns add column if not exists rights jsonb;
 -- later power view tracking.
 -- ---------------------------------------------------------------------------
 create table if not exists public.social_accounts (
-  id            uuid primary key default gen_random_uuid(),
-  user_id       uuid references auth.users (id) on delete cascade,
-  platform      text not null,
-  handle        text not null,
-  status        text not null default 'not_connected',
-  verified      boolean not null default false,
-  connected_at  timestamptz,
-  last_sync_at  timestamptz,
-  error         text,
-  created_at    timestamptz not null default now()
+  id                  uuid primary key default gen_random_uuid(),
+  user_id             uuid references auth.users (id) on delete cascade,
+  platform            text not null,
+  handle              text not null,
+  provider_account_id text,
+  avatar_url          text,
+  status              text not null default 'not_connected',
+  verified            boolean not null default false,
+  connected_at        timestamptz,
+  last_sync_at        timestamptz,
+  error               text,
+  created_at          timestamptz not null default now()
 );
 
 alter table public.social_accounts enable row level security;
@@ -899,6 +901,64 @@ create policy "social_accounts_update" on public.social_accounts
 
 drop policy if exists "social_accounts_delete" on public.social_accounts;
 create policy "social_accounts_delete" on public.social_accounts
+  for delete using (auth.uid() = user_id);
+
+-- Server-only encrypted token storage (browser cannot SELECT token columns)
+create table if not exists public.social_connections (
+  id                uuid primary key default gen_random_uuid(),
+  social_account_id uuid references public.social_accounts (id) on delete cascade,
+  user_id           uuid references auth.users (id) on delete cascade,
+  platform          text not null,
+  access_token_enc  text,
+  refresh_token_enc text,
+  token_type        text default 'bearer',
+  expires_at        timestamptz,
+  scope             text,
+  provider_meta     jsonb,
+  verified_at       timestamptz,
+  verification_data jsonb,
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now()
+);
+
+alter table public.social_connections enable row level security;
+
+drop policy if exists "social_connections_no_browser_select" on public.social_connections;
+create policy "social_connections_no_browser_select" on public.social_connections
+  for select using (false);
+
+drop policy if exists "social_connections_insert" on public.social_connections;
+create policy "social_connections_insert" on public.social_connections
+  for insert with check (auth.uid() = user_id);
+
+drop policy if exists "social_connections_update" on public.social_connections;
+create policy "social_connections_update" on public.social_connections
+  for update using (auth.uid() = user_id);
+
+drop policy if exists "social_connections_delete" on public.social_connections;
+create policy "social_connections_delete" on public.social_connections
+  for delete using (auth.uid() = user_id);
+
+-- Temporary OAuth state for CSRF protection (expires after 10 min)
+create table if not exists public.social_oauth_states (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid references auth.users (id) on delete cascade,
+  platform      text not null,
+  state         text not null unique,
+  code_verifier text,
+  redirect_to   text,
+  created_at    timestamptz not null default now(),
+  expires_at    timestamptz not null
+);
+
+alter table public.social_oauth_states enable row level security;
+
+drop policy if exists "social_oauth_states_insert" on public.social_oauth_states;
+create policy "social_oauth_states_insert" on public.social_oauth_states
+  for insert with check (auth.uid() = user_id);
+
+drop policy if exists "social_oauth_states_delete" on public.social_oauth_states;
+create policy "social_oauth_states_delete" on public.social_oauth_states
   for delete using (auth.uid() = user_id);
 
 -- Notifications table
