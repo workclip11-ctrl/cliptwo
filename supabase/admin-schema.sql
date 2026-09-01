@@ -45,6 +45,12 @@ alter table public.clips add column if not exists payout_date timestamptz;
 -- Only set by ingest_clip_metrics() RPC — client cannot modify it.
 alter table public.clips add column if not exists verified_views integer not null default 0;
 
+-- Financial versioning columns (no-op if present).
+-- Snapshotted from campaign at submission time. Used for display estimates
+-- and to enforce that financial terms cannot change for existing clips.
+alter table public.clips add column if not exists locked_cpm numeric;
+alter table public.clips add column if not exists locked_max_payout numeric;
+
 -- Helper: is the current user an admin? (reads the public.profiles table)
 create or replace function public.is_admin()
 returns boolean
@@ -1522,8 +1528,12 @@ begin
     raise exception 'Campaign not found';
   end if;
 
-  -- Lock CPM in paise (e.g., ₹220 = 22000 paise)
-  v_locked_cpm := round(v_campaign.payout * 100)::integer;
+  -- FINANCIAL VERSIONING: Prefer clip's locked terms (snapshotted at submission).
+  -- Fall back to campaign's current terms for clips submitted before versioning.
+  v_locked_cpm := case
+    when v_clip.locked_cpm is not null then round(v_clip.locked_cpm * 100)::integer
+    else round(v_campaign.payout * 100)::integer
+  end;
   v_verified_views := v_clip.verified_views;
 
   -- Calculate gross: (views / 1000) * CPM in paise
@@ -1531,12 +1541,17 @@ begin
   -- NOTE: Uses verified_views (platform-confirmed), NOT submitted views.
   v_gross := (v_verified_views * v_locked_cpm) / 1000;
 
-  -- Apply maxPayoutPerClip if set (also in paise)
-  if v_campaign.max_payout_per_clip is not null and v_campaign.max_payout_per_clip > 0 then
-    v_max_payout := round(v_campaign.max_payout_per_clip * 100)::integer;
-    if v_gross > v_max_payout then
-      v_gross := v_max_payout;
-    end if;
+  -- Apply maxPayoutPerClip: prefer clip's locked value, fall back to campaign
+  v_max_payout := case
+    when v_clip.locked_max_payout is not null and v_clip.locked_max_payout > 0
+      then round(v_clip.locked_max_payout * 100)::integer
+    when v_campaign.max_payout_per_clip is not null and v_campaign.max_payout_per_clip > 0
+      then round(v_campaign.max_payout_per_clip * 100)::integer
+    else null
+  end;
+
+  if v_max_payout is not null and v_gross > v_max_payout then
+    v_gross := v_max_payout;
   end if;
 
   -- Platform fee: 10% of gross

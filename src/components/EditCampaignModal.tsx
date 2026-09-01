@@ -257,15 +257,43 @@ export function EditCampaignModal({
           </Group>
 
           <Group title="Payment & budget">
+            {submissionCount > 0 && (
+              <div className="mb-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-amber-600">
+                CPM and max payout/clip are locked because this campaign has{" "}
+                {submissionCount} submission{submissionCount === 1 ? "" : "s"}.
+                Existing clips retain the financial terms active when they were submitted.
+                To change financial terms, create a new campaign.
+              </div>
+            )}
             <Field label="CPM (₹ per 1K views)">
-              <input className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground" value={payout} onChange={(e) => setPayout(e.target.value)} />
+              <input
+                className={`w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground ${
+                  submissionCount > 0 ? "cursor-not-allowed opacity-60" : ""
+                }`}
+                value={payout}
+                onChange={(e) => setPayout(e.target.value)}
+                disabled={submissionCount > 0}
+              />
+              {submissionCount > 0 && (
+                <p className="mt-1 text-[11px] text-muted">Locked — clips submitted at this CPM</p>
+              )}
             </Field>
             <Field label="Budget (₹)">
               <input className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground" value={budget} onChange={(e) => setBudget(e.target.value)} />
               {budgetError && <p className="mt-1 text-xs text-red">{budgetError}</p>}
             </Field>
             <Field label="Max payout / clip (₹, optional)">
-              <input className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground" value={maxPerClip} onChange={(e) => setMaxPerClip(e.target.value)} />
+              <input
+                className={`w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground ${
+                  submissionCount > 0 ? "cursor-not-allowed opacity-60" : ""
+                }`}
+                value={maxPerClip}
+                onChange={(e) => setMaxPerClip(e.target.value)}
+                disabled={submissionCount > 0}
+              />
+              {submissionCount > 0 && (
+                <p className="mt-1 text-[11px] text-muted">Locked — existing clips capped at this amount</p>
+              )}
             </Field>
             <Field label="Spend cap (₹, optional)">
               <input className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground" value={spendCap} onChange={(e) => setSpendCap(e.target.value)} />

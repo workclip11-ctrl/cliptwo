@@ -74,7 +74,9 @@ create table public.clips (
   rejection_details text,
   failure_reason text,
   engagement    jsonb,
-  audit         jsonb
+  audit         jsonb,
+  locked_cpm   numeric,
+  locked_max_payout numeric
 );
 
 -- ---------------------------------------------------------------------------

@@ -171,6 +171,8 @@ export interface Clip {
   audit?: AuditEntry[];
   riskFlags?: RiskFlag[];
   verified?: boolean;
+  lockedCpm?: number;
+  lockedMaxPayout?: number;
 }
 
 export interface Appeal {

@@ -1168,6 +1168,8 @@ function mapClip(r: Record<string, unknown>): Clip {
     status: (r.status as ClipStatus) ?? "pending",
     views: Number(r.views ?? 0),
     verifiedViews: Number(r.verified_views ?? 0),
+    lockedCpm: r.locked_cpm != null ? Number(r.locked_cpm) : undefined,
+    lockedMaxPayout: r.locked_max_payout != null ? Number(r.locked_max_payout) : undefined,
     submittedAt: r.submitted_at ? new Date(String(r.submitted_at)).getTime() : Date.now(),
     platform: (r.platform as Platform) ?? "Instagram",
     userId: r.user_id ? String(r.user_id) : undefined,
@@ -1506,6 +1508,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           status: "pending",
           views: 0,
           verifiedViews: 0,
+          lockedCpm: camp?.payout,
+          lockedMaxPayout: camp?.maxPayoutPerClip,
         };
         setState((s) => ({ ...s, clips: [optimistic, ...s.clips] }));
 
@@ -1525,6 +1529,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               video_url: k.videoUrl,
               platform: k.platform ?? "Instagram",
               user_id: u.user?.id ?? null,
+              locked_cpm: camp?.payout ?? null,
+              locked_max_payout: camp?.maxPayoutPerClip ?? null,
             })
             .select()
             .single();
@@ -1734,6 +1740,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (isSupabaseConfigured && me && camp && (!camp.created_by || (camp.created_by !== me.id && !await isUserAdmin(me.id)))) {
           console.error(`Authorization: user ${me.id} cannot update campaign ${id}`);
           return;
+        }
+
+        // FINANCIAL VERSIONING: Block CPM and maxPayoutPerClip changes when
+        // the campaign already has submissions. Creators must start a new
+        // campaign version for different financial terms.
+        const FINANCIAL_FIELDS = ["payout", "maxPayoutPerClip"] as const;
+        const hasClips = stateRef.current.clips.some((k) => k.campaignId === id);
+        if (hasClips) {
+          for (const field of FINANCIAL_FIELDS) {
+            if (field in patch && patch[field] !== camp?.[field]) {
+              console.error(
+                `Financial lock: cannot change ${field} on campaign "${camp?.title}" — ` +
+                  `campaign has existing submissions. Create a new campaign with the updated terms.`,
+              );
+              // Strip the blocked field from the patch
+              const { [field]: _, ...rest } = patch as Record<string, unknown>;
+              patch = rest as Partial<Campaign>;
+            }
+          }
         }
         setState((s) => {
           const entry: AuditEntry = {
