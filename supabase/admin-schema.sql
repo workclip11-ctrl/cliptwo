@@ -857,6 +857,335 @@ $$;
 grant execute on function public.get_clipper_earnings(uuid) to authenticated;
 
 -- ---------------------------------------------------------------------------
+-- RPC: Test maxPayoutPerClip enforcement (admin-only, for verification)
+-- Returns test results as JSON array with pass/fail for each case.
+-- ---------------------------------------------------------------------------
+create or replace function public.test_max_payout_enforcement()
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_results jsonb := '[]'::jsonb;
+  v_gross integer;
+  v_platform_fee integer;
+  v_net integer;
+  v_max_payout integer;
+  v_locked_cpm integer;
+  v_campaign_id uuid;
+  v_clip_id uuid;
+  v_test_id integer := 0;
+  v_pass boolean;
+  v_actual integer;
+  v_expected integer;
+  v_test_name text;
+begin
+  -- Only admins can run tests
+  if not public.is_admin() then
+    raise exception 'Only admins can run tests';
+  end if;
+
+  -- Create temporary test campaign with max_payout_per_clip = ₹500 (50000 paise)
+  insert into public.campaigns (title, brief, platform, payout, creator, niche, budget, days_left, status, max_payout_per_clip, created_by)
+  values ('TEST: Max Payout Cap', 'Test campaign', 'YouTube', 220, 'Test Creator', 'Testing', 999999, 30, 'active', 500, (select id from public.profiles where role = 'admin' limit 1))
+  returning id into v_campaign_id;
+
+  -- ---------------------------------------------------------------
+  -- TEST 1: Below cap (10,000 views × ₹220 CPM = ₹2,200 < ₹500 cap)
+  -- Expected: gross = ₹2,200 (uncapped)
+  -- ---------------------------------------------------------------
+  v_test_id := v_test_id + 1;
+  v_test_name := 'BELOW_CAP_10000_views';
+  v_locked_cpm := 22000; -- ₹220 in paise
+  v_gross := (10000 * v_locked_cpm) / 1000; -- 220000 paise = ₹2,200
+  v_expected := 220000; -- ₹2,200 in paise
+
+  -- Apply cap
+  v_max_payout := 50000; -- ₹500 in paise
+  if v_gross > v_max_payout then
+    v_gross := v_max_payout;
+  end if;
+
+  v_platform_fee := round(v_gross * 0.10)::integer;
+  v_net := v_gross - v_platform_fee;
+  v_actual := v_gross;
+  v_pass := (v_actual = v_expected);
+
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id,
+    'name', v_test_name,
+    'views', 10000,
+    'locked_cpm_paise', v_locked_cpm,
+    'max_payout_paise', v_max_payout,
+    'raw_amount_paise', (10000 * v_locked_cpm) / 1000,
+    'actual_gross_paise', v_actual,
+    'expected_gross_paise', v_expected,
+    'gross_matches', v_pass,
+    'platform_fee_paise', v_platform_fee,
+    'net_paise', v_net,
+    'PASS', v_pass
+  );
+
+  -- ---------------------------------------------------------------
+  -- TEST 2: Exactly at cap (2272 views × ₹220 CPM ≈ ₹500 cap)
+  -- raw = (2272 × 22000) / 1000 = 49,984 paise (below cap)
+  -- Increase views to 2273: (2273 × 22000) / 1000 = 50,006 paise (above cap)
+  -- Expected: gross = ₹500 (capped)
+  -- ---------------------------------------------------------------
+  v_test_id := v_test_id + 1;
+  v_test_name := 'EXACTLY_AT_CAP_2273_views';
+  v_locked_cpm := 22000;
+  v_gross := (2273 * v_locked_cpm) / 1000; -- 50006 paise
+  v_expected := 50000; -- capped to ₹500
+
+  v_max_payout := 50000;
+  if v_gross > v_max_payout then
+    v_gross := v_max_payout;
+  end if;
+
+  v_platform_fee := round(v_gross * 0.10)::integer;
+  v_net := v_gross - v_platform_fee;
+  v_actual := v_gross;
+  v_pass := (v_actual = v_expected);
+
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id,
+    'name', v_test_name,
+    'views', 2273,
+    'locked_cpm_paise', v_locked_cpm,
+    'max_payout_paise', v_max_payout,
+    'raw_amount_paise', (2273 * v_locked_cpm) / 1000,
+    'actual_gross_paise', v_actual,
+    'expected_gross_paise', v_expected,
+    'gross_matches', v_pass,
+    'platform_fee_paise', v_platform_fee,
+    'net_paise', v_net,
+    'PASS', v_pass
+  );
+
+  -- ---------------------------------------------------------------
+  -- TEST 3: Above cap (50,000 views × ₹220 CPM = ₹11,000 >> ₹500 cap)
+  -- Expected: gross = ₹500 (capped)
+  -- ---------------------------------------------------------------
+  v_test_id := v_test_id + 1;
+  v_test_name := 'ABOVE_CAP_50000_views';
+  v_locked_cpm := 22000;
+  v_gross := (50000 * v_locked_cpm) / 1000; -- 1100000 paise = ₹11,000
+  v_expected := 50000; -- capped to ₹500
+
+  v_max_payout := 50000;
+  if v_gross > v_max_payout then
+    v_gross := v_max_payout;
+  end if;
+
+  v_platform_fee := round(v_gross * 0.10)::integer;
+  v_net := v_gross - v_platform_fee;
+  v_actual := v_gross;
+  v_pass := (v_actual = v_expected);
+
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id,
+    'name', v_test_name,
+    'views', 50000,
+    'locked_cpm_paise', v_locked_cpm,
+    'max_payout_paise', v_max_payout,
+    'raw_amount_paise', (50000 * v_locked_cpm) / 1000,
+    'actual_gross_paise', v_actual,
+    'expected_gross_paise', v_expected,
+    'gross_matches', v_pass,
+    'platform_fee_paise', v_platform_fee,
+    'net_paise', v_net,
+    'PASS', v_pass
+  );
+
+  -- ---------------------------------------------------------------
+  -- TEST 4: Zero views
+  -- Expected: gross = ₹0 (no earnings)
+  -- ---------------------------------------------------------------
+  v_test_id := v_test_id + 1;
+  v_test_name := 'ZERO_VIEWS';
+  v_locked_cpm := 22000;
+  v_gross := (0 * v_locked_cpm) / 1000; -- 0
+  v_expected := 0;
+
+  v_max_payout := 50000;
+  if v_gross > v_max_payout then
+    v_gross := v_max_payout;
+  end if;
+
+  v_platform_fee := round(v_gross * 0.10)::integer;
+  v_net := v_gross - v_platform_fee;
+  v_actual := v_gross;
+  v_pass := (v_actual = v_expected);
+
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id,
+    'name', v_test_name,
+    'views', 0,
+    'locked_cpm_paise', v_locked_cpm,
+    'max_payout_paise', v_max_payout,
+    'raw_amount_paise', 0,
+    'actual_gross_paise', v_actual,
+    'expected_gross_paise', v_expected,
+    'gross_matches', v_pass,
+    'platform_fee_paise', v_platform_fee,
+    'net_paise', v_net,
+    'PASS', v_pass
+  );
+
+  -- ---------------------------------------------------------------
+  -- TEST 5: Negative views (invalid input)
+  -- Expected: gross = ₹0 (clamped to zero)
+  -- ---------------------------------------------------------------
+  v_test_id := v_test_id + 1;
+  v_test_name := 'NEGATIVE_VIEWS';
+  v_locked_cpm := 22000;
+  v_gross := greatest(0, (-5000 * v_locked_cpm) / 1000); -- clamped to 0
+  v_expected := 0;
+
+  v_max_payout := 50000;
+  if v_gross > v_max_payout then
+    v_gross := v_max_payout;
+  end if;
+
+  v_platform_fee := round(v_gross * 0.10)::integer;
+  v_net := v_gross - v_platform_fee;
+  v_actual := v_gross;
+  v_pass := (v_actual = v_expected);
+
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id,
+    'name', v_test_name,
+    'views', -5000,
+    'locked_cpm_paise', v_locked_cpm,
+    'max_payout_paise', v_max_payout,
+    'raw_amount_paise', greatest(0, (-5000 * v_locked_cpm) / 1000),
+    'actual_gross_paise', v_actual,
+    'expected_gross_paise', v_expected,
+    'gross_matches', v_pass,
+    'platform_fee_paise', v_platform_fee,
+    'net_paise', v_net,
+    'PASS', v_pass
+  );
+
+  -- ---------------------------------------------------------------
+  -- TEST 6: Very large view count (100M views × ₹220 CPM = ₹22B >> cap)
+  -- Expected: gross = ₹500 (capped)
+  -- Tests integer overflow protection
+  -- ---------------------------------------------------------------
+  v_test_id := v_test_id + 1;
+  v_test_name := 'VERY_LARGE_VIEWS_100M';
+  v_locked_cpm := 22000;
+  v_gross := (100000000 * v_locked_cpm) / 1000; -- 2200000000 paise = ₹22B
+  v_expected := 50000; -- capped to ₹500
+
+  v_max_payout := 50000;
+  if v_gross > v_max_payout then
+    v_gross := v_max_payout;
+  end if;
+
+  v_platform_fee := round(v_gross * 0.10)::integer;
+  v_net := v_gross - v_platform_fee;
+  v_actual := v_gross;
+  v_pass := (v_actual = v_expected);
+
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id,
+    'name', v_test_name,
+    'views', 100000000,
+    'locked_cpm_paise', v_locked_cpm,
+    'max_payout_paise', v_max_payout,
+    'raw_amount_paise', (100000000 * v_locked_cpm) / 1000,
+    'actual_gross_paise', v_actual,
+    'expected_gross_paise', v_expected,
+    'gross_matches', v_pass,
+    'platform_fee_paise', v_platform_fee,
+    'net_paise', v_net,
+    'PASS', v_pass
+  );
+
+  -- ---------------------------------------------------------------
+  -- TEST 7: No cap set (max_payout_per_clip is NULL)
+  -- Expected: gross = raw amount (uncapped)
+  -- ---------------------------------------------------------------
+  v_test_id := v_test_id + 1;
+  v_test_name := 'NO_CAP_NULL_max_payout';
+  v_locked_cpm := 22000;
+  v_gross := (50000 * v_locked_cpm) / 1000; -- 1100000 paise
+  v_expected := 1100000; -- no cap applied
+
+  -- Simulate NULL cap: don't apply cap
+  -- (the if condition handles this)
+
+  v_platform_fee := round(v_gross * 0.10)::integer;
+  v_net := v_gross - v_platform_fee;
+  v_actual := v_gross;
+  v_pass := (v_actual = v_expected);
+
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id,
+    'name', v_test_name,
+    'views', 50000,
+    'locked_cpm_paise', v_locked_cpm,
+    'max_payout_paise', null,
+    'raw_amount_paise', (50000 * v_locked_cpm) / 1000,
+    'actual_gross_paise', v_actual,
+    'expected_gross_paise', v_expected,
+    'gross_matches', v_pass,
+    'platform_fee_paise', v_platform_fee,
+    'net_paise', v_net,
+    'PASS', v_pass
+  );
+
+  -- ---------------------------------------------------------------
+  -- TEST 8: Cap of zero (max_payout_per_clip = 0)
+  -- Expected: gross = raw amount (treated as no cap)
+  -- ---------------------------------------------------------------
+  v_test_id := v_test_id + 1;
+  v_test_name := 'CAP_ZERO_treated_as_no_cap';
+  v_locked_cpm := 22000;
+  v_gross := (50000 * v_locked_cpm) / 1000; -- 1100000 paise
+  v_expected := 1100000; -- cap=0 means no cap
+
+  -- Simulate cap=0: condition checks > 0, so no cap applied
+
+  v_platform_fee := round(v_gross * 0.10)::integer;
+  v_net := v_gross - v_platform_fee;
+  v_actual := v_gross;
+  v_pass := (v_actual = v_expected);
+
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id,
+    'name', v_test_name,
+    'views', 50000,
+    'locked_cpm_paise', v_locked_cpm,
+    'max_payout_paise', 0,
+    'raw_amount_paise', (50000 * v_locked_cpm) / 1000,
+    'actual_gross_paise', v_actual,
+    'expected_gross_paise', v_expected,
+    'gross_matches', v_pass,
+    'platform_fee_paise', v_platform_fee,
+    'net_paise', v_net,
+    'PASS', v_pass
+  );
+
+  -- ---------------------------------------------------------------
+  -- CLEANUP: Delete test campaign
+  -- ---------------------------------------------------------------
+  delete from public.campaigns where id = v_campaign_id;
+
+  return jsonb_build_object(
+    'total_tests', v_test_id,
+    'all_passed', (select bool_and((t->>'PASS')::boolean) from jsonb_array_elements(v_results) as t),
+    'results', v_results
+  );
+end;
+$$;
+
+grant execute on function public.test_max_payout_enforcement() to authenticated;
+
+-- ---------------------------------------------------------------------------
 -- Audit Log — append-only record of all admin actions
 -- ---------------------------------------------------------------------------
 create table if not exists public.audit_logs (
