@@ -1,9 +1,13 @@
 -- cliptwo Supabase schema
 -- Run this in Supabase Dashboard -> SQL Editor -> Run.
 -- NOTE: this drops and recreates the tables, so any existing data is reset.
+-- Drop dependent tables first to avoid foreign key constraint errors.
 
-drop table if exists public.clips;
-drop table if exists public.campaigns;
+drop table if exists public.payouts cascade;
+drop table if exists public.wallet_ledger cascade;
+drop table if exists public.earnings cascade;
+drop table if exists public.clips cascade;
+drop table if exists public.campaigns cascade;
 
 create table public.campaigns (
   id          uuid primary key default gen_random_uuid(),
