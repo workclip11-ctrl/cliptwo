@@ -102,7 +102,7 @@ export default function CampaignsPage() {
 
   const visible = useMemo(() => {
     const list = campaigns.filter((c) => {
-      if (c.status === "closed" || c.status === "draft" || c.status === "budget_reached") return false;
+      if (c.status === "closed" || c.status === "draft" || c.status === "budget_reached" || c.status === "archived") return false;
       if (filters.status && c.status !== filters.status) return false;
       if (filters.platform && c.platform !== filters.platform) return false;
       if (filters.category && (c.category || c.niche) !== filters.category) return false;

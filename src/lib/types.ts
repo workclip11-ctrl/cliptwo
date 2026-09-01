@@ -5,6 +5,7 @@ export type CampaignStatus =
   | "closed"
   | "draft"
   | "paused"
+  | "archived"
   | "budget_reached"
   | "near_budget";
 
@@ -65,6 +66,8 @@ export interface Campaign {
   sourceLink?: string;
   rules?: string;
   created_by?: string;
+  archived_at?: string;
+  archived_by?: string;
 
   // Extended campaign detail
   category?: string;

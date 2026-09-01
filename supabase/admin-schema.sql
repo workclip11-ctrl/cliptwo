@@ -659,19 +659,34 @@ declare
 begin
   v_actor := auth.uid();
   if v_actor is null then raise exception 'Not authenticated'; end if;
-  if not public.is_admin() then raise exception 'Only admins can perform campaign actions'; end if;
 
-  if p_action not in ('pause','resume','close','reopen','delete') then
+  if p_action not in ('pause','resume','close','reopen','archive') then
     raise exception 'Invalid action: %', p_action;
-  end if;
-
-  v_perm := 'campaign.' || p_action;
-  if not public.admin_has_perm(v_perm) then
-    raise exception 'Missing permission: %', v_perm;
   end if;
 
   select * into v_campaign from public.campaigns where id = p_campaign_id;
   if not found then raise exception 'Campaign not found'; end if;
+
+  -- Authorization: campaign owners can archive their own campaigns.
+  -- All other actions require admin role + fine-grained permission.
+  if p_action = 'archive' then
+    if v_campaign.created_by is not null and v_campaign.created_by = v_actor then
+      null; -- Owner archiving own campaign
+    elsif public.is_admin() then
+      v_perm := 'campaign.archive';
+      if not public.admin_has_perm(v_perm) then
+        raise exception 'Missing permission: %', v_perm;
+      end if;
+    else
+      raise exception 'Only the campaign owner or an admin can archive this campaign';
+    end if;
+  else
+    if not public.is_admin() then raise exception 'Only admins can perform campaign actions'; end if;
+    v_perm := 'campaign.' || p_action;
+    if not public.admin_has_perm(v_perm) then
+      raise exception 'Missing permission: %', v_perm;
+    end if;
+  end if;
 
   case p_action
     when 'pause' then
@@ -686,9 +701,13 @@ begin
     when 'reopen' then
       update public.campaigns set status = 'open' where id = p_campaign_id;
       v_new_status := 'open';
-    when 'delete' then
-      delete from public.campaigns where id = p_campaign_id;
-      v_new_status := 'deleted';
+    when 'archive' then
+      update public.campaigns
+        set status = 'archived',
+            archived_at = now(),
+            archived_by = v_actor
+        where id = p_campaign_id;
+      v_new_status := 'archived';
   end case;
 
   perform public.write_admin_audit(

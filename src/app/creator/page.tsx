@@ -307,11 +307,12 @@ function CampaignRow({
   const spent = campaignSpent(c, clips);
   const pct = c.budget ? Math.min(100, Math.round((spent / c.budget) * 100)) : 0;
   const isOpen = c.status === "open";
+  const isArchived = c.status === "archived";
   return (
     <button
       type="button"
       onClick={onOpen}
-      className="block w-full rounded-xl border bg-card p-4 text-left transition-colors hover:border-foreground/30"
+      className={`block w-full rounded-xl border bg-card p-4 text-left transition-colors hover:border-foreground/30 ${isArchived ? "opacity-60" : ""}`}
     >
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
@@ -322,12 +323,14 @@ function CampaignRow({
         </div>
         <span
           className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium ${
-            isOpen
-              ? "border-green/20 bg-green/10 text-green"
-              : "border-muted/20 bg-accent-soft text-muted"
+            isArchived
+              ? "border-amber-500/20 bg-amber-500/10 text-amber-600"
+              : isOpen
+                ? "border-green/20 bg-green/10 text-green"
+                : "border-muted/20 bg-accent-soft text-muted"
           }`}
         >
-          {isOpen ? "Open" : "Closed"}
+          {isArchived ? "Archived" : isOpen ? "Open" : "Closed"}
         </span>
       </div>
       <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-accent-soft">

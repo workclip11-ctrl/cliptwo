@@ -42,7 +42,7 @@ const ACTION_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "campaign_resume", label: "Campaign resumed" },
   { value: "campaign_close", label: "Campaign closed" },
   { value: "campaign_reopen", label: "Campaign reopened" },
-  { value: "campaign_delete", label: "Campaign deleted" },
+  { value: "campaign_archive", label: "Campaign archived" },
   { value: "campaign_created", label: "Campaign created" },
   { value: "campaign_edited", label: "Campaign edited" },
 ];
@@ -88,7 +88,7 @@ const ACTION_COLORS: Record<string, string> = {
   campaign_close: "bg-red/10 text-red",
   campaign_closed: "bg-red/10 text-red",
   campaign_reopen: "bg-green/10 text-green",
-  campaign_delete: "bg-red/10 text-red",
+  campaign_archive: "bg-amber-500/10 text-amber-600",
   campaign_created: "bg-green/10 text-green",
   campaign_edited: "bg-blue-500/10 text-blue-500",
 };

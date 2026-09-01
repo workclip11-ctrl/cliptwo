@@ -1091,6 +1091,8 @@ function mapCampaign(r: Record<string, unknown>): Campaign {
     sourceLink: r.source_link ? String(r.source_link) : undefined,
     rules: r.rules ? String(r.rules) : undefined,
     created_by: r.created_by ? String(r.created_by) : undefined,
+    archived_at: r.archived_at ? String(r.archived_at) : undefined,
+    archived_by: r.archived_by ? String(r.archived_by) : undefined,
     category: r.category ? String(r.category) : undefined,
     platforms: Array.isArray(r.platforms) ? (r.platforms as Platform[]) : undefined,
     verified: r.verified != null ? Boolean(r.verified) : undefined,
@@ -1686,22 +1688,38 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const camp = stateRef.current.campaigns.find((c) => c.id === id);
         // Deny if campaign has no owner (production requires created_by) or user is not owner/admin
         if (isSupabaseConfigured && me && camp && (!camp.created_by || (camp.created_by !== me.id && !await isUserAdmin(me.id)))) {
-          console.error(`Authorization: user ${me.id} cannot delete campaign ${id}`);
+          console.error(`Authorization: user ${me.id} cannot archive campaign ${id}`);
           return;
         }
         if (!isSupabaseConfigured) {
-          setState((s) => ({ ...s, campaigns: s.campaigns.filter((c) => c.id !== id) }));
+          // Local dev: mark as archived, preserve all associated data
+          setState((s) => ({
+            ...s,
+            campaigns: s.campaigns.map((c) =>
+              c.id === id
+                ? { ...c, status: "archived" as const, archived_at: new Date().toISOString(), archived_by: me?.id }
+                : c,
+            ),
+          }));
           return;
         }
         const { error } = await supabase.rpc("admin_campaign_action", {
           p_campaign_id: id,
-          p_action: "delete",
+          p_action: "archive",
         });
         if (error) {
-          console.error("RPC admin_campaign_action failed:", error.message);
+          console.error("RPC admin_campaign_action (archive) failed:", error.message);
           return;
         }
-        setState((s) => ({ ...s, campaigns: s.campaigns.filter((c) => c.id !== id) }));
+        // Mark as archived in local state (do NOT remove — preserve clips/earnings/audit)
+        setState((s) => ({
+          ...s,
+          campaigns: s.campaigns.map((c) =>
+            c.id === id
+              ? { ...c, status: "archived" as const, archived_at: new Date().toISOString(), archived_by: me?.id }
+              : c,
+          ),
+        }));
       },
 
       updateCampaign: async (id, patch, actor, action, note) => {

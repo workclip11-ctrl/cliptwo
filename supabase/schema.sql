@@ -53,6 +53,8 @@ create table public.campaigns (
   style       text,
   rights      jsonb,
   audit       jsonb,
+  archived_at timestamptz,
+  archived_by uuid references auth.users (id) on delete set null,
   created_at  timestamptz not null default now()
 );
 

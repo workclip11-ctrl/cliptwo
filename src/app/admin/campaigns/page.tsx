@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Megaphone, Ban, Trash2 } from "lucide-react";
+import { Megaphone, Ban, Archive } from "lucide-react";
 import { StatusPill } from "@/components/StatusPill";
 import { useStore } from "@/lib/store";
 import { rup } from "@/lib/format";
@@ -10,12 +10,19 @@ import { campaignSpent } from "@/lib/finance";
 export default function AdminCampaigns() {
   const { campaigns, clips, closeCampaign, deleteCampaign } = useStore();
 
+  const activeCampaigns = campaigns.filter((c) => c.status !== "archived");
+
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Campaigns</h1>
         <p className="mt-1 text-sm text-muted">
-          {campaigns.length} campaign{campaigns.length === 1 ? "" : "s"} across all creators.
+          {activeCampaigns.length} active campaign{activeCampaigns.length === 1 ? "" : "s"}
+          {campaigns.length > activeCampaigns.length && (
+            <span className="ml-2 text-xs text-muted">
+              ({campaigns.length - activeCampaigns.length} archived)
+            </span>
+          )}
         </p>
       </div>
 
@@ -37,8 +44,9 @@ export default function AdminCampaigns() {
               const budget = c.budget ?? 0;
               const spent = campaignSpent(c, clips);
               const pct = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
+              const isArchived = c.status === "archived";
               return (
-                <tr key={c.id}>
+                <tr key={c.id} className={isArchived ? "opacity-50" : ""}>
                   <td className="px-4 py-3">
                     <p className="font-medium">{c.title}</p>
                     <p className="text-xs text-muted">{n} clips</p>
@@ -74,16 +82,18 @@ export default function AdminCampaigns() {
                       >
                         <Megaphone size={13} />
                       </Link>
-                      <button
-                        onClick={() => {
-                          if (confirm(`Delete campaign "${c.title}"?`))
-                            deleteCampaign(c.id);
-                        }}
-                        title="Delete"
-                        className="rounded-md border px-2 py-1 text-xs font-medium text-red hover:bg-red-500/10"
-                      >
-                        <Trash2 size={13} />
-                      </button>
+                      {!isArchived && (
+                        <button
+                          onClick={() => {
+                            if (confirm(`Archive campaign "${c.title}"?\n\nAll clips, earnings, and audit history will be preserved.`))
+                              deleteCampaign(c.id);
+                          }}
+                          title="Archive campaign"
+                          className="rounded-md border px-2 py-1 text-xs font-medium text-amber-600 hover:bg-amber-500/10"
+                        >
+                          <Archive size={13} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

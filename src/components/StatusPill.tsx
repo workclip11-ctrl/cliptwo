@@ -15,6 +15,7 @@ const map: Record<AnyStatus, { label: string; cls: string }> = {
   closed: { label: "Closed", cls: "bg-muted/10 text-muted border-muted/20" },
   draft: { label: "Draft", cls: "bg-amber/10 text-amber border-amber/20" },
   paused: { label: "Paused", cls: "bg-amber/10 text-amber border-amber/20" },
+  archived: { label: "Archived", cls: "bg-amber-500/10 text-amber-600 border-amber-500/20" },
   budget_reached: { label: "Budget Reached", cls: "bg-red/10 text-red border-red/20" },
   near_budget: { label: "Near Budget", cls: "bg-amber/10 text-amber border-amber/20" },
 };

@@ -191,7 +191,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   campaign_end: "Campaign ended",
   campaign_close: "Campaign closed",
   campaign_reopen: "Campaign reopened",
-  campaign_delete: "Campaign deleted",
+  campaign_archive: "Campaign archived",
   clip_approved: "Clip approved",
   clip_rejected: "Clip rejected",
   clip_held: "Clip held",
