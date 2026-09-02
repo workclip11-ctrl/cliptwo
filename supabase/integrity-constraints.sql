@@ -47,7 +47,7 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN
   ALTER TABLE public.profiles VALIDATE CONSTRAINT profiles_role_check;
 EXCEPTION WHEN OTHERS THEN
-  RAINT WARNING 'VALIDATE profiles_role_check failed — fix offending rows and re-run';
+  RAISE WARNING 'VALIDATE profiles_role_check failed — fix offending rows and re-run';
 END $$;
 
 DO $$ BEGIN
