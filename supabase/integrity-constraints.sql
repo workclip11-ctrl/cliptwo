@@ -384,35 +384,47 @@ END $$;
 
 -- ── social_accounts ─────────────────────────────────────────────────────────
 DO $$ BEGIN
-  ALTER TABLE public.social_accounts ADD CONSTRAINT social_accounts_status_check
-    CHECK (status IN ('not_connected', 'connecting', 'connected', 'verified', 'connection_error', 'disconnected', 'verification_failed')) NOT VALID;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='social_accounts') THEN
+    ALTER TABLE public.social_accounts ADD CONSTRAINT social_accounts_status_check
+      CHECK (status IN ('not_connected', 'connecting', 'connected', 'verified', 'connection_error', 'disconnected', 'verification_failed')) NOT VALID;
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.social_accounts VALIDATE CONSTRAINT social_accounts_status_check;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='social_accounts') THEN
+    ALTER TABLE public.social_accounts VALIDATE CONSTRAINT social_accounts_status_check;
+  END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE social_accounts_status_check failed — fix offending rows and re-run';
 END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.social_accounts ADD CONSTRAINT social_accounts_user_platform_unique
-    UNIQUE (user_id, platform);
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='social_accounts') THEN
+    ALTER TABLE public.social_accounts ADD CONSTRAINT social_accounts_user_platform_unique
+      UNIQUE (user_id, platform);
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.social_accounts VALIDATE CONSTRAINT social_accounts_user_platform_unique;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='social_accounts') THEN
+    ALTER TABLE public.social_accounts VALIDATE CONSTRAINT social_accounts_user_platform_unique;
+  END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE social_accounts_user_platform_unique failed — deduplicate social accounts first';
 END $$;
 
 -- ── social_connections ──────────────────────────────────────────────────────
 DO $$ BEGIN
-  ALTER TABLE public.social_connections ADD CONSTRAINT social_connections_account_unique
-    UNIQUE (social_account_id);
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='social_connections') THEN
+    ALTER TABLE public.social_connections ADD CONSTRAINT social_connections_account_unique
+      UNIQUE (social_account_id);
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.social_connections VALIDATE CONSTRAINT social_connections_account_unique;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='social_connections') THEN
+    ALTER TABLE public.social_connections VALIDATE CONSTRAINT social_connections_account_unique;
+  END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE social_connections_account_unique failed — deduplicate connections first';
 END $$;
