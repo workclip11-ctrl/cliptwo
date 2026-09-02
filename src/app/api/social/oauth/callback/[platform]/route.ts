@@ -73,6 +73,13 @@ export async function GET(request: NextRequest) {
     const userId = stateRecord.user_id;
     const redirectPath = stateRecord.redirect_to ?? "/clipper/accounts";
 
+    // Security: verify the state was generated for this platform
+    if (stateRecord.platform !== platform) {
+      return NextResponse.redirect(
+        new URL(`${baseRedirect}?error=platform_mismatch&platform=${platform}`, request.url),
+      );
+    }
+
     // Delete the used state (one-time use)
     await supabase.from("social_oauth_states").delete().eq("state", state);
 

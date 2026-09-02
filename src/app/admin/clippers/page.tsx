@@ -276,7 +276,7 @@ export default function AdminClippers() {
                       {s.rejected}
                     </td>
                     <td className="px-4 py-3 text-right font-mono">
-                      {s.approvalRate == null ? "—" : `${s.approvalRate}%`}
+                      {s.approvalRate === null ? "—" : `${s.approvalRate}%`}
                     </td>
                     <td className="px-4 py-3 text-right font-mono">
                       {fmtViews(s.verifiedViews)}
@@ -563,7 +563,7 @@ function ClipperDrawer({
               <Stat label="Rejected" value={String(stats.rejected)} />
               <Stat
                 label="Approval rate"
-                value={stats.approvalRate == null ? "—" : `${stats.approvalRate}%`}
+                value={stats.approvalRate === null ? "—" : `${stats.approvalRate}%`}
               />
               <Stat label="Verified views" value={fmtViews(stats.verifiedViews)} />
               <Stat label="Total earned" value={rup(stats.earned)} />

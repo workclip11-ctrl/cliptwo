@@ -24,7 +24,8 @@ import type { Clip } from "@/lib/types";
 import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
 
-const UPI_ID = "maya.cuts@upi";
+
+
 const MIN_WITHDRAWAL = 100;
 const PAGE = 8;
 
@@ -86,7 +87,7 @@ export default function ClipperWalletPage() {
     .reduce((s, k) => s + netOf(k), 0);
 
   const profile = profiles.find((p) => p.id === user?.id);
-  const upi = profile?.upi || UPI_ID;
+  const upi = profile?.upi || "";
   const verified = !!profile?.upi;
   const canWithdraw = available >= MIN_WITHDRAWAL && !!profile?.upi;
 

@@ -24,6 +24,12 @@ export async function POST(request: Request) {
 
     const supabase = await createClient();
 
+    // Verify authenticated user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
     // 1. Get the social account
     const { data: account, error: accountError } = await supabase
       .from("social_accounts")
@@ -36,6 +42,11 @@ export async function POST(request: Request) {
         { error: "Account not found" },
         { status: 404 },
       );
+    }
+
+    // Ownership check: users can only disconnect their own accounts
+    if (account.user_id !== user.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // 2. Try to revoke the token with the provider (best-effort)

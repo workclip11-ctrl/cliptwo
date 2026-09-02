@@ -1008,7 +1008,7 @@ interface StoreActions {
     status: "reviewing" | "approved" | "rejected",
     actor: string,
   ) => void;
-  updateProfile: (id: string, patch: Partial<Pick<Profile, "name" | "upi" | "bio">>) => void;
+  updateProfile: (id: string, patch: Partial<Pick<Profile, "name" | "upi" | "bio" | "company" | "team" | "username">>) => void;
   addSocialAccount: (a: Omit<SocialAccount, "id" | "connectedAt" | "lastSyncAt"> & {
     connectedAt?: number;
     lastSyncAt?: number;
@@ -1681,9 +1681,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
       closeCampaign: async (id) => {
         const me = await getCurrentUser();
+        if (!me) {
+          console.error("Authorization: not authenticated");
+          setState((s) => ({ ...s, lastError: "Not authenticated" }));
+          return;
+        }
         const existingCamp = stateRef.current.campaigns.find((c) => c.id === id);
         // Deny if campaign has no owner or user is not owner/admin
-        if (me && existingCamp && (!existingCamp.created_by || (existingCamp.created_by !== me.id && !await isUserAdmin(me.id)))) {
+        if (existingCamp && (!existingCamp.created_by || (existingCamp.created_by !== me.id && !await isUserAdmin(me.id)))) {
           console.error(`Authorization: user ${me.id} cannot close campaign ${id}`);
           return;
         }
@@ -2040,9 +2045,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         });
         if (!isSupabaseConfigured) return;
         const prevProfiles = stateRef.current.profiles;
+        const dbPatch: Record<string, unknown> = {};
+        if (patch.name !== undefined) dbPatch.name = patch.name;
+        if (patch.upi !== undefined) dbPatch.upi = patch.upi;
+        if (patch.bio !== undefined) dbPatch.bio = patch.bio;
+        if (patch.company !== undefined) dbPatch.company = patch.company;
+        if (patch.team !== undefined) dbPatch.team = patch.team;
+        if (patch.username !== undefined) dbPatch.username = patch.username;
         const { error } = await supabase
           .from("profiles")
-          .update({ name: patch.name, upi: patch.upi })
+          .update(dbPatch)
           .eq("id", id);
         if (error) {
           console.error("Profile update failed:", error.message);
@@ -2068,7 +2080,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setState((s) => ({ ...s, socialAccounts: [...s.socialAccounts, record] }));
         if (!isSupabaseConfigured) return id;
         // Fire-and-forget async DB insert — if it fails, rollback from state
-        supabase.from("social_accounts").insert({
+        void supabase.from("social_accounts").insert({
           id,
           user_id: a.userId,
           platform: a.platform,
@@ -2093,6 +2105,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               lastError: `Failed to connect social account: ${error.message}`,
             }));
           }
+        }, (e: unknown) => {
+          console.error("Social account insert network error:", e);
+          setState((s) => ({
+            ...s,
+            socialAccounts: s.socialAccounts.filter((acc) => acc.id !== id),
+            lastError: "Failed to connect social account: network error",
+          }));
         });
         return id;
       },

@@ -210,7 +210,7 @@ export default function AdminClips() {
 
       <div className="overflow-hidden rounded-2xl border bg-card">
         <div className="overflow-x-auto">
-          {tab === "review" ? (
+          {tab === "pending" ? (
             <ReviewTable
               clips={list}
               campaigns={campaigns}
