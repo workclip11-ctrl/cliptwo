@@ -31,7 +31,6 @@ export default function AdminWebsite() {
       heroTitle: heroTitle.trim(),
       heroSubtitle: heroSubtitle.trim(),
       featuredIds: featured,
-      razorpayKey: siteSettings.razorpayKey,
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);

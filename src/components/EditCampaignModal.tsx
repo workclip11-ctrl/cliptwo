@@ -5,7 +5,7 @@ import { X } from "lucide-react";
 import { rup } from "@/lib/format";
 import type { Campaign, CampaignRights, Platform } from "@/lib/types";
 
-const PLATFORM_OPTIONS: Platform[] = ["Instagram", "YouTube"];
+const PLATFORM_OPTIONS: Platform[] = ["Instagram", "YouTube", "Kick"];
 
 const CATEGORIES = [
   "Tech",

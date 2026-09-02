@@ -51,7 +51,9 @@ class MockPaymentProvider implements PaymentProvider {
     await new Promise((r) => setTimeout(r, 2000));
 
     // Simulate occasional failures (10% chance for testing)
-    const shouldFail = Math.random() < 0.1;
+    const randomByte = new Uint8Array(1);
+    crypto.getRandomValues(randomByte);
+    const shouldFail = randomByte[0] < 26; // ~10% of 256
 
     if (shouldFail) {
       return {
@@ -75,34 +77,6 @@ class MockPaymentProvider implements PaymentProvider {
 }
 
 // ---------------------------------------------------------------------------
-// Razorpay Provider — production UPI payouts (placeholder)
-// Real implementation would use Razorpay Payouts API.
-// Credentials are read server-side only, NEVER exposed to browser.
-// ---------------------------------------------------------------------------
-// class RazorpayPaymentProvider implements PaymentProvider {
-//   name = "razorpay";
-//   private keyId: string;
-//   private keySecret: string;
-//
-//   constructor() {
-//     this.keyId = process.env.RAZORPAY_KEY_ID ?? "";
-//     this.keySecret = process.env.RAZORPAY_KEY_SECRET ?? "";
-//     if (!this.keyId || !this.keySecret) {
-//       throw new Error("Razorpay credentials not configured");
-//     }
-//   }
-//
-//   async initiatePayout(request: PayoutRequest): Promise<PayoutResponse> {
-//     // Real Razorpay Payouts API call here
-//     // Uses server-side only credentials
-//   }
-//
-//   verifyWebhook(payload: WebhookPayload): boolean {
-//     // Verify Razorpay webhook signature using keySecret
-//   }
-// }
-
-// ---------------------------------------------------------------------------
 // Provider Factory — returns the configured provider
 // NEVER exposes credentials to the client.
 // ---------------------------------------------------------------------------
@@ -112,8 +86,6 @@ export function getPaymentProvider(): PaymentProvider {
   switch (providerName) {
     case "mock":
       return new MockPaymentProvider();
-    // case "razorpay":
-    //   return new RazorpayPaymentProvider();
     default:
       console.warn(
         `Unknown payment provider "${providerName}", falling back to mock`,

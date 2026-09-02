@@ -4,13 +4,11 @@
 // In production, these call the real Instagram Graph API and YouTube Data API
 // to fetch view/engagement counts for a given post/video.
 //
-// In development (no API credentials), a mock provider returns deterministic
-// fake data. The mock is CLEARLY MARKED and mock metrics are stored with
-// source = 'mock' and verification_status = 'pending' — they are NEVER
-// treated as production payout data.
-//
 // SECURITY: All metric fetches happen server-side. The client never calls
 // these functions directly.
+//
+// IMPORTANT: Mock metrics (source='mock') are NEVER used for earnings
+// calculations. Only verified platform API metrics influence payouts.
 // ---------------------------------------------------------------------------
 
 import type { Platform } from "./types";
@@ -23,8 +21,8 @@ export interface FetchedMetrics {
   comments: number;
   shares: number;
   fetchedAt: Date;
-  source: "platform_api" | "mock";
-  verificationStatus: "verified" | "pending";
+  source: "platform_api" | "admin_override";
+  verificationStatus: "verified" | "pending" | "failed";
 }
 
 export interface MetricProvider {
@@ -49,7 +47,6 @@ class InstagramMetricProvider implements MetricProvider {
     postUrl: string,
     accessToken: string,
   ): Promise<FetchedMetrics> {
-    // Extract media ID from URL (simplified — production needs full URL parsing)
     const mediaId = this.extractMediaId(postUrl);
     if (!mediaId) {
       throw new Error(`Could not extract media ID from URL: ${postUrl}`);
@@ -100,12 +97,10 @@ class InstagramMetricProvider implements MetricProvider {
     _accountIdentifier: string,
     _accessToken: string,
   ): Promise<Array<{ postUrl: string; metrics: FetchedMetrics }>> {
-    // Production: fetch recent media from the account, then fetch metrics for each
     throw new Error("Instagram batch metrics not yet implemented");
   }
 
   private extractMediaId(url: string): string | null {
-    // Match patterns like /reel/XXXXX or /p/XXXXX
     const match = url.match(/\/(?:reel|p)\/([A-Za-z0-9_-]+)/);
     return match?.[1] ?? null;
   }
@@ -160,7 +155,6 @@ class YouTubeMetricProvider implements MetricProvider {
   }
 
   private extractVideoId(url: string): string | null {
-    // Match youtube.com/watch?v=XXXXX, youtu.be/XXXXX, youtube.com/shorts/XXXXX
     const patterns = [
       /[?&]v=([A-Za-z0-9_-]{11})/,
       /youtu\.be\/([A-Za-z0-9_-]{11})/,
@@ -174,54 +168,28 @@ class YouTubeMetricProvider implements MetricProvider {
   }
 }
 
-// ── Mock Provider (Development) ─────────────────────────────────────────────
+// ── Kick (Not yet available) ────────────────────────────────────────────────
 //
-// Returns deterministic fake data based on the post URL hash.
-// Metrics are stored with source='mock' and verification_status='pending'.
-// They are NEVER used for earnings calculations.
+// Kick does not have a public API for third-party metric fetching.
+// This provider throws on every operation.
 
-class MockMetricProvider implements MetricProvider {
-  platform: Platform;
+class KickMetricProvider implements MetricProvider {
+  platform: Platform = "Kick";
 
-  constructor(platform: Platform) {
-    this.platform = platform;
+  async fetchMetrics(
+    _postUrl: string,
+    _accessToken: string,
+  ): Promise<FetchedMetrics> {
+    throw new Error(
+      "Kick metrics are not yet available. Kick does not currently offer a public API for third-party metric access.",
+    );
   }
 
-  async fetchMetrics(postUrl: string): Promise<FetchedMetrics> {
-    // Simulate network delay
-    await new Promise((r) => setTimeout(r, 200 + Math.random() * 300));
-
-    // Deterministic "random" based on URL hash for consistent test data
-    const hash = this.simpleHash(postUrl);
-    const views = 1000 + (hash % 50000);
-    const likes = Math.floor(views * (0.02 + (hash % 50) / 1000));
-    const comments = Math.floor(likes * (0.1 + (hash % 20) / 100));
-    const shares = Math.floor(comments * 0.3);
-
-    return {
-      views,
-      likes,
-      comments,
-      shares,
-      fetchedAt: new Date(),
-      source: "mock",
-      verificationStatus: "pending", // Mock data is NEVER verified
-    };
-  }
-
-  async fetchAccountMetrics(): Promise<
-    Array<{ postUrl: string; metrics: FetchedMetrics }>
-  > {
-    return [];
-  }
-
-  private simpleHash(str: string): number {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      hash = (hash << 5) - hash + str.charCodeAt(i);
-      hash |= 0;
-    }
-    return Math.abs(hash);
+  async fetchAccountMetrics(
+    _accountIdentifier: string,
+    _accessToken: string,
+  ): Promise<Array<{ postUrl: string; metrics: FetchedMetrics }>> {
+    throw new Error("Kick integration is not yet available.");
   }
 }
 
@@ -233,29 +201,26 @@ function isConfigured(platform: Platform): boolean {
       return !!(process.env.INSTAGRAM_APP_ID && process.env.INSTAGRAM_APP_SECRET);
     case "YouTube":
       return !!(process.env.YOUTUBE_CLIENT_ID && process.env.YOUTUBE_CLIENT_SECRET);
+    case "Kick":
+      return false; // No API available
     default:
       return false;
   }
 }
 
 export function getMetricProvider(platform: Platform): MetricProvider {
-  if (!isConfigured(platform)) {
-    console.warn(
-      `[metric-providers] ${platform} API not configured — using mock provider. ` +
-        `Mock metrics have source='mock' and verification_status='pending'. ` +
-        `They MUST NOT be used for earnings calculations.`,
-    );
-    return new MockMetricProvider(platform);
-  }
-
   switch (platform) {
     case "Instagram":
       return new InstagramMetricProvider();
     case "YouTube":
       return new YouTubeMetricProvider();
+    case "Kick":
+      return new KickMetricProvider();
     default:
-      return new MockMetricProvider(platform);
+      throw new Error(`Unsupported platform: ${platform}`);
   }
 }
 
-export { isConfigured as isMetricProviderConfigured };
+export function isMetricProviderConfigured(platform: Platform): boolean {
+  return isConfigured(platform);
+}

@@ -18,11 +18,11 @@ import { NewCampaignModal } from "@/components/NewCampaignModal";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup, fmtViews } from "@/lib/format";
-import { financeOf, campaignSpent, isEarned, payoutSplit } from "@/lib/finance";
+import { financeOf, campaignSpent } from "@/lib/finance";
 import type { Campaign, Clip, Platform } from "@/lib/types";
 
 export default function CreatorPage() {
-  const { campaigns, clips, addCampaign } = useStore();
+  const { campaigns, clips, addCampaign, financeRecords } = useStore();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<Campaign | null>(null);
@@ -32,16 +32,16 @@ export default function CreatorPage() {
   );
   const myCampaignIds = new Set(myCampaigns.map((c) => c.id));
   const received = clips.filter((k) => myCampaignIds.has(k.campaignId));
-  const fin = financeOf(received, campaigns);
+  const fin = financeOf(financeRecords, (r) => myCampaignIds.has(r.campaignId));
   const pending = received.filter((k) => k.status === "pending");
   const pendingCount = fin.pendingCount;
-  const totalSpent = fin.paid; // "Paid out" = only completed payouts
-  const totalEarned = fin.earned;
-  const outstanding = fin.outstanding;
+  const totalSpent = fin.paid;
+  const totalEarned = fin.total;
+  const outstanding = fin.pending;
 
   const topClips = [...received]
-    .filter((k) => isEarned(k.status))
-    .sort((a, b) => payoutSplit(b, campaigns).net - payoutSplit(a, campaigns).net)
+    .filter((k) => k.status === "approved" || k.status === "held")
+    .sort((a, b) => (financeRecords.find((r) => r.clipId === b.id)?.netAmount ?? 0) - (financeRecords.find((r) => r.clipId === a.id)?.netAmount ?? 0))
     .slice(0, 4);
 
   return (
@@ -122,12 +122,13 @@ export default function CreatorPage() {
           </div>
           <div className="space-y-3">
             {myCampaigns.slice(0, 3).map((c) => (
-              <CampaignRow
-                key={c.id}
-                c={c}
-                clips={clips}
-                onOpen={() => setSelected(c)}
-              />
+                <CampaignRow
+                  key={c.id}
+                  c={c}
+                  clips={clips}
+                  financeRecords={financeRecords}
+                  onOpen={() => setSelected(c)}
+                />
             ))}
             {myCampaigns.length === 0 && (
               <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted">
@@ -214,7 +215,7 @@ export default function CreatorPage() {
                     {fmtViews(k.views)}
                   </td>
                   <td className="px-4 py-3 text-right font-mono">
-                    {rup(payoutSplit(k, campaigns).net)}
+                    {rup((financeRecords.find((r) => r.clipId === k.id)?.netAmount ?? 0) / 100)}
                   </td>
                 </tr>
               ))}
@@ -287,6 +288,7 @@ export default function CreatorPage() {
         <CampaignDetailModal
           campaign={selected}
           clips={clips}
+          financeRecords={financeRecords}
           onClose={() => setSelected(null)}
         />
       )}
@@ -297,14 +299,16 @@ export default function CreatorPage() {
 function CampaignRow({
   c,
   clips,
+  financeRecords,
   onOpen,
 }: {
   c: Campaign;
   clips: Clip[];
+  financeRecords: import("@/lib/types").FinanceRecord[];
   onOpen: () => void;
 }) {
   const campClips = clips.filter((k) => k.campaignId === c.id);
-  const spent = campaignSpent(c, clips);
+  const spent = campaignSpent(c, financeRecords);
   const pct = c.budget ? Math.min(100, Math.round((spent / c.budget) * 100)) : 0;
   const isOpen = c.status === "open";
   const isArchived = c.status === "archived";
@@ -349,16 +353,18 @@ function CampaignRow({
 function CampaignDetailModal({
   campaign,
   clips,
+  financeRecords,
   onClose,
 }: {
   campaign: Campaign;
   clips: Clip[];
+  financeRecords: import("@/lib/types").FinanceRecord[];
   onClose: () => void;
 }) {
   const campClips = clips.filter((k) => k.campaignId === campaign.id);
   const approvedN = campClips.filter((k) => k.status === "approved").length;
   const pendingN = campClips.filter((k) => k.status === "pending").length;
-  const spent = campaignSpent(campaign, clips);
+  const spent = campaignSpent(campaign, financeRecords);
   const pct = campaign.budget
     ? Math.min(100, Math.round((spent / campaign.budget) * 100))
     : 0;

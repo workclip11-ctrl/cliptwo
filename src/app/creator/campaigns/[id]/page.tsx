@@ -22,7 +22,7 @@ import {
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup, fmtViews, clipEarnings } from "@/lib/format";
-import { financeOf, isEarned, creatorFee, PLATFORM_FEE_RATE } from "@/lib/finance";
+import { financeOf, creatorFee, PLATFORM_FEE_RATE } from "@/lib/finance";
 import { seriesByDay } from "@/lib/analytics";
 import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
@@ -44,7 +44,7 @@ function fmtDateTime(t: number) {
 export default function CreatorCampaignDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
-  const { campaigns, clips, updateCampaign } = useStore();
+  const { campaigns, clips, updateCampaign, financeRecords } = useStore();
   const { user } = useAuth();
   const [editing, setEditing] = useState(false);
   const [adjusting, setAdjusting] = useState(false);
@@ -72,8 +72,8 @@ export default function CreatorCampaignDetailPage() {
 
   const actor = user?.email ?? user?.name ?? "Creator";
   const campClips = clips.filter((k) => k.campaignId === id);
-  const fin = financeOf(campClips, campaigns);
-  const currentSpend = fin.earned;
+  const fin = financeOf(financeRecords, (r) => r.campaignId === id);
+  const currentSpend = fin.paid;
   const verifiedViews = campClips.reduce((s, k) => s + k.views, 0);
   const clipperSet = new Set(campClips.map((k) => k.userId ?? k.clipper));
   const avgCPM =
@@ -313,7 +313,7 @@ export default function CreatorCampaignDetailPage() {
       </Section>
 
       {/* 5. Approved clips */}
-      <Section title={`Approved clips (${campClips.filter((k) => isEarned(k.status)).length})`}>
+      <Section title={`Approved clips (${campClips.filter((k) => k.status === "approved" || k.status === "held").length})`}>
         <ClipList clips={campClips} earned />
       </Section>
 
@@ -364,7 +364,7 @@ export default function CreatorCampaignDetailPage() {
             </thead>
             <tbody className="divide-y">
               {campClips
-                .filter((k) => isEarned(k.status))
+                .filter((k) => k.status === "approved" || k.status === "held")
                 .sort((a, b) => b.submittedAt - a.submittedAt)
                 .map((k) => {
                   const gross = clipEarnings(k, campaigns);
@@ -384,7 +384,7 @@ export default function CreatorCampaignDetailPage() {
                     </tr>
                   );
                 })}
-              {campClips.filter((k) => isEarned(k.status)).length === 0 && (
+              {campClips.filter((k) => k.status === "approved" || k.status === "held").length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-6 text-center text-muted">
                     No payouts yet.
@@ -562,7 +562,7 @@ function ClipList({
   clips: import("@/lib/types").Clip[];
   earned: boolean;
 }) {
-  const list = earned ? clips.filter((k) => isEarned(k.status)) : clips;
+  const list = earned ? clips.filter((k) => k.status === "approved" || k.status === "held") : clips;
   if (list.length === 0)
     return <p className="text-sm text-muted">Nothing here yet.</p>;
   return (

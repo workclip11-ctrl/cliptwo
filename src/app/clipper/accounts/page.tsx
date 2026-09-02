@@ -14,12 +14,16 @@ import {
   X,
   ExternalLink,
   Loader2,
+  Lock,
 } from "lucide-react";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
-import { SUPPORTED_PLATFORMS } from "@/lib/social";
-import { isProviderConfigured } from "@/lib/social-providers";
+import {
+  CONNECTABLE_PLATFORMS,
+  COMING_SOON_PLATFORMS,
+  ALL_PLATFORMS,
+} from "@/lib/social";
 import type { Platform, SocialAccount, SocialAccountStatus } from "@/lib/types";
 
 const STATUS_META: Record<
@@ -86,7 +90,6 @@ export default function SocialAccountsPage() {
     const platform = params.get("platform");
 
     if (error) {
-      // OAuth callback had an error
       const account = myAccounts.find(
         (a) => a.platform.toLowerCase() === (platform ?? "").toLowerCase(),
       );
@@ -97,7 +100,6 @@ export default function SocialAccountsPage() {
         });
       }
     } else if (connectedPlatform) {
-      // OAuth succeeded — find the account that was just connected
       const account = myAccounts.find(
         (a) =>
           a.platform.toLowerCase() === connectedPlatform.toLowerCase() &&
@@ -113,7 +115,6 @@ export default function SocialAccountsPage() {
       }
     }
 
-    // Clean up URL params
     if (error || connectedPlatform) {
       const url = new URL(window.location.href);
       url.searchParams.delete("connected");
@@ -138,7 +139,6 @@ export default function SocialAccountsPage() {
     setModal(null);
     setConnecting(platform);
 
-    // Create the social account in "connecting" state
     const id = addSocialAccount({
       userId: user?.id,
       platform,
@@ -148,7 +148,6 @@ export default function SocialAccountsPage() {
     });
 
     try {
-      // Initiate OAuth — get the authorization URL
       const res = await fetch("/api/social/oauth/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -161,22 +160,8 @@ export default function SocialAccountsPage() {
         throw new Error(data.error || "Failed to initiate OAuth");
       }
 
-      // In mock mode, the callback URL is returned directly
-      // In production, the browser redirects to the provider's auth page
-      if (data.mock) {
-        // Mock mode: simulate the flow with a delay
-        setTimeout(() => {
-          updateSocialAccount(id, {
-            status: "connected",
-            connectedAt: Date.now(),
-            lastSyncAt: Date.now(),
-          });
-          setConnecting(null);
-        }, 1200);
-      } else {
-        // Real OAuth: redirect to provider
-        window.location.href = data.authorizationUrl;
-      }
+      // Real OAuth: redirect to provider
+      window.location.href = data.authorizationUrl;
     } catch (e) {
       updateSocialAccount(id, {
         status: "connection_error",
@@ -205,18 +190,7 @@ export default function SocialAccountsPage() {
         throw new Error(data.error || "Failed to initiate reconnection");
       }
 
-      if (data.mock) {
-        setTimeout(() => {
-          updateSocialAccount(acc.id, {
-            status: "connected",
-            connectedAt: acc.connectedAt ?? Date.now(),
-            lastSyncAt: Date.now(),
-          });
-          setConnecting(null);
-        }, 1200);
-      } else {
-        window.location.href = data.authorizationUrl;
-      }
+      window.location.href = data.authorizationUrl;
     } catch (e) {
       updateSocialAccount(acc.id, {
         status: "connection_error",
@@ -301,13 +275,13 @@ export default function SocialAccountsPage() {
         </p>
       </div>
 
+      {/* Connectable platforms (YouTube, Instagram) */}
       <div className="space-y-3">
-        {SUPPORTED_PLATFORMS.map((platform) => {
+        {CONNECTABLE_PLATFORMS.map((platform) => {
           const acc = myAccounts.find((a) => a.platform === platform);
           const isConnecting =
             connecting === platform || (acc && connecting === acc.id);
           const isVerifying = verifying === acc?.id;
-          const mockMode = !isProviderConfigured(platform);
 
           return (
             <div
@@ -326,11 +300,6 @@ export default function SocialAccountsPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {mockMode && (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-amber/30 bg-amber/10 px-2 py-0.5 text-[10px] font-medium text-amber">
-                      Dev mode
-                    </span>
-                  )}
                   <span
                     className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium ${
                       STATUS_META[acc?.status ?? "not_connected"].className
@@ -474,6 +443,38 @@ export default function SocialAccountsPage() {
           );
         })}
       </div>
+
+      {/* Coming soon platforms (Kick) */}
+      {COMING_SOON_PLATFORMS.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted">
+            Coming soon
+          </p>
+          {COMING_SOON_PLATFORMS.map((platform) => (
+            <div
+              key={platform}
+              className="rounded-2xl border border-dashed bg-background/50 p-5 opacity-60"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <PlatformIcon p={platform} size={22} />
+                  <div>
+                    <p className="text-sm font-semibold">{platform}</p>
+                    <p className="text-xs text-muted">
+                      Integration coming soon — no public API available yet
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted">
+                    <Lock size={12} /> Not available
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-6">

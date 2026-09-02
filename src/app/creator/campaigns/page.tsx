@@ -11,7 +11,7 @@ import { campaignSpent } from "@/lib/finance";
 import type { Platform } from "@/lib/types";
 
 export default function CreatorCampaignsPage() {
-  const { campaigns, clips, addCampaign, closeCampaign } = useStore();
+  const { campaigns, clips, addCampaign, closeCampaign, financeRecords } = useStore();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
 
@@ -49,7 +49,7 @@ export default function CreatorCampaignsPage() {
           const campClips = clips.filter((k) => k.campaignId === c.id);
           const approvedN = campClips.filter((k) => k.status === "approved").length;
           const pendingN = campClips.filter((k) => k.status === "pending").length;
-          const spent = campaignSpent(c, clips);
+          const spent = campaignSpent(c, financeRecords);
           const pct = c.budget ? Math.min(100, Math.round((spent / c.budget) * 100)) : 0;
           const remaining = (c.budget ?? 0) - spent;
           return (

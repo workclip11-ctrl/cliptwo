@@ -186,6 +186,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Keep state in sync with Supabase Auth events (sign-in, sign-out,
     // token refresh, password recovery, etc.).
+    // With per-tab storageKey, the BroadcastChannel is isolated — events
+    // from other tabs never reach this listener.
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -264,7 +266,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut: AuthValue["signOut"] = async () => {
     setError(null);
     if (isSupabaseConfigured) {
-      await supabase.auth.signOut();
+      // scope: 'local' ensures only THIS tab is signed out.
+      // Other tabs retain their own sessions.
+      await supabase.auth.signOut({ scope: "local" });
     }
     setUser(null);
     setRole(null);

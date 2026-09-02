@@ -9,27 +9,27 @@ import { rup, fmtViews } from "@/lib/format";
 import { financeOf, campaignSpent } from "@/lib/finance";
 
 export default function AdminDashboard() {
-  const { campaigns, clips, profiles } = useStore();
+  const { campaigns, clips, profiles, financeRecords } = useStore();
 
   const clippers = profiles.filter((p) => p.role === "clipper");
   const creators = profiles.filter((p) => p.role === "creator");
   const admins = profiles.filter((p) => p.role === "admin");
 
-  const fin = financeOf(clips, campaigns);
+  const fin = financeOf(financeRecords);
   const pendingCount = fin.pendingCount;
-  const approvedCount = fin.earnedCount;
+  const approvedCount = fin.totalCount;
   const paidCount = fin.paidCount;
-  const rejectedCount = fin.rejectedCount;
+  const rejectedCount = clips.filter((k) => k.status === "rejected").length;
 
   // Earnings that have actually been released to clippers.
   const paidOut = fin.paid;
   // Approved (+ payable/processing) clips not yet paid — the admin's outstanding payable.
-  const payable = fin.outstanding;
-  const totalEarned = fin.earned;
+  const payable = fin.total - fin.paid;
+  const totalEarned = fin.total;
 
   const openCampaigns = campaigns.filter((c) => c.status === "open");
   const totalBudget = campaigns.reduce((s, c) => s + (c.budget ?? 0), 0);
-  const totalSpent = campaigns.reduce((s, c) => s + campaignSpent(c, clips), 0);
+  const totalSpent = campaigns.reduce((s, c) => s + campaignSpent(c, financeRecords), 0);
 
   const recentClips = [...clips]
     .sort((a, b) => b.submittedAt - a.submittedAt)

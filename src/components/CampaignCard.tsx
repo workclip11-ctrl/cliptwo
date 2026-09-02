@@ -25,12 +25,12 @@ export function CampaignCard({
   index: number;
   onView?: (c: Campaign) => void;
 }) {
-  const { clips, savedCampaigns, toggleSaveCampaign } = useStore();
+  const { clips, savedCampaigns, toggleSaveCampaign, financeRecords } = useStore();
   const clippersIn = new Set(
     clips.filter((k) => k.campaignId === campaign.id).map((k) => k.clipper),
   ).size;
   const isSaved = savedCampaigns.includes(campaign.id);
-  const b = campaignBudget(campaign, clips);
+  const b = campaignBudget(campaign, financeRecords);
   const remaining = b.remaining;
 
   const inner = (

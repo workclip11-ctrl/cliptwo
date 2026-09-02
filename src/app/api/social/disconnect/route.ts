@@ -2,10 +2,13 @@
 // POST /api/social/disconnect
 // Revokes provider tokens, removes encrypted token storage, and updates
 // the social account status to "disconnected".
+//
+// Uses service_role to read encrypted tokens from social_connections
+// (RLS blocks browser SELECT on token columns).
 // ---------------------------------------------------------------------------
 
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { getProvider } from "@/lib/social-providers";
 import { decryptToken } from "@/lib/token-crypto";
 
@@ -50,14 +53,23 @@ export async function POST(request: Request) {
     }
 
     // 2. Try to revoke the token with the provider (best-effort)
-    // In production, read the encrypted token from social_connections
-    // using service_role and decrypt it before revoking.
+    // Use service_role to read encrypted tokens (RLS blocks browser SELECT)
     try {
       const platform = account.platform as "Instagram" | "YouTube";
       const provider = getProvider(platform);
-      // In production: const token = decryptToken(connection.access_token_enc);
-      // await provider.revokeToken(token);
-      await provider.revokeToken("mock_token");
+
+      // Read encrypted token from social_connections using service_role
+      const adminClient = createServiceClient();
+      const { data: connection } = await adminClient
+        .from("social_connections")
+        .select("access_token_enc")
+        .eq("social_account_id", socialAccountId)
+        .single();
+
+      if (connection?.access_token_enc) {
+        const accessToken = decryptToken(connection.access_token_enc);
+        await provider.revokeToken(accessToken);
+      }
     } catch {
       // Best-effort — even if revocation fails, we clear local state
     }

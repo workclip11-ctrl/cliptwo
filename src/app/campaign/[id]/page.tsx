@@ -29,7 +29,7 @@ function gradientFor(id: string) {
 export default function CampaignDetail() {
   const params = useParams<{ id: string }>();
   const id = params.id as string;
-  const { campaigns, clips, addClip } = useStore();
+  const { campaigns, clips, addClip, financeRecords } = useStore();
   const { isSignedIn, user } = useAuth();
   const router = useRouter();
   const [active, setActive] = useState(false);
@@ -67,7 +67,7 @@ export default function CampaignDetail() {
     );
   }
 
-  const spent = campaignSpent(campaign, clips);
+  const spent = campaignSpent(campaign, financeRecords);
   const remaining = (campaign.budget ?? 0) - spent;
   const pct = campaign.budget ? Math.min(100, Math.round((spent / campaign.budget) * 100)) : 0;
 

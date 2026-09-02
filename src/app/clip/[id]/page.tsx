@@ -121,9 +121,9 @@ export default function ClipDetail() {
             This clip was rejected and won&apos;t earn. Submit a new cut for the same campaign if you&apos;d like to try again.
           </p>
         )}
-        {clip.status === "paid" && (
-          <p className="mt-6 flex items-center gap-1.5 text-sm text-green">
-            <BadgeCheck /> Paid out to your UPI.
+        {clip.status === "held" && (
+          <p className="mt-6 text-sm text-muted">
+            This clip is currently held and under review.
           </p>
         )}
       </div>

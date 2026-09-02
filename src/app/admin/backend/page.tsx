@@ -1,20 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Server, Check, KeyRound, RefreshCw } from "lucide-react";
+import { useRef, useState } from "react";
+import { Server, Check, RefreshCw } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase/client";
 
 export default function AdminBackend() {
   const { siteSettings, campaigns, clips, profiles, setSiteSettings } = useStore();
-  const [razorpayKey, setRazorpayKey] = useState("");
   const [saved, setSaved] = useState(false);
   const dirty = useRef(false);
   const [ping, setPing] = useState<"idle" | "testing" | "ok" | "fail">("idle");
-
-  useEffect(() => {
-    if (!dirty.current) setRazorpayKey(siteSettings.razorpayKey);
-  }, [siteSettings]);
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   let host = "";
@@ -30,7 +25,6 @@ export default function AdminBackend() {
       heroTitle: siteSettings.heroTitle,
       heroSubtitle: siteSettings.heroSubtitle,
       featuredIds: siteSettings.featuredIds,
-      razorpayKey: razorpayKey.trim(),
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -104,28 +98,6 @@ export default function AdminBackend() {
             enable live data. The app currently runs on seed data.
           </p>
         )}
-      </section>
-
-      <section className="rounded-2xl border bg-card p-6">
-        <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-widest text-muted">
-          <KeyRound size={14} /> Razorpay
-        </h2>
-        <label className="mt-4 block text-sm font-medium">API key</label>
-        <input
-          value={razorpayKey}
-          onChange={(e) => {
-            dirty.current = true;
-            setRazorpayKey(e.target.value);
-          }}
-          placeholder="rzp_live_…"
-          className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground sm:max-w-md"
-        />
-        <button
-          onClick={save}
-          className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-        >
-          {saved ? "Saved" : "Save key"}
-        </button>
       </section>
 
       <section className="rounded-2xl border bg-card p-6">

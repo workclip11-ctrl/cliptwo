@@ -19,19 +19,19 @@ import { PlatformIcon } from "@/components/PlatformIcon";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup, fmtViews } from "@/lib/format";
-import { financeOf, campaignSpent, payoutSplit } from "@/lib/finance";
+import { financeOf, campaignSpent } from "@/lib/finance";
 
 export default function ClipperPage() {
-  const { campaigns, clips, socialAccounts } = useStore();
+  const { campaigns, clips, socialAccounts, financeRecords } = useStore();
   const { user } = useAuth();
   const router = useRouter();
 
   const myClips = clips.filter((k) => k.userId && k.userId === user?.id);
   const myAccounts = socialAccounts.filter((a) => a.userId && a.userId === user?.id);
-  const fin = financeOf(myClips, campaigns);
+  const fin = financeOf(financeRecords, (r) => r.clipperId === user?.id);
   const openCampaigns = campaigns.filter((c) => c.status === "open");
-  const earnings = fin.earned;
-  const approvedCount = fin.earnedCount;
+  const earnings = fin.total;
+  const approvedCount = fin.totalCount;
   const pendingCount = fin.pendingCount;
   const maxViews = Math.max(1, ...myClips.map((k) => k.views));
 
@@ -94,7 +94,7 @@ export default function ClipperPage() {
             </div>
             <div className="space-y-4">
               {openCampaigns.map((c) => {
-                const spent = campaignSpent(c, clips);
+                const spent = campaignSpent(c, financeRecords);
                 const remaining = (c.budget ?? 0) - spent;
                 const pct = c.budget
                   ? Math.min(100, Math.round((spent / c.budget) * 100))
@@ -265,7 +265,7 @@ export default function ClipperPage() {
                           {k.views ? fmtViews(k.views) : "—"}
                         </td>
                         <td className="px-4 py-3 text-right font-mono">
-                          {payoutSplit(k, campaigns).net > 0 ? rup(payoutSplit(k, campaigns).net) : "—"}
+                          {(financeRecords.find((r) => r.clipId === k.id)?.netAmount ?? 0) / 100 > 0 ? rup((financeRecords.find((r) => r.clipId === k.id)?.netAmount ?? 0) / 100) : "—"}
                         </td>
                         <td className="px-4 py-3 text-right">
                           <StatusPill status={k.status} />

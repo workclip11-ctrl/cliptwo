@@ -55,6 +55,13 @@ export async function POST(request: Request) {
       );
     }
 
+    if (event === "payout.completed" && !providerRef) {
+      return NextResponse.json(
+        { error: "providerRef required for payout.completed" },
+        { status: 400 },
+      );
+    }
+
     // 3. Get server-side Supabase client
     const supabase = getServerSupabase();
     if (!supabase) {
@@ -66,16 +73,16 @@ export async function POST(request: Request) {
 
     // 4. Process webhook event via server-side RPC only
     if (event === "payout.completed") {
-      const { error } = await supabase.rpc("complete_payout", {
+      const { error } = await supabase.rpc("complete_payout_request", {
         p_payout_id: payoutId,
-        p_provider_ref: providerRef,
+        p_payment_reference: providerRef,
       });
 
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
     } else if (event === "payout.failed") {
-      const { error } = await supabase.rpc("fail_payout", {
+      const { error } = await supabase.rpc("fail_payout_request", {
         p_payout_id: payoutId,
         p_reason: body.reason ?? "Provider reported failure",
       });

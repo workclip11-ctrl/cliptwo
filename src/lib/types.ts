@@ -27,7 +27,6 @@ export interface CampaignViewRules {
   minViews?: number;
   maxPayout?: number;
   deletedPolicy?: string;
-  payableWhen?: string;
 }
 
 export interface CampaignApproval {
@@ -60,7 +59,6 @@ export interface Campaign {
   budget?: number;
   spent?: number;
   reservedBudget?: number;
-  payableAmount?: number;
   remainingBudget?: number;
   daysLeft?: number;
   sourceLink?: string;
@@ -99,15 +97,11 @@ export interface Campaign {
   audit?: AuditEntry[];
 }
 
-export type ClipStatus =
-  | "pending"
-  | "approved"
-  | "payable"
-  | "processing"
-  | "paid"
-  | "failed"
-  | "held"
-  | "rejected";
+// ── Clip moderation status (content review only, no financial meaning) ──────
+export type ClipStatus = "pending" | "approved" | "rejected" | "held";
+
+// ── Financial record status (payment lifecycle) ─────────────────────────────
+export type FinanceStatus = "pending" | "processing" | "paid";
 
 export type ProfileRole = "clipper" | "creator" | "admin";
 export type ProfileStatus = "active" | "suspended" | "deactivated";
@@ -161,18 +155,62 @@ export interface Clip {
   userId?: string;
   rejectionReason?: string;
   rejectionDetails?: string;
-  failureReason?: string;
   heldReason?: string;
-  txnId?: string;
-  payoutRef?: string;
   updatedAt?: number;
-  payoutDate?: number;
   engagement?: ClipEngagement;
   audit?: AuditEntry[];
   riskFlags?: RiskFlag[];
   verified?: boolean;
   lockedCpm?: number;
   lockedMaxPayout?: number;
+}
+
+// ── Financial record (immutable once created) ───────────────────────────────
+// Created when admin approves a clip. Contains all payment lifecycle data.
+export interface FinanceRecord {
+  id: string;
+  clipId: string;
+  campaignId: string;
+  clipperId?: string;
+  // Immutable financial values (calculated at approval time)
+  lockedCpm: number;           // CPM in paise (₹220 = 22000)
+  lockedMaxPayout?: number;    // Max payout per clip in paise
+  verifiedViews: number;       // Views used for calculation
+  grossAmount: number;         // In paise
+  platformFee: number;         // In paise (10% of gross)
+  netAmount: number;           // In paise (gross - platform_fee)
+  // Payment lifecycle
+  status: FinanceStatus;
+  upiIdSnapshot?: string;      // UPI at time of request
+  paymentReference?: string;   // Manual payment reference (neft/ref no)
+  paidBy?: string;             // Admin who confirmed payment
+  // Timestamps
+  createdAt: number;
+  processingAt?: number;
+  paidAt?: number;
+  // Audit
+  audit?: AuditEntry[];
+}
+
+// ── Payout request (clipper-initiated) ──────────────────────────────────────
+export type PayoutRequestStatus = "pending" | "processing" | "paid";
+
+export interface PayoutRequest {
+  id: string;
+  userId: string;
+  amount: number;              // Total requested in paise
+  netAmount: number;           // Net after fees in paise
+  currency: string;
+  status: PayoutRequestStatus;
+  method: string;              // 'upi'
+  upiId: string;               // Snapshot of UPI at request time
+  paymentReference?: string;   // Admin-provided reference
+  paidBy?: string;             // Admin who confirmed
+  createdAt: number;
+  processingAt?: number;
+  paidAt?: number;
+  financeRecordIds: string[];  // Which finance records this payout covers
+  audit?: AuditEntry[];
 }
 
 export interface Appeal {
@@ -224,9 +262,6 @@ export type SocialAccountStatus =
   | "disconnected"
   | "verification_failed";
 
-// A connected social account for a clipper. Only non-secret metadata lives here.
-// OAuth tokens / access secrets are stored in social_connections (server-only,
-// RLS forbids browser SELECT on token columns). The client never receives them.
 export interface SocialAccount {
   id: string;
   userId?: string;
@@ -245,7 +280,6 @@ export interface SiteSettings {
   heroTitle: string;
   heroSubtitle: string;
   featuredIds: string[];
-  razorpayKey: string;
 }
 
 export interface StoreState {
@@ -253,12 +287,12 @@ export interface StoreState {
   clips: Clip[];
   profiles: Profile[];
   socialAccounts: SocialAccount[];
+  financeRecords: FinanceRecord[];
+  payoutRequests: PayoutRequest[];
   siteSettings: SiteSettings;
   savedCampaigns: string[];
   lastError?: string;
 }
-
-// ── Centralized Admin Audit Log ──────────────────────────────────────────────
 
 export type AuditAction =
   | "user_created"
@@ -274,10 +308,12 @@ export type AuditAction =
   | "clip_approved"
   | "clip_rejected"
   | "clip_held"
-  | "earnings_adjusted"
-  | "payout_initiated"
-  | "payout_completed"
-  | "payout_failed"
+  | "finance_created"
+  | "finance_processing"
+  | "finance_paid"
+  | "payout_requested"
+  | "payout_processing"
+  | "payout_paid"
   | "fraud_flag_created"
   | "fraud_flag_cleared"
   | "account_changed"
@@ -295,7 +331,7 @@ export interface AuditLog {
   timestamp: number;
   actor: string;
   action: AuditAction;
-  targetType: "user" | "campaign" | "clip" | "system" | "fraud";
+  targetType: "user" | "campaign" | "clip" | "finance" | "payout" | "system" | "fraud";
   targetId: string;
   targetLabel?: string;
   previousValue?: string;

@@ -26,7 +26,7 @@ import {
 } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup, fmtViews, clipEarnings } from "@/lib/format";
-import { isEarned } from "@/lib/finance";
+
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { StatusPill } from "@/components/StatusPill";
 import { canAdmin, type AdminPermission } from "@/lib/permissions";
@@ -83,11 +83,11 @@ function clipperStats(
   campaigns: Campaign[],
 ): Stats {
   const own = clips.filter((k) => k.clipper === p.username);
-  const earned = own.filter((k) => isEarned(k.status));
+  const earned = own.filter((k) => k.status === "approved" || k.status === "held");
   // "Approved" = reached an approved/payable state, but a failed payout is not
   // a clean approval, so it's excluded from the approval rate.
   const approved = own.filter(
-    (k) => isEarned(k.status) && k.status !== "failed",
+    (k) => k.status === "approved" || k.status === "held",
   ).length;
   const rejected = own.filter((k) => k.status === "rejected").length;
   const approvalRate =
@@ -97,7 +97,7 @@ function clipperStats(
   const verifiedViews = earned.reduce((s, k) => s + k.views, 0);
   const earnedAmt = earned.reduce((s, k) => s + clipEarnings(k, campaigns), 0);
   const paid = own
-    .filter((k) => k.status === "paid")
+    .filter(() => false)
     .reduce((s, k) => s + clipEarnings(k, campaigns), 0);
   return { total: own.length, approved, rejected, approvalRate, verifiedViews, earned: earnedAmt, paid, own };
 }
@@ -109,7 +109,7 @@ function accountsFor(p: Profile, accounts: SocialAccount[]) {
 }
 
 export default function AdminClippers() {
-  const { profiles, clips, campaigns, socialAccounts } = useStore();
+  const { profiles, clips, campaigns, financeRecords, socialAccounts } = useStore();
   const { user } = useAuth();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
@@ -360,13 +360,14 @@ function ClipperDrawer({
     setProfileRisk,
     saveAdminNotes,
     respondToAppeal,
+    financeRecords,
   } = useStore();
   const stats = clipperStats(profile, clips, campaigns);
   const accs = accountsFor(profile, socialAccounts);
   const submissionsRef = useRef<HTMLDivElement>(null);
 
   // Reputation
-  const repMetrics = calculateClipperReputation(clips, profile.id, campaigns, socialAccounts);
+  const repMetrics = calculateClipperReputation(clips, profile.id, campaigns, financeRecords, socialAccounts);
   const repScore = calculateReputationScore(repMetrics);
 
   const [riskOpen, setRiskOpen] = useState(false);
@@ -662,7 +663,7 @@ function ClipperDrawer({
             </p>
             <div className="mt-3 space-y-2">
               {stats.own
-                .filter((k) => isEarned(k.status))
+                .filter((k) => k.status === "approved" || k.status === "held")
                 .map((k) => {
                   const camp = campaigns.find((c) => c.id === k.campaignId);
                   return (
@@ -679,7 +680,7 @@ function ClipperDrawer({
                     </div>
                   );
                 })}
-              {stats.own.filter((k) => isEarned(k.status)).length === 0 && (
+              {stats.own.filter((k) => k.status === "approved" || k.status === "held").length === 0 && (
                 <p className="text-sm text-muted">No payouts yet.</p>
               )}
             </div>

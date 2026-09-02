@@ -655,7 +655,7 @@ function EarningsCalculator() {
 
 export default function Home() {
   const router = useRouter();
-  const { campaigns, clips, siteSettings } = useStore();
+  const { campaigns, clips, siteSettings, financeRecords } = useStore();
   const [active, setActive] = useState<Campaign | null>(null);
 
   const heroTitle =
@@ -669,7 +669,7 @@ export default function Home() {
     const openCampaigns = campaigns.filter((c) => c.status === "open" || c.status === "near_budget").length;
     const totalViews = clips.reduce((s, k) => s + k.views, 0);
     const clippers = new Set(clips.map((k) => k.clipper)).size;
-    const fin = financeOf(clips, campaigns);
+    const fin = financeOf(financeRecords);
     const paidOut = fin.paid;
     return { openCampaigns, totalViews, clippers, paidOut };
   }, [clips, campaigns]);

@@ -1,13 +1,11 @@
 // ---------------------------------------------------------------------------
 // Social provider abstraction — OAuth initiation, callback, token exchange,
-// ownership verification, and token refresh for Instagram and YouTube.
-//
-// In development (no real OAuth credentials), mock providers simulate the
-// full flow so the UI can be tested end-to-end. The mock flow is clearly
-// marked and MUST NOT be used in production.
+// ownership verification, and token refresh for Instagram, YouTube, and Kick.
 //
 // SECURITY: Tokens are NEVER returned to the browser. All token operations
 // happen server-side via API routes that use service_role.
+//
+// Kick: No public OAuth API available yet. The provider throws if called.
 // ---------------------------------------------------------------------------
 
 import type { Platform } from "./types";
@@ -105,8 +103,6 @@ class InstagramProvider implements SocialProvider {
       state,
     });
 
-    // Instagram Basic Display API does not support PKCE in the same way
-    // but we use state for CSRF protection
     return {
       authorizationUrl: `https://www.facebook.com/v19.0/dialog/oauth?${params.toString()}`,
       state,
@@ -209,15 +205,11 @@ class InstagramProvider implements SocialProvider {
   }
 
   async refreshToken(refreshToken: string): Promise<TokenRefreshResult> {
-    // Instagram long-lived tokens don't expire for 60 days
-    // For production, implement token refresh via the Graph API
     void refreshToken;
     throw new Error("Instagram token refresh not implemented — reconnect required");
   }
 
   async revokeToken(accessToken: string): Promise<void> {
-    // Instagram doesn't have a direct revoke endpoint
-    // The token becomes invalid when the user removes the app
     void accessToken;
   }
 
@@ -254,7 +246,6 @@ class YouTubeProvider implements SocialProvider {
   }
 
   getAuthorizationUrl(userId: string, state: string): OAuthInitResult {
-    // Generate PKCE code verifier + challenge
     const codeVerifier = generateCodeVerifier();
 
     const scopes = [
@@ -262,10 +253,6 @@ class YouTubeProvider implements SocialProvider {
       "https://www.googleapis.com/auth/youtube.force-ssl",
     ];
 
-    // NOTE: code_challenge must be computed async (SHA-256 via Web Crypto).
-    // For simplicity in this synchronous function, we store the verifier and
-    // compute the challenge during the callback exchange. In production, use
-    // a helper that returns a Promise or pre-compute via an API route.
     const params = new URLSearchParams({
       client_id: this.clientId,
       redirect_uri: this.redirectUri,
@@ -435,7 +422,6 @@ class YouTubeProvider implements SocialProvider {
   }
 
   async revokeToken(accessToken: string): Promise<void> {
-    // Revoke the token with Google
     await fetch(
       `https://oauth2.googleapis.com/revoke?token=${accessToken}`,
       { method: "POST" },
@@ -463,76 +449,53 @@ class YouTubeProvider implements SocialProvider {
   }
 }
 
-// ── Mock Provider (Development) ─────────────────────────────────────────────
+// ── Kick (Not yet available) ────────────────────────────────────────────────
+//
+// Kick does not have a public OAuth API for third-party integrations.
+// This provider throws on every operation. It exists so the Platform type
+// and UI can reference Kick without using a fake mock provider.
 
-class MockProvider implements SocialProvider {
-  platform: Platform;
+class KickProvider implements SocialProvider {
+  platform: Platform = "Kick";
 
-  constructor(platform: Platform) {
-    this.platform = platform;
+  private throwNotAvailable(): never {
+    throw new Error(
+      "Kick integration is not yet available. Kick does not currently offer a public OAuth API for third-party applications.",
+    );
   }
 
-  getAuthorizationUrl(_userId: string, state: string): OAuthInitResult {
-    const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-    return {
-      authorizationUrl: `${base}/api/social/oauth/callback/${this.platform.toLowerCase()}?code=mock_code_123&state=${state}`,
-      state,
-    };
+  getAuthorizationUrl(_userId: string, _state: string): OAuthInitResult {
+    this.throwNotAvailable();
   }
 
   async exchangeCode(
     _code: string,
     _state: string,
   ): Promise<OAuthCallbackResult> {
-    // Simulate network delay
-    await new Promise((r) => setTimeout(r, 500));
-
-    return {
-      accessToken: `mock_ig_at_${Date.now()}`,
-      refreshToken: `mock_ig_rt_${Date.now()}`,
-      expiresIn: 60 * 60 * 24 * 60, // 60 days
-      scope: "instagram_basic instagram_content_publish",
-      providerAccountId: `mock_${this.platform.toLowerCase()}_${Date.now()}`,
-      handle: `mock_user_${Math.floor(Math.random() * 10000)}`,
-    };
+    this.throwNotAvailable();
   }
 
   async verifyOwnership(
     _accessToken: string,
-    claimedHandle: string,
+    _claimedHandle: string,
   ): Promise<OwnershipVerificationResult> {
-    await new Promise((r) => setTimeout(r, 300));
-    // In mock mode, verification always succeeds
-    return {
-      verified: true,
-      providerAccountId: `mock_${this.platform.toLowerCase()}_verified`,
-      handle: claimedHandle,
-    };
+    this.throwNotAvailable();
   }
 
-  async refreshToken(refreshToken: string): Promise<TokenRefreshResult> {
-    await new Promise((r) => setTimeout(r, 200));
-    return {
-      accessToken: `mock_refreshed_${Date.now()}`,
-      refreshToken,
-      expiresIn: 60 * 60 * 24 * 60,
-    };
+  async refreshToken(_refreshToken: string): Promise<TokenRefreshResult> {
+    this.throwNotAvailable();
   }
 
   async revokeToken(_accessToken: string): Promise<void> {
-    await new Promise((r) => setTimeout(r, 100));
+    this.throwNotAvailable();
   }
 
-  async getProfile(accessToken: string): Promise<{
+  async getProfile(_accessToken: string): Promise<{
     handle: string;
     avatarUrl?: string;
     providerAccountId: string;
   }> {
-    void accessToken;
-    return {
-      handle: `mock_user`,
-      providerAccountId: `mock_profile`,
-    };
+    this.throwNotAvailable();
   }
 }
 
@@ -544,39 +507,42 @@ function isConfigured(platform: Platform): boolean {
       return !!(process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET);
     case "YouTube":
       return !!(process.env.YOUTUBE_CLIENT_ID && process.env.YOUTUBE_CLIENT_SECRET);
+    case "Kick":
+      return false; // No OAuth API available
     default:
       return false;
   }
 }
 
+/** Returns the real provider for the platform, or null if not available. */
 export function getProvider(platform: Platform): SocialProvider {
-  if (!isConfigured(platform)) {
-    console.warn(
-      `[social-providers] ${platform} OAuth not configured — using mock provider. ` +
-        `Set ${platform === "Instagram" ? "INSTAGRAM_CLIENT_ID/SECRET" : "YOUTUBE_CLIENT_ID/SECRET"} for production.`,
-    );
-    return new MockProvider(platform);
-  }
-
   switch (platform) {
     case "Instagram":
       return new InstagramProvider();
     case "YouTube":
       return new YouTubeProvider();
+    case "Kick":
+      return new KickProvider();
     default:
-      return new MockProvider(platform);
+      throw new Error(`Unsupported platform: ${platform}`);
   }
+}
+
+/**
+ * Returns true if the platform has real OAuth credentials configured.
+ * false = platform is not available (Kick) or credentials are missing.
+ */
+export function isPlatformAvailable(platform: Platform): boolean {
+  return isConfigured(platform);
 }
 
 // ── PKCE helpers (for YouTube/Google) ───────────────────────────────────────
 
 function generateCodeVerifier(): string {
   const array = new Uint8Array(32);
-  // Use crypto.getRandomValues if available (browser/edge), otherwise fall back
   if (typeof globalThis.crypto?.getRandomValues === "function") {
     globalThis.crypto.getRandomValues(array);
   } else {
-    // Node.js fallback
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { randomBytes } = require("crypto") as typeof import("crypto");
     const buf = randomBytes(32);

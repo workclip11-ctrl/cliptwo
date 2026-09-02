@@ -33,10 +33,11 @@ import type {
   SocialAccountStatus,
   SiteSettings,
   StoreState,
+  FinanceRecord,
+  PayoutRequest,
 } from "./types";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
-import { EARNED_STATUSES, isEarned, financeOf, campaignBudget, wouldExceedBudget, canAcceptSubmission } from "@/lib/finance";
-import { clipEarnings } from "@/lib/format";
+import { financeOf, campaignBudget, wouldExceedBudget, canAcceptSubmission } from "@/lib/finance";
 import { initAuditLogs } from "@/lib/audit";
 
 const isoDaysAgo = (n: number) => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
@@ -95,7 +96,6 @@ const seed: StoreState = {
         minViews: 1000,
         maxPayout: 5000,
         deletedPolicy: "If the post is deleted or set private, earnings are reversed.",
-        payableWhen: "Becomes payable once approved and views stabilise (48h).",
       },
       approval: {
         afterSubmission: "You'll get a submission ticket linked to this campaign.",
@@ -156,7 +156,6 @@ const seed: StoreState = {
         minViews: 500,
         maxPayout: 3000,
         deletedPolicy: "Private/deleted posts forfeit earnings.",
-        payableWhen: "Payable 24h after approval.",
       },
       approval: {
         afterSubmission: "Ticket created under your clipper profile.",
@@ -217,7 +216,6 @@ const seed: StoreState = {
         minViews: 2000,
         maxPayout: 8000,
         deletedPolicy: "Deleted posts reverse all earnings.",
-        payableWhen: "Payable 72h after approval.",
       },
       approval: {
         afterSubmission: "Ticket created, reviewed by brand team.",
@@ -278,7 +276,6 @@ const seed: StoreState = {
         minViews: 1000,
         maxPayout: 4000,
         deletedPolicy: "Deleted/private posts forfeit earnings.",
-        payableWhen: "Payable 48h after approval.",
       },
       approval: {
         afterSubmission: "Ticket created under your profile.",
@@ -297,19 +294,15 @@ const seed: StoreState = {
       userId: "u_maya",
       videoUrl: "https://instagram.com/reel/xk29a",
       caption: "This app is unhinged 🔥 #tech",
-      status: "paid",
+      status: "approved",
       views: 18400,
       verifiedViews: 16560,
       submittedAt: Date.now() - 1000 * 60 * 60 * 20,
       platform: "Instagram",
-      payoutDate: Date.now() - 1000 * 60 * 60 * 10,
       engagement: { likes: 2100, comments: 142, shares: 380 },
         audit: [
           { action: "submitted", by: "maya.cuts", at: Date.now() - 1000 * 60 * 60 * 20 },
           { action: "approved", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 18 },
-          { action: "payable", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 17 },
-          { action: "processing", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 12 },
-          { action: "paid", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 10, note: "Released to UPI" },
         ],
       },
     {
@@ -376,25 +369,16 @@ const seed: StoreState = {
       userId: "u_maya",
       videoUrl: "https://instagram.com/reel/xk51p",
       caption: "3 quick takes from the keynote",
-      status: "failed",
+      status: "approved",
       views: 9100,
       verifiedViews: 8190,
       submittedAt: Date.now() - 1000 * 60 * 60 * 30,
       platform: "Instagram",
-        failureReason:
-          "UPI verification failed — the UPI ID could not be verified. Update your payment method and retry.",
         engagement: { likes: 510, comments: 33, shares: 44 },
         audit: [
           { action: "submitted", by: "maya.cuts", at: Date.now() - 1000 * 60 * 60 * 30 },
           { action: "approved", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 28 },
-          { action: "payable", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 27 },
-          {
-            action: "failed",
-            by: "workclip11@gmail.com",
-            at: Date.now() - 1000 * 60 * 60 * 26,
-          note: "UPI verification failed — the UPI ID could not be verified. Update your payment method and retry.",
-        },
-      ],
+        ],
     },
     {
       id: "kp1",
@@ -439,7 +423,7 @@ const seed: StoreState = {
       userId: "u_priya",
       videoUrl: "https://youtube.com/shorts/priya03",
       caption: "The aha moment",
-      status: "payable",
+      status: "approved",
       views: 12000,
       verifiedViews: 10800,
       submittedAt: Date.now() - 1000 * 60 * 60 * 24 * 3,
@@ -448,7 +432,6 @@ const seed: StoreState = {
       audit: [
         { action: "submitted", by: "priya.viral", at: Date.now() - 1000 * 60 * 60 * 24 * 3 },
         { action: "approved", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 24 * 2 },
-        { action: "payable", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 24 * 1 },
       ],
     },
     {
@@ -544,22 +527,15 @@ const seed: StoreState = {
       userId: "u_banned",
       videoUrl: "https://youtube.com/shorts/spam02",
       caption: "Spam reel",
-      status: "failed",
+      status: "approved",
       views: 3000,
       verifiedViews: 2700,
       submittedAt: Date.now() - 1000 * 60 * 60 * 24 * 6,
       platform: "YouTube",
-      failureReason: "Account suspended before payout.",
       engagement: { likes: 20, comments: 1, shares: 2 },
       audit: [
         { action: "submitted", by: "banned.user", at: Date.now() - 1000 * 60 * 60 * 24 * 6 },
         { action: "approved", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 24 * 5 },
-        {
-          action: "failed",
-          by: "workclip11@gmail.com",
-          at: Date.now() - 1000 * 60 * 60 * 24 * 4,
-          note: "Account suspended before payout.",
-        },
       ],
     },
     {
@@ -650,7 +626,7 @@ const seed: StoreState = {
       userId: "u_maya",
       videoUrl: "https://youtube.com/shorts/maker02",
       caption: "Maker House — top 5 tools",
-      status: "payable",
+      status: "approved",
       views: 13500,
       verifiedViews: 12150,
       submittedAt: Date.now() - 1000 * 60 * 60 * 24 * 2,
@@ -709,6 +685,89 @@ const seed: StoreState = {
           at: Date.now() - 1000 * 60 * 60 * 24 * 4,
           note: "Possible copyright claim on background audio — under review.",
         },
+      ],
+    },
+  ],
+  financeRecords: [
+    {
+      id: "fr_k1",
+      clipId: "k1",
+      campaignId: "c1",
+      clipperId: "u_maya",
+      lockedCpm: 220,
+      lockedMaxPayout: 5000,
+      verifiedViews: 16560,
+      grossAmount: 3643,
+      platformFee: 364,
+      netAmount: 3279,
+      status: "paid",
+      upiIdSnapshot: "maya.reddy@okaxis",
+      paymentReference: "NEFT-2026-K1-001",
+      paidBy: "u_admin",
+      createdAt: Date.now() - 1000 * 60 * 60 * 18,
+      processingAt: Date.now() - 1000 * 60 * 60 * 14,
+      paidAt: Date.now() - 1000 * 60 * 60 * 10,
+      audit: [
+        { action: "finance_created", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 18 },
+        { action: "finance_processing", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 14 },
+        { action: "finance_paid", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 10 },
+      ],
+    },
+    {
+      id: "fr_kp3",
+      clipId: "kp3",
+      campaignId: "c1",
+      clipperId: "u_priya",
+      lockedCpm: 220,
+      lockedMaxPayout: 5000,
+      verifiedViews: 10800,
+      grossAmount: 2376,
+      platformFee: 238,
+      netAmount: 2138,
+      status: "pending",
+      createdAt: Date.now() - 1000 * 60 * 60 * 24 * 2,
+      audit: [
+        { action: "finance_created", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 24 * 2 },
+      ],
+    },
+    {
+      id: "fr_kc3b",
+      clipId: "kc3b",
+      campaignId: "c3",
+      clipperId: "u_maya",
+      lockedCpm: 280,
+      lockedMaxPayout: 8000,
+      verifiedViews: 12150,
+      grossAmount: 3402,
+      platformFee: 340,
+      netAmount: 3062,
+      status: "pending",
+      createdAt: Date.now() - 1000 * 60 * 60 * 24 * 1,
+      audit: [
+        { action: "finance_created", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 24 * 1 },
+      ],
+    },
+  ],
+  payoutRequests: [
+    {
+      id: "pr_maya_1",
+      userId: "u_maya",
+      amount: 3279,
+      netAmount: 3279,
+      currency: "INR",
+      status: "paid",
+      method: "upi",
+      upiId: "maya.reddy@okaxis",
+      paymentReference: "NEFT-2026-K1-001",
+      paidBy: "u_admin",
+      createdAt: Date.now() - 1000 * 60 * 60 * 12,
+      processingAt: Date.now() - 1000 * 60 * 60 * 11,
+      paidAt: Date.now() - 1000 * 60 * 60 * 10,
+      financeRecordIds: ["fr_k1"],
+      audit: [
+        { action: "payout_requested", by: "maya.cuts", at: Date.now() - 1000 * 60 * 60 * 12 },
+        { action: "payout_processing", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 11 },
+        { action: "payout_paid", by: "workclip11@gmail.com", at: Date.now() - 1000 * 60 * 60 * 10 },
       ],
     },
   ],
@@ -962,7 +1021,6 @@ const seed: StoreState = {
     heroTitle: "",
     heroSubtitle: "",
     featuredIds: [],
-    razorpayKey: "",
   },
   savedCampaigns: [],
 };
@@ -974,12 +1032,14 @@ interface StoreActions {
     status?: CampaignStatus,
   ) => void;
   addClip: (k: Omit<Clip, "id" | "submittedAt" | "status" | "views">) => void;
-  setClipStatus: (
-    id: string,
-    status: ClipStatus,
-    patch?: Partial<Clip>,
-    actor?: string,
-  ) => void;
+  approveClip: (id: string, actor?: string) => void;
+  rejectClip: (id: string, reason: string, details?: string, actor?: string) => void;
+  holdClip: (id: string, reason: string, actor?: string) => void;
+  processFinance: (recordId: string, upiId?: string, actor?: string) => void;
+  payFinance: (recordId: string, paymentRef?: string, actor?: string) => void;
+  requestPayout: () => void;
+  processPayoutRequest: (payoutId: string, actor?: string) => void;
+  completePayoutRequest: (payoutId: string, paymentRef?: string, actor?: string) => void;
   closeCampaign: (id: string) => void;
   deleteCampaign: (id: string) => void;
   updateCampaign: (
@@ -1176,12 +1236,8 @@ function mapClip(r: Record<string, unknown>): Clip {
     userId: r.user_id ? String(r.user_id) : undefined,
     rejectionReason: r.rejection_reason ? String(r.rejection_reason) : undefined,
     rejectionDetails: r.rejection_details ? String(r.rejection_details) : undefined,
-    failureReason: r.failure_reason ? String(r.failure_reason) : undefined,
     heldReason: r.held_reason ? String(r.held_reason) : undefined,
-    txnId: r.txn_id ? String(r.txn_id) : undefined,
-    payoutRef: r.payout_ref ? String(r.payout_ref) : undefined,
     updatedAt: r.updated_at ? new Date(String(r.updated_at)).getTime() : undefined,
-    payoutDate: r.payout_date ? new Date(String(r.payout_date)).getTime() : undefined,
     engagement: (r.engagement as ClipEngagement) ?? undefined,
     audit: Array.isArray(r.audit)
       ? (r.audit as AuditEntry[])
@@ -1217,14 +1273,56 @@ function mapProfile(r: Record<string, unknown>): Profile {
 
 function mapSiteSettings(r: Record<string, unknown> | null): SiteSettings {
   if (!r) {
-    return { heroTitle: "", heroSubtitle: "", featuredIds: [], razorpayKey: "" };
+    return { heroTitle: "", heroSubtitle: "", featuredIds: [] };
   }
   const fids = r.featured_ids;
   return {
     heroTitle: r.hero_title ? String(r.hero_title) : "",
     heroSubtitle: r.hero_subtitle ? String(r.hero_subtitle) : "",
     featuredIds: Array.isArray(fids) ? (fids as unknown[]).map(String) : [],
-    razorpayKey: r.razorpay_key ? String(r.razorpay_key) : "",
+  };
+}
+
+function mapFinanceRecord(r: Record<string, unknown>): FinanceRecord {
+  return {
+    id: String(r.id),
+    clipId: String(r.clip_id),
+    campaignId: String(r.campaign_id),
+    clipperId: r.clipper_id ? String(r.clipper_id) : undefined,
+    lockedCpm: Number(r.locked_cpm ?? 0),
+    lockedMaxPayout: r.locked_max_payout != null ? Number(r.locked_max_payout) : undefined,
+    verifiedViews: Number(r.verified_views ?? 0),
+    grossAmount: Number(r.gross_amount ?? 0),
+    platformFee: Number(r.platform_fee ?? 0),
+    netAmount: Number(r.net_amount ?? 0),
+    status: (r.status as "pending" | "processing" | "paid") ?? "pending",
+    upiIdSnapshot: r.upi_id_snapshot ? String(r.upi_id_snapshot) : undefined,
+    paymentReference: r.payment_reference ? String(r.payment_reference) : undefined,
+    paidBy: r.paid_by ? String(r.paid_by) : undefined,
+    createdAt: r.created_at ? new Date(String(r.created_at)).getTime() : Date.now(),
+    processingAt: r.processing_at ? new Date(String(r.processing_at)).getTime() : undefined,
+    paidAt: r.paid_at ? new Date(String(r.paid_at)).getTime() : undefined,
+    audit: Array.isArray(r.audit) ? (r.audit as AuditEntry[]) : undefined,
+  };
+}
+
+function mapPayoutRequest(r: Record<string, unknown>): PayoutRequest {
+  return {
+    id: String(r.id),
+    userId: String(r.user_id),
+    amount: Number(r.amount ?? 0),
+    netAmount: Number(r.net_amount ?? 0),
+    currency: String(r.currency ?? "INR"),
+    status: (r.status as "pending" | "processing" | "paid") ?? "pending",
+    method: String(r.method ?? "upi"),
+    upiId: String(r.upi_id ?? ""),
+    paymentReference: r.payment_reference ? String(r.payment_reference) : undefined,
+    paidBy: r.paid_by ? String(r.paid_by) : undefined,
+    createdAt: r.created_at ? new Date(String(r.created_at)).getTime() : Date.now(),
+    processingAt: r.processing_at ? new Date(String(r.processing_at)).getTime() : undefined,
+    paidAt: r.paid_at ? new Date(String(r.paid_at)).getTime() : undefined,
+    financeRecordIds: Array.isArray(r.finance_record_ids) ? (r.finance_record_ids as string[]) : [],
+    audit: Array.isArray(r.audit) ? (r.audit as AuditEntry[]) : undefined,
   };
 }
 
@@ -1303,12 +1401,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         { data: profs },
         { data: accts },
         { data: site },
+        { data: fins },
+        { data: payouts },
       ] = await Promise.all([
         supabase.from("campaigns").select("*"),
         supabase.from("clips").select("*"),
         supabase.from("profiles").select("*"),
         supabase.from("social_accounts").select("*"),
         supabase.from("site_settings").select("*").eq("id", 1).maybeSingle(),
+        supabase.from("financial_records").select("*"),
+        supabase.from("payout_requests").select("*"),
       ]);
       if (!active) return;
       if (camps) setState((s) => ({ ...s, campaigns: camps.map(mapCampaign) }));
@@ -1321,6 +1423,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }));
       if (site)
         setState((s) => ({ ...s, siteSettings: mapSiteSettings(site as Record<string, unknown>) }));
+      if (fins)
+        setState((s) => ({ ...s, financeRecords: fins.map(mapFinanceRecord) }));
+      if (payouts)
+        setState((s) => ({ ...s, payoutRequests: payouts.map(mapPayoutRequest) }));
     })().catch(() => {
       /* keep seed on failure */
     });
@@ -1501,7 +1607,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             );
             return;
           }
-          if (!canAcceptSubmission(camp, cur.clips)) {
+          if (!canAcceptSubmission(camp, cur.financeRecords)) {
             console.error(
               `Budget protection: rejecting submission for campaign "${camp.title}". ` +
                 `Campaign has reached its budget.`,
@@ -1564,120 +1670,244 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         })();
       },
 
-       setClipStatus: async (id, status, patch, actor) => {
-          // SECURITY: Only admins can change clip status.
+       approveClip: async (id, actor) => {
           const me = await getCurrentUser();
           if (!await isUserAdmin(me?.id)) {
-            console.error(`Authorization: non-admin user cannot change clip status for ${id}`);
+            console.error(`Authorization: non-admin user cannot approve clip ${id}`);
             return;
           }
-
-          // Capture previous state for rollback
           const prevClips = stateRef.current.clips;
-          const prevCampaigns = stateRef.current.campaigns;
-
-          // Optimistic local state update (will be rolled back on error)
-          const isTransitioningToEarned = EARNED_STATUSES.includes(status);
-          setState((s) => {
-            const at = Date.now();
-            const entry: AuditEntry = {
-              action: status,
-              by: actor,
-              at,
-              note:
-                patch?.rejectionReason ?? patch?.failureReason ?? patch?.heldReason,
-            };
-            return {
-              ...s,
-              clips: s.clips.map((k) => {
-                if (k.id !== id) return k;
-                const earned = EARNED_STATUSES.includes(status);
-                const merged: Clip = {
-                  ...k,
-                  status,
-                  ...patch,
-                  txnId: earned ? (k.txnId ?? `TXN-${k.id.toUpperCase()}`) : k.txnId,
-                  updatedAt: at,
-                  payoutDate: status === "paid" ? at : k.payoutDate,
-                  payoutRef:
-                    status === "paid"
-                      ? k.payoutRef ?? `PAY-${k.id.toUpperCase()}-${at}`
-                      : k.payoutRef,
-                  audit: [...(k.audit ?? []), entry],
-                };
-                if (status !== "rejected" && patch?.rejectionReason === undefined)
-                  merged.rejectionReason = undefined;
-                if (status !== "failed" && patch?.failureReason === undefined)
-                  merged.failureReason = undefined;
-                if (status !== "held" && patch?.heldReason === undefined)
-                  merged.heldReason = undefined;
-                return merged;
-              }),
-            };
+          const prevFinance = stateRef.current.financeRecords;
+          // Optimistic: set clip to approved
+          setState((s) => ({
+            ...s,
+            clips: s.clips.map((k) =>
+              k.id === id ? { ...k, status: "approved" as ClipStatus, updatedAt: Date.now(), audit: [...(k.audit ?? []), { action: "approved", by: actor, at: Date.now() }] } : k,
+            ),
+          }));
+          if (!isSupabaseConfigured) return;
+          const { data, error } = await supabase.rpc("approve_clip", {
+            p_clip_id: id,
+            p_actor: actor ?? null,
           });
-
-          // Auto-update campaign budget status
-          setState((s) => {
-            const changedClip = s.clips.find((k) => k.id === id);
-            if (!changedClip || !isTransitioningToEarned) return s;
-            const camp = s.campaigns.find((x) => x.id === changedClip.campaignId);
-            if (!camp || !camp.budget || camp.budget <= 0) return s;
-            const b = campaignBudget(camp, s.clips);
-            let newStatus: CampaignStatus = camp.status;
-            if (b.status === "budget_reached" && camp.status === "open") {
-              newStatus = "budget_reached";
-            } else if (b.status === "near_budget" && camp.status === "open") {
-              newStatus = "near_budget";
-            } else if (
-              b.status === "ok" &&
-              (camp.status === "budget_reached" || camp.status === "near_budget")
-            ) {
-              newStatus = "open";
-            }
-            if (newStatus === camp.status) return s;
-            return {
+          if (error) {
+            console.error("RPC approve_clip failed:", error.message);
+            setState((s) => ({ ...s, clips: prevClips, financeRecords: prevFinance, lastError: `Approve clip failed: ${error.message}` }));
+            return;
+          }
+          // Server returns the financial record
+          const record = data as Record<string, unknown>;
+          if (record?.id) {
+            setState((s) => ({
               ...s,
-              campaigns: s.campaigns.map((x) =>
-                x.id === camp.id ? { ...x, status: newStatus } : x,
-              ),
-            };
-          });
+              financeRecords: [mapFinanceRecord(record), ...s.financeRecords.filter((r) => r.clipId !== id)],
+            }));
+          }
+          },
 
-         if (!isSupabaseConfigured) return;
-         // SECURITY: Use unified admin_clip_action RPC (server-side auth + role + permission + budget + audit)
-         const { data, error } = await supabase.rpc("admin_clip_action", {
-           p_clip_id: id,
-           p_action: status === "approved" ? "approve"
-             : status === "rejected" ? "reject"
-             : status === "held" ? "hold"
-             : status === "processing" ? "processing"
-             : status === "paid" ? "paid"
-             : status === "failed" ? "failed"
-             : status === "payable" ? "payable"
-             : status,
-           p_reason: patch?.rejectionReason ?? patch?.failureReason ?? patch?.heldReason ?? null,
-           p_details: patch?.rejectionDetails ?? null,
-         });
-         if (error) {
-           console.error("RPC admin_clip_action failed:", error.message);
-           // Revert optimistic update on error — restore previous state
-           setState((s) => ({
-             ...s,
-             clips: prevClips,
-             campaigns: prevCampaigns,
-             lastError: `Clip status update failed: ${error.message}`,
-           }));
-           return;
-         }
-         // Update local state with server-confirmed data
-         const result = data as { clip?: Clip };
-         if (result?.clip) {
-           setState((s) => ({
-             ...s,
-             clips: s.clips.map((k) => k.id === id ? { ...k, ...result.clip } : k),
-           }));
-         }
-         },
+       rejectClip: async (id, reason, details, actor) => {
+          const me = await getCurrentUser();
+          if (!await isUserAdmin(me?.id)) {
+            console.error(`Authorization: non-admin user cannot reject clip ${id}`);
+            return;
+          }
+          const prevClips = stateRef.current.clips;
+          setState((s) => ({
+            ...s,
+            clips: s.clips.map((k) =>
+              k.id === id ? { ...k, status: "rejected" as ClipStatus, rejectionReason: reason, rejectionDetails: details, updatedAt: Date.now(), audit: [...(k.audit ?? []), { action: "rejected", by: actor, at: Date.now(), note: reason }] } : k,
+            ),
+          }));
+          if (!isSupabaseConfigured) return;
+          const { error } = await supabase.rpc("admin_clip_action", {
+            p_clip_id: id,
+            p_action: "reject",
+            p_reason: reason,
+            p_details: details ?? null,
+          });
+          if (error) {
+            console.error("RPC admin_clip_action (reject) failed:", error.message);
+            setState((s) => ({ ...s, clips: prevClips, lastError: `Reject clip failed: ${error.message}` }));
+          }
+          },
+
+       holdClip: async (id, reason, actor) => {
+          const me = await getCurrentUser();
+          if (!await isUserAdmin(me?.id)) {
+            console.error(`Authorization: non-admin user cannot hold clip ${id}`);
+            return;
+          }
+          const prevClips = stateRef.current.clips;
+          setState((s) => ({
+            ...s,
+            clips: s.clips.map((k) =>
+              k.id === id ? { ...k, status: "held" as ClipStatus, heldReason: reason, updatedAt: Date.now(), audit: [...(k.audit ?? []), { action: "held", by: actor, at: Date.now(), note: reason }] } : k,
+            ),
+          }));
+          if (!isSupabaseConfigured) return;
+          const { error } = await supabase.rpc("admin_clip_action", {
+            p_clip_id: id,
+            p_action: "hold",
+            p_reason: reason,
+          });
+          if (error) {
+            console.error("RPC admin_clip_action (hold) failed:", error.message);
+            setState((s) => ({ ...s, clips: prevClips, lastError: `Hold clip failed: ${error.message}` }));
+          }
+          },
+
+       processFinance: async (recordId, upiId, actor) => {
+          const me = await getCurrentUser();
+          if (!await isUserAdmin(me?.id)) {
+            console.error("Authorization: non-admin user cannot process finance");
+            return;
+          }
+          const prevFinance = stateRef.current.financeRecords;
+          setState((s) => ({
+            ...s,
+            financeRecords: s.financeRecords.map((r) =>
+              r.id === recordId ? { ...r, status: "processing" as const, processingAt: Date.now(), upiIdSnapshot: upiId ?? r.upiIdSnapshot } : r,
+            ),
+          }));
+          if (!isSupabaseConfigured) return;
+          const { data, error } = await supabase.rpc("process_finance", {
+            p_record_id: recordId,
+            p_upi_id: upiId ?? null,
+            p_actor: actor ?? null,
+          });
+          if (error) {
+            console.error("RPC process_finance failed:", error.message);
+            setState((s) => ({ ...s, financeRecords: prevFinance, lastError: `Process finance failed: ${error.message}` }));
+            return;
+          }
+          const record = data as Record<string, unknown>;
+          if (record?.id) {
+            setState((s) => ({
+              ...s,
+              financeRecords: s.financeRecords.map((r) => r.id === recordId ? mapFinanceRecord(record) : r),
+            }));
+          }
+          },
+
+       payFinance: async (recordId, paymentRef, actor) => {
+          const me = await getCurrentUser();
+          if (!await isUserAdmin(me?.id)) {
+            console.error("Authorization: non-admin user cannot pay finance");
+            return;
+          }
+          const prevFinance = stateRef.current.financeRecords;
+          setState((s) => ({
+            ...s,
+            financeRecords: s.financeRecords.map((r) =>
+              r.id === recordId ? { ...r, status: "paid" as const, paidAt: Date.now(), paymentReference: paymentRef ?? r.paymentReference, paidBy: me?.id } : r,
+            ),
+          }));
+          if (!isSupabaseConfigured) return;
+          const { data, error } = await supabase.rpc("pay_finance", {
+            p_record_id: recordId,
+            p_payment_reference: paymentRef ?? null,
+            p_actor: actor ?? null,
+          });
+          if (error) {
+            console.error("RPC pay_finance failed:", error.message);
+            setState((s) => ({ ...s, financeRecords: prevFinance, lastError: `Pay finance failed: ${error.message}` }));
+            return;
+          }
+          const record = data as Record<string, unknown>;
+          if (record?.id) {
+            setState((s) => ({
+              ...s,
+              financeRecords: s.financeRecords.map((r) => r.id === recordId ? mapFinanceRecord(record) : r),
+            }));
+          }
+          },
+
+       requestPayout: async () => {
+          const me = await getCurrentUser();
+          if (!me) {
+            setState((s) => ({ ...s, lastError: "Not authenticated" }));
+            return;
+          }
+          if (!isSupabaseConfigured) return;
+          const { data, error } = await supabase.rpc("request_payout");
+          if (error) {
+            console.error("RPC request_payout failed:", error.message);
+            setState((s) => ({ ...s, lastError: `Payout request failed: ${error.message}` }));
+            return;
+          }
+          const payout = data as Record<string, unknown>;
+          if (payout?.id) {
+            setState((s) => ({
+              ...s,
+              payoutRequests: [mapPayoutRequest(payout), ...s.payoutRequests],
+            }));
+          }
+          },
+
+       processPayoutRequest: async (payoutId, actor) => {
+          const me = await getCurrentUser();
+          if (!await isUserAdmin(me?.id)) {
+            console.error("Authorization: non-admin user cannot process payout");
+            return;
+          }
+          const prevPayouts = stateRef.current.payoutRequests;
+          setState((s) => ({
+            ...s,
+            payoutRequests: s.payoutRequests.map((p) =>
+              p.id === payoutId ? { ...p, status: "processing" as const, processingAt: Date.now() } : p,
+            ),
+          }));
+          if (!isSupabaseConfigured) return;
+          const { data, error } = await supabase.rpc("process_payout_request", {
+            p_payout_id: payoutId,
+            p_actor: actor ?? null,
+          });
+          if (error) {
+            console.error("RPC process_payout_request failed:", error.message);
+            setState((s) => ({ ...s, payoutRequests: prevPayouts, lastError: `Process payout failed: ${error.message}` }));
+            return;
+          }
+          const payout = data as Record<string, unknown>;
+          if (payout?.id) {
+            setState((s) => ({
+              ...s,
+              payoutRequests: s.payoutRequests.map((p) => p.id === payoutId ? mapPayoutRequest(payout) : p),
+            }));
+          }
+          },
+
+       completePayoutRequest: async (payoutId, paymentRef, actor) => {
+          const me = await getCurrentUser();
+          if (!await isUserAdmin(me?.id)) {
+            console.error("Authorization: non-admin user cannot complete payout");
+            return;
+          }
+          const prevPayouts = stateRef.current.payoutRequests;
+          setState((s) => ({
+            ...s,
+            payoutRequests: s.payoutRequests.map((p) =>
+              p.id === payoutId ? { ...p, status: "paid" as const, paidAt: Date.now(), paymentReference: paymentRef ?? p.paymentReference, paidBy: me?.id } : p,
+            ),
+          }));
+          if (!isSupabaseConfigured) return;
+          const { data, error } = await supabase.rpc("complete_payout_request", {
+            p_payout_id: payoutId,
+            p_payment_reference: paymentRef ?? null,
+            p_actor: actor ?? null,
+          });
+          if (error) {
+            console.error("RPC complete_payout_request failed:", error.message);
+            setState((s) => ({ ...s, payoutRequests: prevPayouts, lastError: `Complete payout failed: ${error.message}` }));
+            return;
+          }
+          const payout = data as Record<string, unknown>;
+          if (payout?.id) {
+            setState((s) => ({
+              ...s,
+              payoutRequests: s.payoutRequests.map((p) => p.id === payoutId ? mapPayoutRequest(payout) : p),
+            }));
+          }
+          },
 
       closeCampaign: async (id) => {
         const me = await getCurrentUser();
@@ -2160,7 +2390,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             hero_title: site.heroTitle,
             hero_subtitle: site.heroSubtitle,
             featured_ids: site.featuredIds,
-            razorpay_key: site.razorpayKey,
           });
         if (error) {
           console.error("Site settings save failed:", error.message);
@@ -2190,8 +2419,8 @@ export function useStore() {
 
 // Reputation calculation functions
 
-// Calculate per-clipper reputation metrics from clips
-export function calculateClipperReputation(clips: Clip[], userId: string, campaigns: Campaign[], socialAccounts?: { verified?: boolean }[]): {
+// Calculate per-clipper reputation metrics from clips and finance records
+export function calculateClipperReputation(clips: Clip[], userId: string, campaigns: Campaign[], financeRecords: FinanceRecord[], socialAccounts?: { verified?: boolean }[]): {
   totalApproved: number;
   totalRejected: number;
   approvalRate: number;
@@ -2204,20 +2433,20 @@ export function calculateClipperReputation(clips: Clip[], userId: string, campai
 } {
   const clipperClips = clips.filter((k) => k.userId === userId || k.clipper === userId);
   
-  const totalApproved = clipperClips.filter((k) => EARNED_STATUSES.includes(k.status)).length;
+  const totalApproved = clipperClips.filter((k) => k.status === "approved" || k.status === "held").length;
   const totalRejected = clipperClips.filter((k) => k.status === "rejected").length;
   const approvalRate = totalApproved > 0 ? (totalApproved / (totalApproved + totalRejected) * 100) : 0;
   
-  const verifiedClips = clipperClips.filter((k) => isEarned(k.status));
+  const verifiedClips = clipperClips.filter((k) => k.status === "approved");
   const totalVerifiedViews = verifiedClips.reduce((sum, k) => sum + k.views, 0);
   
   const successfulCampaigns = new Set(
     clipperClips.map((k) => k.campaignId)
   ).size;
   
-  const totalEarned = financeOf(clipperClips, campaigns).earned;
+  const totalEarned = financeOf(financeRecords, (r) => r.clipperId === userId).total;
   
-  const completedPayouts = clipperClips.filter((k) => k.status === "paid").length;
+  const completedPayouts = financeRecords.filter((r) => r.clipperId === userId && r.status === "paid").length;
   
   const submittedDates = clipperClips.map((k) => k.submittedAt);
   const accountAge = submittedDates.length > 0 
@@ -2304,8 +2533,8 @@ export function determineBadges(metrics: {
 }
 
 // Calculate reputation score and badges for a clipper
-export function getClipperReputation(clips: Clip[], userId: string, campaigns: Campaign[], socialAccounts?: { verified?: boolean }[]) {
-  const metrics = calculateClipperReputation(clips, userId, campaigns, socialAccounts);
+export function getClipperReputation(clips: Clip[], userId: string, campaigns: Campaign[], financeRecords: FinanceRecord[], socialAccounts?: { verified?: boolean }[]) {
+  const metrics = calculateClipperReputation(clips, userId, campaigns, financeRecords, socialAccounts);
   const score = calculateReputationScore(metrics);
   const badges = determineBadges({
     totalApproved: metrics.totalApproved,

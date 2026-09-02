@@ -3,10 +3,13 @@
 // Server-side ownership verification for a connected social account.
 // Fetches the profile from the provider using stored tokens and checks
 // that the handle matches what the user claimed.
+//
+// Uses service_role to read encrypted tokens from social_connections
+// (RLS blocks browser SELECT on token columns).
 // ---------------------------------------------------------------------------
 
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { getProvider } from "@/lib/social-providers";
 import { decryptToken, isTokenExpired } from "@/lib/token-crypto";
 
@@ -25,6 +28,14 @@ export async function POST(request: Request) {
 
     const supabase = await createClient();
 
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     // 1. Get the social account
     const { data: account, error: accountError } = await supabase
       .from("social_accounts")
@@ -39,39 +50,51 @@ export async function POST(request: Request) {
       );
     }
 
-    // 2. Get the encrypted tokens from social_connections
-    // NOTE: RLS blocks browser from reading tokens, but this is a server route
-    // using the user's session. The social_connections RLS blocks authenticated
-    // SELECT. We need to use a service-role client or work around this.
-    // For now, we query with the user's auth and the insert/update policies
-    // allow the user to manage their own connections.
-    //
-    // Actually, social_connections has `for select using (false)` — even the
-    // authenticated user can't read tokens via the browser client. This route
-    // runs server-side with the user's session cookie. We need service_role
-    // to read tokens. Let's use the admin client for this.
-    //
-    // For this MVP, we'll verify using the social_accounts table metadata
-    // and the provider's API directly. The tokens are in social_connections
-    // which requires service_role to read.
+    if (account.user_id !== user.id) {
+      return NextResponse.json(
+        { error: "Account not found" },
+        { status: 404 },
+      );
+    }
 
-    // In production, use a service_role Supabase client here:
-    // const adminClient = createServiceRoleClient();
-    // For now, we'll verify by calling the provider with the handle we have.
+    // 2. Get the encrypted tokens from social_connections using service_role
+    // RLS blocks browser from reading tokens — service_role bypasses RLS
+    const adminClient = createServiceClient();
+    const { data: connection, error: connError } = await adminClient
+      .from("social_connections")
+      .select("access_token_enc, refresh_token_enc, expires_at")
+      .eq("social_account_id", socialAccountId)
+      .single();
 
-    // 3. Determine provider
+    if (connError || !connection) {
+      return NextResponse.json(
+        { error: "No tokens found for this account. Reconnect the account first." },
+        { status: 400 },
+      );
+    }
+
+    // 3. Check if token is expired
+    if (isTokenExpired(connection.expires_at)) {
+      return NextResponse.json(
+        { error: "Token expired. Reconnect the account to refresh tokens." },
+        { status: 400 },
+      );
+    }
+
+    // 4. Decrypt and use the real token
+    const accessToken = decryptToken(connection.access_token_enc);
+
+    // 5. Determine provider
     const platform = account.platform as "Instagram" | "YouTube";
     const provider = getProvider(platform);
 
-    // 4. In mock mode, auto-verify
-    // In production, this would read the token from social_connections
-    // using service_role and call verifyOwnership()
+    // 6. Verify ownership with the real token
     const verification = await provider.verifyOwnership(
-      "mock_token", // Would be real token in production
+      accessToken,
       account.handle,
     );
 
-    // 5. Update verification status
+    // 7. Update verification status
     if (verification.verified) {
       await supabase
         .from("social_accounts")
@@ -82,7 +105,7 @@ export async function POST(request: Request) {
         .eq("id", socialAccountId);
 
       // Update connection verification timestamp
-      await supabase
+      await adminClient
         .from("social_connections")
         .update({
           verified_at: new Date().toISOString(),

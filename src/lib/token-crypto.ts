@@ -18,6 +18,13 @@ function getKey(): Buffer {
   if (raw && raw.length >= 64) {
     return Buffer.from(raw.slice(0, 64), "hex");
   }
+  // In production, fail closed if key is missing
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "[token-crypto] SOCIAL_TOKEN_KEY must be set in production. " +
+        "Generate a 32-byte hex key (64 hex chars) and set it in your environment.",
+    );
+  }
   // Dev-only fallback — 32 random bytes. NOT for production.
   console.warn(
     "[token-crypto] SOCIAL_TOKEN_KEY not set — using ephemeral dev key. " +

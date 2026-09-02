@@ -13,15 +13,14 @@ import { PlatformIcon } from "@/components/PlatformIcon";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup, fmtViews } from "@/lib/format";
-import { isEarned, payoutSplit } from "@/lib/finance";
+
 import type { Clip } from "@/lib/types";
 
 const TABS = [
   { key: "all", label: "All" },
   { key: "pending", label: "Pending" },
-  { key: "processing", label: "Processing" },
-  { key: "paid", label: "Paid" },
   { key: "rejected", label: "Rejected" },
+  { key: "held", label: "Held" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -49,7 +48,7 @@ function fmtDate(ts: number) {
 }
 
 export default function ClipperSubmissionsPage() {
-  const { campaigns, clips } = useStore();
+  const { campaigns, clips, financeRecords } = useStore();
   const { user } = useAuth();
   const [tab, setTab] = useState<TabKey>("all");
   const [page, setPage] = useState(1);
@@ -73,21 +72,18 @@ export default function ClipperSubmissionsPage() {
   const filtered =
     tab === "all"
       ? myClips
-      : tab === "processing"
-        ? myClips.filter((k) => ["approved", "payable", "processing"].includes(k.status))
-        : myClips.filter((k) => k.status === tab);
+      : myClips.filter((k) => k.status === tab);
 
   const sorted = [...filtered].sort((a, b) => b.submittedAt - a.submittedAt);
   const visible = sorted.slice(0, page * PAGE_SIZE);
   const hasMore = visible.length < sorted.length;
 
-  // A clipper receives NET (gross minus platform fee); reflect that in their totals.
-  const netOf = (k: Clip) => payoutSplit(k, campaigns).net;
+  const netOf = (k: Clip) => (financeRecords.find((r) => r.clipId === k.id)?.netAmount ?? 0) / 100;
   const totalEarnedNet = myClips
-    .filter((k) => isEarned(k.status))
+    .filter((k) => k.status === "approved" || k.status === "held")
     .reduce((s, k) => s + netOf(k), 0);
   const totalPaidNet = myClips
-    .filter((k) => k.status === "paid")
+    .filter((k) => false)
     .reduce((s, k) => s + netOf(k), 0);
   const pendingReview = myClips.filter((k) => k.status === "pending").length;
 
@@ -148,7 +144,7 @@ export default function ClipperSubmissionsPage() {
             const campaign = campaigns.find((c) => c.id === k.campaignId);
             const e = netOf(k);
             const earnedShown = e;
-            const paidShown = k.status === "paid" ? e : 0;
+            const paidShown = 0;
             const cpm = campaign?.payout ?? 0;
 
             return (

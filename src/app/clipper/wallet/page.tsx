@@ -1,13 +1,12 @@
 "use client";
 
-import { startTransition, useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   Wallet,
   ArrowDownToLine,
   CheckCircle2,
   AlertTriangle,
-  Link2,
   ShieldCheck,
   CalendarClock,
   Info,
@@ -18,36 +17,16 @@ import {
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup, fmtViews } from "@/lib/format";
-import { isEarned, payoutSplit } from "@/lib/finance";
-import { supabase } from "@/lib/supabase/client";
-import type { Clip } from "@/lib/types";
+import { financeOf } from "@/lib/finance";
 import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
-
-
 
 const MIN_WITHDRAWAL = 100;
 const PAGE = 8;
 
-interface PayoutRecord {
-  id: string;
-  amount: number;
-  net_amount: number;
-  status: string;
-  method?: string;
-  upi_id?: string;
-  provider?: string;
-  provider_ref?: string;
-  requested_at: string;
-  paid_at?: string;
-  failed_at?: string;
-  reversed_at?: string;
-  failure_reason?: string;
-}
-
 function nextPayoutDate(): string {
   const d = new Date();
-  const day = d.getDay(); // 0 Sun .. 6 Sat
+  const day = d.getDay();
   const daysUntilMon = day === 1 ? 7 : (8 - day) % 7 || 7;
   d.setDate(d.getDate() + daysUntilMon);
   return d.toLocaleDateString("en-IN", {
@@ -66,33 +45,23 @@ function fmtDate(ts: number): string {
 }
 
 export default function ClipperWalletPage() {
-  const { campaigns, clips, profiles, updateProfile } = useStore();
+  const { campaigns, clips, profiles, financeRecords, payoutRequests, updateProfile } = useStore();
   const { user } = useAuth();
   const myClips = clips.filter((k) => k.userId && k.userId === user?.id);
-  // A clipper receives the NET amount (gross minus the platform fee), so every
-  // wallet figure is derived from payoutSplit(...).net — never gross clipEarnings.
-  const netOf = (k: Clip) => payoutSplit(k, campaigns).net;
+  const myFinanceRecords = financeRecords.filter((r) => r.clipperId === user?.id);
+  const myPayouts = payoutRequests.filter((p) => p.userId === user?.id);
 
-  const available = myClips
-    .filter((k) => k.status === "payable")
-    .reduce((s, k) => s + netOf(k), 0);
-  const pendingEarnings = myClips
-    .filter((k) => ["approved", "payable", "processing", "failed"].includes(k.status))
-    .reduce((s, k) => s + netOf(k), 0);
-  const processing = myClips
-    .filter((k) => k.status === "processing")
-    .reduce((s, k) => s + netOf(k), 0);
-  const totalEarned = myClips
-    .filter((k) => isEarned(k.status))
-    .reduce((s, k) => s + netOf(k), 0);
+  const fin = financeOf(myFinanceRecords);
+  const available = fin.paid;
+  const pendingEarnings = fin.pending;
+  const processing = fin.processing;
+  const totalEarned = fin.total;
 
   const profile = profiles.find((p) => p.id === user?.id);
   const upi = profile?.upi || "";
   const verified = !!profile?.upi;
-  const canWithdraw = available >= MIN_WITHDRAWAL && !!profile?.upi;
+  const canWithdraw = available >= MIN_WITHDRAWAL * 100 && !!profile?.upi;
 
-  const [payouts, setPayouts] = useState<PayoutRecord[]>([]);
-  const [loadingPayouts, setLoadingPayouts] = useState(true);
   const [requesting, setRequesting] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
   const [requestSuccess, setRequestSuccess] = useState<string | null>(null);
@@ -100,28 +69,6 @@ export default function ClipperWalletPage() {
   const [editingUpi, setEditingUpi] = useState(false);
   const [upiInput, setUpiInput] = useState(profile?.upi ?? "");
 
-  // Fetch real payout history from database
-  const refreshPayouts = useCallback(async () => {
-    if (!user?.id) return;
-    startTransition(() => { setLoadingPayouts(true); });
-    try {
-      const { data } = await supabase
-        .from("payouts")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("requested_at", { ascending: false })
-        .limit(20);
-      startTransition(() => { setPayouts((data as PayoutRecord[]) ?? []); setLoadingPayouts(false); });
-    } catch {
-      startTransition(() => { setLoadingPayouts(false); });
-    }
-  }, [user]);
-
-  useEffect(() => {
-    void refreshPayouts();
-  }, [refreshPayouts]);
-
-  // Handle real payout request via server-side API
   const handleRequestPayout = async () => {
     if (!canWithdraw || requesting) return;
     setRequesting(true);
@@ -142,10 +89,8 @@ export default function ClipperWalletPage() {
       }
 
       setRequestSuccess(
-        `Payout of ${rup(available)} requested. It will be processed shortly.`,
+        `Payout of ${rup(available / 100)} requested. It will be processed shortly.`,
       );
-      // Refresh payout list
-      void refreshPayouts();
     } catch {
       setRequestError("Network error. Please try again.");
     } finally {
@@ -155,19 +100,15 @@ export default function ClipperWalletPage() {
 
   const txns = [...myClips].sort((a, b) => b.submittedAt - a.submittedAt);
   const visible = txns.slice(0, page * PAGE);
-  const paidTxns = txns.filter((k) => k.status === "paid");
 
   const byCampaign = new Map<string, number>();
-  for (const k of myClips) {
-    byCampaign.set(
-      k.campaignId,
-      (byCampaign.get(k.campaignId) ?? 0) + netOf(k),
-    );
+  for (const r of myFinanceRecords) {
+    const existing = byCampaign.get(r.campaignId) ?? 0;
+    byCampaign.set(r.campaignId, existing + r.netAmount);
   }
 
-  // Check if user has any in-progress payout
-  const hasInProgress = payouts.some(
-    (p) => p.status === "requested" || p.status === "processing",
+  const hasInProgress = myPayouts.some(
+    (p) => p.status === "pending" || p.status === "processing",
   );
 
   return (
@@ -183,27 +124,27 @@ export default function ClipperWalletPage() {
         <div className="rounded-2xl border bg-card p-4">
           <p className="text-xs text-muted">Available balance</p>
           <p className="mt-1 font-mono text-xl font-semibold text-green">
-            {rup(available)}
+            {rup(available / 100)}
           </p>
           <p className="mt-1 text-[11px] text-muted">Ready to withdraw</p>
         </div>
         <div className="rounded-2xl border bg-card p-4">
           <p className="text-xs text-muted">Pending earnings</p>
           <p className="mt-1 font-mono text-xl font-semibold text-amber">
-            {rup(pendingEarnings)}
+            {rup(pendingEarnings / 100)}
           </p>
-          <p className="mt-1 text-[11px] text-muted">Approved + in payout</p>
+          <p className="mt-1 text-[11px] text-muted">Awaiting admin review</p>
         </div>
         <div className="rounded-2xl border bg-card p-4">
           <p className="text-xs text-muted">Processing</p>
           <p className="mt-1 font-mono text-xl font-semibold text-blue-500">
-            {rup(processing)}
+            {rup(processing / 100)}
           </p>
           <p className="mt-1 text-[11px] text-muted">Payout in flight</p>
         </div>
         <div className="rounded-2xl border bg-card p-4">
           <p className="text-xs text-muted">Total earned</p>
-          <p className="mt-1 font-mono text-xl font-semibold">{rup(totalEarned)}</p>
+          <p className="mt-1 font-mono text-xl font-semibold">{rup(totalEarned / 100)}</p>
           <p className="mt-1 text-[11px] text-muted">All time</p>
         </div>
       </div>
@@ -221,7 +162,6 @@ export default function ClipperWalletPage() {
                   <th className="px-4 py-3 font-medium">Campaign</th>
                   <th className="px-4 py-3 font-medium">Clip</th>
                   <th className="px-4 py-3 text-right font-medium">Views</th>
-                  <th className="px-4 py-3 text-right font-medium">CPM</th>
                   <th className="px-4 py-3 text-right font-medium">Amount</th>
                   <th className="px-4 py-3 font-medium">Status</th>
                 </tr>
@@ -229,15 +169,14 @@ export default function ClipperWalletPage() {
               <tbody className="divide-y">
                 {visible.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-6 text-center text-muted">
+                    <td colSpan={6} className="px-4 py-6 text-center text-muted">
                       No transactions yet.
                     </td>
                   </tr>
                 ) : (
                   visible.map((k) => {
                     const camp = campaigns.find((c) => c.id === k.campaignId);
-                    const amount = netOf(k);
-                    const earned = isEarned(k.status);
+                    const record = myFinanceRecords.find((r) => r.clipId === k.id);
                     return (
                       <tr key={k.id} className="align-top">
                         <td className="whitespace-nowrap px-4 py-3 text-muted">
@@ -261,36 +200,17 @@ export default function ClipperWalletPage() {
                           </Link>
                         </td>
                         <td className="px-4 py-3 text-right font-mono">
-                          {fmtViews(k.views)}
+                          {fmtViews(k.verifiedViews ?? k.views)}
                         </td>
-                          <td className="px-4 py-3 text-right font-mono text-muted">
-                            {rup(camp?.payout ?? 0)}
-                          </td>
                         <td className="px-4 py-3 text-right font-mono">
-                          {earned ? (
-                            <span className="text-green">{rup(amount)}</span>
+                          {record ? (
+                            <span className="text-green">{rup(record.netAmount / 100)}</span>
                           ) : (
                             <span className="text-muted">—</span>
                           )}
                         </td>
                         <td className="px-4 py-3">
                           <StatusPill status={k.status} />
-                          {k.status === "failed" && k.failureReason && (
-                            <div className="mt-2 max-w-[260px] rounded-md border border-red/30 bg-red/5 p-2 text-xs text-red">
-                              <p className="font-medium">Payout failed</p>
-                              <p className="mt-0.5 text-red/90">
-                                {k.failureReason}
-                              </p>
-                              <div className="mt-2 flex gap-2">
-                                <Link
-                                  href="/clipper/wallet"
-                                  className="inline-flex items-center gap-1 rounded-md bg-accent px-2 py-1 text-[11px] font-medium text-white"
-                                >
-                                  <Link2 size={12} /> Update payment
-                                </Link>
-                              </div>
-                            </div>
-                          )}
                         </td>
                       </tr>
                     );
@@ -422,7 +342,6 @@ export default function ClipperWalletPage() {
               </div>
             </div>
 
-            {/* Success/error messages */}
             {requestSuccess && (
               <div className="mt-4 flex items-start gap-2 rounded-xl border border-green/30 bg-accent-soft p-3 text-sm text-green">
                 <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
@@ -436,7 +355,6 @@ export default function ClipperWalletPage() {
               </div>
             )}
 
-            {/* Payout request button */}
             {!requestSuccess && (
               <button
                 type="button"
@@ -453,8 +371,8 @@ export default function ClipperWalletPage() {
                 ) : (
                   <>
                     <ArrowDownToLine size={16} />
-                    {available >= MIN_WITHDRAWAL
-                      ? `Request payout · ${rup(available)}`
+                    {available >= MIN_WITHDRAWAL * 100
+                      ? `Request payout · ${rup(available / 100)}`
                       : `Needs ${rup(MIN_WITHDRAWAL)} to withdraw`}
                   </>
                 )}
@@ -468,7 +386,7 @@ export default function ClipperWalletPage() {
                     Add your UPI ID above to enable payouts
                   </span>
                 ) : (
-                  "Only released (paid) balance can be withdrawn — pending, held, or disputed earnings are not payable."
+                  "Only released (paid) balance can be withdrawn — pending or processing earnings are not yet payable."
                 )}
               </p>
             )}
@@ -477,33 +395,26 @@ export default function ClipperWalletPage() {
           <div className="rounded-2xl border bg-card p-5">
             <h3 className="text-sm font-semibold">Payout history</h3>
             <div className="mt-3 divide-y">
-              {loadingPayouts ? (
-                <p className="py-4 text-sm text-muted">Loading...</p>
-              ) : payouts.length === 0 ? (
+              {myPayouts.length === 0 ? (
                 <p className="py-4 text-sm text-muted">No payouts yet.</p>
               ) : (
-                payouts.map((p) => (
+                myPayouts.map((p) => (
                   <div
                     key={p.id}
                     className="flex items-center justify-between py-3 text-sm"
                   >
                     <div>
                       <p className="font-medium">
-                        {rup(p.net_amount / 100)}
+                        {rup(p.netAmount / 100)}
                       </p>
                       <p className="text-xs text-muted">
-                        {fmtDate(new Date(p.requested_at).getTime())}
-                        {p.paid_at && " · Paid"}
-                        {p.failed_at && " · Failed"}
+                        {fmtDate(p.createdAt)}
+                        {p.paidAt && " · Paid"}
                         {p.status === "processing" && " · Processing"}
-                        {p.status === "reversed" && " · Reversed"}
                       </p>
-                      {p.failure_reason && (
-                        <p className="mt-1 text-xs text-red">{p.failure_reason}</p>
-                      )}
-                      {p.provider_ref && (
+                      {p.paymentReference && (
                         <p className="mt-0.5 text-[11px] text-muted font-mono">
-                          Ref: {p.provider_ref}
+                          Ref: {p.paymentReference}
                         </p>
                       )}
                     </div>
@@ -511,13 +422,9 @@ export default function ClipperWalletPage() {
                       className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
                         p.status === "paid"
                           ? "bg-green/10 text-green"
-                          : p.status === "failed"
-                            ? "bg-red/10 text-red"
-                            : p.status === "processing"
-                              ? "bg-blue-500/10 text-blue-500"
-                              : p.status === "reversed"
-                                ? "bg-amber/10 text-amber"
-                                : "bg-muted/10 text-muted"
+                          : p.status === "processing"
+                            ? "bg-blue-500/10 text-blue-500"
+                            : "bg-muted/10 text-muted"
                       }`}
                     >
                       {p.status}
@@ -548,7 +455,7 @@ export default function ClipperWalletPage() {
                   >
                     {campaigns.find((c) => c.id === id)?.title ?? id}
                   </Link>
-                  <span className="font-mono">{rup(amount)}</span>
+                  <span className="font-mono">{rup(amount / 100)}</span>
                 </li>
               ))}
             </ul>

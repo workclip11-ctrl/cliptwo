@@ -76,6 +76,48 @@ as $$
   );
 $$;
 
+-- ===========================================================================
+-- AUDIT LOGS — single authoritative audit system.
+-- Append-only. No UPDATE or DELETE allowed. Actor always from auth.uid().
+-- ===========================================================================
+create table if not exists public.audit_logs (
+  id              text primary key,
+  timestamp       timestamptz not null default now(),
+  actor_id        uuid references auth.users(id) on delete set null,
+  actor           text not null,
+  action          text not null,
+  entity_type     text not null,
+  entity_id       text not null,
+  entity_label    text,
+  before_state    jsonb,
+  after_state     jsonb,
+  metadata        jsonb,
+  idempotency_key text unique,
+  target_type     text,
+  target_id       text,
+  target_label    text,
+  previous_value  text,
+  new_value       text,
+  reason          text
+);
+
+create index if not exists audit_logs_timestamp_idx on public.audit_logs(timestamp desc);
+create index if not exists audit_logs_action_idx on public.audit_logs(action);
+create index if not exists audit_logs_entity_type_idx on public.audit_logs(entity_type);
+create index if not exists audit_logs_actor_id_idx on public.audit_logs(actor_id);
+create index if not exists audit_logs_entity_id_idx on public.audit_logs(entity_id);
+create index if not exists audit_logs_idempotency_idx on public.audit_logs(idempotency_key);
+
+alter table public.audit_logs enable row level security;
+
+drop policy if exists "audit_logs_select" on public.audit_logs;
+create policy "audit_logs_select" on public.audit_logs
+  for select using (public.is_admin());
+
+drop policy if exists "audit_logs_insert" on public.audit_logs;
+create policy "audit_logs_insert" on public.audit_logs
+  for insert with check (public.is_admin());
+
 -- Fine-grained admin permissions: which sensitive actions each admin may do.
 -- Grant/revoke rows here, e.g.
 --   insert into public.admin_permissions (admin_id, permission)
@@ -451,6 +493,11 @@ declare
   v_actor_id uuid;
   v_actor_email text;
 begin
+  -- Only admins can write audit logs
+  if not public.is_admin() then
+    raise exception 'Only admins can write audit logs';
+  end if;
+
   -- Actor ALWAYS derived from auth.uid() — never from client parameters
   v_actor_id := auth.uid();
   select email into v_actor_email from public.profiles where id = v_actor_id;
@@ -1198,6 +1245,42 @@ create policy "social_accounts_update" on public.social_accounts
 drop policy if exists "social_accounts_delete" on public.social_accounts;
 create policy "social_accounts_delete" on public.social_accounts
   for delete using (auth.uid() = user_id);
+
+-- Trigger: enforce field-level permissions on social_accounts updates.
+-- Non-admins cannot change trust fields (verified, provider_account_id, etc.)
+-- ---------------------------------------------------------------------------
+create or replace function public.enforce_social_account_field_permissions()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  -- Admins can change anything (skip checks)
+  if public.is_admin() then
+    return NEW;
+  end if;
+
+  -- Non-admins: block changes to trust fields
+  if (OLD.verified IS DISTINCT FROM NEW.verified) then
+    raise exception 'Only admins can change verified status';
+  end if;
+  if (OLD.provider_account_id IS DISTINCT FROM NEW.provider_account_id) then
+    raise exception 'Only admins can change provider_account_id';
+  end if;
+  if (OLD.status IS DISTINCT FROM NEW.status) then
+    raise exception 'Only admins can change connection status';
+  end if;
+
+  return NEW;
+end;
+$$;
+
+drop trigger if exists enforce_social_account_fields on public.social_accounts;
+create trigger enforce_social_account_fields
+  before update on public.social_accounts
+  for each row
+  execute function public.enforce_social_account_field_permissions();
 
 -- Server-only encrypted token storage (browser cannot SELECT token columns)
 create table if not exists public.social_connections (
@@ -2616,54 +2699,6 @@ grant execute on function public.test_max_payout_enforcement() to authenticated;
 -- Audit Log — append-only record of all admin actions
 -- ---------------------------------------------------------------------------
 -- ===========================================================================
--- AUDIT LOGS — single authoritative audit system.
--- Append-only. No UPDATE or DELETE allowed. Actor always from auth.uid().
--- ===========================================================================
-create table if not exists public.audit_logs (
-  id              text primary key,
-  timestamp       timestamptz not null default now(),
-  actor_id        uuid references auth.users(id) on delete set null,
-  actor           text not null,
-  action          text not null,
-  entity_type     text not null,
-  entity_id       text not null,
-  entity_label    text,
-  before_state    jsonb,
-  after_state     jsonb,
-  metadata        jsonb,
-  idempotency_key text unique,
-  -- Legacy columns kept for backward compatibility during migration
-  target_type     text,
-  target_id       text,
-  target_label    text,
-  previous_value  text,
-  new_value       text,
-  reason          text
-);
-
--- Indexes for search and filtering
-create index if not exists audit_logs_timestamp_idx on public.audit_logs(timestamp desc);
-create index if not exists audit_logs_action_idx on public.audit_logs(action);
-create index if not exists audit_logs_entity_type_idx on public.audit_logs(entity_type);
-create index if not exists audit_logs_actor_id_idx on public.audit_logs(actor_id);
-create index if not exists audit_logs_entity_id_idx on public.audit_logs(entity_id);
-create index if not exists audit_logs_idempotency_idx on public.audit_logs(idempotency_key);
-
--- RLS: admins read all, backend service role inserts. No UPDATE or DELETE.
-alter table public.audit_logs enable row level security;
-
-drop policy if exists "audit_logs_select" on public.audit_logs;
-create policy "audit_logs_select" on public.audit_logs
-  for select using (public.is_admin());
-
-drop policy if exists "audit_logs_insert" on public.audit_logs;
-create policy "audit_logs_insert" on public.audit_logs
-  for insert with check (true);
-
--- No UPDATE or DELETE policies = those operations are denied by default.
--- This enforces append-only semantics at the database level.
-
--- ===========================================================================
 -- DATA INTEGRITY CONSTRAINTS
 -- All constraints use IF NOT EXISTS pattern via DO blocks for idempotency.
 -- These enforce valid domain values at the database level, not just TypeScript.
@@ -2675,12 +2710,12 @@ create policy "audit_logs_insert" on public.audit_logs
 DO $$ BEGIN
   ALTER TABLE public.profiles ADD CONSTRAINT profiles_role_check
     CHECK (role IN ('clipper', 'creator', 'admin'));
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.profiles ADD CONSTRAINT profiles_status_check
     CHECK (status IN ('active', 'suspended', 'deactivated'));
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 -- ---------------------------------------------------------------------------
 -- campaigns: valid statuses (defense-in-depth with schema.sql)
@@ -2688,71 +2723,71 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN
   ALTER TABLE public.campaigns ADD CONSTRAINT campaigns_status_check
     CHECK (status IN ('open', 'closed', 'draft', 'paused', 'archived', 'budget_reached', 'near_budget'));
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.campaigns ADD CONSTRAINT campaigns_payout_nonneg
     CHECK (payout >= 0);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.campaigns ADD CONSTRAINT campaigns_budget_nonneg
     CHECK (budget >= 0);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.campaigns ADD CONSTRAINT campaigns_spent_nonneg
     CHECK (spent >= 0);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.campaigns ADD CONSTRAINT campaigns_days_left_nonneg
     CHECK (days_left >= 0);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.campaigns ADD CONSTRAINT campaigns_max_payout_nonneg
     CHECK (max_payout_per_clip IS NULL OR max_payout_per_clip >= 0);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.campaigns ADD CONSTRAINT campaigns_spend_cap_nonneg
     CHECK (spend_cap IS NULL OR spend_cap >= 0);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 -- ---------------------------------------------------------------------------
 -- clips: valid statuses, non-negative views/engagement
 -- ---------------------------------------------------------------------------
 DO $$ BEGIN
   ALTER TABLE public.clips ADD CONSTRAINT clips_status_check
-    CHECK (status IN ('pending', 'approved', 'rejected', 'held', 'processing', 'paid', 'failed', 'payable'));
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+    CHECK (status IN ('pending', 'approved', 'rejected', 'held'));
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.clips ADD CONSTRAINT clips_views_nonneg
     CHECK (views >= 0);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.clips ADD CONSTRAINT clips_verified_views_nonneg
     CHECK (verified_views >= 0);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.clips ADD CONSTRAINT clips_locked_cpm_nonneg
     CHECK (locked_cpm IS NULL OR locked_cpm >= 0);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.clips ADD CONSTRAINT clips_locked_max_payout_nonneg
     CHECK (locked_max_payout IS NULL OR locked_max_payout >= 0);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 -- Unique constraint on txn_id (provider transaction reference)
 DO $$ BEGIN
   ALTER TABLE public.clips ADD CONSTRAINT clips_txn_id_unique
     UNIQUE (txn_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 -- ---------------------------------------------------------------------------
 -- clip_metrics: valid sources, verification statuses, non-negative engagement
@@ -2760,32 +2795,32 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN
   ALTER TABLE public.clip_metrics ADD CONSTRAINT clip_metrics_source_check
     CHECK (source IN ('platform_api', 'manual', 'mock', 'admin_override'));
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.clip_metrics ADD CONSTRAINT clip_metrics_verification_check
     CHECK (verification_status IN ('pending', 'verified', 'failed', 'disputed'));
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.clip_metrics ADD CONSTRAINT clip_metrics_views_nonneg
     CHECK (views >= 0);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.clip_metrics ADD CONSTRAINT clip_metrics_likes_nonneg
     CHECK (likes >= 0);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.clip_metrics ADD CONSTRAINT clip_metrics_comments_nonneg
     CHECK (comments >= 0);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.clip_metrics ADD CONSTRAINT clip_metrics_shares_nonneg
     CHECK (shares >= 0);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 -- ---------------------------------------------------------------------------
 -- metrics_sync_jobs: valid statuses
@@ -2793,12 +2828,12 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN
   ALTER TABLE public.metrics_sync_jobs ADD CONSTRAINT metrics_sync_jobs_status_check
     CHECK (status IN ('pending', 'running', 'completed', 'failed'));
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.metrics_sync_jobs ADD CONSTRAINT metrics_sync_jobs_captured_nonneg
     CHECK (metrics_captured >= 0);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 -- ---------------------------------------------------------------------------
 -- social_accounts: valid statuses, unique per user+platform
@@ -2806,12 +2841,12 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN
   ALTER TABLE public.social_accounts ADD CONSTRAINT social_accounts_status_check
     CHECK (status IN ('not_connected', 'connecting', 'connected', 'verified', 'connection_error', 'disconnected', 'verification_failed'));
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.social_accounts ADD CONSTRAINT social_accounts_user_platform_unique
     UNIQUE (user_id, platform);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 -- ---------------------------------------------------------------------------
 -- social_connections: one connection per social account
@@ -2819,7 +2854,7 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN
   ALTER TABLE public.social_connections ADD CONSTRAINT social_connections_account_unique
     UNIQUE (social_account_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 -- ---------------------------------------------------------------------------
 -- earnings: valid statuses, non-negative financial amounts
@@ -2827,43 +2862,43 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN
   ALTER TABLE public.earnings ADD CONSTRAINT earnings_status_check
     CHECK (status IN ('pending', 'approved', 'paid', 'failed'));
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.earnings ADD CONSTRAINT earnings_locked_cpm_nonneg
     CHECK (locked_cpm >= 0);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.earnings ADD CONSTRAINT earnings_verified_views_nonneg
     CHECK (verified_views >= 0);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.earnings ADD CONSTRAINT earnings_gross_nonneg
     CHECK (gross_amount >= 0);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.earnings ADD CONSTRAINT earnings_platform_fee_nonneg
     CHECK (platform_fee >= 0);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.earnings ADD CONSTRAINT earnings_net_nonneg
     CHECK (net_amount >= 0);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.earnings ADD CONSTRAINT earnings_creator_fee_nonneg
     CHECK (creator_fee >= 0);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 -- Unique constraint on earnings per clip (one earning record per clip)
 DO $$ BEGIN
   ALTER TABLE public.earnings ADD CONSTRAINT earnings_clip_unique
     UNIQUE (clip_id);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 -- ---------------------------------------------------------------------------
 -- wallet_ledger: valid types (already has CHECK in table definition)
@@ -2875,14 +2910,14 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN
   ALTER TABLE public.payouts ADD CONSTRAINT payouts_amount_nonneg
     CHECK (amount >= 0);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.payouts ADD CONSTRAINT payouts_net_amount_nonneg
     CHECK (net_amount >= 0);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.payouts ADD CONSTRAINT payouts_retry_count_nonneg
     CHECK (retry_count >= 0);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;

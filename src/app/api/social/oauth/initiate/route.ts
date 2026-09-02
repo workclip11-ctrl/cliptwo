@@ -2,6 +2,9 @@
 // POST /api/social/oauth/initiate
 // Generates OAuth authorization URL and stores the state parameter for CSRF
 // protection. Returns the URL for the client to redirect to.
+//
+// Supported platforms: Instagram, YouTube.
+// Kick: returns 400 with "not available" message.
 // ---------------------------------------------------------------------------
 
 import { NextResponse } from "next/server";
@@ -10,6 +13,22 @@ import { getProvider, isProviderConfigured } from "@/lib/social-providers";
 import type { Platform } from "@/lib/types";
 
 const VALID_PLATFORMS: Platform[] = ["Instagram", "YouTube"];
+
+function validateRedirectTo(redirectTo: string | undefined): string {
+  if (!redirectTo) return "/clipper/accounts";
+
+  // Only allow relative paths
+  if (redirectTo.startsWith("http://") || redirectTo.startsWith("https://")) {
+    return "/clipper/accounts";
+  }
+
+  // Ensure it starts with /
+  if (!redirectTo.startsWith("/")) {
+    return "/clipper/accounts";
+  }
+
+  return redirectTo;
+}
 
 export async function POST(request: Request) {
   try {
@@ -20,36 +39,18 @@ export async function POST(request: Request) {
 
     if (!VALID_PLATFORMS.includes(platform)) {
       return NextResponse.json(
-        { error: "Invalid platform" },
+        { error: "Invalid platform. Only Instagram and YouTube are supported for OAuth." },
         { status: 400 },
       );
     }
 
     if (!isProviderConfigured(platform)) {
-      // Mock mode: return a mock authorization URL
-      const supabase = await createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-      }
-
-      const state = `mock_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-      const provider = getProvider(platform);
-      const { authorizationUrl } = provider.getAuthorizationUrl(user.id, state);
-
-      // Store state in DB
-      await supabase.from("social_oauth_states").insert({
-        user_id: user.id,
-        platform,
-        state,
-        redirect_to: redirectTo ?? "/clipper/accounts",
-        expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
-      });
-
-      return NextResponse.json({ authorizationUrl, mock: true });
+      return NextResponse.json(
+        {
+          error: `${platform} OAuth is not configured. Set ${platform === "Instagram" ? "INSTAGRAM_CLIENT_ID/SECRET" : "YOUTUBE_CLIENT_ID/SECRET"} environment variables.`,
+        },
+        { status: 503 },
+      );
     }
 
     // Real OAuth flow
@@ -62,7 +63,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const state = `${user.id}_${platform}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    // Cryptographically random state: user-bound, platform-bound, expires in 10min
+    const state = `${user.id}_${platform}_${Date.now()}_${crypto.randomUUID()}`;
     const provider = getProvider(platform);
 
     // YouTube requires async PKCE code_challenge generation
@@ -78,7 +80,7 @@ export async function POST(request: Request) {
       platform,
       state,
       code_verifier: codeVerifier ?? null,
-      redirect_to: redirectTo ?? "/clipper/accounts",
+      redirect_to: validateRedirectTo(redirectTo),
       expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
     });
 

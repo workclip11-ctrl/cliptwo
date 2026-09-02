@@ -15,7 +15,19 @@ import type { Platform } from "@/lib/types";
 function getPlatform(pathname: string): Platform | null {
   if (pathname.includes("/instagram")) return "Instagram";
   if (pathname.includes("/youtube")) return "YouTube";
+  if (pathname.includes("/kick")) return "Kick";
   return null;
+}
+
+function validateRedirectPath(path: string): string {
+  if (!path) return "/clipper/accounts";
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    return "/clipper/accounts";
+  }
+  if (!path.startsWith("/")) {
+    return "/clipper/accounts";
+  }
+  return path;
 }
 
 export async function GET(request: NextRequest) {
@@ -71,7 +83,7 @@ export async function GET(request: NextRequest) {
     }
 
     const userId = stateRecord.user_id;
-    const redirectPath = stateRecord.redirect_to ?? "/clipper/accounts";
+    const redirectPath = validateRedirectPath(stateRecord.redirect_to);
 
     // Security: verify the state was generated for this platform
     if (stateRecord.platform !== platform) {

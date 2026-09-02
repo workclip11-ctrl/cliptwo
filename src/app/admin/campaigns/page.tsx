@@ -8,7 +8,7 @@ import { rup } from "@/lib/format";
 import { campaignSpent } from "@/lib/finance";
 
 export default function AdminCampaigns() {
-  const { campaigns, clips, closeCampaign, deleteCampaign } = useStore();
+  const { campaigns, clips, financeRecords, closeCampaign, deleteCampaign } = useStore();
 
   const activeCampaigns = campaigns.filter((c) => c.status !== "archived");
 
@@ -42,7 +42,7 @@ export default function AdminCampaigns() {
             {campaigns.map((c) => {
               const n = clips.filter((k) => k.campaignId === c.id).length;
               const budget = c.budget ?? 0;
-              const spent = campaignSpent(c, clips);
+              const spent = campaignSpent(c, financeRecords);
               const pct = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
               const isArchived = c.status === "archived";
               return (

@@ -74,7 +74,7 @@ function Row({ label, value }: { label: string; value: ReactNode }) {
 export default function CampaignDetailPage() {
   const params = useParams<{ campaignId: string }>();
   const id = params.campaignId as string;
-  const { campaigns, clips, addClip, savedCampaigns, toggleSaveCampaign } = useStore();
+  const { campaigns, clips, addClip, savedCampaigns, toggleSaveCampaign, financeRecords } = useStore();
   const { isSignedIn, user } = useAuth();
   const router = useRouter();
   const [active, setActive] = useState(false);
@@ -119,7 +119,7 @@ export default function CampaignDetailPage() {
     else router.push(isClipper ? "/clipper/campaigns" : "/creator");
   }
   const platforms = campaign.platforms?.length ? campaign.platforms : [campaign.platform];
-  const spent = campaignSpent(campaign, clips);
+  const spent = campaignSpent(campaign, financeRecords);
   const remaining = (campaign.budget ?? 0) - spent;
   const pct = campaign.budget ? Math.min(100, Math.round((spent / campaign.budget) * 100)) : 0;
   const category = campaign.category ?? campaign.niche ?? "—";
@@ -358,7 +358,7 @@ export default function CampaignDetailPage() {
             <Row label="Minimum views" value={vr?.minViews ? fmtViews(vr.minViews) : "—"} />
             <Row label="Maximum payout" value={vr?.maxPayout ? rup(vr.maxPayout) : "—"} />
             <Row label="If post is deleted / private" value={vr?.deletedPolicy} />
-            <Row label="When earnings become payable" value={vr?.payableWhen} />
+
           </Section>
 
           {/* Approval process */}

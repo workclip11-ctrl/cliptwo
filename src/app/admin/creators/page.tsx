@@ -22,13 +22,13 @@ import {
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup, fmtViews, clipEarnings } from "@/lib/format";
-import { financeOf, isEarned } from "@/lib/finance";
+import { financeOf } from "@/lib/finance";
 import { seriesByDay, viewsByPlatform, spendByCampaign } from "@/lib/analytics";
 import { TimeSeriesChart, BreakdownBars } from "@/components/charts";
 import { TopClipsTable } from "@/components/TopClipsTable";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { StatusPill } from "@/components/StatusPill";
-import type { Campaign, Clip, Profile } from "@/lib/types";
+import type { Campaign, Clip, Profile, FinanceRecord } from "@/lib/types";
 
 const HIGH_SPEND_BUDGET = 30000;
 
@@ -71,22 +71,23 @@ function creatorStats(
   p: Profile,
   campaigns: Campaign[],
   clips: Clip[],
+  financeRecords: FinanceRecord[],
 ): Stats {
   const myCampaigns = campaigns.filter((c) => c.created_by === p.id);
   const myIds = new Set(myCampaigns.map((c) => c.id));
   const received = clips.filter((k) => myIds.has(k.campaignId));
-  const fin = financeOf(received, campaigns);
+  const fin = financeOf(financeRecords, (r) => myIds.has(r.campaignId));
   return {
     campaigns: myCampaigns.length,
     activeCampaigns: myCampaigns.filter((c) => c.status === "open").length,
     totalBudget: myCampaigns.reduce((s, c) => s + (c.budget ?? 0), 0),
-    totalSpent: fin.earned,
+    totalSpent: fin.total,
     verifiedViews: received
-      .filter((k) => isEarned(k.status))
+      .filter((k) => k.status === "approved" || k.status === "held")
       .reduce((s, k) => s + k.views, 0),
     clipsReceived: received.length,
-    clipsApproved: fin.earnedCount,
-    outstanding: fin.outstanding,
+    clipsApproved: fin.totalCount,
+    outstanding: fin.total - fin.paid,
     paid: fin.paid,
     myCampaigns,
     received,
@@ -94,7 +95,7 @@ function creatorStats(
 }
 
 export default function AdminCreators() {
-  const { profiles, campaigns, clips } = useStore();
+  const { profiles, campaigns, clips, financeRecords } = useStore();
   const { user } = useAuth();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
@@ -112,7 +113,7 @@ export default function AdminCreators() {
       );
     });
     return matched.filter((p) => {
-      const s = creatorStats(p, campaigns, clips);
+      const s = creatorStats(p, campaigns, clips, financeRecords);
       switch (filter) {
         case "verified":
           return !!p.verified;
@@ -195,7 +196,7 @@ export default function AdminCreators() {
             </thead>
             <tbody className="divide-y">
               {rows.map((p) => {
-                const s = creatorStats(p, campaigns, clips);
+                const s = creatorStats(p, campaigns, clips, financeRecords);
                 const suspended = p.status === "suspended";
                 return (
                   <tr
@@ -308,8 +309,8 @@ function CreatorDrawer({
   actor?: string;
   onClose: () => void;
 }) {
-  const { verifyProfile, updateProfileStatus, saveAdminNotes, deactivateProfile, deleteProfile } = useStore();
-  const stats = creatorStats(profile, campaigns, clips);
+  const { verifyProfile, updateProfileStatus, saveAdminNotes, deactivateProfile, deleteProfile, financeRecords } = useStore();
+  const stats = creatorStats(profile, campaigns, clips, financeRecords);
   const suspended = profile.status === "suspended";
   const deactivated = profile.status === "deactivated";
   const [notes, setNotes] = useState(profile.adminNotes ?? "");
@@ -439,8 +440,8 @@ function CreatorDrawer({
               <div className="space-y-2">
                 {stats.myCampaigns.map((c) => {
                   const campFin = financeOf(
-                    stats.received.filter((k) => k.campaignId === c.id),
-                    campaigns,
+                    financeRecords,
+                    (r) => r.campaignId === c.id,
                   );
                   return (
                     <div
@@ -450,7 +451,7 @@ function CreatorDrawer({
                       <div>
                         <p className="font-medium">{c.title}</p>
                         <p className="text-xs text-muted">
-                          Budget {rup(c.budget ?? 0)} · Spent {rup(campFin.earned)} ·{" "}
+                          Budget {rup(c.budget ?? 0)} · Spent {rup(campFin.total)} ·{" "}
                           {stats.received.filter((k) => k.campaignId === c.id).length} clips
                         </p>
                       </div>
@@ -567,10 +568,10 @@ function CreatorDrawer({
             </p>
             <div className="mt-3 space-y-2">
               {stats.received
-                .filter((k) => isEarned(k.status))
+                .filter((k) => k.status === "approved" || k.status === "held")
                 .map((k) => {
                   const camp = campaigns.find((c) => c.id === k.campaignId);
-                  const released = k.status === "paid";
+                  const released = false;
                   return (
                     <div
                       key={k.id}
@@ -590,7 +591,7 @@ function CreatorDrawer({
                     </div>
                   );
                 })}
-              {stats.received.filter((k) => isEarned(k.status)).length === 0 && (
+              {stats.received.filter((k) => k.status === "approved" || k.status === "held").length === 0 && (
                 <p className="text-sm text-muted">No payouts yet.</p>
               )}
             </div>

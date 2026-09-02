@@ -20,16 +20,16 @@ import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
-import { isEarned } from "@/lib/finance";
+
 import { rup, fmtViews, clipEarnings } from "@/lib/format";
 import type { ClipStatus } from "@/lib/types";
 
 const FILTERS: Array<{ key: ClipStatus | "all"; label: string }> = [
   { key: "all", label: "All" },
   { key: "pending", label: "Pending" },
-  { key: "processing", label: "Processing" },
-  { key: "paid", label: "Paid" },
+  { key: "approved", label: "Approved" },
   { key: "rejected", label: "Rejected" },
+  { key: "held", label: "Held" },
 ];
 
 function fmtDate(t: number) {
@@ -55,8 +55,8 @@ export default function CreatorSubmissionsPage() {
 
   const filtered = all.filter((k) => {
     if (filter !== "all") {
-      if (filter === "processing") {
-        if (!["approved", "payable", "processing"].includes(k.status)) return false;
+      if (filter === "approved") {
+        if (!["approved", "held"].includes(k.status)) return false;
       } else if (k.status !== filter) {
         return false;
       }
@@ -99,13 +99,13 @@ export default function CreatorSubmissionsPage() {
         <div className="rounded-2xl border bg-card p-5">
           <p className="text-xs text-muted">Approved</p>
           <p className="mt-1 font-mono text-2xl font-semibold">
-            {all.filter((k) => isEarned(k.status)).length}
+            {all.filter((k) => k.status === "approved" || k.status === "held").length}
           </p>
         </div>
         <div className="rounded-2xl border bg-card p-5">
-          <p className="text-xs text-muted">Paid out</p>
+          <p className="text-xs text-muted">Rejected</p>
           <p className="mt-1 font-mono text-2xl font-semibold">
-            {count("paid")}
+            {count("rejected")}
           </p>
         </div>
       </div>

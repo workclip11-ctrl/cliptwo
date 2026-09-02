@@ -34,7 +34,7 @@ const RISK_TYPES: RiskType[] = [
 ];
 
 export default function AdminRiskPage() {
-  const { clips, campaigns, setClipStatus } = useStore();
+  const { clips, campaigns, holdClip } = useStore();
   const [q, setQ] = useState("");
   const [severityFilter, setSeverityFilter] = useState<Severity | "">("");
   const [statusFilter, setStatusFilter] = useState<RiskStatus | "">("");
@@ -153,7 +153,7 @@ export default function AdminRiskPage() {
                       </button>
                       <button
                         onClick={() => {
-                          setClipStatus(c.id, "held", { heldReason: "Risk review held" });
+                          holdClip(c.id, "Risk review held");
                         }}
                         className="rounded-md border px-2.5 py-1 text-xs font-medium text-red hover:bg-red-500/10"
                       >
@@ -226,20 +226,9 @@ export default function AdminRiskPage() {
                               className="w-full resize-none rounded-md border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-foreground"
                             />
                             <div className="flex gap-2">
-                               <button
+                                <button
                                 onClick={() => {
-                                  const newFlag: RiskFlag = {
-                                    type: flagType,
-                                    severity: flagSeverity,
-                                    note: flagNote || undefined,
-                                    flaggedBy: "Admin",
-                                    at: Date.now(),
-                                    status: "New",
-                                  };
-                                  const updated = [...flags, newFlag];
-                                  setClipStatus(c.id, c.status, {
-                                    riskFlags: updated,
-                                  });
+                                  holdClip(c.id, flagNote || "Risk flag added");
                                   setFlaggingId(null);
                                   setFlagNote("");
                                 }}

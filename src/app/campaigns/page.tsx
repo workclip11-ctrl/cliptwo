@@ -58,7 +58,7 @@ const STATUS_OPTIONS: { value: CampaignStatus | ""; label: string }[] = [
 ];
 
 export default function CampaignsPage() {
-  const { campaigns, clips, savedCampaigns } = useStore();
+  const { campaigns, clips, savedCampaigns, financeRecords } = useStore();
   const { user } = useAuth();
   const [sort, setSort] = useState<SortKey>("cpm");
   const [showFilters, setShowFilters] = useState(false);
@@ -116,7 +116,7 @@ export default function CampaignsPage() {
       if (filters.cpmMax && cpm > Number(filters.cpmMax)) return false;
       if (filters.minViews && (c.viewRules?.minViews ?? 0) < Number(filters.minViews)) return false;
       if (filters.budgetRemaining) {
-        const b = campaignBudget(c, clips);
+        const b = campaignBudget(c, financeRecords);
         if (b.remaining < Number(filters.budgetRemaining)) return false;
       }
       if (filters.savedOnly && user && !savedCampaigns.includes(c.id)) return false;
@@ -132,8 +132,8 @@ export default function CampaignsPage() {
         case "ending":
           return (a.daysLeft ?? 999) - (b.daysLeft ?? 999);
         case "budget": {
-          const rb = campaignBudget(b, clips).remaining;
-          const ra = campaignBudget(a, clips).remaining;
+          const rb = campaignBudget(b, financeRecords).remaining;
+          const ra = campaignBudget(a, financeRecords).remaining;
           return rb - ra;
         }
       }

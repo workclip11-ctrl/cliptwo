@@ -24,12 +24,12 @@ export function SubmitClipModal({
   onClose: () => void;
   onSubmit: (caption: string, videoUrl: string, platform: Platform) => void;
 }) {
-  const { clips } = useStore();
+  const { clips, financeRecords } = useStore();
   const [caption, setCaption] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [platform, setPlatform] = useState<Platform>(campaign.platform);
 
-  const budget = campaignBudget(campaign, clips);
+  const budget = campaignBudget(campaign, financeRecords);
   const isAtBudget = budget.status === "budget_reached";
   const isNearBudget = budget.status === "near_budget";
   const isDisabled = isAtBudget || !videoUrl || !caption;

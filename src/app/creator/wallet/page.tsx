@@ -6,7 +6,6 @@ import {
   TrendingUp,
   Clock,
   CheckCircle2,
-  AlertTriangle,
   IndianRupee,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
@@ -15,7 +14,7 @@ import { rup } from "@/lib/format";
 import { campaignSpent, PLATFORM_FEE_RATE } from "@/lib/finance";
 
 export default function CreatorWalletPage() {
-  const { campaigns, clips } = useStore();
+  const { campaigns, financeRecords } = useStore();
   const { user } = useAuth();
 
   const myCampaigns = campaigns.filter(
@@ -23,7 +22,7 @@ export default function CreatorWalletPage() {
   );
 
   const totalBudget = myCampaigns.reduce((s, c) => s + (c.budget ?? 0), 0);
-  const totalSpent = myCampaigns.reduce((s, c) => s + campaignSpent(c, clips), 0);
+  const totalSpent = myCampaigns.reduce((s, c) => s + campaignSpent(c, financeRecords), 0);
   const totalRemaining = totalBudget - totalSpent;
   const utilizationPct = totalBudget > 0 ? Math.min(100, Math.round((totalSpent / totalBudget) * 100)) : 0;
 
@@ -96,18 +95,15 @@ export default function CreatorWalletPage() {
               </thead>
               <tbody className="divide-y">
                 {myCampaigns.map((c) => {
-                  const spent = campaignSpent(c, clips);
+                  const spent = campaignSpent(c, financeRecords);
                   const remaining = (c.budget ?? 0) - spent;
                   const pct = c.budget
                     ? Math.min(100, Math.round((spent / c.budget) * 100))
                     : 0;
-                  const clipCount = clips.filter((k) => k.campaignId === c.id).length;
-                  const paidCount = clips.filter(
-                    (k) => k.campaignId === c.id && k.status === "paid",
+                  const clipCount = financeRecords.filter((r) => r.campaignId === c.id).length;
+                  const paidCount = financeRecords.filter(
+                    (r) => r.campaignId === c.id && r.status === "paid",
                   ).length;
-                  const hasIssues = clips.some(
-                    (k) => k.campaignId === c.id && k.status === "failed",
-                  );
                   return (
                     <tr key={c.id}>
                       <td className="px-4 py-3">
@@ -140,11 +136,7 @@ export default function CreatorWalletPage() {
                         {rup(c.payout)}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        {hasIssues ? (
-                          <span className="inline-flex items-center gap-1 text-xs text-red">
-                            <AlertTriangle size={12} /> Issues
-                          </span>
-                        ) : paidCount > 0 ? (
+                        {paidCount > 0 ? (
                           <span className="inline-flex items-center gap-1 text-xs text-green">
                             <CheckCircle2 size={12} /> Paid
                           </span>
