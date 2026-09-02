@@ -2662,3 +2662,227 @@ create policy "audit_logs_insert" on public.audit_logs
 
 -- No UPDATE or DELETE policies = those operations are denied by default.
 -- This enforces append-only semantics at the database level.
+
+-- ===========================================================================
+-- DATA INTEGRITY CONSTRAINTS
+-- All constraints use IF NOT EXISTS pattern via DO blocks for idempotency.
+-- These enforce valid domain values at the database level, not just TypeScript.
+-- ===========================================================================
+
+-- ---------------------------------------------------------------------------
+-- profiles: valid roles and statuses
+-- ---------------------------------------------------------------------------
+DO $$ BEGIN
+  ALTER TABLE public.profiles ADD CONSTRAINT profiles_role_check
+    CHECK (role IN ('clipper', 'creator', 'admin'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE public.profiles ADD CONSTRAINT profiles_status_check
+    CHECK (status IN ('active', 'suspended', 'deactivated'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- ---------------------------------------------------------------------------
+-- campaigns: valid statuses (defense-in-depth with schema.sql)
+-- ---------------------------------------------------------------------------
+DO $$ BEGIN
+  ALTER TABLE public.campaigns ADD CONSTRAINT campaigns_status_check
+    CHECK (status IN ('open', 'closed', 'draft', 'paused', 'archived', 'budget_reached', 'near_budget'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE public.campaigns ADD CONSTRAINT campaigns_payout_nonneg
+    CHECK (payout >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE public.campaigns ADD CONSTRAINT campaigns_budget_nonneg
+    CHECK (budget >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE public.campaigns ADD CONSTRAINT campaigns_spent_nonneg
+    CHECK (spent >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE public.campaigns ADD CONSTRAINT campaigns_days_left_nonneg
+    CHECK (days_left >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE public.campaigns ADD CONSTRAINT campaigns_max_payout_nonneg
+    CHECK (max_payout_per_clip IS NULL OR max_payout_per_clip >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE public.campaigns ADD CONSTRAINT campaigns_spend_cap_nonneg
+    CHECK (spend_cap IS NULL OR spend_cap >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- ---------------------------------------------------------------------------
+-- clips: valid statuses, non-negative views/engagement
+-- ---------------------------------------------------------------------------
+DO $$ BEGIN
+  ALTER TABLE public.clips ADD CONSTRAINT clips_status_check
+    CHECK (status IN ('pending', 'approved', 'rejected', 'held', 'processing', 'paid', 'failed', 'payable'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE public.clips ADD CONSTRAINT clips_views_nonneg
+    CHECK (views >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE public.clips ADD CONSTRAINT clips_verified_views_nonneg
+    CHECK (verified_views >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE public.clips ADD CONSTRAINT clips_locked_cpm_nonneg
+    CHECK (locked_cpm IS NULL OR locked_cpm >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE public.clips ADD CONSTRAINT clips_locked_max_payout_nonneg
+    CHECK (locked_max_payout IS NULL OR locked_max_payout >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Unique constraint on txn_id (provider transaction reference)
+DO $$ BEGIN
+  ALTER TABLE public.clips ADD CONSTRAINT clips_txn_id_unique
+    UNIQUE (txn_id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- ---------------------------------------------------------------------------
+-- clip_metrics: valid sources, verification statuses, non-negative engagement
+-- ---------------------------------------------------------------------------
+DO $$ BEGIN
+  ALTER TABLE public.clip_metrics ADD CONSTRAINT clip_metrics_source_check
+    CHECK (source IN ('platform_api', 'manual', 'mock', 'admin_override'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE public.clip_metrics ADD CONSTRAINT clip_metrics_verification_check
+    CHECK (verification_status IN ('pending', 'verified', 'failed', 'disputed'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE public.clip_metrics ADD CONSTRAINT clip_metrics_views_nonneg
+    CHECK (views >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE public.clip_metrics ADD CONSTRAINT clip_metrics_likes_nonneg
+    CHECK (likes >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE public.clip_metrics ADD CONSTRAINT clip_metrics_comments_nonneg
+    CHECK (comments >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE public.clip_metrics ADD CONSTRAINT clip_metrics_shares_nonneg
+    CHECK (shares >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- ---------------------------------------------------------------------------
+-- metrics_sync_jobs: valid statuses
+-- ---------------------------------------------------------------------------
+DO $$ BEGIN
+  ALTER TABLE public.metrics_sync_jobs ADD CONSTRAINT metrics_sync_jobs_status_check
+    CHECK (status IN ('pending', 'running', 'completed', 'failed'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE public.metrics_sync_jobs ADD CONSTRAINT metrics_sync_jobs_captured_nonneg
+    CHECK (metrics_captured >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- ---------------------------------------------------------------------------
+-- social_accounts: valid statuses, unique per user+platform
+-- ---------------------------------------------------------------------------
+DO $$ BEGIN
+  ALTER TABLE public.social_accounts ADD CONSTRAINT social_accounts_status_check
+    CHECK (status IN ('not_connected', 'connecting', 'connected', 'verified', 'connection_error', 'disconnected', 'verification_failed'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE public.social_accounts ADD CONSTRAINT social_accounts_user_platform_unique
+    UNIQUE (user_id, platform);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- ---------------------------------------------------------------------------
+-- social_connections: one connection per social account
+-- ---------------------------------------------------------------------------
+DO $$ BEGIN
+  ALTER TABLE public.social_connections ADD CONSTRAINT social_connections_account_unique
+    UNIQUE (social_account_id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- ---------------------------------------------------------------------------
+-- earnings: valid statuses, non-negative financial amounts
+-- ---------------------------------------------------------------------------
+DO $$ BEGIN
+  ALTER TABLE public.earnings ADD CONSTRAINT earnings_status_check
+    CHECK (status IN ('pending', 'approved', 'paid', 'failed'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE public.earnings ADD CONSTRAINT earnings_locked_cpm_nonneg
+    CHECK (locked_cpm >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE public.earnings ADD CONSTRAINT earnings_verified_views_nonneg
+    CHECK (verified_views >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE public.earnings ADD CONSTRAINT earnings_gross_nonneg
+    CHECK (gross_amount >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE public.earnings ADD CONSTRAINT earnings_platform_fee_nonneg
+    CHECK (platform_fee >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE public.earnings ADD CONSTRAINT earnings_net_nonneg
+    CHECK (net_amount >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE public.earnings ADD CONSTRAINT earnings_creator_fee_nonneg
+    CHECK (creator_fee >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Unique constraint on earnings per clip (one earning record per clip)
+DO $$ BEGIN
+  ALTER TABLE public.earnings ADD CONSTRAINT earnings_clip_unique
+    UNIQUE (clip_id);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- ---------------------------------------------------------------------------
+-- wallet_ledger: valid types (already has CHECK in table definition)
+-- Non-negative amount NOT enforced here because ledger uses negative amounts
+-- for debits. The type CHECK already constrains valid entry types.
+-- ---------------------------------------------------------------------------
+-- payouts: valid statuses (already has CHECK in table definition)
+-- Amounts must be non-negative
+DO $$ BEGIN
+  ALTER TABLE public.payouts ADD CONSTRAINT payouts_amount_nonneg
+    CHECK (amount >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE public.payouts ADD CONSTRAINT payouts_net_amount_nonneg
+    CHECK (net_amount >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE public.payouts ADD CONSTRAINT payouts_retry_count_nonneg
+    CHECK (retry_count >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
