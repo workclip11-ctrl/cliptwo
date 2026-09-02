@@ -230,13 +230,19 @@ export default function SocialAccountsPage() {
 
   async function disconnect(acc: SocialAccount) {
     try {
-      await fetch("/api/social/disconnect", {
+      const res = await fetch("/api/social/disconnect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ socialAccountId: acc.id }),
       });
-    } catch {
-      // Best-effort — clear local state even if server call fails
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        console.error("Disconnect failed:", body.error ?? res.statusText);
+        return;
+      }
+    } catch (e) {
+      console.error("Disconnect request failed:", e);
+      return;
     }
     updateSocialAccount(acc.id, { status: "disconnected", verified: false });
   }

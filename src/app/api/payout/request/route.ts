@@ -85,16 +85,24 @@ export async function POST(request: Request) {
 
       if (response.status === "completed" && response.providerRef) {
         // Mark as processing (provider accepted)
-        await supabase.rpc("process_payout", {
+        const { error: processErr } = await supabase.rpc("process_payout", {
           p_payout_id: payout.id,
           p_provider: providerName,
         });
+        if (processErr) {
+          console.error("process_payout RPC failed:", processErr.message);
+          // Non-fatal: payout was accepted by provider, but DB state may be stale
+        }
       } else if (response.status === "failed") {
         // Mark as failed
-        await supabase.rpc("fail_payout", {
+        const { error: failErr } = await supabase.rpc("fail_payout", {
           p_payout_id: payout.id,
           p_reason: response.error ?? "Provider rejected payout",
         });
+        if (failErr) {
+          console.error("fail_payout RPC failed:", failErr.message);
+          // Non-fatal: payout was rejected, but DB state may be stale
+        }
       }
     }
 

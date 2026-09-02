@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
     if (existingAccount) {
       // Update existing account
       socialAccountId = existingAccount.id;
-      await supabase
+      const { error: acctErr } = await supabase
         .from("social_accounts")
         .update({
           handle: tokenResult.handle,
@@ -111,9 +111,13 @@ export async function GET(request: NextRequest) {
           error: null,
         })
         .eq("id", socialAccountId);
+      if (acctErr) {
+        console.error(`[oauth/callback/${platform}] social_accounts update failed:`, acctErr.message);
+        throw new Error(`Failed to update social account: ${acctErr.message}`);
+      }
 
       // Update or create connection
-      await supabase.from("social_connections").upsert(
+      const { error: connErr } = await supabase.from("social_connections").upsert(
         {
           social_account_id: socialAccountId,
           user_id: userId,
@@ -127,6 +131,10 @@ export async function GET(request: NextRequest) {
         },
         { onConflict: "social_account_id" },
       );
+      if (connErr) {
+        console.error(`[oauth/callback/${platform}] social_connections upsert failed:`, connErr.message);
+        throw new Error(`Failed to store tokens: ${connErr.message}`);
+      }
     } else {
       // Create new social account
       const { data: newAccount } = await supabase
@@ -150,7 +158,7 @@ export async function GET(request: NextRequest) {
       socialAccountId = newAccount.id;
 
       // Create connection with encrypted tokens
-      await supabase.from("social_connections").insert({
+      const { error: connErr } = await supabase.from("social_connections").insert({
         social_account_id: socialAccountId,
         user_id: userId,
         platform,
@@ -160,6 +168,10 @@ export async function GET(request: NextRequest) {
         expires_at: expiresAt.toISOString(),
         scope: tokenResult.scope,
       });
+      if (connErr) {
+        console.error(`[oauth/callback/${platform}] social_connections insert failed:`, connErr.message);
+        throw new Error(`Failed to store tokens: ${connErr.message}`);
+      }
     }
 
     // 5. Verify ownership (server-side)
@@ -169,7 +181,7 @@ export async function GET(request: NextRequest) {
     );
 
     if (verification.verified) {
-      await supabase
+      const { error: verifyAcctErr } = await supabase
         .from("social_accounts")
         .update({
           verified: true,
@@ -177,14 +189,20 @@ export async function GET(request: NextRequest) {
           avatar_url: verification.avatarUrl ?? null,
         })
         .eq("id", socialAccountId);
+      if (verifyAcctErr) {
+        console.error(`[oauth/callback/${platform}] verification update failed:`, verifyAcctErr.message);
+      }
 
-      await supabase
+      const { error: verifyConnErr } = await supabase
         .from("social_connections")
         .update({
           verified_at: new Date().toISOString(),
           verification_data: verification,
         })
         .eq("social_account_id", socialAccountId);
+      if (verifyConnErr) {
+        console.error(`[oauth/callback/${platform}] connection verification update failed:`, verifyConnErr.message);
+      }
     }
 
     // 6. Redirect back to accounts page with success

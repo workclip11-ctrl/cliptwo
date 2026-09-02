@@ -255,6 +255,7 @@ export interface StoreState {
   socialAccounts: SocialAccount[];
   siteSettings: SiteSettings;
   savedCampaigns: string[];
+  lastError?: string;
 }
 
 // ── Centralized Admin Audit Log ──────────────────────────────────────────────

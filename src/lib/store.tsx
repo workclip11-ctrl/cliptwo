@@ -968,6 +968,7 @@ const seed: StoreState = {
 };
 
 interface StoreActions {
+  clearError: () => void;
   addCampaign: (
     c: Omit<Campaign, "id" | "createdAt" | "status">,
     status?: CampaignStatus,
@@ -1229,10 +1230,6 @@ function mapSiteSettings(r: Record<string, unknown> | null): SiteSettings {
 
 const StoreContext = createContext<(StoreState & StoreActions) | null>(null);
 
-function ignore(p: PromiseLike<unknown>) {
-  Promise.resolve(p).catch(() => {});
-}
-
 const LOCAL_STORAGE_KEY = "cliptwo_local_state";
 
 function loadLocalState(): Partial<StoreState> | null {
@@ -1376,6 +1373,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         console.error(`Authorization: non-admin user cannot admin-patch profile ${id}`);
         return;
       }
+      // Capture previous state for rollback
+      const prevProfiles = stateRef.current.profiles;
       setState((s) => {
         const entry: AuditEntry = { action: action ?? "updated", by: actor, at: Date.now(), note };
         return {
@@ -1386,8 +1385,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         };
       });
       if (!isSupabaseConfigured) return;
-      // Profile field keys that map to timestamptz columns must be sent as ISO
-      // strings, not raw epoch numbers, or Postgres rejects the input.
       const DATE_KEYS = new Set(["verifiedAt"]);
       const update: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(patch)) {
@@ -1406,10 +1403,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         ...(existing?.audit ?? []),
         { action: action ?? "updated", by: actor, at: Date.now(), note },
       ];
-      ignore(supabase.from("profiles").update(update).eq("id", id));
+      const { error } = await supabase.from("profiles").update(update).eq("id", id);
+      if (error) {
+        console.error("Profile update failed:", error.message);
+        setState((s) => ({ ...s, profiles: prevProfiles, lastError: `Profile update failed: ${error.message}` }));
+      }
     };
 
     return {
+      clearError: () => {
+        setState((s) => ({ ...s, lastError: undefined }));
+      },
       addCampaign: (c, status = "open") => {
         // SECURITY: Every campaign must have a creator (created_by).
         // The caller must provide created_by. If missing, the campaign is
@@ -1465,6 +1469,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           });
           if (error) {
             console.error("RPC create_campaign failed:", error.message);
+            setState((s) => ({
+              ...s,
+              campaigns: s.campaigns.filter((x) => x.id !== optimistic.id),
+              lastError: `Failed to create campaign: ${error.message}`,
+            }));
             return;
           }
           if (data) {
@@ -1476,7 +1485,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               ],
             }));
           }
-        })().catch(() => {});
+        })();
       },
 
       addClip: (k) => {
@@ -1520,7 +1529,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             (u.user?.user_metadata?.name as string) ||
             u.user?.email ||
             k.clipper;
-          const { data } = await supabase
+          const { data, error } = await supabase
             .from("clips")
             .insert({
               campaign_id: k.campaignId,
@@ -1534,6 +1543,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             })
             .select()
             .single();
+          if (error) {
+            console.error("Clip insert failed:", error.message);
+            setState((s) => ({
+              ...s,
+              clips: s.clips.filter((x) => x.id !== optimistic.id),
+              lastError: `Failed to submit clip: ${error.message}`,
+            }));
+            return;
+          }
           if (data) {
             setState((s) => ({
               ...s,
@@ -1543,7 +1561,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               ],
             }));
           }
-        })().catch(() => {});
+        })();
       },
 
        setClipStatus: async (id, status, patch, actor) => {
@@ -1553,6 +1571,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             console.error(`Authorization: non-admin user cannot change clip status for ${id}`);
             return;
           }
+
+          // Capture previous state for rollback
+          const prevClips = stateRef.current.clips;
+          const prevCampaigns = stateRef.current.campaigns;
 
           // Optimistic local state update (will be rolled back on error)
           const isTransitioningToEarned = EARNED_STATUSES.includes(status);
@@ -1638,12 +1660,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
          });
          if (error) {
            console.error("RPC admin_clip_action failed:", error.message);
-           // Revert optimistic update on error
+           // Revert optimistic update on error — restore previous state
            setState((s) => ({
              ...s,
-             clips: s.clips.map((k) =>
-               k.id === id ? { ...k, status: k.status } : k
-             ),
+             clips: prevClips,
+             campaigns: prevCampaigns,
+             lastError: `Clip status update failed: ${error.message}`,
            }));
            return;
          }
@@ -1680,6 +1702,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         });
         if (error) {
           console.error("RPC admin_campaign_action failed:", error.message);
+          setState((s) => ({ ...s, lastError: `Failed to close campaign: ${error.message}` }));
           return;
         }
         const result = data as { to?: string };
@@ -1719,6 +1742,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         });
         if (error) {
           console.error("RPC admin_campaign_action (archive) failed:", error.message);
+          setState((s) => ({ ...s, lastError: `Failed to archive campaign: ${error.message}` }));
           return;
         }
         // Mark as archived in local state (do NOT remove — preserve clips/earnings/audit)
@@ -1760,6 +1784,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             }
           }
         }
+        const prevCampaigns = stateRef.current.campaigns;
         setState((s) => {
           const entry: AuditEntry = {
             action: action ?? "updated",
@@ -1782,16 +1807,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           const col = CAMPAIGN_DB_MAP[k];
           if (col) update[col] = (v as unknown) ?? null;
         }
-        update.audit = [
-          ...(camp?.audit ?? []),
-          {
-            action: action ?? "updated",
-            by: actor,
-            at: Date.now(),
-            note,
-          },
-        ];
-        ignore(supabase.from("campaigns").update(update).eq("id", id));
+        const currentCamp = stateRef.current.campaigns.find((c) => c.id === id);
+        update.audit = currentCamp?.audit ?? [];
+        const { error } = await supabase.from("campaigns").update(update).eq("id", id);
+        if (error) {
+          console.error("Campaign update failed:", error.message);
+          setState((s) => ({ ...s, campaigns: prevCampaigns, lastError: `Campaign update failed: ${error.message}` }));
+        }
       },
 
       updateProfileStatus: async (id, status, actor, reason) => {
@@ -1803,6 +1825,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         });
         if (error) {
           console.error("RPC admin_user_action failed:", error.message);
+          setState((s) => ({ ...s, lastError: `User status update failed: ${error.message}` }));
           return;
         }
         setState((s) => ({
@@ -1823,6 +1846,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         });
         if (error) {
           console.error("RPC admin_user_action failed:", error.message);
+          setState((s) => ({ ...s, lastError: `Verification update failed: ${error.message}` }));
           return;
         }
         setState((s) => ({
@@ -1844,6 +1868,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         });
         if (error) {
           console.error("RPC admin_user_action failed:", error.message);
+          setState((s) => ({ ...s, lastError: `Risk flag update failed: ${error.message}` }));
           return;
         }
         setState((s) => ({
@@ -1865,6 +1890,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         });
         if (error) {
           console.error("RPC admin_user_action failed:", error.message);
+          setState((s) => ({ ...s, lastError: `Admin notes save failed: ${error.message}` }));
           return;
         }
         setState((s) => ({
@@ -1900,6 +1926,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         });
         if (error) {
           console.error("RPC admin_user_action (delete) failed:", error.message);
+          setState((s) => ({ ...s, lastError: `User deletion failed: ${error.message}` }));
           return;
         }
         setState((s) => ({ ...s, profiles: s.profiles.filter((p) => p.id !== id) }));
@@ -1929,6 +1956,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         });
         if (error) {
           console.error("RPC admin_user_action (deactivate) failed:", error.message);
+          setState((s) => ({ ...s, lastError: `User deactivation failed: ${error.message}` }));
           return;
         }
         setState((s) => ({
@@ -1961,6 +1989,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const { error } = await supabase.rpc("deactivate_own_account");
         if (error) {
           console.error("RPC deactivate_own_account failed:", error.message);
+          setState((s) => ({ ...s, lastError: `Account deactivation failed: ${error.message}` }));
           return;
         }
         setState((s) => ({
@@ -2010,12 +2039,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           return { ...s, profiles: [...s.profiles, created] };
         });
         if (!isSupabaseConfigured) return;
-        ignore(
-          supabase
-            .from("profiles")
-            .update({ name: patch.name, upi: patch.upi })
-            .eq("id", id),
-        );
+        const prevProfiles = stateRef.current.profiles;
+        const { error } = await supabase
+          .from("profiles")
+          .update({ name: patch.name, upi: patch.upi })
+          .eq("id", id);
+        if (error) {
+          console.error("Profile update failed:", error.message);
+          setState((s) => ({ ...s, profiles: prevProfiles, lastError: `Profile update failed: ${error.message}` }));
+        }
       },
 
       addSocialAccount: (a) => {
@@ -2035,29 +2067,38 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         };
         setState((s) => ({ ...s, socialAccounts: [...s.socialAccounts, record] }));
         if (!isSupabaseConfigured) return id;
-        ignore(
-          supabase.from("social_accounts").insert({
-            id,
-            user_id: a.userId,
-            platform: a.platform,
-            handle: a.handle,
-            provider_account_id: a.providerAccountId ?? null,
-            avatar_url: a.avatarUrl ?? null,
-            status: a.status,
-            verified: a.verified,
-            connected_at: a.connectedAt
-              ? new Date(a.connectedAt).toISOString()
-              : null,
-            last_sync_at: a.lastSyncAt
-              ? new Date(a.lastSyncAt).toISOString()
-              : null,
-            error: a.error,
-          }),
-        );
+        // Fire-and-forget async DB insert — if it fails, rollback from state
+        supabase.from("social_accounts").insert({
+          id,
+          user_id: a.userId,
+          platform: a.platform,
+          handle: a.handle,
+          provider_account_id: a.providerAccountId ?? null,
+          avatar_url: a.avatarUrl ?? null,
+          status: a.status,
+          verified: a.verified,
+          connected_at: a.connectedAt
+            ? new Date(a.connectedAt).toISOString()
+            : null,
+          last_sync_at: a.lastSyncAt
+            ? new Date(a.lastSyncAt).toISOString()
+            : null,
+          error: a.error,
+        }).then(({ error }) => {
+          if (error) {
+            console.error("Social account insert failed:", error.message);
+            setState((s) => ({
+              ...s,
+              socialAccounts: s.socialAccounts.filter((acc) => acc.id !== id),
+              lastError: `Failed to connect social account: ${error.message}`,
+            }));
+          }
+        });
         return id;
       },
 
-      updateSocialAccount: (id, patch) => {
+      updateSocialAccount: async (id, patch) => {
+        const prevAccounts = stateRef.current.socialAccounts;
         setState((s) => ({
           ...s,
           socialAccounts: s.socialAccounts.map((acc) =>
@@ -2082,25 +2123,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           payload.last_sync_at = patch.lastSyncAt
             ? new Date(patch.lastSyncAt).toISOString()
             : null;
-        ignore(
-          supabase.from("social_accounts").update(payload).eq("id", id),
-        );
+        const { error } = await supabase.from("social_accounts").update(payload).eq("id", id);
+        if (error) {
+          console.error("Social account update failed:", error.message);
+          setState((s) => ({ ...s, socialAccounts: prevAccounts, lastError: `Social account update failed: ${error.message}` }));
+        }
       },
 
-      setSiteSettings: (site) => {
+      setSiteSettings: async (site) => {
+        const prevSettings = stateRef.current.siteSettings;
         setState((s) => ({ ...s, siteSettings: site }));
         if (!isSupabaseConfigured) return;
-        ignore(
-          supabase
-            .from("site_settings")
-            .upsert({
-              id: 1,
-              hero_title: site.heroTitle,
-              hero_subtitle: site.heroSubtitle,
-              featured_ids: site.featuredIds,
-              razorpay_key: site.razorpayKey,
-            }),
-        );
+        const { error } = await supabase
+          .from("site_settings")
+          .upsert({
+            id: 1,
+            hero_title: site.heroTitle,
+            hero_subtitle: site.heroSubtitle,
+            featured_ids: site.featuredIds,
+            razorpay_key: site.razorpayKey,
+          });
+        if (error) {
+          console.error("Site settings save failed:", error.message);
+          setState((s) => ({ ...s, siteSettings: prevSettings, lastError: `Settings save failed: ${error.message}` }));
+        }
       },
       toggleSaveCampaign: (id) => {
         setState((s) => ({
