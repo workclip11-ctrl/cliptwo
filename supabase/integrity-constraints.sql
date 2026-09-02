@@ -203,23 +203,31 @@ EXCEPTION WHEN OTHERS THEN
 END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.clips ADD CONSTRAINT clips_locked_cpm_nonneg
-    CHECK (locked_cpm IS NULL OR locked_cpm >= 0) NOT VALID;
+  IF _col_exists('clips', 'locked_cpm') THEN
+    ALTER TABLE public.clips ADD CONSTRAINT clips_locked_cpm_nonneg
+      CHECK (locked_cpm IS NULL OR locked_cpm >= 0) NOT VALID;
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.clips VALIDATE CONSTRAINT clips_locked_cpm_nonneg;
+  IF _col_exists('clips', 'locked_cpm') THEN
+    ALTER TABLE public.clips VALIDATE CONSTRAINT clips_locked_cpm_nonneg;
+  END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE clips_locked_cpm_nonneg failed — fix offending rows and re-run';
 END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.clips ADD CONSTRAINT clips_locked_max_payout_nonneg
-    CHECK (locked_max_payout IS NULL OR locked_max_payout >= 0) NOT VALID;
+  IF _col_exists('clips', 'locked_max_payout') THEN
+    ALTER TABLE public.clips ADD CONSTRAINT clips_locked_max_payout_nonneg
+      CHECK (locked_max_payout IS NULL OR locked_max_payout >= 0) NOT VALID;
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.clips VALIDATE CONSTRAINT clips_locked_max_payout_nonneg;
+  IF _col_exists('clips', 'locked_max_payout') THEN
+    ALTER TABLE public.clips VALIDATE CONSTRAINT clips_locked_max_payout_nonneg;
+  END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE clips_locked_max_payout_nonneg failed — fix offending rows and re-run';
 END $$;
