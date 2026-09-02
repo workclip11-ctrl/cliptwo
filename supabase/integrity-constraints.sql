@@ -20,7 +20,6 @@
 -- ────────────────────────────────────────────────────────────────────────────
 
 -- Backfill campaigns.created_by where NULL
--- Uses a dedicated "system" UUID to indicate pre-constraint legacy records.
 DO $$ BEGIN
   UPDATE public.campaigns SET created_by = '00000000-0000-0000-0000-000000000099'
   WHERE created_by IS NULL;
@@ -31,6 +30,19 @@ DO $$ BEGIN
   UPDATE public.clips SET user_id = '00000000-0000-0000-0000-000000000099'
   WHERE user_id IS NULL;
 EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+-- ────────────────────────────────────────────────────────────────────────────
+-- HELPER: check if a column exists on a table
+-- ────────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION _col_exists(p_table text, p_column text)
+RETURNS boolean
+LANGUAGE sql
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = p_table AND column_name = p_column
+  );
+$$;
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- STEP 2: ADD CONSTRAINTS (NOT VALID for speed, then VALIDATE)
@@ -139,7 +151,7 @@ EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE campaigns_spend_cap_nonneg failed — fix offending rows and re-run';
 END $$;
 
--- campaigns.created_by NOT NULL (deferrable for trigger timing)
+-- campaigns.created_by NOT NULL
 DO $$ BEGIN
   ALTER TABLE public.campaigns ADD CONSTRAINT campaigns_created_by_not_null
     CHECK (created_by IS NOT NULL) NOT VALID;
@@ -174,13 +186,18 @@ EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE clips_views_nonneg failed — fix offending rows and re-run';
 END $$;
 
+-- clips.verified_views (only if column exists)
 DO $$ BEGIN
-  ALTER TABLE public.clips ADD CONSTRAINT clips_verified_views_nonneg
-    CHECK (verified_views >= 0) NOT VALID;
+  IF _col_exists('clips', 'verified_views') THEN
+    ALTER TABLE public.clips ADD CONSTRAINT clips_verified_views_nonneg
+      CHECK (verified_views >= 0) NOT VALID;
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.clips VALIDATE CONSTRAINT clips_verified_views_nonneg;
+  IF _col_exists('clips', 'verified_views') THEN
+    ALTER TABLE public.clips VALIDATE CONSTRAINT clips_verified_views_nonneg;
+  END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE clips_verified_views_nonneg failed — fix offending rows and re-run';
 END $$;
@@ -219,104 +236,140 @@ EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE clips_user_id_not_null failed — backfill user_id on clips first';
 END $$;
 
--- clips.txn_id unique (allow NULLs, but when set must be unique)
+-- clips.txn_id unique (only if column exists)
 DO $$ BEGIN
-  ALTER TABLE public.clips ADD CONSTRAINT clips_txn_id_unique
-    UNIQUE (txn_id) NOT VALID;
+  IF _col_exists('clips', 'txn_id') THEN
+    ALTER TABLE public.clips ADD CONSTRAINT clips_txn_id_unique
+      UNIQUE (txn_id) NOT VALID;
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.clips VALIDATE CONSTRAINT clips_txn_id_unique;
+  IF _col_exists('clips', 'txn_id') THEN
+    ALTER TABLE public.clips VALIDATE CONSTRAINT clips_txn_id_unique;
+  END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE clips_txn_id_unique failed — deduplicate txn_id values first';
 END $$;
 
--- ── clip_metrics ────────────────────────────────────────────────────────────
+-- ── clip_metrics (only if table exists) ─────────────────────────────────────
 DO $$ BEGIN
-  ALTER TABLE public.clip_metrics ADD CONSTRAINT clip_metrics_source_check
-    CHECK (source IN ('platform_api', 'manual', 'mock', 'admin_override')) NOT VALID;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='clip_metrics') THEN
+    ALTER TABLE public.clip_metrics ADD CONSTRAINT clip_metrics_source_check
+      CHECK (source IN ('platform_api', 'manual', 'mock', 'admin_override')) NOT VALID;
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.clip_metrics VALIDATE CONSTRAINT clip_metrics_source_check;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='clip_metrics') THEN
+    ALTER TABLE public.clip_metrics VALIDATE CONSTRAINT clip_metrics_source_check;
+  END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE clip_metrics_source_check failed — fix offending rows and re-run';
 END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.clip_metrics ADD CONSTRAINT clip_metrics_verification_check
-    CHECK (verification_status IN ('pending', 'verified', 'failed', 'disputed')) NOT VALID;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='clip_metrics') THEN
+    ALTER TABLE public.clip_metrics ADD CONSTRAINT clip_metrics_verification_check
+      CHECK (verification_status IN ('pending', 'verified', 'failed', 'disputed')) NOT VALID;
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.clip_metrics VALIDATE CONSTRAINT clip_metrics_verification_check;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='clip_metrics') THEN
+    ALTER TABLE public.clip_metrics VALIDATE CONSTRAINT clip_metrics_verification_check;
+  END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE clip_metrics_verification_check failed — fix offending rows and re-run';
 END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.clip_metrics ADD CONSTRAINT clip_metrics_views_nonneg
-    CHECK (views >= 0) NOT VALID;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='clip_metrics') THEN
+    ALTER TABLE public.clip_metrics ADD CONSTRAINT clip_metrics_views_nonneg
+      CHECK (views >= 0) NOT VALID;
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.clip_metrics VALIDATE CONSTRAINT clip_metrics_views_nonneg;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='clip_metrics') THEN
+    ALTER TABLE public.clip_metrics VALIDATE CONSTRAINT clip_metrics_views_nonneg;
+  END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE clip_metrics_views_nonneg failed — fix offending rows and re-run';
 END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.clip_metrics ADD CONSTRAINT clip_metrics_likes_nonneg
-    CHECK (likes >= 0) NOT VALID;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='clip_metrics') THEN
+    ALTER TABLE public.clip_metrics ADD CONSTRAINT clip_metrics_likes_nonneg
+      CHECK (likes >= 0) NOT VALID;
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.clip_metrics VALIDATE CONSTRAINT clip_metrics_likes_nonneg;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='clip_metrics') THEN
+    ALTER TABLE public.clip_metrics VALIDATE CONSTRAINT clip_metrics_likes_nonneg;
+  END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE clip_metrics_likes_nonneg failed — fix offending rows and re-run';
 END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.clip_metrics ADD CONSTRAINT clip_metrics_comments_nonneg
-    CHECK (comments >= 0) NOT VALID;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='clip_metrics') THEN
+    ALTER TABLE public.clip_metrics ADD CONSTRAINT clip_metrics_comments_nonneg
+      CHECK (comments >= 0) NOT VALID;
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.clip_metrics VALIDATE CONSTRAINT clip_metrics_comments_nonneg;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='clip_metrics') THEN
+    ALTER TABLE public.clip_metrics VALIDATE CONSTRAINT clip_metrics_comments_nonneg;
+  END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE clip_metrics_comments_nonneg failed — fix offending rows and re-run';
 END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.clip_metrics ADD CONSTRAINT clip_metrics_shares_nonneg
-    CHECK (shares >= 0) NOT VALID;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='clip_metrics') THEN
+    ALTER TABLE public.clip_metrics ADD CONSTRAINT clip_metrics_shares_nonneg
+      CHECK (shares >= 0) NOT VALID;
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.clip_metrics VALIDATE CONSTRAINT clip_metrics_shares_nonneg;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='clip_metrics') THEN
+    ALTER TABLE public.clip_metrics VALIDATE CONSTRAINT clip_metrics_shares_nonneg;
+  END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE clip_metrics_shares_nonneg failed — fix offending rows and re-run';
 END $$;
 
--- ── metrics_sync_jobs ───────────────────────────────────────────────────────
+-- ── metrics_sync_jobs (only if table exists) ────────────────────────────────
 DO $$ BEGIN
-  ALTER TABLE public.metrics_sync_jobs ADD CONSTRAINT metrics_sync_jobs_status_check
-    CHECK (status IN ('pending', 'running', 'completed', 'failed')) NOT VALID;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='metrics_sync_jobs') THEN
+    ALTER TABLE public.metrics_sync_jobs ADD CONSTRAINT metrics_sync_jobs_status_check
+      CHECK (status IN ('pending', 'running', 'completed', 'failed')) NOT VALID;
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.metrics_sync_jobs VALIDATE CONSTRAINT metrics_sync_jobs_status_check;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='metrics_sync_jobs') THEN
+    ALTER TABLE public.metrics_sync_jobs VALIDATE CONSTRAINT metrics_sync_jobs_status_check;
+  END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE metrics_sync_jobs_status_check failed — fix offending rows and re-run';
 END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.metrics_sync_jobs ADD CONSTRAINT metrics_sync_jobs_captured_nonneg
-    CHECK (metrics_captured >= 0) NOT VALID;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='metrics_sync_jobs') THEN
+    ALTER TABLE public.metrics_sync_jobs ADD CONSTRAINT metrics_sync_jobs_captured_nonneg
+      CHECK (metrics_captured >= 0) NOT VALID;
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.metrics_sync_jobs VALIDATE CONSTRAINT metrics_sync_jobs_captured_nonneg;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='metrics_sync_jobs') THEN
+    ALTER TABLE public.metrics_sync_jobs VALIDATE CONSTRAINT metrics_sync_jobs_captured_nonneg;
+  END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE metrics_sync_jobs_captured_nonneg failed — fix offending rows and re-run';
 END $$;
@@ -356,129 +409,177 @@ EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE social_connections_account_unique failed — deduplicate connections first';
 END $$;
 
--- ── earnings ────────────────────────────────────────────────────────────────
+-- ── earnings (only if table exists) ─────────────────────────────────────────
 DO $$ BEGIN
-  ALTER TABLE public.earnings ADD CONSTRAINT earnings_status_check
-    CHECK (status IN ('pending', 'approved', 'paid', 'failed')) NOT VALID;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='earnings') THEN
+    ALTER TABLE public.earnings ADD CONSTRAINT earnings_status_check
+      CHECK (status IN ('pending', 'approved', 'paid', 'failed')) NOT VALID;
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.earnings VALIDATE CONSTRAINT earnings_status_check;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='earnings') THEN
+    ALTER TABLE public.earnings VALIDATE CONSTRAINT earnings_status_check;
+  END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE earnings_status_check failed — fix offending rows and re-run';
 END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.earnings ADD CONSTRAINT earnings_locked_cpm_nonneg
-    CHECK (locked_cpm >= 0) NOT VALID;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='earnings') THEN
+    ALTER TABLE public.earnings ADD CONSTRAINT earnings_locked_cpm_nonneg
+      CHECK (locked_cpm >= 0) NOT VALID;
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.earnings VALIDATE CONSTRAINT earnings_locked_cpm_nonneg;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='earnings') THEN
+    ALTER TABLE public.earnings VALIDATE CONSTRAINT earnings_locked_cpm_nonneg;
+  END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE earnings_locked_cpm_nonneg failed — fix offending rows and re-run';
 END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.earnings ADD CONSTRAINT earnings_verified_views_nonneg
-    CHECK (verified_views >= 0) NOT VALID;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='earnings') THEN
+    ALTER TABLE public.earnings ADD CONSTRAINT earnings_verified_views_nonneg
+      CHECK (verified_views >= 0) NOT VALID;
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.earnings VALIDATE CONSTRAINT earnings_verified_views_nonneg;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='earnings') THEN
+    ALTER TABLE public.earnings VALIDATE CONSTRAINT earnings_verified_views_nonneg;
+  END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE earnings_verified_views_nonneg failed — fix offending rows and re-run';
 END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.earnings ADD CONSTRAINT earnings_gross_nonneg
-    CHECK (gross_amount >= 0) NOT VALID;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='earnings') THEN
+    ALTER TABLE public.earnings ADD CONSTRAINT earnings_gross_nonneg
+      CHECK (gross_amount >= 0) NOT VALID;
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.earnings VALIDATE CONSTRAINT earnings_gross_nonneg;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='earnings') THEN
+    ALTER TABLE public.earnings VALIDATE CONSTRAINT earnings_gross_nonneg;
+  END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE earnings_gross_nonneg failed — fix offending rows and re-run';
 END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.earnings ADD CONSTRAINT earnings_platform_fee_nonneg
-    CHECK (platform_fee >= 0) NOT VALID;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='earnings') THEN
+    ALTER TABLE public.earnings ADD CONSTRAINT earnings_platform_fee_nonneg
+      CHECK (platform_fee >= 0) NOT VALID;
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.earnings VALIDATE CONSTRAINT earnings_platform_fee_nonneg;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='earnings') THEN
+    ALTER TABLE public.earnings VALIDATE CONSTRAINT earnings_platform_fee_nonneg;
+  END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE earnings_platform_fee_nonneg failed — fix offending rows and re-run';
 END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.earnings ADD CONSTRAINT earnings_net_nonneg
-    CHECK (net_amount >= 0) NOT VALID;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='earnings') THEN
+    ALTER TABLE public.earnings ADD CONSTRAINT earnings_net_nonneg
+      CHECK (net_amount >= 0) NOT VALID;
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.earnings VALIDATE CONSTRAINT earnings_net_nonneg;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='earnings') THEN
+    ALTER TABLE public.earnings VALIDATE CONSTRAINT earnings_net_nonneg;
+  END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE earnings_net_nonneg failed — fix offending rows and re-run';
 END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.earnings ADD CONSTRAINT earnings_creator_fee_nonneg
-    CHECK (creator_fee >= 0) NOT VALID;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='earnings') THEN
+    ALTER TABLE public.earnings ADD CONSTRAINT earnings_creator_fee_nonneg
+      CHECK (creator_fee >= 0) NOT VALID;
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.earnings VALIDATE CONSTRAINT earnings_creator_fee_nonneg;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='earnings') THEN
+    ALTER TABLE public.earnings VALIDATE CONSTRAINT earnings_creator_fee_nonneg;
+  END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE earnings_creator_fee_nonneg failed — fix offending rows and re-run';
 END $$;
 
--- One earning record per clip (idempotency enforcement at DB level)
 DO $$ BEGIN
-  ALTER TABLE public.earnings ADD CONSTRAINT earnings_clip_unique
-    UNIQUE (clip_id) NOT VALID;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='earnings') THEN
+    ALTER TABLE public.earnings ADD CONSTRAINT earnings_clip_unique
+      UNIQUE (clip_id) NOT VALID;
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.earnings VALIDATE CONSTRAINT earnings_clip_unique;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='earnings') THEN
+    ALTER TABLE public.earnings VALIDATE CONSTRAINT earnings_clip_unique;
+  END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE earnings_clip_unique failed — deduplicate earnings first';
 END $$;
 
--- ── payouts ─────────────────────────────────────────────────────────────────
+-- ── payouts (only if table exists) ──────────────────────────────────────────
 DO $$ BEGIN
-  ALTER TABLE public.payouts ADD CONSTRAINT payouts_amount_nonneg
-    CHECK (amount >= 0) NOT VALID;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='payouts') THEN
+    ALTER TABLE public.payouts ADD CONSTRAINT payouts_amount_nonneg
+      CHECK (amount >= 0) NOT VALID;
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.payouts VALIDATE CONSTRAINT payouts_amount_nonneg;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='payouts') THEN
+    ALTER TABLE public.payouts VALIDATE CONSTRAINT payouts_amount_nonneg;
+  END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE payouts_amount_nonneg failed — fix offending rows and re-run';
 END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.payouts ADD CONSTRAINT payouts_net_amount_nonneg
-    CHECK (net_amount >= 0) NOT VALID;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='payouts') THEN
+    ALTER TABLE public.payouts ADD CONSTRAINT payouts_net_amount_nonneg
+      CHECK (net_amount >= 0) NOT VALID;
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.payouts VALIDATE CONSTRAINT payouts_net_amount_nonneg;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='payouts') THEN
+    ALTER TABLE public.payouts VALIDATE CONSTRAINT payouts_net_amount_nonneg;
+  END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE payouts_net_amount_nonneg failed — fix offending rows and re-run';
 END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.payouts ADD CONSTRAINT payouts_retry_count_nonneg
-    CHECK (retry_count >= 0) NOT VALID;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='payouts') THEN
+    ALTER TABLE public.payouts ADD CONSTRAINT payouts_retry_count_nonneg
+      CHECK (retry_count >= 0) NOT VALID;
+  END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  ALTER TABLE public.payouts VALIDATE CONSTRAINT payouts_retry_count_nonneg;
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='payouts') THEN
+    ALTER TABLE public.payouts VALIDATE CONSTRAINT payouts_retry_count_nonneg;
+  END IF;
 EXCEPTION WHEN OTHERS THEN
-  RAISE WARNING 'VALIDATE payouts_retry_count_nonneg failed — fix offending rows and re-run';
+  RAISE WARNING 'VALIDATE payouts_retry_count failed — fix offending rows and re-run';
 END $$;
+
+-- ────────────────────────────────────────────────────────────────────────────
+-- CLEANUP: drop helper function
+-- ────────────────────────────────────────────────────────────────────────────
+DROP FUNCTION IF EXISTS _col_exists(text, text);
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- DONE
