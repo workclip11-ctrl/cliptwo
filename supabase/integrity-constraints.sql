@@ -248,7 +248,7 @@ END $$;
 DO $$ BEGIN
   IF _col_exists('clips', 'txn_id') THEN
     ALTER TABLE public.clips ADD CONSTRAINT clips_txn_id_unique
-      UNIQUE (txn_id) NOT VALID;
+      UNIQUE (txn_id);
   END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
@@ -396,7 +396,7 @@ END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.social_accounts ADD CONSTRAINT social_accounts_user_platform_unique
-    UNIQUE (user_id, platform) NOT VALID;
+    UNIQUE (user_id, platform);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
@@ -408,7 +408,7 @@ END $$;
 -- ── social_connections ──────────────────────────────────────────────────────
 DO $$ BEGIN
   ALTER TABLE public.social_connections ADD CONSTRAINT social_connections_account_unique
-    UNIQUE (social_account_id) NOT VALID;
+    UNIQUE (social_account_id);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
@@ -526,7 +526,7 @@ END $$;
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='earnings') THEN
     ALTER TABLE public.earnings ADD CONSTRAINT earnings_clip_unique
-      UNIQUE (clip_id) NOT VALID;
+      UNIQUE (clip_id);
   END IF;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
