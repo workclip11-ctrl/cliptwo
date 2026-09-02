@@ -11,16 +11,13 @@ export const isSupabaseConfigured = isValidUrl(url);
 
 const SESSION_KEY = "cliptwo_session_v1";
 
-// Per-tab session storage. A tab's own session is kept in sessionStorage and
-// takes priority; otherwise we fall back to the shared localStorage session so
-// a fresh tab still defaults to signed-in. This keeps each tab's identity
-// independent (signing in as a different user in one tab won't flip another).
+// Per-tab session storage. Each tab is fully isolated — signing in as a
+// different user in another tab does NOT affect this tab. New tabs must
+// log in fresh (no automatic session sharing via localStorage).
 const hybridCookies = {
   getAll() {
     if (typeof window === "undefined") return [];
-    const raw =
-      window.sessionStorage.getItem(SESSION_KEY) ??
-      window.localStorage.getItem(SESSION_KEY);
+    const raw = window.sessionStorage.getItem(SESSION_KEY);
     if (!raw) return [];
     try {
       return JSON.parse(raw) as { name: string; value: string }[];
@@ -32,7 +29,6 @@ const hybridCookies = {
     if (typeof window === "undefined") return;
     const raw = JSON.stringify(cookiesToSet.map((c) => ({ name: c.name, value: c.value })));
     window.sessionStorage.setItem(SESSION_KEY, raw);
-    window.localStorage.setItem(SESSION_KEY, raw);
   },
 };
 
