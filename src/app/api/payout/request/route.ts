@@ -6,22 +6,22 @@
 // 2. Calls request_payout() RPC which:
 //    - Reads user ID from auth.uid()
 //    - Reads verified UPI from profiles
-//    - Calculates authoritative balance from wallet_ledger
+//    - Calculates authoritative balance from financial_records + payout_requests
 //    - Enforces minimum threshold
 //    - Checks no duplicate processing payout
-//    - Creates payout record + debit ledger entry atomically
-// 3. Optionally triggers payment provider
+//    - Creates payout record atomically
+//
+// Cliptwo uses MANUAL QR/UPI payments. There is no automated payment provider.
+// Admin reviews payout requests and manually processes UPI transfers.
 //
 // The browser NEVER sees API credentials. All financial logic is server-side.
 // ---------------------------------------------------------------------------
 
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { getPaymentProvider } from "@/lib/payment-provider";
 
 export async function POST(request: Request) {
   try {
-    // 1. Create server-side Supabase client with session cookie
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -32,7 +32,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Read session from request cookies
     const cookieHeader = request.headers.get("cookie") ?? "";
 
     const supabase = createServerClient(supabaseUrl, supabaseKey, {
@@ -48,7 +47,6 @@ export async function POST(request: Request) {
       },
     });
 
-    // 2. Authenticate
     const {
       data: { user },
       error: authError,
@@ -58,7 +56,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    // 3. Call request_payout() RPC — all validation happens server-side
+    // Call request_payout() RPC — all validation happens server-side
     const { data, error: rpcError } = await supabase.rpc("request_payout");
 
     if (rpcError) {
@@ -68,45 +66,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const payout = data;
-
-    // 4. If provider is not mock, initiate real payout
-    const providerName = process.env.PAYMENT_PROVIDER ?? "mock";
-    if (providerName !== "mock" && payout?.id) {
-      const provider = getPaymentProvider();
-      const response = await provider.initiatePayout({
-        payoutId: payout.id,
-        amount: payout.net_amount,
-        currency: payout.currency ?? "INR",
-        upiId: payout.upi_id ?? "",
-        idempotencyKey: payout.idempotency_key ?? `payout-${payout.id}`,
-        metadata: payout.metadata ?? {},
-      });
-
-      if (response.status === "completed" && response.providerRef) {
-        // Mark as processing (provider accepted)
-        const { error: processErr } = await supabase.rpc("process_payout", {
-          p_payout_id: payout.id,
-          p_provider: providerName,
-        });
-        if (processErr) {
-          console.error("process_payout RPC failed:", processErr.message);
-          // Non-fatal: payout was accepted by provider, but DB state may be stale
-        }
-      } else if (response.status === "failed") {
-        // Mark as failed
-        const { error: failErr } = await supabase.rpc("fail_payout", {
-          p_payout_id: payout.id,
-          p_reason: response.error ?? "Provider rejected payout",
-        });
-        if (failErr) {
-          console.error("fail_payout RPC failed:", failErr.message);
-          // Non-fatal: payout was rejected, but DB state may be stale
-        }
-      }
-    }
-
-    return NextResponse.json({ payout, success: true });
+    return NextResponse.json({ payout: data, success: true });
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Internal server error";

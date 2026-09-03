@@ -11,7 +11,7 @@ export function fmtViews(n: number) {
 }
 
 // Client-side earnings estimate for display only.
-// Server-side create_earning RPC is the authoritative calculation.
+// Server-side approve_clip() RPC creates the authoritative financial_records.
 export function clipEarnings(clip: Clip, campaigns: Campaign[]) {
   if (clip.status !== "approved") return 0;
   const camp = campaigns.find((c) => c.id === clip.campaignId);

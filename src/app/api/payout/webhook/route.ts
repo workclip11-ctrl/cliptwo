@@ -1,103 +1,22 @@
 // ---------------------------------------------------------------------------
 // POST /api/payout/webhook
 //
-// Handles payment provider webhooks for payout status updates.
-// Providers send status updates (completed, failed) to this endpoint.
+// Reserved for future payment provider webhooks. Currently a no-op since
+// Cliptwo uses manual QR/UPI payments with admin-recorded references.
 //
-// Security:
-// - Verifies webhook signature using provider-specific logic
-// - Only processes trusted events
-// - Updates payout state only via server-side RPC
-// - Idempotent: duplicate webhooks are safely ignored
-//
-// The browser NEVER sees this endpoint. Providers call it directly.
+// When a real payment provider is integrated, this endpoint will:
+// - Verify webhook signature using provider-specific logic
+// - Process payout.completed / payout.failed events
+// - Update payout state only via server-side RPC
 // ---------------------------------------------------------------------------
 
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { getPaymentProvider } from "@/lib/payment-provider";
 
-// Server-only Supabase client (uses service_role key for webhook processing)
-function getServerSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !serviceKey) {
-    return null;
-  }
-
-  return createClient(url, serviceKey);
-}
-
-export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-
-    // 1. Verify webhook signature
-    const provider = getPaymentProvider();
-    const isValid = provider.verifyWebhook(body);
-    if (!isValid) {
-      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-    }
-
-    // 2. Extract event data
-    const { event, providerRef, payoutId } = body as {
-      event: string;
-      providerRef: string;
-      payoutId: string;
-      amount: number;
-    };
-
-    if (!payoutId || !event) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 },
-      );
-    }
-
-    if (event === "payout.completed" && !providerRef) {
-      return NextResponse.json(
-        { error: "providerRef required for payout.completed" },
-        { status: 400 },
-      );
-    }
-
-    // 3. Get server-side Supabase client
-    const supabase = getServerSupabase();
-    if (!supabase) {
-      return NextResponse.json(
-        { error: "Payment system not configured" },
-        { status: 503 },
-      );
-    }
-
-    // 4. Process webhook event via server-side RPC only
-    if (event === "payout.completed") {
-      const { error } = await supabase.rpc("complete_payout_request", {
-        p_payout_id: payoutId,
-        p_payment_reference: providerRef,
-      });
-
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
-      }
-    } else if (event === "payout.failed") {
-      const { error } = await supabase.rpc("fail_payout_request", {
-        p_payout_id: payoutId,
-        p_reason: body.reason ?? "Provider reported failure",
-      });
-
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
-      }
-    } else {
-      return NextResponse.json({ error: "Unknown event type" }, { status: 400 });
-    }
-
-    return NextResponse.json({ received: true });
-  } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Internal server error";
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
+export async function POST() {
+  // No automated payment provider is configured.
+  // Admin manually marks payouts as paid via the admin dashboard.
+  return NextResponse.json(
+    { error: "Webhook processing not available — manual UPI payments only" },
+    { status: 501 },
+  );
 }

@@ -697,20 +697,13 @@ EXCEPTION WHEN OTHERS THEN
 END $$;;
 
 -- ── wallet_ledger ──────────────────────────────────────────────────────────
+-- NOTE: wallet_ledger amounts CAN be negative (debit entries store negative
+-- values). The previous wallet_ledger_amount_nonneg constraint was incorrect
+-- and has been removed. The wallet_ledger_type_check (in financial-rewrite.sql)
+-- constrains valid entry types instead.
 DO $$ BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='wallet_ledger') THEN
-    ALTER TABLE public.wallet_ledger ADD CONSTRAINT wallet_ledger_amount_nonneg
-      CHECK (amount >= 0) NOT VALID;
-  END IF;
-EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
-
-DO $$ BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='wallet_ledger') THEN
-    ALTER TABLE public.wallet_ledger VALIDATE CONSTRAINT wallet_ledger_amount_nonneg;
-  END IF;
-EXCEPTION WHEN OTHERS THEN
-  RAISE WARNING 'VALIDATE wallet_ledger_amount_nonneg failed — fix offending rows and re-run';
-END $$;;
+  ALTER TABLE public.wallet_ledger DROP CONSTRAINT IF EXISTS wallet_ledger_amount_nonneg;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- ── Platform constraints (YouTube, Instagram, Kick only) ─────────────────────
 
