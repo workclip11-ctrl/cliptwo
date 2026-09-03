@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Plus, Sparkles } from "lucide-react";
 import { NewCampaignModal } from "@/components/NewCampaignModal";
 import { useStore } from "@/lib/store";
@@ -13,6 +14,7 @@ import type { Platform } from "@/lib/types";
 export default function CreatorCampaignsPage() {
   const { campaigns, clips, addCampaign, closeCampaign, financeRecords } = useStore();
   const { user } = useAuth();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
 
   const myCampaigns = campaigns.filter(
@@ -53,16 +55,17 @@ export default function CreatorCampaignsPage() {
           const pct = c.budget ? Math.min(100, Math.round((spent / c.budget) * 100)) : 0;
           const remaining = (c.budget ?? 0) - spent;
           return (
-            <div key={c.id} className="rounded-2xl border bg-card p-5">
+            <div
+              key={c.id}
+              onClick={() => router.push(`/creator/campaigns/${c.id}`)}
+              className="cursor-pointer rounded-2xl border bg-card p-5 transition-colors hover:bg-accent-soft/50"
+            >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
-                     <Link
-                       href={`/creator/campaigns/${c.id}`}
-                       className="font-semibold hover:underline underline-offset-2"
-                     >
+                     <span className="font-semibold">
                       {c.title}
-                    </Link>
+                     </span>
                     <span
                       className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium ${
                         c.status === "open"
@@ -121,7 +124,10 @@ export default function CreatorCampaignsPage() {
                 </div>
                 {c.status === "open" && (
                   <button
-                    onClick={() => closeCampaign(c.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeCampaign(c.id);
+                    }}
                     className="rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-accent-soft"
                   >
                     Close campaign
