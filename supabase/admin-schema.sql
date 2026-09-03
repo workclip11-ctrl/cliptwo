@@ -360,7 +360,8 @@ create or replace function public.create_campaign(
   p_timezone text default null,
   p_what_to_make text default null,
   p_style text default null,
-  p_rights jsonb default null
+  p_rights jsonb default null,
+  p_status text default 'open'
 )
 returns jsonb
 language plpgsql
@@ -372,6 +373,11 @@ declare
   v_is_creator boolean;
   v_campaign jsonb;
 begin
+  -- Validate status: only 'draft' or 'open' allowed at creation
+  if p_status not in ('draft', 'open') then
+    raise exception 'Invalid status: %. Only draft or open allowed at creation.', p_status;
+  end if;
+
   -- Get authenticated user
   v_user_id := auth.uid();
   if v_user_id is null then
@@ -394,14 +400,14 @@ begin
     max_payout_per_clip, recommended_duration, hook, caption_req, aspect_ratio,
     cta, branding, do_list, dont_list, source_assets, example_clips,
     view_rules, approval, thumbnails, brand_assets, spend_cap, timezone,
-    what_to_make, style, rights
+    what_to_make, style, rights, status
   ) values (
     p_title, p_brief, p_platform, p_payout, p_creator, p_niche, p_budget, p_days_left,
     p_source_link, p_rules, p_category, p_platforms, p_objective, p_start_date, p_end_date,
     p_max_payout_per_clip, p_recommended_duration, p_hook, p_caption_req, p_aspect_ratio,
     p_cta, p_branding, p_do_list, p_dont_list, p_source_assets, p_example_clips,
     p_view_rules, p_approval, p_thumbnails, p_brand_assets, p_spend_cap, p_timezone,
-    p_what_to_make, p_style, p_rights
+    p_what_to_make, p_style, p_rights, p_status
   )
   returning to_jsonb(campaigns.*) into v_campaign;
 
@@ -413,7 +419,7 @@ grant execute on function public.create_campaign(
   text, text, text, numeric, text, text, numeric, integer, text, text, text,
   jsonb, text, date, date, numeric, text, text, text, text, text, text,
   jsonb, jsonb, jsonb, jsonb, jsonb, jsonb, jsonb, jsonb, numeric, text,
-  text, text, jsonb
+  text, text, jsonb, text
 ) to authenticated;
 
 -- Clips: only the owner (or an admin) may edit / delete a clip. The base
@@ -917,6 +923,164 @@ end;
 $$;
 
 grant execute on function public.admin_campaign_action(uuid, text, text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- RPC: campaign_action -- owner lifecycle actions
+-- Campaign owners can pause, resume, close, reopen their own campaigns.
+-- Actions go through this RPC, never direct UPDATE.
+-- ---------------------------------------------------------------------------
+create or replace function public.campaign_action(
+  p_campaign_id uuid,
+  p_action text,
+  p_reason text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_actor uuid;
+  v_campaign record;
+  v_new_status text;
+begin
+  v_actor := auth.uid();
+  if v_actor is null then raise exception 'Not authenticated'; end if;
+
+  if p_action not in ('pause', 'resume', 'close', 'reopen') then
+    raise exception 'Invalid action: %', p_action;
+  end if;
+
+  select * into v_campaign from public.campaigns where id = p_campaign_id;
+  if not found then raise exception 'Campaign not found'; end if;
+
+  -- Authorization: only the campaign owner can perform lifecycle actions
+  if v_campaign.created_by is null or v_campaign.created_by != v_actor then
+    raise exception 'Only the campaign owner can perform this action';
+  end if;
+
+  -- Validate state transitions
+  case p_action
+    when 'pause' then
+      if v_campaign.status != 'open' then
+        raise exception 'Can only pause an open campaign (current: %)', v_campaign.status;
+      end if;
+      v_new_status := 'paused';
+    when 'resume' then
+      if v_campaign.status != 'paused' then
+        raise exception 'Can only resume a paused campaign (current: %)', v_campaign.status;
+      end if;
+      v_new_status := 'open';
+    when 'close' then
+      if v_campaign.status not in ('open', 'paused') then
+        raise exception 'Can only close an open or paused campaign (current: %)', v_campaign.status;
+      end if;
+      v_new_status := 'closed';
+    when 'reopen' then
+      if v_campaign.status != 'closed' then
+        raise exception 'Can only reopen a closed campaign (current: %)', v_campaign.status;
+      end if;
+      v_new_status := 'open';
+  end case;
+
+  update public.campaigns set status = v_new_status where id = p_campaign_id;
+
+  -- Write audit log directly (security definer bypasses RLS)
+  insert into public.audit_logs (
+    id, actor_id, actor, action, entity_type, entity_id, entity_label,
+    before_state, after_state, metadata, idempotency_key
+  ) values (
+    'audit-' || extract(epoch from now())::bigint || '-' || upper(md5(random()::text)),
+    v_actor,
+    coalesce((select email from public.profiles where id = v_actor), 'unknown'),
+    'campaign_' || p_action,
+    'campaign',
+    p_campaign_id::text,
+    v_campaign.title,
+    jsonb_build_object('status', v_campaign.status),
+    jsonb_build_object('status', v_new_status),
+    jsonb_build_object('reason', p_reason, 'action', p_action, 'actor_type', 'owner'),
+    'campaign-' || p_campaign_id::text || '-' || p_action || '-' || extract(epoch from now())::bigint
+  );
+
+  return jsonb_build_object('success', true, 'action', p_action, 'campaign_id', p_campaign_id, 'to', v_new_status);
+end;
+$$;
+
+grant execute on function public.campaign_action(uuid, text, text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- RPC: adjust_campaign_budget -- secure budget adjustment with validation
+-- Only campaign owners can adjust. Budget must be >= current spend.
+-- ---------------------------------------------------------------------------
+create or replace function public.adjust_campaign_budget(
+  p_campaign_id uuid,
+  p_new_budget numeric,
+  p_reason text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_actor uuid;
+  v_campaign record;
+  v_current_spend numeric;
+  v_old_budget numeric;
+begin
+  v_actor := auth.uid();
+  if v_actor is null then raise exception 'Not authenticated'; end if;
+
+  select * into v_campaign from public.campaigns where id = p_campaign_id;
+  if not found then raise exception 'Campaign not found'; end if;
+
+  -- Authorization: only the campaign owner can adjust budget
+  if v_campaign.created_by is null or v_campaign.created_by != v_actor then
+    raise exception 'Only the campaign owner can adjust the budget';
+  end if;
+
+  -- Validate budget
+  if p_new_budget < 0 then
+    raise exception 'Budget cannot be negative';
+  end if;
+
+  -- Calculate current spend from finance_records
+  select coalesce(sum(amount), 0) into v_current_spend
+  from public.finance_records
+  where campaign_id = p_campaign_id and status in ('pending', 'paid');
+
+  if p_new_budget < v_current_spend then
+    raise exception 'Budget (₹%) cannot be lower than amount already spent (₹%)', p_new_budget, v_current_spend;
+  end if;
+
+  v_old_budget := v_campaign.budget;
+
+  update public.campaigns set budget = p_new_budget where id = p_campaign_id;
+
+  -- Write audit log
+  insert into public.audit_logs (
+    id, actor_id, actor, action, entity_type, entity_id, entity_label,
+    before_state, after_state, metadata, idempotency_key
+  ) values (
+    'audit-' || extract(epoch from now())::bigint || '-' || upper(md5(random()::text)),
+    v_actor,
+    coalesce((select email from public.profiles where id = v_actor), 'unknown'),
+    'campaign_budget_adjusted',
+    'campaign',
+    p_campaign_id::text,
+    v_campaign.title,
+    jsonb_build_object('budget', v_old_budget),
+    jsonb_build_object('budget', p_new_budget),
+    jsonb_build_object('reason', p_reason, 'old_budget', v_old_budget, 'new_budget', p_new_budget, 'current_spend', v_current_spend, 'actor_type', 'owner'),
+    'budget-' || p_campaign_id::text || '-' || extract(epoch from now())::bigint
+  );
+
+  return jsonb_build_object('success', true, 'budget', p_new_budget, 'previous', v_old_budget);
+end;
+$$;
+
+grant execute on function public.adjust_campaign_budget(uuid, numeric, text) to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- RPC: Secure clip status update (admin-only)

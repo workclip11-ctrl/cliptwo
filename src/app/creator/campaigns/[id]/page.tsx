@@ -18,6 +18,7 @@ import {
   Heart,
   History,
   RotateCcw,
+  Loader2,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
@@ -44,10 +45,14 @@ function fmtDateTime(t: number) {
 export default function CreatorCampaignDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
-  const { campaigns, clips, updateCampaign, financeRecords } = useStore();
+  const { campaigns, clips, updateCampaign, financeRecords, pauseCampaign, resumeCampaign, closeCampaign, reopenCampaign, adjustBudget } = useStore();
   const { user } = useAuth();
   const [editing, setEditing] = useState(false);
   const [adjusting, setAdjusting] = useState(false);
+  const [pausing, setPausing] = useState(false);
+  const [resuming, setResuming] = useState(false);
+  const [ending, setEnding] = useState(false);
+  const [reopening, setReopening] = useState(false);
 
   const camp = campaigns.find((c) => c.id === id);
 
@@ -100,19 +105,26 @@ export default function CreatorCampaignDetailPage() {
 
   const handleEdit = (patch: Partial<typeof camp>, note?: string) =>
     updateCampaign(camp.id, patch, actor, "edited", note);
-  const handleBudget = (b: number, note: string) =>
-    updateCampaign(camp.id, { budget: b }, actor, "budget", note);
-  const handlePause = () =>
-    updateCampaign(camp.id, { status: "paused" }, actor, "paused", "Paused campaign");
-  const handleResume = () =>
-    updateCampaign(camp.id, { status: "open" }, actor, "resumed", "Resumed campaign");
+  const handleBudget = (b: number, note: string) => {
+    adjustBudget(camp.id, b, note).then(() => setAdjusting(false));
+  };
+  const handlePause = () => {
+    setPausing(true);
+    pauseCampaign(camp.id, "Paused by creator").finally(() => setPausing(false));
+  };
+  const handleResume = () => {
+    setResuming(true);
+    resumeCampaign(camp.id, "Resumed by creator").finally(() => setResuming(false));
+  };
   const handleEnd = () => {
-    if (confirm("End this campaign? It will stop accepting new submissions."))
-      updateCampaign(camp.id, { status: "closed" }, actor, "ended", "Ended campaign");
+    if (!confirm("End this campaign? It will stop accepting new submissions.")) return;
+    setEnding(true);
+    closeCampaign(camp.id, "Ended by creator").finally(() => setEnding(false));
   };
   const handleReopen = () => {
-    if (confirm("Reopen this campaign? It will start accepting submissions again."))
-      updateCampaign(camp.id, { status: "open" }, actor, "reopened", "Reopened campaign");
+    if (!confirm("Reopen this campaign? It will start accepting submissions again.")) return;
+    setReopening(true);
+    reopenCampaign(camp.id, "Reopened by creator").finally(() => setReopening(false));
   };
 
   return (
@@ -148,33 +160,37 @@ export default function CreatorCampaignDetailPage() {
           {camp.status === "open" && (
             <button
               onClick={handlePause}
-              className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-accent-soft"
+              disabled={pausing}
+              className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-accent-soft disabled:opacity-50"
             >
-              <Pause size={14} /> Pause
+              {pausing ? <Loader2 size={14} className="animate-spin" /> : <Pause size={14} />} Pause
             </button>
           )}
           {isPaused && (
             <button
               onClick={handleResume}
-              className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-accent-soft"
+              disabled={resuming}
+              className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-accent-soft disabled:opacity-50"
             >
-              <Play size={14} /> Resume
+              {resuming ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />} Resume
             </button>
           )}
           {!isClosed && (
             <button
               onClick={handleEnd}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-red/30 px-3 py-2 text-sm font-medium text-red hover:bg-red/5"
+              disabled={ending}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-red/30 px-3 py-2 text-sm font-medium text-red hover:bg-red/5 disabled:opacity-50"
             >
-              <Ban size={14} /> End
+              {ending ? <Loader2 size={14} className="animate-spin" /> : <Ban size={14} />} End
             </button>
           )}
           {isClosed && (
             <button
               onClick={handleReopen}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-green/30 px-3 py-2 text-sm font-medium text-green hover:bg-green/5"
+              disabled={reopening}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-green/30 px-3 py-2 text-sm font-medium text-green hover:bg-green/5 disabled:opacity-50"
             >
-              <RotateCcw size={14} /> Reopen
+              {reopening ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />} Reopen
             </button>
           )}
           {!isClosed && (

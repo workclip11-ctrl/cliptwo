@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X } from "lucide-react";
+import { X, Loader2 } from "lucide-react";
 import { rup } from "@/lib/format";
 import type { Campaign } from "@/lib/types";
 
@@ -14,12 +14,13 @@ export function AdjustBudgetModal({
   campaign: Campaign;
   currentSpend: number;
   onClose: () => void;
-  onSave: (budget: number, note: string) => void;
+  onSave: (budget: number, note: string) => Promise<void> | void;
 }) {
   const [budget, setBudget] = useState(String(campaign.budget ?? 0));
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const b = Number(budget) || 0;
     if (b < currentSpend) {
       setError(
@@ -27,7 +28,12 @@ export function AdjustBudgetModal({
       );
       return;
     }
-    onSave(b, `Budget adjusted to ${rup(b)}`);
+    setSaving(true);
+    try {
+      await onSave(b, `Budget adjusted to ${rup(b)}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -71,8 +77,10 @@ export function AdjustBudgetModal({
           </button>
           <button
             onClick={handleSave}
-            className="rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white hover:opacity-90"
+            disabled={saving}
+            className="rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
           >
+            {saving ? <Loader2 size={14} className="mr-1 inline animate-spin" /> : null}
             Save budget
           </button>
         </div>

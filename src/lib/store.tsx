@@ -1040,7 +1040,11 @@ interface StoreActions {
   requestPayout: () => void;
   processPayoutRequest: (payoutId: string, actor?: string) => void;
   completePayoutRequest: (payoutId: string, paymentRef?: string, actor?: string) => void;
-  closeCampaign: (id: string) => void;
+  closeCampaign: (id: string, reason?: string) => Promise<void>;
+  pauseCampaign: (id: string, reason?: string) => Promise<void>;
+  resumeCampaign: (id: string, reason?: string) => Promise<void>;
+  reopenCampaign: (id: string, reason?: string) => Promise<void>;
+  adjustBudget: (id: string, newBudget: number, reason?: string) => Promise<void>;
   deleteCampaign: (id: string) => void;
   updateCampaign: (
     id: string,
@@ -1573,6 +1577,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             p_what_to_make: c.whatToMake ?? null,
             p_style: c.style ?? null,
             p_rights: c.rights ?? null,
+            p_status: status,
           });
           if (error) {
             console.error("RPC create_campaign failed:", error.message);
@@ -1913,14 +1918,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       closeCampaign: async (id) => {
         const me = await getCurrentUser();
         if (!me) {
-          console.error("Authorization: not authenticated");
           setState((s) => ({ ...s, lastError: "Not authenticated" }));
-          return;
-        }
-        const existingCamp = stateRef.current.campaigns.find((c) => c.id === id);
-        // Deny if campaign has no owner or user is not owner/admin
-        if (existingCamp && (!existingCamp.created_by || (existingCamp.created_by !== me.id && !await isUserAdmin(me.id)))) {
-          console.error(`Authorization: user ${me.id} cannot close campaign ${id}`);
           return;
         }
         if (!isSupabaseConfigured) {
@@ -1932,12 +1930,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           }));
           return;
         }
-        const { data, error } = await supabase.rpc("admin_campaign_action", {
+        const { data, error } = await supabase.rpc("campaign_action", {
           p_campaign_id: id,
           p_action: "close",
         });
         if (error) {
-          console.error("RPC admin_campaign_action failed:", error.message);
+          console.error("RPC campaign_action(close) failed:", error.message);
           setState((s) => ({ ...s, lastError: `Failed to close campaign: ${error.message}` }));
           return;
         }
@@ -1947,6 +1945,150 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             ...s,
             campaigns: s.campaigns.map((c) =>
               c.id === id ? { ...c, status: result.to as CampaignStatus } : c,
+            ),
+          }));
+        }
+      },
+
+      pauseCampaign: async (id, reason) => {
+        const me = await getCurrentUser();
+        if (!me) {
+          setState((s) => ({ ...s, lastError: "Not authenticated" }));
+          return;
+        }
+        if (!isSupabaseConfigured) {
+          setState((s) => ({
+            ...s,
+            campaigns: s.campaigns.map((c) =>
+              c.id === id ? { ...c, status: "paused" } : c,
+            ),
+          }));
+          return;
+        }
+        const { data, error } = await supabase.rpc("campaign_action", {
+          p_campaign_id: id,
+          p_action: "pause",
+          p_reason: reason ?? "Paused by creator",
+        });
+        if (error) {
+          console.error("RPC campaign_action(pause) failed:", error.message);
+          setState((s) => ({ ...s, lastError: `Failed to pause campaign: ${error.message}` }));
+          return;
+        }
+        const result = data as { to?: string };
+        if (result?.to) {
+          setState((s) => ({
+            ...s,
+            campaigns: s.campaigns.map((c) =>
+              c.id === id ? { ...c, status: result.to as CampaignStatus } : c,
+            ),
+          }));
+        }
+      },
+
+      resumeCampaign: async (id, reason) => {
+        const me = await getCurrentUser();
+        if (!me) {
+          setState((s) => ({ ...s, lastError: "Not authenticated" }));
+          return;
+        }
+        if (!isSupabaseConfigured) {
+          setState((s) => ({
+            ...s,
+            campaigns: s.campaigns.map((c) =>
+              c.id === id ? { ...c, status: "open" } : c,
+            ),
+          }));
+          return;
+        }
+        const { data, error } = await supabase.rpc("campaign_action", {
+          p_campaign_id: id,
+          p_action: "resume",
+          p_reason: reason ?? "Resumed by creator",
+        });
+        if (error) {
+          console.error("RPC campaign_action(resume) failed:", error.message);
+          setState((s) => ({ ...s, lastError: `Failed to resume campaign: ${error.message}` }));
+          return;
+        }
+        const result = data as { to?: string };
+        if (result?.to) {
+          setState((s) => ({
+            ...s,
+            campaigns: s.campaigns.map((c) =>
+              c.id === id ? { ...c, status: result.to as CampaignStatus } : c,
+            ),
+          }));
+        }
+      },
+
+      reopenCampaign: async (id, reason) => {
+        const me = await getCurrentUser();
+        if (!me) {
+          setState((s) => ({ ...s, lastError: "Not authenticated" }));
+          return;
+        }
+        if (!isSupabaseConfigured) {
+          setState((s) => ({
+            ...s,
+            campaigns: s.campaigns.map((c) =>
+              c.id === id ? { ...c, status: "open" } : c,
+            ),
+          }));
+          return;
+        }
+        const { data, error } = await supabase.rpc("campaign_action", {
+          p_campaign_id: id,
+          p_action: "reopen",
+          p_reason: reason ?? "Reopened by creator",
+        });
+        if (error) {
+          console.error("RPC campaign_action(reopen) failed:", error.message);
+          setState((s) => ({ ...s, lastError: `Failed to reopen campaign: ${error.message}` }));
+          return;
+        }
+        const result = data as { to?: string };
+        if (result?.to) {
+          setState((s) => ({
+            ...s,
+            campaigns: s.campaigns.map((c) =>
+              c.id === id ? { ...c, status: result.to as CampaignStatus } : c,
+            ),
+          }));
+        }
+      },
+
+      adjustBudget: async (id, newBudget, reason) => {
+        const me = await getCurrentUser();
+        if (!me) {
+          setState((s) => ({ ...s, lastError: "Not authenticated" }));
+          return;
+        }
+        if (!isSupabaseConfigured) {
+          setState((s) => ({
+            ...s,
+            campaigns: s.campaigns.map((c) =>
+              c.id === id ? { ...c, budget: newBudget } : c,
+            ),
+          }));
+          return;
+        }
+        const { data, error } = await supabase.rpc("adjust_campaign_budget", {
+          p_campaign_id: id,
+          p_new_budget: newBudget,
+          p_reason: reason ?? "Budget adjusted by creator",
+        });
+        if (error) {
+          console.error("RPC adjust_campaign_budget failed:", error.message);
+          setState((s) => ({ ...s, lastError: `Failed to adjust budget: ${error.message}` }));
+          return;
+        }
+        const result = data as { budget?: number };
+        if (result?.budget != null) {
+          setState((s) => ({
+            ...s,
+            campaigns: s.campaigns.map((c) =>
+              c.id === id ? { ...c, budget: result.budget } : c,
             ),
           }));
         }
