@@ -144,7 +144,7 @@ export default function CreatorCampaignDetailPage() {
             <StatusPill status={camp.status} />
           </div>
           <p className="mt-1 text-sm text-muted">
-            {camp.niche} · {camp.platform}
+            {camp.category ?? camp.niche ?? "Campaign"} · {camp.platform}
             {camp.startDate || camp.endDate
               ? ` · ${camp.startDate ?? "—"} → ${camp.endDate ?? "—"}`
               : ""}

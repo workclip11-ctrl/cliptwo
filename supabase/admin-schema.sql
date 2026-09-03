@@ -1035,9 +1035,13 @@ begin
   select * into v_campaign from public.campaigns where id = p_campaign_id;
   if not found then raise exception 'Campaign not found'; end if;
 
-  -- Authorization: only the campaign owner can adjust budget
-  if v_campaign.created_by is null or v_campaign.created_by != v_actor then
-    raise exception 'Only the campaign owner can adjust the budget';
+  -- Authorization: campaign owner or admin
+  if v_campaign.created_by is not null and v_campaign.created_by = v_actor then
+    null; -- Owner adjusting own campaign
+  elsif public.is_admin() then
+    null; -- Admin adjusting campaign
+  else
+    raise exception 'Only the campaign owner or an admin can adjust the budget';
   end if;
 
   -- Validate budget
@@ -1045,13 +1049,15 @@ begin
     raise exception 'Budget cannot be negative';
   end if;
 
-  -- Calculate current spend from finance_records
-  select coalesce(sum(amount), 0) into v_current_spend
-  from public.finance_records
-  where campaign_id = p_campaign_id and status in ('pending', 'paid');
+  -- Calculate current committed spend from earnings (net_amount, matching frontend financeOf)
+  -- reserved = sum of net_amount where status in ('pending','approved','paid')
+  -- This matches the frontend campaignBudget: spent (paid) + committed (pending+processing)
+  select coalesce(sum(net_amount), 0) into v_current_spend
+  from public.earnings
+  where campaign_id = p_campaign_id and status in ('pending', 'approved', 'paid');
 
   if p_new_budget < v_current_spend then
-    raise exception 'Budget (₹%) cannot be lower than amount already spent (₹%)', p_new_budget, v_current_spend;
+    raise exception 'Budget (₹%) cannot be lower than committed/spent amount (₹%)', p_new_budget, v_current_spend;
   end if;
 
   v_old_budget := v_campaign.budget;
