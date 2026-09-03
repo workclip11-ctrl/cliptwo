@@ -19,6 +19,7 @@ import {
   History,
   RotateCcw,
   Loader2,
+  Send,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
@@ -45,7 +46,7 @@ function fmtDateTime(t: number) {
 export default function CreatorCampaignDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
-  const { campaigns, clips, updateCampaign, financeRecords, pauseCampaign, resumeCampaign, closeCampaign, reopenCampaign, adjustBudget } = useStore();
+  const { campaigns, clips, updateCampaign, financeRecords, pauseCampaign, resumeCampaign, closeCampaign, reopenCampaign, publishCampaign, adjustBudget } = useStore();
   const { user } = useAuth();
   const [editing, setEditing] = useState(false);
   const [adjusting, setAdjusting] = useState(false);
@@ -53,6 +54,7 @@ export default function CreatorCampaignDetailPage() {
   const [resuming, setResuming] = useState(false);
   const [ending, setEnding] = useState(false);
   const [reopening, setReopening] = useState(false);
+  const [publishing, setPublishing] = useState(false);
 
   const camp = campaigns.find((c) => c.id === id);
 
@@ -99,6 +101,7 @@ export default function CreatorCampaignDetailPage() {
   const budgetPct = budget > 0 ? Math.min(100, Math.round((currentSpend / budget) * 100)) : 0;
   const isClosed = camp.status === "closed";
   const isPaused = camp.status === "paused";
+  const isDraft = camp.status === "draft";
 
   const viewsSeries = seriesByDay(campClips, (k) => k.views);
   const spendSeries = seriesByDay(campClips, (k) => clipEarnings(k, campaigns));
@@ -125,6 +128,11 @@ export default function CreatorCampaignDetailPage() {
     if (!confirm("Reopen this campaign? It will start accepting submissions again.")) return;
     setReopening(true);
     reopenCampaign(camp.id, "Reopened by creator").finally(() => setReopening(false));
+  };
+  const handlePublish = () => {
+    if (!confirm("Publish this campaign? It will become live and visible to clippers.")) return;
+    setPublishing(true);
+    publishCampaign(camp.id, "Published by creator").finally(() => setPublishing(false));
   };
 
   return (
@@ -157,6 +165,15 @@ export default function CreatorCampaignDetailPage() {
           >
             <Pencil size={14} /> Edit
           </button>
+          {isDraft && (
+            <button
+              onClick={handlePublish}
+              disabled={publishing}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+            >
+              {publishing ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} {publishing ? "Publishing..." : "Publish"}
+            </button>
+          )}
           {camp.status === "open" && (
             <button
               onClick={handlePause}
@@ -175,7 +192,7 @@ export default function CreatorCampaignDetailPage() {
               {resuming ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />} Resume
             </button>
           )}
-          {!isClosed && (
+          {!isClosed && !isDraft && (
             <button
               onClick={handleEnd}
               disabled={ending}

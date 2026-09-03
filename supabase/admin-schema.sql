@@ -926,7 +926,7 @@ grant execute on function public.admin_campaign_action(uuid, text, text) to auth
 
 -- ---------------------------------------------------------------------------
 -- RPC: campaign_action -- owner lifecycle actions
--- Campaign owners can pause, resume, close, reopen their own campaigns.
+-- Campaign owners can pause, resume, close, reopen, publish their own campaigns.
 -- Actions go through this RPC, never direct UPDATE.
 -- ---------------------------------------------------------------------------
 create or replace function public.campaign_action(
@@ -947,7 +947,7 @@ begin
   v_actor := auth.uid();
   if v_actor is null then raise exception 'Not authenticated'; end if;
 
-  if p_action not in ('pause', 'resume', 'close', 'reopen') then
+  if p_action not in ('pause', 'resume', 'close', 'reopen', 'publish') then
     raise exception 'Invalid action: %', p_action;
   end if;
 
@@ -979,6 +979,11 @@ begin
     when 'reopen' then
       if v_campaign.status != 'closed' then
         raise exception 'Can only reopen a closed campaign (current: %)', v_campaign.status;
+      end if;
+      v_new_status := 'open';
+    when 'publish' then
+      if v_campaign.status != 'draft' then
+        raise exception 'Can only publish a draft campaign (current: %)', v_campaign.status;
       end if;
       v_new_status := 'open';
   end case;

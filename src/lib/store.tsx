@@ -1044,6 +1044,7 @@ interface StoreActions {
   pauseCampaign: (id: string, reason?: string) => Promise<void>;
   resumeCampaign: (id: string, reason?: string) => Promise<void>;
   reopenCampaign: (id: string, reason?: string) => Promise<void>;
+  publishCampaign: (id: string, reason?: string) => Promise<void>;
   adjustBudget: (id: string, newBudget: number, reason?: string) => Promise<void>;
   deleteCampaign: (id: string) => void;
   updateCampaign: (
@@ -2045,6 +2046,42 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (error) {
           console.error("RPC campaign_action(reopen) failed:", error.message);
           setState((s) => ({ ...s, lastError: `Failed to reopen campaign: ${error.message}` }));
+          return;
+        }
+        const result = data as { to?: string };
+        if (result?.to) {
+          setState((s) => ({
+            ...s,
+            campaigns: s.campaigns.map((c) =>
+              c.id === id ? { ...c, status: result.to as CampaignStatus } : c,
+            ),
+          }));
+        }
+      },
+
+      publishCampaign: async (id, reason) => {
+        const me = await getCurrentUser();
+        if (!me) {
+          setState((s) => ({ ...s, lastError: "Not authenticated" }));
+          return;
+        }
+        if (!isSupabaseConfigured) {
+          setState((s) => ({
+            ...s,
+            campaigns: s.campaigns.map((c) =>
+              c.id === id ? { ...c, status: "open" } : c,
+            ),
+          }));
+          return;
+        }
+        const { data, error } = await supabase.rpc("campaign_action", {
+          p_campaign_id: id,
+          p_action: "publish",
+          p_reason: reason ?? "Published by creator",
+        });
+        if (error) {
+          console.error("RPC campaign_action(publish) failed:", error.message);
+          setState((s) => ({ ...s, lastError: `Failed to publish campaign: ${error.message}` }));
           return;
         }
         const result = data as { to?: string };
