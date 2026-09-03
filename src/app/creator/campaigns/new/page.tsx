@@ -11,10 +11,16 @@ import {
   Save,
   Eye,
   Send,
+  Upload,
+  FileVideo,
+  ImageIcon,
+  File,
+  Link as LinkIcon,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup } from "@/lib/format";
+import { uploadCampaignFile } from "@/lib/upload";
 import type {
   Campaign,
   CampaignApproval,
@@ -91,10 +97,21 @@ export default function NewCampaignWizard() {
   const [objective, setObjective] = useState("");
   const [description, setDescription] = useState("");
 
-  // Step 2
-  const [sourceAssets, setSourceAssets] = useState<CampaignSourceAsset[]>([]);
-  const [thumbnails, setThumbnails] = useState<string[]>([""]);
-  const [brandAssets, setBrandAssets] = useState<CampaignSourceAsset[]>([]);
+  // Step 2 — source content
+  const [sourceType, setSourceType] = useState<"link" | "file">("link");
+  const [sourceLink, setSourceLink] = useState("");
+  const [sourceFile, setSourceFile] = useState<File | null>(null);
+  const [sourcePreview, setSourcePreview] = useState("");
+  const [sourceUploading, setSourceUploading] = useState(false);
+
+  const [thumbFile, setThumbFile] = useState<File | null>(null);
+  const [thumbPreview, setThumbPreview] = useState("");
+  const [thumbUploading, setThumbUploading] = useState(false);
+
+  const [brandFile, setBrandFile] = useState<File | null>(null);
+  const [brandPreview, setBrandPreview] = useState("");
+  const [brandUploading, setBrandUploading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Step 3
   const [platforms, setPlatforms] = useState<Platform[]>([]);
@@ -169,7 +186,11 @@ export default function NewCampaignWizard() {
     return e;
   }
 
-  function buildCampaign(): Omit<Campaign, "id" | "createdAt" | "status"> {
+  function buildCampaign(uploaded: {
+    sourceAssets: CampaignSourceAsset[];
+    thumbnails: string[];
+    brandAssets: CampaignSourceAsset[];
+  }): Omit<Campaign, "id" | "createdAt" | "status"> {
     const cleanDos = dos.map((d) => d.trim()).filter(Boolean);
     const cleanDonts = donts.map((d) => d.trim()).filter(Boolean);
     const cleanReject = rejectionReasons.map((r) => r.trim()).filter(Boolean);
@@ -199,7 +220,7 @@ export default function NewCampaignWizard() {
       niche: category,
       budget: Number(budget) || 0,
       daysLeft: 30,
-      sourceLink: sourceAssets[0]?.url ?? "",
+      sourceLink: sourceType === "link" ? sourceLink.trim() : "",
       rules: "",
       category,
       platforms,
@@ -215,14 +236,14 @@ export default function NewCampaignWizard() {
       branding: style.trim() || undefined,
       doList: cleanDos,
       dontList: cleanDonts,
-      sourceAssets: sourceAssets.filter((a) => a.url.trim()),
+      sourceAssets: uploaded.sourceAssets,
       exampleClips: [],
       viewRules: {
         minViews: minViews ? Number(minViews) : undefined,
       },
       approval,
-      thumbnails: thumbnails.map((t) => t.trim()).filter(Boolean),
-      brandAssets: brandAssets.filter((a) => a.url.trim()),
+      thumbnails: uploaded.thumbnails,
+      brandAssets: uploaded.brandAssets,
       spendCap: spendCap ? Number(spendCap) : undefined,
       timezone: timezone.trim() || undefined,
       whatToMake: whatToMake.trim() || undefined,
@@ -232,7 +253,8 @@ export default function NewCampaignWizard() {
     };
   }
 
-  function submit(status: CampaignStatus) {
+  async function submit(status: CampaignStatus) {
+    if (isSubmitting) return;
     if (status === "open") {
       const e = validate();
       setErrors(e);
@@ -242,13 +264,55 @@ export default function NewCampaignWizard() {
         return;
       }
     }
-    addCampaign(buildCampaign(), status);
-    setSavedMsg(
-      status === "draft"
-        ? "Draft saved. You can finish and publish it later."
-        : "Campaign published.",
-    );
-    setTimeout(() => router.push("/creator/campaigns"), 900);
+
+    setIsSubmitting(true);
+    try {
+      // Upload files to storage before creating the campaign
+      const uploadedSourceAssets: CampaignSourceAsset[] = [];
+      const uploadedThumbnails: string[] = [];
+      const uploadedBrandAssets: CampaignSourceAsset[] = [];
+
+      if (sourceType === "file" && sourceFile) {
+        setSourceUploading(true);
+        const url = await uploadCampaignFile("source", sourceFile);
+        setSourceUploading(false);
+        if (url) uploadedSourceAssets.push({ label: sourceFile.name, url });
+      } else if (sourceType === "link" && sourceLink.trim()) {
+        uploadedSourceAssets.push({ label: "", url: sourceLink.trim() });
+      }
+
+      if (thumbFile) {
+        setThumbUploading(true);
+        const url = await uploadCampaignFile("thumbnail", thumbFile);
+        setThumbUploading(false);
+        if (url) uploadedThumbnails.push(url);
+      }
+
+      if (brandFile) {
+        setBrandUploading(true);
+        const url = await uploadCampaignFile("brand", brandFile);
+        setBrandUploading(false);
+        if (url) uploadedBrandAssets.push({ label: brandFile.name, url });
+      }
+
+      // Build and submit the campaign with the uploaded URLs
+      addCampaign(
+        buildCampaign({
+          sourceAssets: uploadedSourceAssets,
+          thumbnails: uploadedThumbnails,
+          brandAssets: uploadedBrandAssets,
+        }),
+        status,
+      );
+      setSavedMsg(
+        status === "draft"
+          ? "Draft saved. You can finish and publish it later."
+          : "Campaign published.",
+      );
+      setTimeout(() => router.push("/creator/campaigns"), 900);
+    } catch {
+      setIsSubmitting(false);
+    }
   }
 
   function stepWithError(e: Record<string, string>): number {
@@ -366,153 +430,220 @@ export default function NewCampaignWizard() {
           </div>
         )}
 
-        {/* STEP 2 */}
+        {/* STEP 2 — Source content */}
         {step === 1 && (
           <div className="space-y-5">
+            {/* Source videos / files */}
             <div>
               <p className="text-sm font-medium">Source videos / files</p>
               <p className="text-xs text-muted">
-                Paste a link to the raw footage creators should cut from.
+                Paste a link to the source footage creators should cut from.
               </p>
-              <div className="mt-2 space-y-2">
-                {sourceAssets.map((a, i) => (
-                  <div key={i} className="flex gap-2">
-                    <input
-                      className={inputCls}
-                      value={a.label}
-                      placeholder="Label (e.g. Keynote raw)"
-                      onChange={(e) =>
-                        setSourceAssets((prev) =>
-                          prev.map((x, j) =>
-                            j === i ? { ...x, label: e.target.value } : x,
-                          ),
-                        )
-                      }
-                    />
-                    <input
-                      className={inputCls}
-                      value={a.url}
-                      placeholder="https://…"
-                      onChange={(e) =>
-                        setSourceAssets((prev) =>
-                          prev.map((x, j) =>
-                            j === i ? { ...x, url: e.target.value } : x,
-                          ),
-                        )
-                      }
-                    />
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setSourceAssets((prev) => prev.filter((_, j) => j !== i))
-                      }
-                      className="rounded-md border px-2 text-muted"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ))}
+
+              {/* Mode toggle */}
+              <div className="mt-3 flex gap-2">
                 <button
                   type="button"
-                  onClick={() =>
-                    setSourceAssets((prev) => [...prev, { label: "", url: "" }])
-                  }
-                  className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
+                  onClick={() => setSourceType("link")}
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium ${
+                    sourceType === "link"
+                      ? "border-accent bg-accent-soft"
+                      : "hover:bg-background"
+                  }`}
                 >
-                  <Plus size={12} /> Add source link
+                  <LinkIcon size={13} /> Paste link
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSourceType("file")}
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium ${
+                    sourceType === "file"
+                      ? "border-accent bg-accent-soft"
+                      : "hover:bg-background"
+                  }`}
+                >
+                  <Upload size={13} /> Upload file
                 </button>
               </div>
+
+              {/* Link input */}
+              {sourceType === "link" && (
+                <div className="mt-3">
+                  <input
+                    className={inputCls}
+                    value={sourceLink}
+                    onChange={(e) => setSourceLink(e.target.value)}
+                    placeholder="https://drive.google.com/…"
+                  />
+                </div>
+              )}
+
+              {/* File input */}
+              {sourceType === "file" && (
+                <div className="mt-3">
+                  {sourceFile ? (
+                    <div className="flex items-center gap-3 rounded-lg border bg-accent-soft p-3">
+                      <FileVideo size={16} className="shrink-0 text-muted" />
+                      <span className="flex-1 truncate text-sm">{sourceFile.name}</span>
+                      <span className="text-xs text-muted">
+                        {(sourceFile.size / 1024 / 1024).toFixed(1)} MB
+                      </span>
+                      {sourceUploading && (
+                        <span className="text-xs text-muted">Uploading…</span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSourceFile(null);
+                          setSourcePreview("");
+                        }}
+                        className="rounded p-0.5 text-muted hover:text-foreground"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed p-4 text-sm text-muted hover:border-foreground/30 hover:text-foreground">
+                      <Upload size={16} />
+                      Choose a video file
+                      <input
+                        type="file"
+                        accept="video/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) {
+                            setSourceFile(f);
+                            setSourcePreview(URL.createObjectURL(f));
+                          }
+                        }}
+                      />
+                    </label>
+                  )}
+                  {sourcePreview && sourceFile?.type.startsWith("video/") && (
+                    <video
+                      src={sourcePreview}
+                      controls
+                      className="mt-2 max-h-40 w-full rounded-lg"
+                    />
+                  )}
+                </div>
+              )}
             </div>
 
+            <div className="border-t" />
+
+            {/* Thumbnail */}
             <div>
-              <p className="text-sm font-medium">Thumbnails</p>
-              <p className="text-xs text-muted">Paste thumbnail image URLs.</p>
-              <div className="mt-2 space-y-2">
-                {thumbnails.map((t, i) => (
-                  <div key={i} className="flex gap-2">
-                    <input
-                      className={inputCls}
-                      value={t}
-                      placeholder="https://…"
-                      onChange={(e) =>
-                        setThumbnails((prev) =>
-                          prev.map((x, j) => (j === i ? e.target.value : x)),
-                        )
-                      }
-                    />
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setThumbnails((prev) => prev.filter((_, j) => j !== i))
-                      }
-                      className="rounded-md border px-2 text-muted"
-                    >
-                      <X size={14} />
-                    </button>
+              <p className="text-sm font-medium">Thumbnail</p>
+              <p className="text-xs text-muted">Upload one thumbnail image.</p>
+              <div className="mt-3">
+                {thumbFile ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3 rounded-lg border bg-accent-soft p-3">
+                      <ImageIcon size={16} className="shrink-0 text-muted" />
+                      <span className="flex-1 truncate text-sm">{thumbFile.name}</span>
+                      {thumbUploading && (
+                        <span className="text-xs text-muted">Uploading…</span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setThumbFile(null);
+                          setThumbPreview("");
+                        }}
+                        className="rounded p-0.5 text-muted hover:text-foreground"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                    {thumbPreview && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={thumbPreview}
+                        alt="Thumbnail preview"
+                        className="h-24 w-24 rounded-lg object-cover"
+                      />
+                    )}
                   </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setThumbnails((prev) => [...prev, ""])}
-                  className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
-                >
-                  <Plus size={12} /> Add thumbnail
-                </button>
+                ) : (
+                  <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed p-4 text-sm text-muted hover:border-foreground/30 hover:text-foreground">
+                    <Upload size={16} />
+                    Upload thumbnail
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) {
+                          setThumbFile(f);
+                          setThumbPreview(URL.createObjectURL(f));
+                        }
+                      }}
+                    />
+                  </label>
+                )}
               </div>
             </div>
 
+            <div className="border-t" />
+
+            {/* Brand asset / logo */}
             <div>
               <p className="text-sm font-medium">Brand assets / logos</p>
               <p className="text-xs text-muted">
-                Logos or brand kits creators may use.
+                Upload one brand asset or logo.
               </p>
-              <div className="mt-2 space-y-2">
-                {brandAssets.map((a, i) => (
-                  <div key={i} className="flex gap-2">
-                    <input
-                      className={inputCls}
-                      value={a.label}
-                      placeholder="Label (e.g. Logo pack)"
-                      onChange={(e) =>
-                        setBrandAssets((prev) =>
-                          prev.map((x, j) =>
-                            j === i ? { ...x, label: e.target.value } : x,
-                          ),
-                        )
-                      }
-                    />
-                    <input
-                      className={inputCls}
-                      value={a.url}
-                      placeholder="https://…"
-                      onChange={(e) =>
-                        setBrandAssets((prev) =>
-                          prev.map((x, j) =>
-                            j === i ? { ...x, url: e.target.value } : x,
-                          ),
-                        )
-                      }
-                    />
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setBrandAssets((prev) => prev.filter((_, j) => j !== i))
-                      }
-                      className="rounded-md border px-2 text-muted"
-                    >
-                      <X size={14} />
-                    </button>
+              <div className="mt-3">
+                {brandFile ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3 rounded-lg border bg-accent-soft p-3">
+                      <File size={16} className="shrink-0 text-muted" />
+                      <span className="flex-1 truncate text-sm">{brandFile.name}</span>
+                      {brandUploading && (
+                        <span className="text-xs text-muted">Uploading…</span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBrandFile(null);
+                          setBrandPreview("");
+                        }}
+                        className="rounded p-0.5 text-muted hover:text-foreground"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                    {brandPreview && brandFile?.type.startsWith("image/") && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={brandPreview}
+                        alt="Brand asset preview"
+                        className="h-24 w-24 rounded-lg object-contain"
+                      />
+                    )}
                   </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() =>
-                    setBrandAssets((prev) => [...prev, { label: "", url: "" }])
-                  }
-                  className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
-                >
-                  <Plus size={12} /> Add brand asset
-                </button>
+                ) : (
+                  <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed p-4 text-sm text-muted hover:border-foreground/30 hover:text-foreground">
+                    <Upload size={16} />
+                    Upload asset
+                    <input
+                      type="file"
+                      accept="image/*,.pdf,.ai,.eps,.svg"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) {
+                          setBrandFile(f);
+                          if (f.type.startsWith("image/")) {
+                            setBrandPreview(URL.createObjectURL(f));
+                          }
+                        }
+                      }}
+                    />
+                  </label>
+                )}
               </div>
             </div>
           </div>
@@ -920,6 +1051,22 @@ export default function NewCampaignWizard() {
             <ReviewRow label="Objective" value={objective} />
             <ReviewRow label="Description" value={description} />
             <ReviewRow
+              label="Source"
+              value={
+                sourceType === "file"
+                  ? sourceFile?.name ?? "—"
+                  : sourceLink || "—"
+              }
+            />
+            <ReviewRow
+              label="Thumbnail"
+              value={thumbFile?.name ?? "—"}
+            />
+            <ReviewRow
+              label="Brand asset"
+              value={brandFile?.name ?? "—"}
+            />
+            <ReviewRow
               label="Platforms"
               value={platforms
                 .map((p) => PLATFORM_OPTIONS.find((o) => o.value === p)?.label)
@@ -978,14 +1125,16 @@ export default function NewCampaignWizard() {
           <button
             type="button"
             onClick={() => submit("draft")}
-            className="inline-flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent-soft"
+            disabled={isSubmitting}
+            className="inline-flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent-soft disabled:opacity-50"
           >
-            <Save size={14} /> Save draft
+            <Save size={14} /> {isSubmitting ? "Saving…" : "Save draft"}
           </button>
           <button
             type="button"
             onClick={() => goStep(9)}
-            className="inline-flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent-soft"
+            disabled={isSubmitting}
+            className="inline-flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent-soft disabled:opacity-50"
           >
             <Eye size={14} /> Preview
           </button>
@@ -993,7 +1142,8 @@ export default function NewCampaignWizard() {
             <button
               type="button"
               onClick={() => goStep(Math.min(STEPS.length - 1, step + 1))}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white"
+              disabled={isSubmitting}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
             >
               Next <ArrowRight size={14} />
             </button>
@@ -1001,9 +1151,10 @@ export default function NewCampaignWizard() {
             <button
               type="button"
               onClick={() => submit("open")}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white"
+              disabled={isSubmitting}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
             >
-              <Send size={14} /> Publish campaign
+              <Send size={14} /> {isSubmitting ? "Publishing…" : "Publish campaign"}
             </button>
           )}
         </div>
