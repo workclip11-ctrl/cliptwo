@@ -22,7 +22,6 @@ import { useAuth } from "@/lib/auth";
 import {
   CONNECTABLE_PLATFORMS,
   COMING_SOON_PLATFORMS,
-  ALL_PLATFORMS,
 } from "@/lib/social";
 import type { Platform, SocialAccount, SocialAccountStatus } from "@/lib/types";
 

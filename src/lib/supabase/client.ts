@@ -47,15 +47,18 @@ const tabId = getTabId();
 const storageKey = `cliptwo_auth_${tabId}`;
 
 // sessionStorage adapter — proper key-value interface for GoTrueClient.
-// Each key is stored as a separate sessionStorage entry namespaced by tabId.
+// SSR-safe: returns null/no-op when window is unavailable (SSR, static gen).
 const sessionStorageAdapter = {
   getItem: async (key: string): Promise<string | null> => {
+    if (typeof window === "undefined") return null;
     return window.sessionStorage.getItem(key);
   },
   setItem: async (key: string, value: string): Promise<void> => {
+    if (typeof window === "undefined") return;
     window.sessionStorage.setItem(key, value);
   },
   removeItem: async (key: string): Promise<void> => {
+    if (typeof window === "undefined") return;
     window.sessionStorage.removeItem(key);
   },
 };

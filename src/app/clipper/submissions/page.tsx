@@ -83,8 +83,8 @@ export default function ClipperSubmissionsPage() {
     .filter((k) => k.status === "approved" || k.status === "held")
     .reduce((s, k) => s + netOf(k), 0);
   const totalPaidNet = myClips
-    .filter((k) => false)
-    .reduce((s, k) => s + netOf(k), 0);
+    .filter((_k) => false)
+    .reduce((s, _k) => s + netOf(_k), 0);
   const pendingReview = myClips.filter((k) => k.status === "pending").length;
 
   return (

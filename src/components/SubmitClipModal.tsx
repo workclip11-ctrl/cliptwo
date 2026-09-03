@@ -24,7 +24,7 @@ export function SubmitClipModal({
   onClose: () => void;
   onSubmit: (caption: string, videoUrl: string, platform: Platform) => void;
 }) {
-  const { clips, financeRecords } = useStore();
+  const { clips: _clips, financeRecords } = useStore();
   const [caption, setCaption] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [platform, setPlatform] = useState<Platform>(campaign.platform);

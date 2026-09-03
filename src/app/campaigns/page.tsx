@@ -58,7 +58,7 @@ const STATUS_OPTIONS: { value: CampaignStatus | ""; label: string }[] = [
 ];
 
 export default function CampaignsPage() {
-  const { campaigns, clips, savedCampaigns, financeRecords } = useStore();
+  const { campaigns, savedCampaigns, financeRecords } = useStore();
   const { user } = useAuth();
   const [sort, setSort] = useState<SortKey>("cpm");
   const [showFilters, setShowFilters] = useState(false);
@@ -140,7 +140,7 @@ export default function CampaignsPage() {
     });
 
     return list;
-  }, [campaigns, clips, sort, filters, savedCampaigns, user]);
+  }, [campaigns, financeRecords, sort, filters, savedCampaigns, user]);
 
   return (
     <main className="min-h-screen bg-background">

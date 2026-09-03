@@ -37,7 +37,7 @@ import type {
   PayoutRequest,
 } from "./types";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
-import { financeOf, campaignBudget, wouldExceedBudget, canAcceptSubmission } from "@/lib/finance";
+import { financeOf, canAcceptSubmission } from "@/lib/finance";
 import { initAuditLogs } from "@/lib/audit";
 
 const isoDaysAgo = (n: number) => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
@@ -1434,6 +1434,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const actions = useMemo<StoreActions>(() => {
@@ -2014,7 +2015,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                   `campaign has existing submissions. Create a new campaign with the updated terms.`,
               );
               // Strip the blocked field from the patch
-              const { [field]: _, ...rest } = patch as Record<string, unknown>;
+              const { [field]: _removed, ...rest } = patch as Record<string, unknown>;
               patch = rest as Partial<Campaign>;
             }
           }
@@ -2116,7 +2117,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }));
       },
 
-      saveAdminNotes: async (id, notes, actor) => {
+      saveAdminNotes: async (id, notes, _actor) => {
         if (!isSupabaseConfigured) return;
         const { error } = await supabase.rpc("admin_user_action", {
           p_user_id: id,
@@ -2405,6 +2406,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }));
       },
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const value = { ...state, ...actions };

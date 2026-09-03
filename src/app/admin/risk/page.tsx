@@ -5,7 +5,7 @@ import { Search, ShieldAlert, X } from "lucide-react";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { useStore } from "@/lib/store";
 import { fmtViews } from "@/lib/format";
-import type { RiskFlag, RiskType, Severity, RiskStatus } from "@/lib/types";
+import type { RiskType, Severity, RiskStatus } from "@/lib/types";
 
 const SEVERITY_COLORS: Record<Severity, string> = {
   low: "bg-blue-500/10 text-blue-500",

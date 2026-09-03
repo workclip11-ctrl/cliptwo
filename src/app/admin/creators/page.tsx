@@ -131,7 +131,7 @@ export default function AdminCreators() {
           return true;
       }
     });
-  }, [profiles, campaigns, clips, q, filter]);
+  }, [profiles, campaigns, clips, financeRecords, q, filter]);
 
   const selected = profiles.find((p) => p.id === selectedId) ?? null;
 

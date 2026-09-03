@@ -672,7 +672,7 @@ export default function Home() {
     const fin = financeOf(financeRecords);
     const paidOut = fin.paid;
     return { openCampaigns, totalViews, clippers, paidOut };
-  }, [clips, campaigns]);
+  }, [clips, campaigns, financeRecords]);
 
   // Featured campaigns from database
   const featuredIds = siteSettings.featuredIds;

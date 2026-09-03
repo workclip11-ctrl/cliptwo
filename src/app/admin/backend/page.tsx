@@ -7,7 +7,7 @@ import { isSupabaseConfigured, supabase } from "@/lib/supabase/client";
 
 export default function AdminBackend() {
   const { siteSettings, campaigns, clips, profiles, setSiteSettings } = useStore();
-  const [saved, setSaved] = useState(false);
+  const [_saved, setSaved] = useState(false);
   const dirty = useRef(false);
   const [ping, setPing] = useState<"idle" | "testing" | "ok" | "fail">("idle");
 
@@ -19,7 +19,7 @@ export default function AdminBackend() {
     host = "";
   }
 
-  function save() {
+  function _save() {
     dirty.current = false;
     setSiteSettings({
       heroTitle: siteSettings.heroTitle,

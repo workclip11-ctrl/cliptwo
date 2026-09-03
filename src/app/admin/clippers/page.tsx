@@ -109,7 +109,7 @@ function accountsFor(p: Profile, accounts: SocialAccount[]) {
 }
 
 export default function AdminClippers() {
-  const { profiles, clips, campaigns, financeRecords, socialAccounts } = useStore();
+  const { profiles, clips, campaigns, financeRecords: _financeRecords, socialAccounts } = useStore();
   const { user } = useAuth();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
