@@ -157,6 +157,12 @@ export default function CreatorCampaignDetailPage() {
               ? ` · ${camp.startDate ?? "—"} → ${camp.endDate ?? "—"}`
               : ""}
           </p>
+          {camp.thumbnails?.[0] && (
+            <div className="mt-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={camp.thumbnails[0]} alt="Campaign thumbnail" className="h-32 w-56 rounded-xl border object-cover" />
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           <button
@@ -572,6 +578,50 @@ function Defs({ rows }: { rows: Array<[string, string | undefined]> }) {
 }
 
 function Asset({ label, value }: { label: string; value: string }) {
+  const isImage = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(value);
+  const isVideo = /\.(mp4|webm|mov|avi)$/i.test(value);
+  const fileName = value.split("/").pop()?.split("?")[0] ?? value;
+  const displayName = fileName.length > 40 ? fileName.slice(0, 37) + "..." : fileName;
+
+  if (isImage) {
+    return (
+      <li className="flex items-center gap-3">
+        <span className="w-32 shrink-0 text-muted">{label}</span>
+        <a href={value} target="_blank" rel="noreferrer" className="group shrink-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={value} alt={label} className="h-16 w-28 rounded-lg border object-cover transition-opacity group-hover:opacity-80" />
+        </a>
+        <a
+          href={value}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex min-w-0 items-center gap-1 truncate text-accent hover:underline"
+        >
+          <span className="truncate">{displayName}</span>
+          <ExternalLink size={12} className="shrink-0" />
+        </a>
+      </li>
+    );
+  }
+
+  if (isVideo) {
+    return (
+      <li className="flex items-center gap-3">
+        <span className="w-32 shrink-0 text-muted">{label}</span>
+        <a
+          href={value}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex min-w-0 items-center gap-1 truncate text-accent hover:underline"
+        >
+          <Film size={14} className="shrink-0" />
+          <span className="truncate">{displayName}</span>
+          <ExternalLink size={12} className="shrink-0" />
+        </a>
+      </li>
+    );
+  }
+
   return (
     <li className="flex items-center gap-2">
       <span className="w-32 shrink-0 text-muted">{label}</span>
@@ -581,7 +631,7 @@ function Asset({ label, value }: { label: string; value: string }) {
         rel="noreferrer"
         className="inline-flex min-w-0 items-center gap-1 truncate text-accent hover:underline"
       >
-        <span className="truncate">{value}</span>
+        <span className="truncate">{displayName}</span>
         <ExternalLink size={12} className="shrink-0" />
       </a>
     </li>

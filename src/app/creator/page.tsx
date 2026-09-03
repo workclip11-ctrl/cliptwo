@@ -319,6 +319,10 @@ function CampaignRow({
       className={`block w-full rounded-xl border bg-card p-4 text-left transition-colors hover:border-foreground/30 ${isArchived ? "opacity-60" : ""}`}
     >
       <div className="flex items-center justify-between gap-3">
+        {c.thumbnails?.[0] ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img src={c.thumbnails[0]} alt="" className="h-10 w-10 shrink-0 rounded-lg border object-cover" />
+        ) : null}
         <div className="min-w-0">
           <p className="truncate font-medium">{c.title}</p>
           <p className="truncate text-xs text-muted">
@@ -397,6 +401,11 @@ function CampaignDetailModal({
             {isOpen ? "Open" : "Closed"}
           </span>
         </div>
+
+        {campaign.thumbnails?.[0] && (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img src={campaign.thumbnails[0]} alt="" className="mt-3 h-24 w-40 rounded-lg border object-cover" />
+        )}
 
         <p className="mt-3 text-sm text-muted">{campaign.brief}</p>
 

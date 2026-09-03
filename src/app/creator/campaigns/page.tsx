@@ -61,7 +61,12 @@ export default function CreatorCampaignsPage() {
               className="cursor-pointer rounded-2xl border bg-card p-5 transition-colors hover:bg-accent-soft/50"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
+                <div className="flex items-start gap-3">
+                  {c.thumbnails?.[0] && (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src={c.thumbnails[0]} alt="" className="h-12 w-20 shrink-0 rounded-lg border object-cover" />
+                  )}
+                  <div>
                   <div className="flex items-center gap-2">
                      <span className="font-semibold">
                       {c.title}
@@ -87,6 +92,7 @@ export default function CreatorCampaignsPage() {
                   <p className="mt-1 text-xs text-muted">
                     {c.creator} · {c.niche} · {c.platform}
                   </p>
+                  </div>
                 </div>
                 <div className="text-right">
                   <p className="font-mono text-lg font-medium text-amber">

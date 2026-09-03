@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
-import { X } from "lucide-react";
+import { useState, useRef, type ReactNode } from "react";
+import { X, Upload, Loader2, ImageIcon, FileText, XCircle } from "lucide-react";
 import { rup } from "@/lib/format";
+import { uploadCampaignFile } from "@/lib/upload";
 import type { Campaign, CampaignRights, Platform } from "@/lib/types";
 
 const PLATFORM_OPTIONS: Platform[] = ["Instagram", "YouTube", "Kick"];
@@ -85,9 +86,16 @@ export function EditCampaignModal({
   const [reviewTime, setReviewTime] = useState(campaign.approval?.reviewTime ?? "");
   const [rights, setRights] = useState<CampaignRights>(campaign.rights ?? emptyRights());
   const [sourceLink, setSourceLink] = useState(campaign.sourceLink ?? "");
-  const [brandAssets, setBrandAssets] = useState(
-    (campaign.brandAssets ?? []).map((a) => a.url).join(", "),
+  const [thumbnail, setThumbnail] = useState<string | null>(
+    campaign.thumbnails?.[0] ?? null,
   );
+  const [thumbnailUploading, setThumbnailUploading] = useState(false);
+  const [brandAsset, setBrandAsset] = useState<string | null>(
+    campaign.brandAssets?.[0]?.url ?? null,
+  );
+  const [brandAssetUploading, setBrandAssetUploading] = useState(false);
+  const thumbInputRef = useRef<HTMLInputElement>(null);
+  const brandInputRef = useRef<HTMLInputElement>(null);
   const [confirmRules, setConfirmRules] = useState(false);
   const [budgetError, setBudgetError] = useState("");
 
@@ -111,6 +119,26 @@ export function EditCampaignModal({
 
   const importantChanged = newSignature !== importantSignature(campaign);
   const needsConfirm = importantChanged && submissionCount > 0;
+
+  const handleThumbUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setThumbnailUploading(true);
+    const url = await uploadCampaignFile("thumbnail", file);
+    if (url) setThumbnail(url);
+    setThumbnailUploading(false);
+    e.target.value = "";
+  };
+
+  const handleBrandAssetUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBrandAssetUploading(true);
+    const url = await uploadCampaignFile("brand-asset", file);
+    if (url) setBrandAsset(url);
+    setBrandAssetUploading(false);
+    e.target.value = "";
+  };
 
   const handleSave = () => {
     const b = Number(budget) || 0;
@@ -146,11 +174,8 @@ export function EditCampaignModal({
       approval: { ...campaign.approval, autoReview, reviewTime: reviewTime.trim() || undefined },
       rights,
       sourceLink: sourceLink.trim() || undefined,
-      brandAssets: brandAssets
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .map((url) => ({ label: "", url })),
+      thumbnails: thumbnail ? [thumbnail] : [],
+      brandAssets: brandAsset ? [{ label: "", url: brandAsset }] : [],
     };
 
     const changed: string[] = [];
@@ -382,9 +407,88 @@ export function EditCampaignModal({
             <Field label="Source video link">
               <input className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground" value={sourceLink} onChange={(e) => setSourceLink(e.target.value)} />
             </Field>
-            <Field label="Brand assets (comma-separated URLs)">
-              <input className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground" value={brandAssets} onChange={(e) => setBrandAssets(e.target.value)} />
-            </Field>
+          </Group>
+
+          <Group title="Thumbnail">
+            <div className="col-span-full">
+              {thumbnail ? (
+                <div className="relative inline-block">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={thumbnail} alt="Thumbnail" className="h-24 w-40 rounded-lg border object-cover" />
+                  <button
+                    onClick={() => setThumbnail(null)}
+                    className="absolute -right-2 -top-2 rounded-full bg-foreground p-0.5 text-background"
+                  >
+                    <XCircle size={16} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => thumbInputRef.current?.click()}
+                  disabled={thumbnailUploading}
+                  className="flex h-24 w-40 items-center justify-center gap-2 rounded-lg border border-dashed text-sm text-muted hover:border-foreground/30 disabled:opacity-50"
+                >
+                  {thumbnailUploading ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <ImageIcon size={16} />
+                  )}
+                  {thumbnailUploading ? "Uploading..." : "Upload thumbnail"}
+                </button>
+              )}
+              <input
+                ref={thumbInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleThumbUpload}
+              />
+            </div>
+          </Group>
+
+          <Group title="Brand asset">
+            <div className="col-span-full">
+              {brandAsset ? (
+                <div className="relative inline-block">
+                  {/\.(jpg|jpeg|png|gif|webp|svg)$/i.test(brandAsset) ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img src={brandAsset} alt="Brand asset" className="h-24 w-40 rounded-lg border object-cover" />
+                  ) : (
+                    <div className="flex h-24 w-40 items-center gap-2 rounded-lg border bg-accent-soft px-3 text-sm">
+                      <FileText size={16} className="shrink-0 text-muted" />
+                      <span className="truncate text-xs text-muted">Uploaded asset</span>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => setBrandAsset(null)}
+                    className="absolute -right-2 -top-2 rounded-full bg-foreground p-0.5 text-background"
+                  >
+                    <XCircle size={16} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => brandInputRef.current?.click()}
+                  disabled={brandAssetUploading}
+                  className="flex h-24 w-40 items-center justify-center gap-2 rounded-lg border border-dashed text-sm text-muted hover:border-foreground/30 disabled:opacity-50"
+                >
+                  {brandAssetUploading ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Upload size={16} />
+                  )}
+                  {brandAssetUploading ? "Uploading..." : "Upload asset"}
+                </button>
+              )}
+              <input
+                ref={brandInputRef}
+                type="file"
+                className="hidden"
+                onChange={handleBrandAssetUpload}
+              />
+            </div>
           </Group>
         </div>
 
