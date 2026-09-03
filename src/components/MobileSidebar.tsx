@@ -39,7 +39,7 @@ export function MobileSidebar({
 
   return (
     <div className="fixed inset-0 z-50 sm:hidden">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute inset-0 cursor-pointer bg-black/40" onClick={onClose} />
       <div
         ref={ref}
         className="absolute inset-y-0 left-0 w-64 overflow-y-auto bg-card shadow-xl"

@@ -38,7 +38,7 @@ export function AdjustBudgetModal({
 
   return (
     <div
-      className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-30 flex cursor-pointer items-center justify-center bg-black/40 p-4"
       onClick={onClose}
     >
       <div
