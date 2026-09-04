@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
 
     // ── Step 8: Exchange code for tokens ───────────────────────────────
     const provider = getProvider(platform);
-    const tokenResult = await provider.exchangeCode(code, state);
+    const tokenResult = await provider.exchangeCode(code, state, stateRecord.code_verifier ?? undefined);
 
     // ── Step 9: Encrypt tokens before storage ──────────────────────────
     const accessTokenEnc = encryptToken(tokenResult.accessToken);
@@ -165,6 +165,17 @@ export async function GET(request: NextRequest) {
         throw new Error(`Failed to update social account: ${acctErr.message}`);
       }
 
+      // Preserve existing refresh token if Google didn't return a new one
+      const { data: existingConn } = await adminClient
+        .from("social_connections")
+        .select("refresh_token_enc")
+        .eq("social_account_id", socialAccountId)
+        .single();
+
+      const finalRefreshTokenEnc = refreshTokenEnc
+        ?? existingConn?.refresh_token_enc
+        ?? null;
+
       // Upsert connection with encrypted tokens
       const { error: connErr } = await adminClient.from("social_connections").upsert(
         {
@@ -172,7 +183,7 @@ export async function GET(request: NextRequest) {
           user_id: userId,
           platform,
           access_token_enc: accessTokenEnc,
-          refresh_token_enc: refreshTokenEnc,
+          refresh_token_enc: finalRefreshTokenEnc,
           token_type: "bearer",
           expires_at: expiresAt.toISOString(),
           scope: tokenResult.scope,

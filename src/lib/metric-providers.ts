@@ -135,8 +135,17 @@ class YouTubeMetricProvider implements MetricProvider {
     const stats = video?.statistics;
     const snippet = video?.snippet;
 
+    if (!video) {
+      throw new Error(`Video not found or is private/deleted: ${videoId}`);
+    }
     if (!stats) {
       throw new Error(`No statistics found for video: ${videoId}`);
+    }
+    if (!snippet) {
+      throw new Error(`No snippet found for video: ${videoId}`);
+    }
+    if (!snippet.channelId) {
+      throw new Error(`No channelId found for video: ${videoId}`);
     }
 
     return {
@@ -144,7 +153,7 @@ class YouTubeMetricProvider implements MetricProvider {
       likes: parseInt(stats.likeCount ?? "0", 10),
       comments: parseInt(stats.commentCount ?? "0", 10),
       shares: 0, // YouTube API doesn't expose share counts directly
-      channelId: snippet?.channelId,
+      channelId: snippet.channelId,
       fetchedAt: new Date(),
       source: "platform_api",
       verificationStatus: "verified",

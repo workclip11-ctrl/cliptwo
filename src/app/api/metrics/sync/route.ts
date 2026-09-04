@@ -191,8 +191,17 @@ export async function POST(request: Request) {
         // Fetch metrics from the platform
         const metrics = await provider.fetchMetrics(clip.video_url, accessToken);
 
-        // Ownership verification: ensure the video belongs to the connected account
-        if (clipPlatform === "YouTube" && metrics.channelId) {
+        // Ownership verification (fail-closed): for YouTube, BOTH channelId and
+        // provider_account_id must exist and match. Missing either = reject.
+        if (clipPlatform === "YouTube") {
+          if (!metrics.channelId || !socialAccount.provider_account_id) {
+            results.push({
+              clipId: cid,
+              status: "rejected",
+              error: "YouTube ownership could not be verified — missing channel identification",
+            });
+            continue;
+          }
           if (metrics.channelId !== socialAccount.provider_account_id) {
             results.push({
               clipId: cid,
@@ -203,8 +212,8 @@ export async function POST(request: Request) {
           }
         }
 
-        // Store via the ingest_clip_metrics RPC
-        const { error: ingestError } = await supabase.rpc(
+        // Store via the ingest_clip_metrics RPC (service_role-only)
+        const { error: ingestError } = await adminClient.rpc(
           "ingest_clip_metrics",
           {
             p_clip_id: cid,

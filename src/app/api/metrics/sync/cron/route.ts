@@ -167,8 +167,17 @@ export async function GET(request: Request) {
         // Fetch metrics from the platform
         const metrics = await provider.fetchMetrics(clip.video_url, accessToken);
 
-        // Ownership verification: ensure the video belongs to the connected account
-        if (clipPlatform === "YouTube" && metrics.channelId) {
+        // Ownership verification (fail-closed): for YouTube, BOTH channelId and
+        // provider_account_id must exist and match. Missing either = reject.
+        if (clipPlatform === "YouTube") {
+          if (!metrics.channelId || !socialAccount.provider_account_id) {
+            results.push({
+              clipId: clip.id,
+              status: "rejected",
+              error: "YouTube ownership could not be verified — missing channel identification",
+            });
+            continue;
+          }
           if (metrics.channelId !== socialAccount.provider_account_id) {
             results.push({
               clipId: clip.id,

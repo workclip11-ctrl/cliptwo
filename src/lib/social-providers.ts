@@ -55,7 +55,7 @@ export interface SocialProvider {
   ): Promise<OAuthInitResult>;
 
   /** Exchange authorization code for tokens and fetch user profile */
-  exchangeCode(code: string, state: string): Promise<OAuthCallbackResult>;
+  exchangeCode(code: string, state: string, codeVerifier?: string): Promise<OAuthCallbackResult>;
 
   /** Verify that the connected account belongs to the claimed user */
   verifyOwnership(
@@ -89,7 +89,16 @@ class InstagramProvider implements SocialProvider {
     return process.env.INSTAGRAM_CLIENT_SECRET ?? "";
   }
   private get redirectUri(): string {
-    const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    const base = process.env.NEXT_PUBLIC_APP_URL;
+    if (!base) {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(
+          "[social-providers] NEXT_PUBLIC_APP_URL must be set in production. " +
+            "Set it to your deployed URL (e.g., https://cliptwo.vercel.app).",
+        );
+      }
+      return "http://localhost:3000/api/social/oauth/callback/instagram";
+    }
     return `${base}/api/social/oauth/callback/instagram`;
   }
 
@@ -112,6 +121,7 @@ class InstagramProvider implements SocialProvider {
   async exchangeCode(
     code: string,
     _state: string,
+    _codeVerifier?: string,
   ): Promise<OAuthCallbackResult> {
     // 1. Exchange code for short-lived token
     const tokenRes = await fetch(
@@ -241,7 +251,16 @@ class YouTubeProvider implements SocialProvider {
     return process.env.YOUTUBE_CLIENT_SECRET ?? "";
   }
   private get redirectUri(): string {
-    const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    const base = process.env.NEXT_PUBLIC_APP_URL;
+    if (!base) {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(
+          "[social-providers] NEXT_PUBLIC_APP_URL must be set in production. " +
+            "Set it to your deployed URL (e.g., https://cliptwo.vercel.app).",
+        );
+      }
+      return "http://localhost:3000/api/social/oauth/callback/youtube";
+    }
     return `${base}/api/social/oauth/callback/youtube`;
   }
 
@@ -304,17 +323,23 @@ class YouTubeProvider implements SocialProvider {
   async exchangeCode(
     code: string,
     _state: string,
+    codeVerifier?: string,
   ): Promise<OAuthCallbackResult> {
+    const body: Record<string, string> = {
+      client_id: this.clientId,
+      client_secret: this.clientSecret,
+      code,
+      redirect_uri: this.redirectUri,
+      grant_type: "authorization_code",
+    };
+    if (codeVerifier) {
+      body.code_verifier = codeVerifier;
+    }
+
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_id: this.clientId,
-        client_secret: this.clientSecret,
-        code,
-        redirect_uri: this.redirectUri,
-        grant_type: "authorization_code",
-      }),
+      body: new URLSearchParams(body),
     });
 
     if (!tokenRes.ok) {
@@ -469,6 +494,7 @@ class KickProvider implements SocialProvider {
   async exchangeCode(
     _code: string,
     _state: string,
+    _codeVerifier?: string,
   ): Promise<OAuthCallbackResult> {
     this.throwNotAvailable();
   }
