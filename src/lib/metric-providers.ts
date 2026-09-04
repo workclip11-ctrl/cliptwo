@@ -20,6 +20,7 @@ export interface FetchedMetrics {
   likes: number;
   comments: number;
   shares: number;
+  channelId?: string; // YouTube channel ID for ownership verification
   fetchedAt: Date;
   source: "platform_api" | "admin_override";
   verificationStatus: "verified" | "pending" | "failed";
@@ -121,7 +122,7 @@ class YouTubeMetricProvider implements MetricProvider {
     }
 
     const res = await fetch(
-      `https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${videoId}`,
+      `https://www.googleapis.com/youtube/v3/videos?part=statistics,snippet&id=${videoId}`,
       { headers: { Authorization: `Bearer ${accessToken}` } },
     );
 
@@ -130,7 +131,9 @@ class YouTubeMetricProvider implements MetricProvider {
     }
 
     const data = await res.json();
-    const stats = data.items?.[0]?.statistics;
+    const video = data.items?.[0];
+    const stats = video?.statistics;
+    const snippet = video?.snippet;
 
     if (!stats) {
       throw new Error(`No statistics found for video: ${videoId}`);
@@ -141,6 +144,7 @@ class YouTubeMetricProvider implements MetricProvider {
       likes: parseInt(stats.likeCount ?? "0", 10),
       comments: parseInt(stats.commentCount ?? "0", 10),
       shares: 0, // YouTube API doesn't expose share counts directly
+      channelId: snippet?.channelId,
       fetchedAt: new Date(),
       source: "platform_api",
       verificationStatus: "verified",
@@ -198,7 +202,7 @@ class KickMetricProvider implements MetricProvider {
 function isConfigured(platform: Platform): boolean {
   switch (platform) {
     case "Instagram":
-      return !!(process.env.INSTAGRAM_APP_ID && process.env.INSTAGRAM_APP_SECRET);
+      return !!(process.env.INSTAGRAM_CLIENT_ID && process.env.INSTAGRAM_CLIENT_SECRET);
     case "YouTube":
       return !!(process.env.YOUTUBE_CLIENT_ID && process.env.YOUTUBE_CLIENT_SECRET);
     case "Kick":

@@ -250,7 +250,6 @@ class YouTubeProvider implements SocialProvider {
 
     const scopes = [
       "https://www.googleapis.com/auth/youtube.readonly",
-      "https://www.googleapis.com/auth/youtube.force-ssl",
     ];
 
     const params = new URLSearchParams({
@@ -281,7 +280,6 @@ class YouTubeProvider implements SocialProvider {
 
     const scopes = [
       "https://www.googleapis.com/auth/youtube.readonly",
-      "https://www.googleapis.com/auth/youtube.force-ssl",
     ];
 
     const params = new URLSearchParams({

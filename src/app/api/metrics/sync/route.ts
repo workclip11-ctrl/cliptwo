@@ -11,7 +11,8 @@
 import { NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { getMetricProvider, isMetricProviderConfigured } from "@/lib/metric-providers";
-import { decryptToken, isTokenExpired } from "@/lib/token-crypto";
+import { getProvider } from "@/lib/social-providers";
+import { decryptToken, encryptToken, isTokenExpired } from "@/lib/token-crypto";
 import type { Platform } from "@/lib/types";
 
 export async function POST(request: Request) {
@@ -103,7 +104,7 @@ export async function POST(request: Request) {
         // Find the social account for this user+platform
         const { data: socialAccount } = await adminClient
           .from("social_accounts")
-          .select("id")
+          .select("id, provider_account_id")
           .eq("user_id", clip.user_id)
           .eq("platform", clipPlatform)
           .single();
@@ -132,19 +133,75 @@ export async function POST(request: Request) {
           continue;
         }
 
-        if (isTokenExpired(connection.expires_at)) {
-          results.push({
-            clipId: cid,
-            status: "skipped",
-            error: `${clipPlatform} token expired — reconnect the account`,
-          });
-          continue;
-        }
+        let accessToken = decryptToken(connection.access_token_enc);
 
-        const accessToken = decryptToken(connection.access_token_enc);
+        // Token refresh: if expired, try to refresh using the refresh token
+        if (isTokenExpired(connection.expires_at)) {
+          const { data: connFull } = await adminClient
+            .from("social_connections")
+            .select("refresh_token_enc")
+            .eq("social_account_id", socialAccount.id)
+            .single();
+
+          if (!connFull?.refresh_token_enc) {
+            results.push({
+              clipId: cid,
+              status: "skipped",
+              error: `${clipPlatform} token expired and no refresh token available — reconnect the account`,
+            });
+            continue;
+          }
+
+          try {
+            const refreshToken = decryptToken(connFull.refresh_token_enc);
+            const provider = getProvider(clipPlatform);
+            const refreshed = await provider.refreshToken(refreshToken);
+
+            // Persist the new encrypted tokens
+            await adminClient
+              .from("social_connections")
+              .update({
+                access_token_enc: encryptToken(refreshed.accessToken),
+                refresh_token_enc: refreshed.refreshToken
+                  ? encryptToken(refreshed.refreshToken)
+                  : connFull.refresh_token_enc,
+                expires_at: new Date(Date.now() + refreshed.expiresIn * 1000).toISOString(),
+                updated_at: new Date().toISOString(),
+              })
+              .eq("social_account_id", socialAccount.id);
+
+            accessToken = refreshed.accessToken;
+          } catch {
+            // Mark connection as needing reconnect
+            await adminClient
+              .from("social_accounts")
+              .update({ status: "connection_error", error: "Token refresh failed — reconnect required" })
+              .eq("id", socialAccount.id)
+              .eq("user_id", clip.user_id);
+
+            results.push({
+              clipId: cid,
+              status: "skipped",
+              error: `${clipPlatform} token refresh failed — reconnect the account`,
+            });
+            continue;
+          }
+        }
 
         // Fetch metrics from the platform
         const metrics = await provider.fetchMetrics(clip.video_url, accessToken);
+
+        // Ownership verification: ensure the video belongs to the connected account
+        if (clipPlatform === "YouTube" && metrics.channelId) {
+          if (metrics.channelId !== socialAccount.provider_account_id) {
+            results.push({
+              clipId: cid,
+              status: "rejected",
+              error: "This YouTube video does not belong to your connected YouTube channel",
+            });
+            continue;
+          }
+        }
 
         // Store via the ingest_clip_metrics RPC
         const { error: ingestError } = await supabase.rpc(
