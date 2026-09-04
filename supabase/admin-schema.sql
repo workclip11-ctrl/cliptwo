@@ -2151,116 +2151,9 @@ $$;
 
 grant execute on function public.get_clipper_earnings(uuid) to authenticated;
 
--- ===========================================================================
--- PAYOUT RPCs — server-side only. Users request, server processes.
--- ===========================================================================
-
--- ---------------------------------------------------------------------------
--- RPC: request_payout — clipper requests a payout.
--- 1. Authenticated via auth.uid()
--- 2. Reads verified UPI from profiles
--- 3. Calculates balance from wallet_ledger (authoritative)
--- 4. Enforces minimum threshold (100 INR = 10000 paise)
--- 5. Checks no duplicate processing payout exists
--- 6. Creates payout record + debit ledger entry atomically
--- ---------------------------------------------------------------------------
-create or replace function public.request_payout()
-returns jsonb
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_user_id uuid;
-  v_balance integer;
-  v_upi text;
-  v_payout_id uuid;
-  v_payout jsonb;
-  v_idempotency_key text;
-  v_min_withdrawal constant integer := 10000; -- ₹100 in paise
-begin
-  -- 1. Get authenticated user
-  v_user_id := auth.uid();
-  if v_user_id is null then
-    raise exception 'Not authenticated';
-  end if;
-
-  -- 2. Read verified UPI from profiles
-  select upi into v_upi
-  from public.profiles
-  where id = v_user_id and status = 'active';
-
-  if v_upi is null or trim(v_upi) = '' then
-    raise exception 'No verified UPI ID on file. Add a UPI ID first.';
-  end if;
-
-  -- 3. Calculate authoritative balance from ledger
-  select coalesce(sum(amount), 0) into v_balance
-  from public.wallet_ledger
-  where user_id = v_user_id;
-
-  -- 4. Enforce minimum withdrawal
-  if v_balance < v_min_withdrawal then
-    raise exception 'Minimum withdrawal is ₹100. Current balance: ₹%', v_balance / 100;
-  end if;
-
-  -- 5. Check no equivalent payout is already processing/requested
-  if exists (
-    select 1 from public.payouts
-    where user_id = v_user_id
-      and status in ('requested', 'processing')
-  ) then
-    raise exception 'A payout is already in progress. Please wait for it to complete.';
-  end if;
-
-  -- 6. Generate idempotency key (one per user per hour window)
-  v_idempotency_key := 'payout-' || v_user_id::text || '-' || to_char(now(), 'YYYY-MM-DD-HH24');
-
-  -- Check idempotency
-  if exists (select 1 from public.payouts where idempotency_key = v_idempotency_key) then
-    select to_jsonb(p.*) into v_payout
-    from public.payouts p
-    where idempotency_key = v_idempotency_key;
-    return v_payout;
-  end if;
-
-  -- 7. Create payout record
-  insert into public.payouts (
-    user_id, amount, net_amount, currency, status, method, upi_id,
-    idempotency_key, metadata
-  ) values (
-    v_user_id, v_balance, v_balance, 'INR', 'requested', 'upi', v_upi,
-    v_idempotency_key,
-    jsonb_build_object(
-      'requested_by', (select email from public.profiles where id = v_user_id),
-      'balance_at_request', v_balance
-    )
-  )
-  returning id into v_payout_id;
-
-  -- 8. Debit the wallet ledger (creates negative entry to reserve funds)
-  insert into public.wallet_ledger (
-    user_id, type, amount, currency, reference_type, reference_id,
-    idempotency_key, metadata
-  ) values (
-    v_user_id, 'payout_debit', -v_balance, 'INR', 'payout', v_payout_id,
-    'payout-debit-' || v_payout_id::text,
-    jsonb_build_object(
-      'payout_id', v_payout_id,
-      'reason', 'Payout requested, funds reserved'
-    )
-  );
-
-  -- Return the payout record
-  select to_jsonb(p.*) into v_payout
-  from public.payouts p
-  where id = v_payout_id;
-
-  return v_payout;
-end;
-$$;
-
-grant execute on function public.request_payout() to authenticated;
+-- NOTE: request_payout() is defined by financial-rewrite.sql (uses
+-- financial_records + payout_requests). Do NOT define it here — it would
+-- create a duplicate that could be accidentally dropped by cleanup.
 
 -- ---------------------------------------------------------------------------
 -- RPC: process_payout — admin marks payout as processing.
@@ -3532,10 +3425,8 @@ DO $$ BEGIN
   REVOKE EXECUTE ON FUNCTION public.reverse_payout(uuid, text) FROM authenticated;
 EXCEPTION WHEN undefined_function THEN NULL; END $$;
 
--- Legacy request_payout (uses wallet_ledger/payouts — superseded by financial-rewrite.sql)
-DO $$ BEGIN
-  REVOKE EXECUTE ON FUNCTION public.request_payout() FROM authenticated;
-EXCEPTION WHEN undefined_function THEN NULL; END $$;
+-- NOTE: request_payout() is NOT dropped here. It is defined by
+-- financial-rewrite.sql and must survive all reruns of admin-schema.sql.
 
 -- Drop legacy functions
 DROP FUNCTION IF EXISTS public.create_earning(uuid, text);
