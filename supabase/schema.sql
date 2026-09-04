@@ -69,7 +69,7 @@ create table public.clips (
   platform     text not null,
   views        integer not null default 0 check (views >= 0),
   verified_views integer not null default 0 check (verified_views >= 0),
-  status       text not null default 'pending' check (status in ('pending','approved','rejected','held','processing','paid','failed','payable')),
+   status       text not null default 'pending' check (status in ('pending','approved','rejected','held')),
   submitted_at timestamptz not null default now(),
   rejection_reason text,
   rejection_details text,

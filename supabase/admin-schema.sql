@@ -562,14 +562,11 @@ begin
   if v_actor is null then raise exception 'Not authenticated'; end if;
   if not public.is_admin() then raise exception 'Only admins can perform clip actions'; end if;
 
-  if p_action not in ('approve','reject','hold','payable','processing','paid','failed','retry','release','revert') then
-    raise exception 'Invalid action: %', p_action;
+  if p_action not in ('approve','reject','hold') then
+    raise exception 'Invalid action: %. Only reject and hold are allowed. Use approve_clip() for approval.', p_action;
   end if;
 
   v_perm := 'clip.' || p_action;
-  if p_action = 'retry' then v_perm := 'clip.processing'; end if;
-  if p_action = 'release' then v_perm := 'clip.approve'; end if;
-  if p_action = 'revert' then v_perm := 'clip.payable'; end if;
 
   if not public.admin_has_perm(v_perm) then
     raise exception 'Missing permission: %', v_perm;
@@ -581,19 +578,15 @@ begin
 
   v_new_status := case p_action
     when 'approve' then 'approved' when 'reject' then 'rejected'
-    when 'hold' then 'held' when 'payable' then 'payable'
-    when 'processing' then 'processing' when 'paid' then 'paid'
-    when 'failed' then 'failed' when 'retry' then 'processing'
-    when 'release' then 'approved' when 'revert' then 'payable'
+    when 'hold' then 'held'
   end;
 
   perform public.update_clip_status(
     p_clip_id, v_new_status,
     case when p_action = 'reject' then p_reason else null end,
     case when p_action = 'reject' then p_details else null end,
-    case when p_action = 'failed' then p_reason else null end,
-    case when p_action = 'hold' then p_reason else null end,
-    null, null
+    null,
+    case when p_action = 'hold' then p_reason else null end
   );
 
   perform public.write_admin_audit(
@@ -1054,12 +1047,12 @@ begin
     raise exception 'Budget cannot be negative';
   end if;
 
-  -- Calculate current committed spend from earnings (net_amount, matching frontend financeOf)
-  -- reserved = sum of net_amount where status in ('pending','approved','paid')
-  -- This matches the frontend campaignBudget: spent (paid) + committed (pending+processing)
+  -- Calculate current committed spend from financial_records (net_amount)
+  -- reserved = sum of net_amount where status in ('pending','processing')
+  -- (paid records are already consumed by payouts)
   select coalesce(sum(net_amount), 0) into v_current_spend
-  from public.earnings
-  where campaign_id = p_campaign_id and status in ('pending', 'approved', 'paid');
+  from public.financial_records
+  where campaign_id = p_campaign_id and status in ('pending', 'processing');
 
   if p_new_budget < v_current_spend then
     raise exception 'Budget (₹%) cannot be lower than committed/spent amount (₹%)', p_new_budget, v_current_spend;
@@ -1103,9 +1096,7 @@ create or replace function public.update_clip_status(
   p_rejection_reason text default null,
   p_rejection_details text default null,
   p_failure_reason text default null,
-  p_held_reason text default null,
-  p_txn_id text default null,
-  p_payout_ref text default null
+  p_held_reason text default null
 )
 returns jsonb
 language plpgsql
@@ -1115,8 +1106,6 @@ as $$
 declare
   v_clip record;
   v_actor uuid;
-  v_is_admin boolean;
-  v_earning_status text;
 begin
   -- Get current user
   v_actor := auth.uid();
@@ -1125,14 +1114,13 @@ begin
   end if;
 
   -- Verify admin role
-  v_is_admin := public.is_admin();
-  if not v_is_admin then
+  if not public.is_admin() then
     raise exception 'Only admins can update clip status';
   end if;
 
-  -- Validate status
-  if p_status not in ('pending', 'approved', 'rejected', 'held', 'processing', 'paid', 'failed', 'payable') then
-    raise exception 'Invalid status: %', p_status;
+  -- Validate status — moderation only. Financial state lives in financial_records.
+  if p_status not in ('pending', 'approved', 'rejected', 'held') then
+    raise exception 'Invalid status: %. Only pending, approved, rejected, held are allowed. Use approve_clip() for approval.', p_status;
   end if;
 
   -- Get current clip
@@ -1141,16 +1129,13 @@ begin
     raise exception 'Clip not found';
   end if;
 
-  -- Update the clip
+  -- Update the clip (moderation fields only)
   update public.clips set
     status = p_status,
     rejection_reason = coalesce(p_rejection_reason, rejection_reason),
     rejection_details = coalesce(p_rejection_details, rejection_details),
     failure_reason = coalesce(p_failure_reason, failure_reason),
     held_reason = coalesce(p_held_reason, held_reason),
-    txn_id = coalesce(p_txn_id, txn_id),
-    payout_ref = coalesce(p_payout_ref, payout_ref),
-    payout_date = case when p_status = 'paid' then now() else payout_date end,
     updated_at = now(),
     audit = coalesce(audit, '[]'::jsonb) || jsonb_build_object(
       'action', 'status_changed',
@@ -1161,20 +1146,6 @@ begin
     )
   where id = p_clip_id
   returning to_jsonb(clips.*) into v_clip;
-
-  -- When clip becomes financially approved, create immutable earning record
-  if p_status in ('approved', 'payable', 'processing', 'paid') then
-    -- Check if earning already exists for this clip
-    if not exists (select 1 from public.earnings where clip_id = p_clip_id) then
-      -- Create earning with locked CPM
-      v_earning_status := case
-        when p_status = 'paid' then 'paid'
-        when p_status in ('processing', 'payable') then 'approved'
-        else p_status
-      end;
-      perform public.create_earning(p_clip_id, v_earning_status);
-    end if;
-  end if;
 
   return v_clip;
 end;
@@ -1214,7 +1185,7 @@ end;
 $$;
 
 -- Grant execute to authenticated users (RLS still applies within the function)
-grant execute on function public.update_clip_status(uuid, text, text, text, text, text, text, text) to authenticated;
+grant execute on function public.update_clip_status(uuid, text, text, text, text, text) to authenticated;
 grant execute on function public.update_clip_views(uuid, integer, jsonb) to authenticated;
 
 -- ---------------------------------------------------------------------------
@@ -3583,3 +3554,66 @@ end;
 $$;
 
 grant execute on function public.finalize_clip_earning(uuid) to service_role;
+
+-- ===========================================================================
+-- LEGACY FINANCE CLEANUP
+--
+-- The following functions belonged to the old earnings/wallet_ledger/payouts
+-- architecture. They are superseded by:
+--   approve_clip(), finalize_clip_earning(), submit_clip(),
+--   request_payout() [financial-rewrite.sql], process_payout_request(),
+--   complete_payout_request(), get_wallet_balance(), get_safe_finance_records()
+--
+-- Safe to run: uses DROP FUNCTION IF EXISTS (no errors if already removed).
+-- ===========================================================================
+
+-- Revoke execute from all legacy functions before dropping
+DO $$ BEGIN
+  REVOKE EXECUTE ON FUNCTION public.create_earning(uuid, text) FROM authenticated;
+EXCEPTION WHEN undefined_function THEN NULL; END $$;
+
+DO $$ BEGIN
+  REVOKE EXECUTE ON FUNCTION public.update_earning_status(uuid, text, text) FROM authenticated;
+EXCEPTION WHEN undefined_function THEN NULL; END $$;
+
+DO $$ BEGIN
+  REVOKE EXECUTE ON FUNCTION public.get_clipper_earnings(uuid) FROM authenticated;
+EXCEPTION WHEN undefined_function THEN NULL; END $$;
+
+DO $$ BEGIN
+  REVOKE EXECUTE ON FUNCTION public.process_payout(uuid, text) FROM authenticated;
+EXCEPTION WHEN undefined_function THEN NULL; END $$;
+
+DO $$ BEGIN
+  REVOKE EXECUTE ON FUNCTION public.complete_payout(uuid, text) FROM authenticated;
+EXCEPTION WHEN undefined_function THEN NULL; END $$;
+
+DO $$ BEGIN
+  REVOKE EXECUTE ON FUNCTION public.fail_payout(uuid, text) FROM authenticated;
+EXCEPTION WHEN undefined_function THEN NULL; END $$;
+
+DO $$ BEGIN
+  REVOKE EXECUTE ON FUNCTION public.reverse_payout(uuid, text) FROM authenticated;
+EXCEPTION WHEN undefined_function THEN NULL; END $$;
+
+-- Legacy request_payout (uses wallet_ledger/payouts — superseded by financial-rewrite.sql)
+DO $$ BEGIN
+  REVOKE EXECUTE ON FUNCTION public.request_payout() FROM authenticated;
+EXCEPTION WHEN undefined_function THEN NULL; END $$;
+
+-- Drop legacy functions
+DROP FUNCTION IF EXISTS public.create_earning(uuid, text);
+DROP FUNCTION IF EXISTS public.update_earning_status(uuid, text, text);
+DROP FUNCTION IF EXISTS public.get_clipper_earnings(uuid);
+DROP FUNCTION IF EXISTS public.process_payout(uuid, text);
+DROP FUNCTION IF EXISTS public.complete_payout(uuid, text);
+DROP FUNCTION IF EXISTS public.fail_payout(uuid, text);
+DROP FUNCTION IF EXISTS public.reverse_payout(uuid, text);
+
+-- Revoke execute from legacy update_clip_status (old signature with 8 params)
+DO $$ BEGIN
+  REVOKE EXECUTE ON FUNCTION public.update_clip_status(uuid, text, text, text, text, text, text, text) FROM authenticated;
+EXCEPTION WHEN undefined_function THEN NULL; END $$;
+
+-- Drop old update_clip_status with legacy 8-param signature (replaced above with 6-param)
+DROP FUNCTION IF EXISTS public.update_clip_status(uuid, text, text, text, text, text, text, text);
