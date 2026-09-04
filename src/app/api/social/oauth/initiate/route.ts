@@ -5,10 +5,15 @@
 //
 // Supported platforms: Instagram, YouTube.
 // Kick: returns 400 with "not available" message.
+//
+// Security model:
+//   - Authenticates user via normal Supabase auth client
+//   - Uses service-role client for social_oauth_states insert (RLS removed)
+//   - Never exposes service-role key to the browser
 // ---------------------------------------------------------------------------
 
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { getProvider, isProviderConfigured } from "@/lib/social-providers";
 import type { Platform } from "@/lib/types";
 
@@ -53,7 +58,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Real OAuth flow
+    // ── Step 1: Authenticate the user ──────────────────────────────────
     const supabase = await createClient();
     const {
       data: { user },
@@ -63,7 +68,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    // Cryptographically random state: user-bound, platform-bound, expires in 10min
+    // ── Step 2: Service-role client for trusted DB operations ───────────
+    // RLS policies on social_oauth_states have been removed.
+    // This endpoint is a trusted server route that must use elevated access
+    // after verifying the user.
+    const adminClient = createServiceClient();
+
+    // ── Step 3: Generate cryptographically random state ─────────────────
     const state = `${user.id}_${platform}_${Date.now()}_${crypto.randomUUID()}`;
     const provider = getProvider(platform);
 
@@ -74,15 +85,25 @@ export async function POST(request: Request) {
 
     const { authorizationUrl, codeVerifier } = authResult;
 
-    // Store state + optional PKCE verifier in DB
-    await supabase.from("social_oauth_states").insert({
-      user_id: user.id,
-      platform,
-      state,
-      code_verifier: codeVerifier ?? null,
-      redirect_to: validateRedirectTo(redirectTo),
-      expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
-    });
+    // ── Step 4: Store state + optional PKCE verifier via service-role ───
+    const { error: stateError } = await adminClient
+      .from("social_oauth_states")
+      .insert({
+        user_id: user.id,
+        platform,
+        state,
+        code_verifier: codeVerifier ?? null,
+        redirect_to: validateRedirectTo(redirectTo),
+        expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      });
+
+    if (stateError) {
+      console.error("[oauth/initiate] Failed to store OAuth state:", stateError.message);
+      return NextResponse.json(
+        { error: "Failed to initiate OAuth: could not store state" },
+        { status: 500 },
+      );
+    }
 
     return NextResponse.json({ authorizationUrl });
   } catch (e) {

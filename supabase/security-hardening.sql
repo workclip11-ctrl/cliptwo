@@ -222,10 +222,13 @@ DROP POLICY IF EXISTS "social_oauth_states_delete" ON public.social_oauth_states
 -- No SELECT policy exists (RLS blocks all reads by default).
 
 -- ────────────────────────────────────────────────────────────────────────────
--- 11. FIX: Site settings — create a public view without secrets
--- The site_settings table exposes razorpay_key to all users via world-readable
--- SELECT policy. Create a safe public view and restrict the table.
+-- 11. FIX: Site settings — drop obsolete razorpay_key column, create public view
+-- The razorpay_key column is obsolete (no Razorpay integration) and was
+-- world-readable via the site_settings SELECT policy. Drop it and create
+-- a safe public view exposing only non-secret fields.
 -- ────────────────────────────────────────────────────────────────────────────
+ALTER TABLE public.site_settings DROP COLUMN IF EXISTS razorpay_key;
+
 CREATE OR REPLACE VIEW public.site_settings_public AS
   SELECT id, hero_title, hero_subtitle, featured_ids, updated_at
   FROM public.site_settings;
@@ -336,6 +339,79 @@ GRANT EXECUTE ON FUNCTION public.update_clip_views(uuid, integer, jsonb) TO auth
 GRANT EXECUTE ON FUNCTION public.get_latest_verified_metrics(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_clip_metrics(uuid, integer) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_campaign_budget(uuid) TO authenticated;
+
+-- ────────────────────────────────────────────────────────────────────────────
+-- 15. FIX: Stop exposing full financial_records to campaign creators
+-- The previous policy allowed creators to SELECT full financial_records rows
+-- for their campaigns, exposing clipper_id, upi_id_snapshot, payment_reference,
+-- and other sensitive fields.
+--
+-- Fix: Remove creator SELECT access from the base table. Create a SECURITY
+-- DEFINER function that returns safe financial records:
+--   - Clippers: own records (all fields)
+--   - Creators: records for their campaigns (sensitive fields nulled)
+--   - Admins: all records (all fields)
+--
+-- The store calls this function instead of direct SELECT on financial_records.
+-- All existing financeOf/campaignSpent/campaignBudget functions work unchanged.
+-- ────────────────────────────────────────────────────────────────────────────
+
+-- 15a. Remove creator SELECT from financial_records
+DROP POLICY IF EXISTS "financial_records_select" ON public.financial_records;
+CREATE POLICY "financial_records_select" ON public.financial_records
+  FOR SELECT USING (
+    auth.uid() = clipper_id
+    OR public.is_admin()
+  );
+
+-- 15b. SECURITY DEFINER function: returns safe financial records per role
+CREATE OR REPLACE FUNCTION public.get_safe_finance_records()
+RETURNS SETOF public.financial_records
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT
+    fr.id,
+    fr.clip_id,
+    fr.campaign_id,
+    -- Hide clipper identity from creators
+    CASE WHEN public.is_admin() OR auth.uid() = fr.clipper_id
+      THEN fr.clipper_id ELSE NULL END AS clipper_id,
+    fr.locked_cpm,
+    fr.locked_max_payout,
+    fr.verified_views,
+    fr.gross_amount,
+    fr.platform_fee,
+    fr.net_amount,
+    fr.status,
+    -- Hide sensitive payment fields from creators
+    CASE WHEN public.is_admin() OR auth.uid() = fr.clipper_id
+      THEN fr.upi_id_snapshot ELSE NULL END AS upi_id_snapshot,
+    CASE WHEN public.is_admin() OR auth.uid() = fr.clipper_id
+      THEN fr.payment_reference ELSE NULL END AS payment_reference,
+    CASE WHEN public.is_admin() OR auth.uid() = fr.clipper_id
+      THEN fr.paid_by ELSE NULL END AS paid_by,
+    fr.created_at,
+    fr.processing_at,
+    fr.paid_at,
+    -- Hide audit trail from creators
+    CASE WHEN public.is_admin() OR auth.uid() = fr.clipper_id
+      THEN fr.audit ELSE NULL END AS audit
+  FROM public.financial_records fr
+  WHERE
+    -- Clippers see own records
+    fr.clipper_id = auth.uid()
+    -- Admins see everything
+    OR public.is_admin()
+    -- Creators see records for their campaigns (safe fields only)
+    OR EXISTS (
+      SELECT 1 FROM public.campaigns c
+      WHERE c.id = fr.campaign_id AND c.created_by = auth.uid()
+    );
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_safe_finance_records() TO authenticated;
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- DONE

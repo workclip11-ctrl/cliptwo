@@ -248,16 +248,14 @@ create table if not exists public.site_settings (
   hero_title   text,
   hero_subtitle text,
   featured_ids text[] not null default '{}',
-  razorpay_key text,
   updated_at   timestamptz not null default now()
 );
 
 alter table public.site_settings enable row level security;
 
--- SECURITY NOTE: site_settings is world-readable because the public homepage
--- needs hero_title/hero_subtitle/featured_ids. The razorpay_key column should
--- only be used server-side (API routes) and never sent to the browser. If this
--- becomes a concern, split into a public view (without key) and an admin-only table.
+-- SECURITY: site_settings is world-readable because the public homepage
+-- needs hero_title/hero_subtitle/featured_ids. No secret columns exist.
+-- For sensitive settings, use a separate admin-only table.
 drop policy if exists "site_settings_select" on public.site_settings;
 create policy "site_settings_select" on public.site_settings
   for select using (true);
@@ -267,8 +265,8 @@ create policy "site_settings_all" on public.site_settings
   for all using (public.is_admin()) with check (public.is_admin());
 
 -- Seed the single settings row if it does not exist yet.
-insert into public.site_settings (id, hero_title, hero_subtitle, featured_ids, razorpay_key)
-values (1, '', '', '{}', '')
+insert into public.site_settings (id, hero_title, hero_subtitle, featured_ids)
+values (1, '', '', '{}')
 on conflict (id) do nothing;
 
 -- ---------------------------------------------------------------------------
@@ -326,6 +324,7 @@ create trigger set_created_by
 -- Server-side role check + created_by from auth.uid()
 -- ---------------------------------------------------------------------------
 create or replace function public.create_campaign(
+  p_id uuid default null,
   p_title text,
   p_brief text,
   p_platform text,
@@ -394,15 +393,16 @@ begin
   end if;
 
   -- Insert campaign (created_by is set by trigger to auth.uid())
+  -- If p_id is provided, use it (allows pre-specifying for storage path consistency)
   insert into public.campaigns (
-    title, brief, platform, payout, creator, niche, budget, days_left,
+    id, title, brief, platform, payout, creator, niche, budget, days_left,
     source_link, rules, category, platforms, objective, start_date, end_date,
     max_payout_per_clip, recommended_duration, hook, caption_req, aspect_ratio,
     cta, branding, do_list, dont_list, source_assets, example_clips,
     view_rules, approval, thumbnails, brand_assets, spend_cap, timezone,
     what_to_make, style, rights, status
   ) values (
-    p_title, p_brief, p_platform, p_payout, p_creator, p_niche, p_budget, p_days_left,
+    coalesce(p_id, gen_random_uuid()), p_title, p_brief, p_platform, p_payout, p_creator, p_niche, p_budget, p_days_left,
     p_source_link, p_rules, p_category, p_platforms, p_objective, p_start_date, p_end_date,
     p_max_payout_per_clip, p_recommended_duration, p_hook, p_caption_req, p_aspect_ratio,
     p_cta, p_branding, p_do_list, p_dont_list, p_source_assets, p_example_clips,
@@ -416,7 +416,7 @@ end;
 $$;
 
 grant execute on function public.create_campaign(
-  text, text, text, numeric, text, text, numeric, integer, text, text, text,
+  uuid, text, text, text, numeric, text, text, numeric, integer, text, text, text,
   jsonb, text, date, date, numeric, text, text, text, text, text, text,
   jsonb, jsonb, jsonb, jsonb, jsonb, jsonb, jsonb, jsonb, numeric, text,
   text, text, jsonb, text

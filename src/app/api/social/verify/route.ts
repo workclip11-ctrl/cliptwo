@@ -94,15 +94,17 @@ export async function POST(request: Request) {
       account.handle,
     );
 
-    // 7. Update verification status
+    // 7. Update verification status (use service-role to bypass trigger restrictions
+    // on trusted fields: verified, provider_account_id)
     if (verification.verified) {
-      await supabase
+      await adminClient
         .from("social_accounts")
         .update({
           verified: true,
           provider_account_id: verification.providerAccountId,
         })
-        .eq("id", socialAccountId);
+        .eq("id", socialAccountId)
+        .eq("user_id", user.id);
 
       // Update connection verification timestamp
       await adminClient

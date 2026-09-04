@@ -1030,6 +1030,7 @@ interface StoreActions {
   addCampaign: (
     c: Omit<Campaign, "id" | "createdAt" | "status">,
     status?: CampaignStatus,
+    campaignId?: string,
   ) => void;
   addClip: (k: Omit<Clip, "id" | "submittedAt" | "status" | "views">) => void;
   approveClip: (id: string, actor?: string) => void;
@@ -1412,7 +1413,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         supabase.from("profiles").select("*"),
         supabase.from("social_accounts").select("*"),
         supabase.from("site_settings").select("*").eq("id", 1).maybeSingle(),
-        supabase.from("financial_records").select("*"),
+        // SECURITY: Use get_safe_finance_records() instead of direct table access.
+        // This function strips sensitive fields (clipper_id, upi_id_snapshot,
+        // payment_reference, paid_by) for creators, while returning full data
+        // for clippers (own records) and admins (all records).
+        supabase.rpc("get_safe_finance_records").then(({ data, error }) => {
+          if (error) return { data: null };
+          // RPC returns array of objects; map to FinanceRecord shape
+          return { data };
+        }),
         supabase.from("payout_requests").select("*"),
       ]);
       if (!active) return;
@@ -1524,13 +1533,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       clearError: () => {
         setState((s) => ({ ...s, lastError: undefined }));
       },
-      addCampaign: (c, status = "open") => {
+      addCampaign: (c, status = "open", campaignId) => {
         // SECURITY: Every campaign must have a creator (created_by).
         // The caller must provide created_by. If missing, the campaign is
         // rejected in production (Supabase enforces NOT NULL via RPC).
+        // If campaignId is provided, use it (allows pre-specifying for storage path consistency).
+        const campaignIdValue = campaignId ?? `c${Date.now()}`;
         const optimistic: Campaign = {
           ...c,
-          id: `c${Date.now()}`,
+          id: campaignIdValue,
           createdAt: Date.now(),
           status,
           created_by: c.created_by,
@@ -1541,6 +1552,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         (async () => {
           // SECURITY: Use RPC for server-side creator role validation
           const { data, error } = await supabase.rpc("create_campaign", {
+            p_id: campaignId,
             p_title: c.title,
             p_brief: c.brief,
             p_platform: c.platform,
@@ -2425,6 +2437,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
       addSocialAccount: (a) => {
+        // SECURITY: Only manages local React state for optimistic UI.
+        // Database persistence happens server-side through the OAuth flow:
+        //   - OAuth initiate → creates state record (service-role)
+        //   - OAuth callback → creates/updates social_accounts + social_connections (service-role)
+        // Direct client INSERT to social_accounts is forbidden by RLS.
         const id = `sa_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const record: SocialAccount = {
           id,
@@ -2440,75 +2457,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           error: a.error,
         };
         setState((s) => ({ ...s, socialAccounts: [...s.socialAccounts, record] }));
-        if (!isSupabaseConfigured) return id;
-        // Fire-and-forget async DB insert — if it fails, rollback from state
-        void supabase.from("social_accounts").insert({
-          id,
-          user_id: a.userId,
-          platform: a.platform,
-          handle: a.handle,
-          provider_account_id: a.providerAccountId ?? null,
-          avatar_url: a.avatarUrl ?? null,
-          status: a.status,
-          verified: a.verified,
-          connected_at: a.connectedAt
-            ? new Date(a.connectedAt).toISOString()
-            : null,
-          last_sync_at: a.lastSyncAt
-            ? new Date(a.lastSyncAt).toISOString()
-            : null,
-          error: a.error,
-        }).then(({ error }) => {
-          if (error) {
-            console.error("Social account insert failed:", error.message);
-            setState((s) => ({
-              ...s,
-              socialAccounts: s.socialAccounts.filter((acc) => acc.id !== id),
-              lastError: `Failed to connect social account: ${error.message}`,
-            }));
-          }
-        }, (e: unknown) => {
-          console.error("Social account insert network error:", e);
-          setState((s) => ({
-            ...s,
-            socialAccounts: s.socialAccounts.filter((acc) => acc.id !== id),
-            lastError: "Failed to connect social account: network error",
-          }));
-        });
         return id;
       },
 
       updateSocialAccount: async (id, patch) => {
-        const prevAccounts = stateRef.current.socialAccounts;
+        // SECURITY: Only manages local React state for optimistic UI.
+        // Database persistence happens server-side:
+        //   - OAuth callback → updates social_accounts (service-role)
+        //   - Disconnect API → updates status (service-role)
+        //   - Verify API → updates verified fields (service-role)
+        // Direct client UPDATE to social_accounts is forbidden by RLS
+        // for trusted fields (verified, provider_account_id, status).
         setState((s) => ({
           ...s,
           socialAccounts: s.socialAccounts.map((acc) =>
             acc.id === id ? { ...acc, ...patch } : acc,
           ),
         }));
-        if (!isSupabaseConfigured) return;
-        const payload: Record<string, unknown> = {};
-        if (patch.handle !== undefined) payload.handle = patch.handle;
-        if (patch.status !== undefined) payload.status = patch.status;
-        if (patch.verified !== undefined) payload.verified = patch.verified;
-        if (patch.error !== undefined) payload.error = patch.error;
-        if (patch.providerAccountId !== undefined)
-          payload.provider_account_id = patch.providerAccountId;
-        if (patch.avatarUrl !== undefined)
-          payload.avatar_url = patch.avatarUrl;
-        if (patch.connectedAt !== undefined)
-          payload.connected_at = patch.connectedAt
-            ? new Date(patch.connectedAt).toISOString()
-            : null;
-        if (patch.lastSyncAt !== undefined)
-          payload.last_sync_at = patch.lastSyncAt
-            ? new Date(patch.lastSyncAt).toISOString()
-            : null;
-        const { error } = await supabase.from("social_accounts").update(payload).eq("id", id);
-        if (error) {
-          console.error("Social account update failed:", error.message);
-          setState((s) => ({ ...s, socialAccounts: prevAccounts, lastError: `Social account update failed: ${error.message}` }));
-        }
       },
 
       setSiteSettings: async (site) => {

@@ -268,13 +268,16 @@ export default function NewCampaignWizard() {
     setIsSubmitting(true);
     try {
       // Upload files to storage before creating the campaign
+      // Generate a temporary campaign ID for storage path; the real campaign
+      // will be created with this ID via the create_campaign RPC.
+      const tempCampaignId = crypto.randomUUID();
       const uploadedSourceAssets: CampaignSourceAsset[] = [];
       const uploadedThumbnails: string[] = [];
       const uploadedBrandAssets: CampaignSourceAsset[] = [];
 
       if (sourceType === "file" && sourceFile) {
         setSourceUploading(true);
-        const url = await uploadCampaignFile("source", sourceFile);
+        const url = await uploadCampaignFile("source", tempCampaignId, sourceFile);
         setSourceUploading(false);
         if (url) uploadedSourceAssets.push({ label: sourceFile.name, url });
       } else if (sourceType === "link" && sourceLink.trim()) {
@@ -283,19 +286,21 @@ export default function NewCampaignWizard() {
 
       if (thumbFile) {
         setThumbUploading(true);
-        const url = await uploadCampaignFile("thumbnail", thumbFile);
+        const url = await uploadCampaignFile("thumbnail", tempCampaignId, thumbFile);
         setThumbUploading(false);
         if (url) uploadedThumbnails.push(url);
       }
 
       if (brandFile) {
         setBrandUploading(true);
-        const url = await uploadCampaignFile("brand", brandFile);
+        const url = await uploadCampaignFile("brand", tempCampaignId, brandFile);
         setBrandUploading(false);
         if (url) uploadedBrandAssets.push({ label: brandFile.name, url });
       }
 
       // Build and submit the campaign with the uploaded URLs
+      // Pass tempCampaignId so the RPC creates the campaign with the same ID
+      // used for storage path consistency.
       addCampaign(
         buildCampaign({
           sourceAssets: uploadedSourceAssets,
@@ -303,6 +308,7 @@ export default function NewCampaignWizard() {
           brandAssets: uploadedBrandAssets,
         }),
         status,
+        tempCampaignId,
       );
       setSavedMsg(
         status === "draft"

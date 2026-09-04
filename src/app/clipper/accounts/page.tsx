@@ -19,6 +19,7 @@ import {
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
 import {
   CONNECTABLE_PLATFORMS,
   COMING_SOON_PLATFORMS,
@@ -69,52 +70,55 @@ function fmtDate(ts?: number) {
 }
 
 export default function SocialAccountsPage() {
-  const { socialAccounts, addSocialAccount, updateSocialAccount } = useStore();
+  const { socialAccounts, updateSocialAccount } = useStore();
   const { user } = useAuth();
   const myAccounts = socialAccounts.filter(
     (a) => a.userId && a.userId === user?.id,
   );
+
+  // Reload social accounts from DB (called after OAuth callback)
+  const reloadSocialAccounts = useCallback(async () => {
+    if (!isSupabaseConfigured || !user) return;
+    const { data } = await supabase
+      .from("social_accounts")
+      .select("*")
+      .eq("user_id", user.id);
+    if (!data) return;
+    // Update store with fresh DB data for each account
+    for (const r of data) {
+      const mapped = {
+        id: r.id as string,
+        userId: r.user_id as string,
+        platform: r.platform as Platform,
+        handle: r.handle as string,
+        providerAccountId: r.provider_account_id as string | undefined,
+        avatarUrl: r.avatar_url as string | undefined,
+        status: r.status as SocialAccountStatus,
+        verified: r.verified as boolean,
+        connectedAt: r.connected_at ? new Date(r.connected_at as string).getTime() : undefined,
+        lastSyncAt: r.last_sync_at ? new Date(r.last_sync_at as string).getTime() : undefined,
+        error: r.error as string | undefined,
+      };
+      updateSocialAccount(mapped.id, mapped);
+    }
+  }, [user, updateSocialAccount]);
 
   const [connecting, setConnecting] = useState<string | null>(null);
   const [modal, setModal] = useState<Platform | null>(null);
   const [handle, setHandle] = useState("");
   const [verifying, setVerifying] = useState<string | null>(null);
 
-  // Handle OAuth callback results from URL params
+  // Handle OAuth callback results from URL params and reload from DB
   const handleOAuthCallback = useCallback(() => {
     const params = new URLSearchParams(window.location.search);
     const connectedPlatform = params.get("connected");
-    const verified = params.get("verified");
     const error = params.get("error");
-    const platform = params.get("platform");
-
-    if (error) {
-      const account = myAccounts.find(
-        (a) => a.platform.toLowerCase() === (platform ?? "").toLowerCase(),
-      );
-      if (account) {
-        updateSocialAccount(account.id, {
-          status: "connection_error",
-          error: `OAuth error: ${error.replace(/_/g, " ")}`,
-        });
-      }
-    } else if (connectedPlatform) {
-      const account = myAccounts.find(
-        (a) =>
-          a.platform.toLowerCase() === connectedPlatform.toLowerCase() &&
-          a.status === "connecting",
-      );
-      if (account) {
-        updateSocialAccount(account.id, {
-          status: verified === "true" ? "verified" : "connected",
-          verified: verified === "true",
-          connectedAt: Date.now(),
-          lastSyncAt: Date.now(),
-        });
-      }
-    }
 
     if (error || connectedPlatform) {
+      // Reload social accounts from DB (server created/updated the real record)
+      void reloadSocialAccounts();
+
+      // Clean URL params
       const url = new URL(window.location.href);
       url.searchParams.delete("connected");
       url.searchParams.delete("verified");
@@ -122,13 +126,16 @@ export default function SocialAccountsPage() {
       url.searchParams.delete("platform");
       window.history.replaceState({}, "", url.toString());
     }
-  }, [myAccounts, updateSocialAccount]);
+  }, [reloadSocialAccounts]);
 
   useEffect(() => {
     handleOAuthCallback();
   }, [handleOAuthCallback]);
 
   // ── OAuth initiation ──────────────────────────────────────────────────────
+  // SECURITY: Does NOT create a fake social_accounts row in the DB.
+  // The server OAuth callback creates/updates the real record via service-role.
+  // Local "connecting" state is tracked only in component state.
 
   async function submitConnect() {
     if (!modal) return;
@@ -137,14 +144,6 @@ export default function SocialAccountsPage() {
     const platform = modal;
     setModal(null);
     setConnecting(platform);
-
-    const id = addSocialAccount({
-      userId: user?.id,
-      platform,
-      handle: h,
-      status: "connecting",
-      verified: false,
-    });
 
     try {
       const res = await fetch("/api/social/oauth/initiate", {
@@ -162,19 +161,16 @@ export default function SocialAccountsPage() {
       // Real OAuth: redirect to provider
       window.location.href = data.authorizationUrl;
     } catch (e) {
-      updateSocialAccount(id, {
-        status: "connection_error",
-        error: e instanceof Error ? e.message : "Connection failed",
-      });
+      console.error("OAuth initiation failed:", e);
       setConnecting(null);
     }
   }
 
   // ── Reconnect ─────────────────────────────────────────────────────────────
+  // SECURITY: Does NOT update the DB directly. Server OAuth callback handles it.
 
   async function reconnect(acc: SocialAccount) {
     setConnecting(acc.id);
-    updateSocialAccount(acc.id, { status: "connecting", error: undefined });
 
     try {
       const res = await fetch("/api/social/oauth/initiate", {
@@ -191,10 +187,7 @@ export default function SocialAccountsPage() {
 
       window.location.href = data.authorizationUrl;
     } catch (e) {
-      updateSocialAccount(acc.id, {
-        status: "connection_error",
-        error: e instanceof Error ? e.message : "Reconnection failed",
-      });
+      console.error("Reconnect failed:", e);
       setConnecting(null);
     }
   }
@@ -221,6 +214,8 @@ export default function SocialAccountsPage() {
   }
 
   // ── Verify ownership ──────────────────────────────────────────────────────
+  // SECURITY: Server-side verifies and updates social_accounts via service-role.
+  // Local state is updated optimistically after server confirms.
 
   async function verifyAccount(acc: SocialAccount) {
     setVerifying(acc.id);

@@ -124,7 +124,7 @@ export function EditCampaignModal({
     const file = e.target.files?.[0];
     if (!file) return;
     setThumbnailUploading(true);
-    const url = await uploadCampaignFile("thumbnail", file);
+    const url = await uploadCampaignFile("thumbnail", campaign.id, file);
     if (url) setThumbnail(url);
     setThumbnailUploading(false);
     e.target.value = "";
@@ -134,7 +134,7 @@ export function EditCampaignModal({
     const file = e.target.files?.[0];
     if (!file) return;
     setBrandAssetUploading(true);
-    const url = await uploadCampaignFile("brand-asset", file);
+    const url = await uploadCampaignFile("brand-asset", campaign.id, file);
     if (url) setBrandAsset(url);
     setBrandAssetUploading(false);
     e.target.value = "";
