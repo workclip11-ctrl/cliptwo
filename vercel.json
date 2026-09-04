@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/metrics/sync/cron",
-      "schedule": "0 */6 * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
