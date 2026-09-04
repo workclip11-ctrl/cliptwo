@@ -115,17 +115,32 @@ export default function SocialAccountsPage() {
     return data.session?.access_token ?? null;
   }
 
-  // Handle OAuth callback results from URL params and reload from DB
-  const handleOAuthCallback = useCallback(() => {
+  // Handle OAuth callback results from URL params and reload from DB.
+  // Runs once on mount after redirect from OAuth callback.
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const connectedPlatform = params.get("connected");
     const error = params.get("error");
 
-    if (error || connectedPlatform) {
-      // Reload social accounts from DB (server created/updated the real record)
+    if (error) {
+      const errorMessages: Record<string, string> = {
+        provider_denied: "You denied access on the provider's page.",
+        invalid_state: "OAuth state expired or was already used. Please try again.",
+        state_expired: "The OAuth session expired. Please try again.",
+        missing_params: "Missing required parameters from the OAuth callback.",
+        platform_mismatch: "Platform mismatch during OAuth flow.",
+        unknown_platform: "Unknown platform in OAuth callback.",
+      };
+      const friendlyMessage = errorMessages[error]
+        ?? `OAuth failed: ${decodeURIComponent(error)}`;
+      // Defer state update to avoid cascading renders
+      queueMicrotask(() => setOauthError(friendlyMessage));
       void reloadSocialAccounts();
+    } else if (connectedPlatform) {
+      void reloadSocialAccounts();
+    }
 
-      // Clean URL params
+    if (error || connectedPlatform) {
       const url = new URL(window.location.href);
       url.searchParams.delete("connected");
       url.searchParams.delete("verified");
@@ -133,11 +148,8 @@ export default function SocialAccountsPage() {
       url.searchParams.delete("platform");
       window.history.replaceState({}, "", url.toString());
     }
-  }, [reloadSocialAccounts]);
-
-  useEffect(() => {
-    handleOAuthCallback();
-  }, [handleOAuthCallback]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── OAuth initiation ──────────────────────────────────────────────────────
   // SECURITY: Does NOT create a fake social_accounts row in the DB.

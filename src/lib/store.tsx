@@ -2386,12 +2386,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         //   - Verify API → updates verified fields (service-role)
         // Direct client UPDATE to social_accounts is forbidden by RLS
         // for trusted fields (verified, provider_account_id, status).
-        setState((s) => ({
-          ...s,
-          socialAccounts: s.socialAccounts.map((acc) =>
-            acc.id === id ? { ...acc, ...patch } : acc,
-          ),
-        }));
+        setState((s) => {
+          const exists = s.socialAccounts.some((acc) => acc.id === id);
+          if (exists) {
+            // Update existing entry
+            return {
+              ...s,
+              socialAccounts: s.socialAccounts.map((acc) =>
+                acc.id === id ? { ...acc, ...patch } : acc,
+              ),
+            };
+          }
+          // Insert new entry (OAuth callback created it in DB, reload fetched it)
+          return {
+            ...s,
+            socialAccounts: [...s.socialAccounts, patch as SocialAccount],
+          };
+        });
       },
 
       setSiteSettings: async (site) => {

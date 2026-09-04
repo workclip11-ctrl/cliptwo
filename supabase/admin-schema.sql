@@ -1403,6 +1403,13 @@ security definer
 set search_path = public
 as $$
 begin
+  -- Service-role (auth.uid() is NULL) — trusted server operations, skip checks.
+  -- The OAuth callback, disconnect, and verify routes use service-role for
+  -- trusted writes. These are server-side only and never reachable from the browser.
+  if auth.uid() is null then
+    return NEW;
+  end if;
+
   -- Admins can change anything (skip checks)
   if public.is_admin() then
     return NEW;
