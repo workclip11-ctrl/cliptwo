@@ -105,8 +105,8 @@ export default function SocialAccountsPage() {
 
   const [connecting, setConnecting] = useState<string | null>(null);
   const [modal, setModal] = useState<Platform | null>(null);
-  const [handle, setHandle] = useState("");
   const [verifying, setVerifying] = useState<string | null>(null);
+  const [oauthError, setOauthError] = useState<string | null>(null);
 
   // Handle OAuth callback results from URL params and reload from DB
   const handleOAuthCallback = useCallback(() => {
@@ -139,10 +139,8 @@ export default function SocialAccountsPage() {
 
   async function submitConnect() {
     if (!modal) return;
-    const h = handle.trim();
-    if (!h) return;
     const platform = modal;
-    setModal(null);
+    setOauthError(null);
     setConnecting(platform);
 
     try {
@@ -158,10 +156,13 @@ export default function SocialAccountsPage() {
         throw new Error(data.error || "Failed to initiate OAuth");
       }
 
-      // Real OAuth: redirect to provider
+      // Success — redirect to provider
+      setModal(null);
       window.location.href = data.authorizationUrl;
     } catch (e) {
-      console.error("OAuth initiation failed:", e);
+      const msg = e instanceof Error ? e.message : "OAuth initiation failed";
+      console.error("OAuth initiation failed:", msg);
+      setOauthError(msg);
       setConnecting(null);
     }
   }
@@ -171,6 +172,7 @@ export default function SocialAccountsPage() {
 
   async function reconnect(acc: SocialAccount) {
     setConnecting(acc.id);
+    setOauthError(null);
 
     try {
       const res = await fetch("/api/social/oauth/initiate", {
@@ -187,7 +189,9 @@ export default function SocialAccountsPage() {
 
       window.location.href = data.authorizationUrl;
     } catch (e) {
-      console.error("Reconnect failed:", e);
+      const msg = e instanceof Error ? e.message : "Reconnection failed";
+      console.error("Reconnect failed:", msg);
+      setOauthError(msg);
       setConnecting(null);
     }
   }
@@ -470,6 +474,20 @@ export default function SocialAccountsPage() {
         </div>
       )}
 
+      {/* OAuth error banner (shown outside modal for reconnect errors) */}
+      {oauthError && !modal && (
+        <div className="rounded-xl border border-red/30 bg-red/5 p-4 text-sm text-red">
+          <p className="font-medium">Connection failed</p>
+          <p className="mt-1 text-xs">{oauthError}</p>
+          <button
+            onClick={() => setOauthError(null)}
+            className="mt-2 text-xs font-medium underline hover:no-underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-6">
           <div className="w-full max-w-sm rounded-2xl border bg-card p-6">
@@ -478,7 +496,7 @@ export default function SocialAccountsPage() {
               <button
                 onClick={() => {
                   setModal(null);
-                  setHandle("");
+                  setOauthError(null);
                 }}
                 aria-label="Close"
                 className="rounded-md p-1 text-muted hover:text-foreground"
@@ -487,32 +505,33 @@ export default function SocialAccountsPage() {
               </button>
             </div>
             <p className="mt-2 text-sm text-muted">
-              Enter your {modal} username. You&apos;ll be redirected to {modal} to
-              authorize the connection.
+              You&apos;ll be redirected to {modal} to authorize the connection.
+              Your channel will be verified automatically.
             </p>
-            <label className="mt-4 block text-sm">
-              <span className="text-muted">Username / handle</span>
-              <input
-                value={handle}
-                onChange={(e) => setHandle(e.target.value)}
-                placeholder="@yourhandle"
-                autoFocus
-                className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
-              />
-            </label>
+
+            {oauthError && (
+              <div className="mt-3 rounded-md border border-red/30 bg-red/5 p-3 text-xs text-red">
+                {oauthError}
+              </div>
+            )}
 
             <div className="mt-4 flex gap-2">
               <button
                 onClick={submitConnect}
-                disabled={!handle.trim()}
+                disabled={!!connecting}
                 className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
               >
-                <ExternalLink size={14} /> Connect via OAuth
+                {connecting ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <ExternalLink size={14} />
+                )}
+                {connecting ? "Connecting…" : "Connect via OAuth"}
               </button>
               <button
                 onClick={() => {
                   setModal(null);
-                  setHandle("");
+                  setOauthError(null);
                 }}
                 className="rounded-lg border px-4 py-2 text-sm font-medium"
               >
@@ -527,6 +546,5 @@ export default function SocialAccountsPage() {
 
   function openConnect(platform: Platform) {
     setModal(platform);
-    setHandle("");
   }
 }

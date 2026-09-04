@@ -42,6 +42,8 @@ export async function POST(request: Request) {
       redirectTo?: string;
     };
 
+    console.log(`[oauth/initiate] Starting OAuth for platform: ${platform}`);
+
     if (!VALID_PLATFORMS.includes(platform)) {
       return NextResponse.json(
         { error: "Invalid platform. Only Instagram and YouTube are supported for OAuth." },
@@ -50,6 +52,7 @@ export async function POST(request: Request) {
     }
 
     if (!isProviderConfigured(platform)) {
+      console.error(`[oauth/initiate] ${platform} provider not configured — missing environment variables`);
       return NextResponse.json(
         {
           error: `${platform} OAuth is not configured. Set ${platform === "Instagram" ? "INSTAGRAM_CLIENT_ID/SECRET" : "YOUTUBE_CLIENT_ID/SECRET"} environment variables.`,
@@ -65,13 +68,13 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser();
 
     if (!user) {
+      console.error("[oauth/initiate] Authentication failed — no user session");
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
+    console.log(`[oauth/initiate] Authenticated user: ${user.id}`);
+
     // ── Step 2: Service-role client for trusted DB operations ───────────
-    // RLS policies on social_oauth_states have been removed.
-    // This endpoint is a trusted server route that must use elevated access
-    // after verifying the user.
     const adminClient = createServiceClient();
 
     // ── Step 3: Generate cryptographically random state ─────────────────
@@ -84,6 +87,8 @@ export async function POST(request: Request) {
       : provider.getAuthorizationUrl(user.id, state);
 
     const { authorizationUrl, codeVerifier } = authResult;
+
+    console.log(`[oauth/initiate] Generated state, PKCE: ${codeVerifier ? "yes" : "no"}`);
 
     // ── Step 4: Store state + optional PKCE verifier via service-role ───
     const { error: stateError } = await adminClient
@@ -105,11 +110,13 @@ export async function POST(request: Request) {
       );
     }
 
+    console.log(`[oauth/initiate] OAuth state stored, returning authorization URL`);
+
     return NextResponse.json({ authorizationUrl });
   } catch (e) {
-    console.error("[oauth/initiate]", e);
+    console.error("[oauth/initiate] Unexpected error:", e);
     return NextResponse.json(
-      { error: "Failed to initiate OAuth" },
+      { error: "Server OAuth configuration is incomplete." },
       { status: 500 },
     );
   }
