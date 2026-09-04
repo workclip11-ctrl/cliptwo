@@ -1032,7 +1032,7 @@ interface StoreActions {
     status?: CampaignStatus,
     campaignId?: string,
   ) => Promise<string | null>;
-  addClip: (k: Omit<Clip, "id" | "submittedAt" | "status" | "views">) => void;
+  addClip: (k: Omit<Clip, "id" | "submittedAt" | "status" | "views">) => Promise<Clip | null>;
   approveClip: (id: string, actor?: string) => void;
   rejectClip: (id: string, reason: string, details?: string, actor?: string) => void;
   holdClip: (id: string, reason: string, actor?: string) => void;
@@ -1081,44 +1081,6 @@ interface StoreActions {
   setSiteSettings: (s: SiteSettings) => void;
   toggleSaveCampaign: (id: string) => void;
 }
-
-// Maps Campaign model keys to DB columns for `updateCampaign`. Only keys
-// present in the patch are written, so partial edits never clobber fields.
-const CAMPAIGN_DB_MAP: Record<string, string> = {
-  title: "title",
-  brief: "brief",
-  platform: "platform",
-  payout: "payout",
-  niche: "niche",
-  budget: "budget",
-  spent: "spent",
-  daysLeft: "days_left",
-  sourceLink: "source_link",
-  rules: "rules",
-  category: "category",
-  platforms: "platforms",
-  verified: "verified",
-  objective: "objective",
-  startDate: "start_date",
-  endDate: "end_date",
-  maxPayoutPerClip: "max_payout_per_clip",
-  recommendedDuration: "recommended_duration",
-  hook: "hook",
-  captionReq: "caption_req",
-  aspectRatio: "aspect_ratio",
-  cta: "cta",
-  branding: "branding",
-  viewRules: "view_rules",
-  approval: "approval",
-  thumbnails: "thumbnails",
-  brandAssets: "brand_assets",
-  spendCap: "spend_cap",
-  timezone: "timezone",
-  whatToMake: "what_to_make",
-  style: "style",
-  rights: "rights",
-  status: "status",
-};
 
 // Maps Profile model keys to DB columns for admin updates. Only keys present
 // in the patch are written, so partial edits never clobber fields.
@@ -1611,7 +1573,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return campaignIdValue;
       },
 
-      addClip: (k) => {
+      addClip: async (k) => {
         const cur = stateRef.current;
         const camp = cur.campaigns.find((c) => c.id === k.campaignId);
 
@@ -1627,36 +1589,37 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         };
         setState((s) => ({ ...s, clips: [optimistic, ...s.clips] }));
 
-        if (!isSupabaseConfigured) return;
-        (async () => {
-          // Server-side validation: submit_clip RPC checks role, campaign status,
-          // budget, platform, duplicate URLs, and locks the campaign row.
-          const { data, error } = await supabase.rpc("submit_clip", {
-            p_campaign_id: k.campaignId,
-            p_caption: k.caption,
-            p_video_url: k.videoUrl,
-            p_platform: k.platform ?? "Instagram",
-          });
-          if (error) {
-            // Rollback optimistic clip on failure
-            setState((s) => ({
-              ...s,
-              clips: s.clips.filter((x) => x.id !== optimistic.id),
-              lastError: `Failed to submit clip: ${error.message}`,
-            }));
-            return;
-          }
-          if (data) {
-            // Replace optimistic clip with server-returned clip
-            setState((s) => ({
-              ...s,
-              clips: [
-                mapClip(data as Record<string, unknown>),
-                ...s.clips.filter((x) => x.id !== optimistic.id),
-              ],
-            }));
-          }
-        })();
+        if (!isSupabaseConfigured) return optimistic;
+        // Server-side validation: submit_clip RPC checks role, campaign status,
+        // budget, platform, duplicate URLs, and locks the campaign row.
+        const { data, error } = await supabase.rpc("submit_clip", {
+          p_campaign_id: k.campaignId,
+          p_caption: k.caption,
+          p_video_url: k.videoUrl,
+          p_platform: k.platform ?? "Instagram",
+        });
+        if (error) {
+          // Rollback optimistic clip on failure
+          setState((s) => ({
+            ...s,
+            clips: s.clips.filter((x) => x.id !== optimistic.id),
+            lastError: `Failed to submit clip: ${error.message}`,
+          }));
+          throw new Error(error.message);
+        }
+        if (data) {
+          // Replace optimistic clip with server-returned clip
+          const serverClip = mapClip(data as Record<string, unknown>);
+          setState((s) => ({
+            ...s,
+            clips: [
+              serverClip,
+              ...s.clips.filter((x) => x.id !== optimistic.id),
+            ],
+          }));
+          return serverClip;
+        }
+        return null;
       },
 
        approveClip: async (id, actor) => {
@@ -2088,34 +2051,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
       updateCampaign: async (id, patch, actor, action, note) => {
-        // SECURITY: Only campaign creator or admins can update campaigns.
-        const me = await getCurrentUser();
-        const camp = stateRef.current.campaigns.find((c) => c.id === id);
-        // Deny if campaign has no owner (production requires created_by) or user is not owner/admin
-        if (isSupabaseConfigured && me && camp && (!camp.created_by || (camp.created_by !== me.id && !await isUserAdmin(me.id)))) {
-          console.error(`Authorization: user ${me.id} cannot update campaign ${id}`);
-          return;
-        }
-
-        // FINANCIAL VERSIONING: Block CPM and maxPayoutPerClip changes when
-        // the campaign already has submissions. Creators must start a new
-        // campaign version for different financial terms.
-        const FINANCIAL_FIELDS = ["payout", "maxPayoutPerClip"] as const;
-        const hasClips = stateRef.current.clips.some((k) => k.campaignId === id);
-        if (hasClips) {
-          for (const field of FINANCIAL_FIELDS) {
-            if (field in patch && patch[field] !== camp?.[field]) {
-              console.error(
-                `Financial lock: cannot change ${field} on campaign "${camp?.title}" — ` +
-                  `campaign has existing submissions. Create a new campaign with the updated terms.`,
-              );
-              // Strip the blocked field from the patch
-              const { [field]: _removed, ...rest } = patch as Record<string, unknown>;
-              patch = rest as Partial<Campaign>;
-            }
-          }
-        }
         const prevCampaigns = stateRef.current.campaigns;
+        // Optimistic update
         setState((s) => {
           const entry: AuditEntry = {
             action: action ?? "updated",
@@ -2133,17 +2070,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           };
         });
         if (!isSupabaseConfigured) return;
-        const update: Record<string, unknown> = {};
-        for (const [k, v] of Object.entries(patch)) {
-          const col = CAMPAIGN_DB_MAP[k];
-          if (col) update[col] = (v as unknown) ?? null;
-        }
-        const currentCamp = stateRef.current.campaigns.find((c) => c.id === id);
-        update.audit = currentCamp?.audit ?? [];
-        const { error } = await supabase.from("campaigns").update(update).eq("id", id);
+        // Server-side validation: update_campaign RPC enforces ownership,
+        // financial field lock, and immutable field protection.
+        const { data, error } = await supabase.rpc("update_campaign", {
+          p_campaign_id: id,
+          p_patch: patch,
+        });
         if (error) {
-          console.error("Campaign update failed:", error.message);
+          console.error("RPC update_campaign failed:", error.message);
           setState((s) => ({ ...s, campaigns: prevCampaigns, lastError: `Campaign update failed: ${error.message}` }));
+          return;
+        }
+        // Replace optimistic with server-returned campaign
+        if (data) {
+          setState((s) => ({
+            ...s,
+            campaigns: [
+              mapCampaign(data as Record<string, unknown>),
+              ...s.campaigns.filter((c) => c.id !== id),
+            ],
+          }));
         }
       },
 

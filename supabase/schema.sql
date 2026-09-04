@@ -290,10 +290,10 @@ drop policy if exists "campaigns_insert" on public.campaigns;
 create policy "campaigns_insert" on public.campaigns for insert with check (auth.uid() = created_by);
 
 drop policy if exists "campaigns_update" on public.campaigns;
-create policy "campaigns_update" on public.campaigns for update using (auth.uid() = created_by);
+create policy "campaigns_update" on public.campaigns for update using (auth.uid() = created_by or public.is_admin());
 
 drop policy if exists "campaigns_delete" on public.campaigns;
-create policy "campaigns_delete" on public.campaigns for delete using (auth.uid() = created_by);
+create policy "campaigns_delete" on public.campaigns for delete using (auth.uid() = created_by or public.is_admin());
 
 drop policy if exists "clips_select" on public.clips;
 create policy "clips_select" on public.clips for select using (true);
@@ -301,8 +301,11 @@ create policy "clips_select" on public.clips for select using (true);
 drop policy if exists "clips_insert" on public.clips;
 create policy "clips_insert" on public.clips for insert with check (auth.uid() = user_id);
 
+-- UPDATE: only admins can update clips (status, views, financial fields)
+-- Clippers cannot update any fields after submission
 drop policy if exists "clips_update" on public.clips;
-create policy "clips_update" on public.clips for update using (auth.role() = 'authenticated');
+create policy "clips_update" on public.clips for update using (public.is_admin());
 
+-- DELETE: only admins can delete clips
 drop policy if exists "clips_delete" on public.clips;
-create policy "clips_delete" on public.clips for delete using (auth.role() = 'authenticated');
+create policy "clips_delete" on public.clips for delete using (public.is_admin());

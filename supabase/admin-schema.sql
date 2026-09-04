@@ -1309,21 +1309,47 @@ grant execute on function public.ingest_clip_metrics(uuid, integer, integer, int
 -- ---------------------------------------------------------------------------
 -- RPC: Get latest verified metrics for a clip
 -- Returns the most recent verified metric snapshot for display/earnings.
+-- Authorization: admin, clip owner, or campaign owner.
 -- ---------------------------------------------------------------------------
 create or replace function public.get_latest_verified_metrics(
   p_clip_id uuid
 )
 returns jsonb
-language sql
+language plpgsql
 security definer
 set search_path = public
 as $$
-  select to_jsonb(cm.*
-  ) from public.clip_metrics cm
+declare
+  v_clip record;
+  v_result jsonb;
+begin
+  -- Load clip to check ownership
+  select * into v_clip from public.clips where id = p_clip_id;
+  if not found then
+    raise exception 'Clip not found';
+  end if;
+
+  -- Authorization: admin, clip owner, or campaign owner
+  if not (
+    public.is_admin()
+    or v_clip.user_id = auth.uid()
+    or exists (
+      select 1 from public.campaigns c
+      where c.id = v_clip.campaign_id and c.created_by = auth.uid()
+    )
+  ) then
+    raise exception 'Not authorized to view metrics for this clip';
+  end if;
+
+  select to_jsonb(cm.*) into v_result
+  from public.clip_metrics cm
   where cm.clip_id = p_clip_id
     and cm.verification_status = 'verified'
   order by cm.captured_at desc
   limit 1;
+
+  return v_result;
+end;
 $$;
 
 grant execute on function public.get_latest_verified_metrics(uuid) to authenticated;
@@ -1331,23 +1357,53 @@ grant execute on function public.get_latest_verified_metrics(uuid) to authentica
 -- ---------------------------------------------------------------------------
 -- RPC: Get metric history for a clip
 -- Returns all metric snapshots (verified and pending) for a clip.
+-- Authorization: admin, clip owner, or campaign owner.
 -- ---------------------------------------------------------------------------
 create or replace function public.get_clip_metrics(
   p_clip_id uuid,
   p_limit integer default 50
 )
 returns jsonb
-language sql
+language plpgsql
 security definer
 set search_path = public
 as $$
-  select coalesce(jsonb_agg(cm.*), '[]'::jsonb)
+declare
+  v_clip record;
+  v_clamped_limit integer;
+  v_result jsonb;
+begin
+  -- Load clip to check ownership
+  select * into v_clip from public.clips where id = p_clip_id;
+  if not found then
+    raise exception 'Clip not found';
+  end if;
+
+  -- Authorization: admin, clip owner, or campaign owner
+  if not (
+    public.is_admin()
+    or v_clip.user_id = auth.uid()
+    or exists (
+      select 1 from public.campaigns c
+      where c.id = v_clip.campaign_id and c.created_by = auth.uid()
+    )
+  ) then
+    raise exception 'Not authorized to view metrics for this clip';
+  end if;
+
+  -- Clamp limit to safe range
+  v_clamped_limit := greatest(1, least(coalesce(p_limit, 50), 100));
+
+  select coalesce(jsonb_agg(cm.*), '[]'::jsonb) into v_result
   from (
     select * from public.clip_metrics
     where clip_id = p_clip_id
     order by captured_at desc
-    limit p_limit
+    limit v_clamped_limit
   ) cm;
+
+  return v_result;
+end;
 $$;
 
 grant execute on function public.get_clip_metrics(uuid, integer) to authenticated;
@@ -3102,6 +3158,146 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 -- ---------------------------------------------------------------------------
+-- RPC: update_campaign — Secure server-side campaign update.
+-- Enforces: authentication, ownership/admin, financial field lock,
+-- and blocks immutable fields. Replaces direct client UPDATE.
+-- ---------------------------------------------------------------------------
+create or replace function public.update_campaign(
+  p_campaign_id uuid,
+  p_patch jsonb
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_id uuid;
+  v_campaign record;
+  v_is_admin boolean;
+  v_update jsonb;
+  v_result jsonb;
+  v_FINANCIAL_FIELDS text[] := array['payout', 'max_payout_per_clip'];
+  v_IMMUTABLE_FIELDS text[] := array[
+    'id', 'created_by', 'created_at', 'archived_by', 'archived_at'
+  ];
+  v_field text;
+  v_has_clips boolean;
+begin
+  -- 1. Require authenticated user
+  v_user_id := auth.uid();
+  if v_user_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  -- 2. Check admin status
+  v_is_admin := public.is_admin();
+
+  -- 3. Require active creator or admin
+  if not v_is_admin then
+    if not exists (
+      select 1 from public.profiles
+      where id = v_user_id and role = 'creator' and status = 'active'
+    ) then
+      raise exception 'Only active creators or admins can update campaigns';
+    end if;
+  end if;
+
+  -- 4. Load the campaign
+  select * into v_campaign from public.campaigns where id = p_campaign_id;
+  if not found then
+    raise exception 'Campaign not found: %', p_campaign_id;
+  end if;
+
+  -- 5. Creator can only update own campaigns
+  if not v_is_admin and v_campaign.created_by != v_user_id then
+    raise exception 'Not authorized to update this campaign';
+  end if;
+
+  -- 6. Block immutable fields
+  for v_field in select unnest(v_IMMUTABLE_FIELDS)
+  loop
+    if p_patch ? v_field then
+      raise exception 'Cannot update immutable field: %', v_field;
+    end if;
+  end loop;
+
+  -- 7. Block status changes (use campaign_action/admin_campaign_action RPCs)
+  if p_patch ? 'status' then
+    raise exception 'Cannot change status through update. Use campaign_action RPC.';
+  end if;
+
+  -- 8. Financial field lock: block payout/max_payout_per_clip if clips exist
+  for v_field in select unnest(v_FINANCIAL_FIELDS)
+  loop
+    if p_patch ? v_field then
+      -- Check if any clips exist for this campaign (database is authoritative)
+      select exists (
+        select 1 from public.clips where campaign_id = p_campaign_id
+      ) into v_has_clips;
+
+      if v_has_clips then
+        raise exception 'Cannot change % on campaign with existing submissions. Create a new campaign with updated terms.', v_field;
+      end if;
+    end if;
+  end loop;
+
+  -- 9. Build safe update object (only known editable columns)
+  v_update := '{}'::jsonb;
+  if p_patch ? 'title' then v_update := v_update || jsonb_build_object('title', p_patch->>'title'); end if;
+  if p_patch ? 'brief' then v_update := v_update || jsonb_build_object('brief', p_patch->>'brief'); end if;
+  if p_patch ? 'platform' then v_update := v_update || jsonb_build_object('platform', p_patch->>'platform'); end if;
+  if p_patch ? 'payout' then v_update := v_update || jsonb_build_object('payout', (p_patch->>'payout')::numeric); end if;
+  if p_patch ? 'niche' then v_update := v_update || jsonb_build_object('niche', p_patch->>'niche'); end if;
+  if p_patch ? 'budget' then v_update := v_update || jsonb_build_object('budget', (p_patch->>'budget')::numeric); end if;
+  if p_patch ? 'spent' then v_update := v_update || jsonb_build_object('spent', (p_patch->>'spent')::numeric); end if;
+  if p_patch ? 'daysLeft' then v_update := v_update || jsonb_build_object('days_left', (p_patch->>'daysLeft')::integer); end if;
+  if p_patch ? 'sourceLink' then v_update := v_update || jsonb_build_object('source_link', p_patch->>'sourceLink'); end if;
+  if p_patch ? 'rules' then v_update := v_update || jsonb_build_object('rules', p_patch->>'rules'); end if;
+  if p_patch ? 'category' then v_update := v_update || jsonb_build_object('category', p_patch->>'category'); end if;
+  if p_patch ? 'platforms' then v_update := v_update || jsonb_build_object('platforms', p_patch->'platforms'); end if;
+  if p_patch ? 'verified' then v_update := v_update || jsonb_build_object('verified', (p_patch->>'verified')::boolean); end if;
+  if p_patch ? 'objective' then v_update := v_update || jsonb_build_object('objective', p_patch->>'objective'); end if;
+  if p_patch ? 'startDate' then v_update := v_update || jsonb_build_object('start_date', (p_patch->>'startDate')::date); end if;
+  if p_patch ? 'endDate' then v_update := v_update || jsonb_build_object('end_date', (p_patch->>'endDate')::date); end if;
+  if p_patch ? 'maxPayoutPerClip' then v_update := v_update || jsonb_build_object('max_payout_per_clip', (p_patch->>'maxPayoutPerClip')::numeric); end if;
+  if p_patch ? 'recommendedDuration' then v_update := v_update || jsonb_build_object('recommended_duration', p_patch->>'recommendedDuration'); end if;
+  if p_patch ? 'hook' then v_update := v_update || jsonb_build_object('hook', p_patch->>'hook'); end if;
+  if p_patch ? 'captionReq' then v_update := v_update || jsonb_build_object('caption_req', p_patch->>'captionReq'); end if;
+  if p_patch ? 'aspectRatio' then v_update := v_update || jsonb_build_object('aspect_ratio', p_patch->>'aspectRatio'); end if;
+  if p_patch ? 'cta' then v_update := v_update || jsonb_build_object('cta', p_patch->>'cta'); end if;
+  if p_patch ? 'branding' then v_update := v_update || jsonb_build_object('branding', p_patch->>'branding'); end if;
+  if p_patch ? 'viewRules' then v_update := v_update || jsonb_build_object('view_rules', p_patch->'viewRules'); end if;
+  if p_patch ? 'approval' then v_update := v_update || jsonb_build_object('approval', p_patch->'approval'); end if;
+  if p_patch ? 'thumbnails' then v_update := v_update || jsonb_build_object('thumbnails', p_patch->'thumbnails'); end if;
+  if p_patch ? 'brandAssets' then v_update := v_update || jsonb_build_object('brand_assets', p_patch->'brandAssets'); end if;
+  if p_patch ? 'spendCap' then v_update := v_update || jsonb_build_object('spend_cap', (p_patch->>'spendCap')::numeric); end if;
+  if p_patch ? 'timezone' then v_update := v_update || jsonb_build_object('timezone', p_patch->>'timezone'); end if;
+  if p_patch ? 'whatToMake' then v_update := v_update || jsonb_build_object('what_to_make', p_patch->>'whatToMake'); end if;
+  if p_patch ? 'style' then v_update := v_update || jsonb_build_object('style', p_patch->>'style'); end if;
+  if p_patch ? 'rights' then v_update := v_update || jsonb_build_object('rights', p_patch->'rights'); end if;
+
+  -- Nothing to update
+  if v_update = '{}'::jsonb then
+    raise exception 'No valid fields to update';
+  end if;
+
+  -- 10. Perform the update
+  execute format(
+    'UPDATE public.campaigns SET %s WHERE id = $1 RETURNING to_jsonb(campaigns.*)',
+    (select string_agg(key || ' = $2->>' || quote_literal(key), ', ')
+     from jsonb_object_keys(v_update) key)
+  )
+  using p_campaign_id, v_update
+  into v_result;
+
+  return v_result;
+end;
+$$;
+
+grant execute on function public.update_campaign(uuid, jsonb) to authenticated;
+
+-- ---------------------------------------------------------------------------
 -- RPC: submit_clip — Server-side clip submission with full validation.
 -- Replaces direct client INSERT into clips. Validates campaign status,
 -- budget, platform, fields, and duplicate URLs. Locks campaign row to
@@ -3216,6 +3412,8 @@ begin
   end if;
 
   -- 11. Store the campaign's current payout terms into locked fields
+  -- Convert from campaign rupees to paise for immutable financial versioning.
+  -- These paise values are used by approve_clip() and finalize_clip_earning().
   v_locked_cpm := case
     when v_campaign.payout is not null then round(v_campaign.payout * 100)::integer
     else null
@@ -3322,6 +3520,11 @@ begin
   end if;
 
   -- 5. Calculate gross from locked CPM and verified views
+  -- Unit convention:
+  --   financial_records.locked_cpm = paise (set by approve_clip from clips.locked_cpm)
+  --   financial_records.locked_max_payout = paise
+  --   campaigns.budget = rupees
+  -- gross = floor((views * locked_cpm_paise) / 1000)
   v_locked_cpm := v_record.locked_cpm;
   v_gross := (v_verified_views * v_locked_cpm) / 1000;
 

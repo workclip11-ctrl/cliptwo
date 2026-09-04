@@ -241,15 +241,19 @@ export default function CampaignDetail() {
         <SubmitClipModal
           campaign={campaign}
           onClose={() => setActive(false)}
-          onSubmit={(caption, videoUrl, platform: Platform) => {
-            addClip({
-              campaignId: campaign.id,
-              clipper: user?.name ?? user?.email ?? "clipper",
-              caption,
-              videoUrl,
-              platform,
-            });
-            setActive(false);
+          onSubmit={async (caption, videoUrl, platform: Platform) => {
+            try {
+              await addClip({
+                campaignId: campaign.id,
+                clipper: user?.name ?? user?.email ?? "clipper",
+                caption,
+                videoUrl,
+                platform,
+              });
+              setActive(false);
+            } catch {
+              // Error handled by store.lastError — keep modal open
+            }
           }}
         />
       )}

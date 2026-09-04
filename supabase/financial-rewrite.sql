@@ -278,19 +278,25 @@ BEGIN
   IF NOT FOUND THEN RAISE EXCEPTION 'Campaign not found'; END IF;
 
   -- FINANCIAL VERSIONING: Use clip's locked terms
+  -- Unit convention:
+  --   campaigns.payout = rupees
+  --   campaigns.max_payout_per_clip = rupees
+  --   clips.locked_cpm = paise (already converted by submit_clip)
+  --   clips.locked_max_payout = paise (already converted by submit_clip)
+  --   financial_records monetary fields = paise
   v_locked_cpm := CASE
-    WHEN v_clip.locked_cpm IS NOT NULL THEN round(v_clip.locked_cpm * 100)::integer
+    WHEN v_clip.locked_cpm IS NOT NULL THEN v_clip.locked_cpm::integer
     ELSE round(v_campaign.payout * 100)::integer
   END;
   v_verified_views := v_clip.verified_views;
 
-  -- Calculate gross: (views / 1000) * CPM in paise
+  -- Calculate gross: floor((views * locked_cpm_paise) / 1000)
   v_gross := (v_verified_views * v_locked_cpm) / 1000;
 
-  -- Apply maxPayoutPerClip cap
+  -- Apply maxPayoutPerClip cap (already in paise from clip, or convert from campaign rupees)
   v_max_payout := CASE
     WHEN v_clip.locked_max_payout IS NOT NULL AND v_clip.locked_max_payout > 0
-      THEN round(v_clip.locked_max_payout * 100)::integer
+      THEN v_clip.locked_max_payout::integer
     WHEN v_campaign.max_payout_per_clip IS NOT NULL AND v_campaign.max_payout_per_clip > 0
       THEN round(v_campaign.max_payout_per_clip * 100)::integer
     ELSE NULL
