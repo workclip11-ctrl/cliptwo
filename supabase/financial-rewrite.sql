@@ -4,6 +4,20 @@
 -- Separates clip moderation status from financial status.
 -- Creates authoritative financial_records and payout_requests tables.
 -- Migrates existing data. Safe to run once on existing databases.
+--
+-- FINANCIAL SEMANTICS (single source of truth):
+--
+-- financial_records.status = Earning lifecycle:
+--   pending    = Clip approved, earning calculated, awaiting finalization
+--   processing = Finalized, available for withdrawal
+--   paid       = Included in a completed payout request (permanently consumed)
+--
+-- payout_requests.status = Actual UPI payment lifecycle:
+--   pending    = Clipper requested withdrawal
+--   processing = Admin initiated UPI payment
+--   paid       = Admin confirmed UPI payment (money sent to clipper)
+--
+-- Wallet balance = sum(processing records) - sum(all active payout requests)
 -- ===========================================================================
 
 -- ────────────────────────────────────────────────────────────────────────────
@@ -23,7 +37,10 @@ CREATE TABLE IF NOT EXISTS public.financial_records (
   gross_amount        integer NOT NULL,            -- In paise: (views / 1000) * cpm
   platform_fee        integer NOT NULL,            -- In paise: 10% of gross
   net_amount          integer NOT NULL,            -- In paise: gross - platform_fee
-  -- Payment lifecycle
+  -- Payment lifecycle (earning finalization, NOT UPI payment)
+  -- pending    = awaiting finalization
+  -- processing = finalized, available for withdrawal
+  -- paid       = included in a completed payout (permanently consumed)
   status              text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'paid')),
   upi_id_snapshot     text,                        -- UPI at time of payment
   payment_reference   text,                        -- Manual payment reference (NEFT/ref no)
@@ -72,6 +89,8 @@ CREATE POLICY "financial_records_delete" ON public.financial_records
 -- ────────────────────────────────────────────────────────────────────────────
 -- STEP 2: Create payout_requests table
 -- Clipper-initiated payout requests. Admin processes manually via UPI.
+-- This is the ONLY authoritative record of actual money paid to clipper.
+-- Status: pending → processing → paid (no rejected/failed state)
 -- ────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.payout_requests (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -94,6 +113,10 @@ CREATE TABLE IF NOT EXISTS public.payout_requests (
 -- Indexes
 CREATE INDEX IF NOT EXISTS payout_requests_user_idx ON public.payout_requests(user_id);
 CREATE INDEX IF NOT EXISTS payout_requests_status_idx ON public.payout_requests(status);
+
+-- GIN index on finance_record_ids for uniqueness checks
+CREATE INDEX IF NOT EXISTS payout_requests_finance_record_ids_idx
+  ON public.payout_requests USING gin (finance_record_ids);
 
 -- RLS: user sees own, admin sees all
 ALTER TABLE public.payout_requests ENABLE ROW LEVEL SECURITY;
@@ -204,6 +227,7 @@ END $$;
 -- RPC: approve_clip — Admin approves a clip, creating a financial record.
 -- This is the ONLY way a financial record is created.
 -- Atomic: locks campaign, checks budget, creates record, all in one txn.
+-- Creates record as 'processing' (finalized, available for withdrawal).
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.approve_clip(
   p_clip_id uuid,
@@ -281,6 +305,7 @@ BEGIN
   v_net := v_gross - v_platform_fee;
 
   -- BUDGET ENFORCEMENT (atomic)
+  -- Reserved = all non-paid records (pending + processing)
   v_budget := v_campaign.budget;
   IF v_budget IS NOT NULL AND v_budget > 0 THEN
     SELECT coalesce(sum(gross_amount), 0) INTO v_reserved
@@ -295,7 +320,7 @@ BEGIN
     END IF;
   END IF;
 
-  -- INSERT financial record (immutable snapshot)
+  -- INSERT financial record as 'processing' (finalized, available for withdrawal)
   INSERT INTO public.financial_records (
     clip_id, campaign_id, clipper_id,
     locked_cpm, locked_max_payout, verified_views,
@@ -305,7 +330,7 @@ BEGIN
     p_clip_id, v_clip.campaign_id, v_clip.user_id,
     v_locked_cpm, v_clip.locked_max_payout, v_verified_views,
     v_gross, v_platform_fee, v_net,
-    'pending',
+    'processing',
     jsonb_build_object(
       'action', 'created',
       'by', coalesce(p_actor, (SELECT email FROM public.profiles WHERE id = auth.uid())),
@@ -332,101 +357,19 @@ $$;
 GRANT EXECUTE ON FUNCTION public.approve_clip(uuid, text) TO authenticated;
 
 -- ---------------------------------------------------------------------------
--- RPC: process_finance — Admin marks financial record as processing.
--- Manual UPI payment initiated. pending → processing.
+-- process_finance() and pay_finance() REMOVED.
+--
+-- financial_records.status represents earning finalization, NOT UPI payment.
+-- The actual UPI payment happens ONLY through payout_requests.
+--
+-- Earning lifecycle:  pending → processing (finalized) → paid (claimed by payout)
+-- Payment lifecycle:  pending → processing → paid (via payout_requests only)
 -- ---------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.process_finance(
-  p_record_id uuid,
-  p_upi_id text DEFAULT NULL,
-  p_actor text DEFAULT NULL
-)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_record jsonb;
-BEGIN
-  IF NOT public.is_admin() THEN
-    RAISE EXCEPTION 'Only admins can process financial records';
-  END IF;
-
-  UPDATE public.financial_records SET
-    status = 'processing',
-    upi_id_snapshot = coalesce(p_upi_id, upi_id_snapshot),
-    processing_at = now(),
-    audit = coalesce(audit, '[]'::jsonb) || jsonb_build_object(
-      'action', 'processing',
-      'by', coalesce(p_actor, (SELECT email FROM public.profiles WHERE id = auth.uid())),
-      'at', now()
-    )
-  WHERE id = p_record_id AND status = 'pending'
-  RETURNING to_jsonb(financial_records.*) INTO v_record;
-
-  IF v_record IS NULL THEN
-    RAISE EXCEPTION 'Financial record not found or not in pending status';
-  END IF;
-
-  RETURN v_record;
-END;
-$$;
-
-GRANT EXECUTE ON FUNCTION public.process_finance(uuid, text, text) TO authenticated;
-
--- ---------------------------------------------------------------------------
--- RPC: pay_finance — Admin confirms UPI payment. processing → paid.
--- This is the ONLY way money is released.
--- ---------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.pay_finance(
-  p_record_id uuid,
-  p_payment_reference text DEFAULT NULL,
-  p_actor text DEFAULT NULL
-)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_record record;
-  v_result jsonb;
-BEGIN
-  IF NOT public.is_admin() THEN
-    RAISE EXCEPTION 'Only admins can mark financial records as paid';
-  END IF;
-
-  SELECT * INTO v_record
-  FROM public.financial_records
-  WHERE id = p_record_id AND status = 'processing';
-
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'Financial record not found or not in processing status';
-  END IF;
-
-  UPDATE public.financial_records SET
-    status = 'paid',
-    payment_reference = coalesce(p_payment_reference, payment_reference),
-    paid_by = auth.uid(),
-    paid_at = now(),
-    audit = coalesce(audit, '[]'::jsonb) || jsonb_build_object(
-      'action', 'paid',
-      'by', coalesce(p_actor, (SELECT email FROM public.profiles WHERE id = auth.uid())),
-      'at', now(),
-      'payment_reference', p_payment_reference
-    )
-  WHERE id = p_record_id AND status = 'processing'
-  RETURNING to_jsonb(financial_records.*) INTO v_result;
-
-  RETURN v_result;
-END;
-$$;
-
-GRANT EXECUTE ON FUNCTION public.pay_finance(uuid, text, text) TO authenticated;
 
 -- ---------------------------------------------------------------------------
 -- RPC: request_payout — Clipper requests a payout of available funds.
 -- Creates a payout_requests record with status=pending.
+-- Uses advisory lock to prevent concurrent payout requests for same user.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.request_payout()
 RETURNS jsonb
@@ -442,6 +385,7 @@ DECLARE
   v_result jsonb;
   v_pending_count integer;
   v_record_ids uuid[];
+  v_record_sum integer;
 BEGIN
   -- 1. Get authenticated user
   v_user_id := auth.uid();
@@ -449,7 +393,15 @@ BEGIN
     RAISE EXCEPTION 'Not authenticated';
   END IF;
 
-  -- 2. Verify active account
+  -- 2. Advisory lock: serialize payout requests per user
+  -- Prevents two simultaneous requests from both succeeding
+  IF NOT pg_try_advisory_xact_lock(
+    ('x' || md5(v_user_id::text))::bit(64)::bigint
+  ) THEN
+    RAISE EXCEPTION 'Another payout request is being processed. Please try again.';
+  END IF;
+
+  -- 3. Verify active account
   IF NOT EXISTS (
     SELECT 1 FROM public.profiles
     WHERE id = v_user_id AND status = 'active'
@@ -457,7 +409,7 @@ BEGIN
     RAISE EXCEPTION 'Account is not active';
   END IF;
 
-  -- 3. Read verified UPI
+  -- 4. Read verified UPI
   SELECT upi INTO v_upi
   FROM public.profiles
   WHERE id = v_user_id AND status = 'active';
@@ -466,7 +418,7 @@ BEGIN
     RAISE EXCEPTION 'No verified UPI ID on file. Add a UPI ID in Settings first.';
   END IF;
 
-  -- 4. Check no pending/processing payout exists
+  -- 5. Check no pending/processing payout exists (inside lock)
   SELECT count(*) INTO v_pending_count
   FROM public.payout_requests
   WHERE user_id = v_user_id
@@ -476,42 +428,53 @@ BEGIN
     RAISE EXCEPTION 'A payout request is already in progress. Please wait for it to complete.';
   END IF;
 
-  -- 5. Calculate available balance from paid financial records
+  -- 6. Calculate available balance
+  -- Available = sum(processing records) - sum(all active payout requests)
+  -- processing = finalized earnings available for withdrawal
+  -- paid = already claimed by a completed payout, not available
   SELECT coalesce(sum(net_amount), 0) INTO v_balance
   FROM public.financial_records
-  WHERE clipper_id = v_user_id AND status = 'paid';
+  WHERE clipper_id = v_user_id AND status = 'processing';
 
-  -- Subtract ALL active payout requests (pending + processing + paid)
-  -- This prevents double-payout: once paid, funds are permanently consumed.
   v_balance := v_balance - coalesce((
     SELECT coalesce(sum(net_amount), 0)
     FROM public.payout_requests
     WHERE user_id = v_user_id AND status IN ('pending', 'processing', 'paid')
   ), 0);
 
-  -- 6. Enforce minimum ₹100 (10000 paise)
+  -- 7. Enforce minimum ₹100 (10000 paise)
   IF v_balance < 10000 THEN
     RAISE EXCEPTION 'Minimum withdrawal is ₹100. Current available: ₹%', v_balance / 100;
   END IF;
 
-  -- 7. Get the paid finance record IDs that will be covered
+  -- 8. Get the processing finance record IDs that will be covered
   -- Exclude records already referenced by ANY existing payout request
-  SELECT array_agg(id) INTO v_record_ids
+  SELECT array_agg(id), coalesce(sum(net_amount), 0)
+  INTO v_record_ids, v_record_sum
   FROM public.financial_records
-  WHERE clipper_id = v_user_id AND status = 'paid'
+  WHERE clipper_id = v_user_id AND status = 'processing'
     AND id <> ALL(coalesce(
       (SELECT array_agg(unnest) FROM public.payout_requests,
        unnest(finance_record_ids) WHERE user_id = v_user_id),
       '{}'
     ));
 
-  -- 8. Create payout request
+  -- 9. Validate: payout amount must equal sum of referenced records
+  IF v_record_sum != v_balance THEN
+    RAISE EXCEPTION 'Balance mismatch: calculated ₹% but records total ₹%', v_balance, v_record_sum;
+  END IF;
+
+  IF v_record_ids IS NULL OR array_length(v_record_ids, 1) = 0 THEN
+    RAISE EXCEPTION 'No eligible financial records for payout';
+  END IF;
+
+  -- 10. Create payout request (inside advisory lock)
   INSERT INTO public.payout_requests (
     user_id, amount, net_amount, currency, status, method, upi_id,
     finance_record_ids, audit
   ) VALUES (
     v_user_id, v_balance, v_balance, 'INR', 'pending', 'upi', v_upi,
-    coalesce(v_record_ids, '{}'),
+    v_record_ids,
     jsonb_build_object(
       'action', 'requested',
       'by', (SELECT email FROM public.profiles WHERE id = v_user_id),
@@ -520,6 +483,17 @@ BEGIN
     )
   )
   RETURNING id INTO v_payout_id;
+
+  -- 11. Mark referenced financial records as 'paid' (claimed by this payout)
+  UPDATE public.financial_records SET
+    status = 'paid',
+    paid_at = now(),
+    audit = coalesce(audit, '[]'::jsonb) || jsonb_build_object(
+      'action', 'claimed_by_payout',
+      'payout_id', v_payout_id,
+      'at', now()
+    )
+  WHERE id = ANY(v_record_ids);
 
   -- Return the payout record
   SELECT to_jsonb(pr.*) INTO v_result
@@ -633,7 +607,9 @@ GRANT EXECUTE ON FUNCTION public.complete_payout_request(uuid, text, text) TO au
 
 -- ---------------------------------------------------------------------------
 -- RPC: get_wallet_balance — Derive balance from authoritative financial records.
--- Positive = available for payout. Never stored, always computed.
+-- Available = sum(processing records) - sum(all active payout requests)
+-- processing = finalized earnings available for withdrawal
+-- paid = claimed by a completed payout, not available
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.get_wallet_balance(p_user_id uuid)
 RETURNS jsonb
@@ -646,7 +622,7 @@ AS $$
     'available', coalesce((
       SELECT sum(fr.net_amount)
       FROM public.financial_records fr
-      WHERE fr.clipper_id = p_user_id AND fr.status = 'paid'
+      WHERE fr.clipper_id = p_user_id AND fr.status = 'processing'
     ), 0)
       - coalesce((
       SELECT sum(pr.net_amount)
@@ -796,6 +772,8 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 -- ────────────────────────────────────────────────────────────────────────────
 -- STEP 8: Remove old financial RPCs (replaced by new ones above)
 -- ────────────────────────────────────────────────────────────────────────────
+DO $$ BEGIN DROP FUNCTION IF EXISTS public.process_finance(uuid, text, text); END $$;
+DO $$ BEGIN DROP FUNCTION IF EXISTS public.pay_finance(uuid, text, text); END $$;
 DO $$ BEGIN DROP FUNCTION IF EXISTS public.create_earning(uuid, text); END $$;
 DO $$ BEGIN DROP FUNCTION IF EXISTS public.update_earning_status(uuid, text, text); END $$;
 DO $$ BEGIN DROP FUNCTION IF EXISTS public.process_payout(uuid, text); END $$;

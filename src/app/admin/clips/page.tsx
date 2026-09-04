@@ -50,7 +50,7 @@ const TABS: Array<{ key: string; label: string; statuses: ClipStatus[] }> = [
 ];
 
 export default function AdminClips() {
-  const { clips, campaigns, financeRecords, approveClip, rejectClip, holdClip, processFinance, payFinance } = useStore();
+  const { clips, campaigns, financeRecords, approveClip, rejectClip, holdClip } = useStore();
   const { user } = useAuth();
   const actor = user?.email ?? user?.name ?? "Admin";
 
@@ -70,10 +70,6 @@ export default function AdminClips() {
   const [rejectDetails, setRejectDetails] = useState("");
   const [holdingId, setHoldingId] = useState<string | null>(null);
   const [holdReason, setHoldReason] = useState("");
-  const [processingId, setProcessingId] = useState<string | null>(null);
-  const [upiId, setUpiId] = useState("");
-  const [payingId, setPayingId] = useState<string | null>(null);
-  const [paymentRef, setPaymentRef] = useState("");
   const [auditId, setAuditId] = useState<string | null>(null);
 
   const pendingFin = financeOf(financeRecords, (r) => r.status === "pending");
@@ -257,42 +253,10 @@ export default function AdminClips() {
               onToggleAudit={(id) => setAuditId(auditId === id ? null : id)}
             />
           ) : (
-            <FinanceTable
+            <ApprovedClipsTable
               financeRecords={list.map((k) => financeRecords.find((r) => r.clipId === k.id)).filter(Boolean) as FinanceRecord[]}
               clips={list}
               campaigns={campaigns}
-              onStartProcessing={(r) => {
-                setProcessingId(r.id);
-                setUpiId(r.upiIdSnapshot ?? "");
-              }}
-              onConfirmProcessing={(r) => {
-                processFinance(r.id, upiId || undefined, actor);
-                setProcessingId(null);
-                setUpiId("");
-              }}
-              onCancelProcessing={() => {
-                setProcessingId(null);
-                setUpiId("");
-              }}
-              onPay={(r) => {
-                setPayingId(r.id);
-                setPaymentRef("");
-              }}
-              onConfirmPay={(r) => {
-                payFinance(r.id, paymentRef || undefined, actor);
-                setPayingId(null);
-                setPaymentRef("");
-              }}
-              onCancelPay={() => {
-                setPayingId(null);
-                setPaymentRef("");
-              }}
-              processingId={processingId}
-              upiId={upiId}
-              setUpiId={setUpiId}
-              payingId={payingId}
-              paymentRef={paymentRef}
-              setPaymentRef={setPaymentRef}
               auditId={auditId}
               onToggleAudit={(id) => setAuditId(auditId === id ? null : id)}
             />
@@ -519,40 +483,16 @@ function ReviewTable({
   );
 }
 
-function FinanceTable({
+function ApprovedClipsTable({
   financeRecords,
   clips,
   campaigns,
-  onStartProcessing,
-  onConfirmProcessing,
-  onCancelProcessing,
-  onPay,
-  onConfirmPay,
-  onCancelPay,
-  processingId,
-  upiId,
-  setUpiId,
-  payingId,
-  paymentRef,
-  setPaymentRef,
   auditId,
   onToggleAudit,
 }: {
   financeRecords: FinanceRecord[];
   clips: Clip[];
   campaigns: Campaign[];
-  onStartProcessing: (r: FinanceRecord) => void;
-  onConfirmProcessing: (r: FinanceRecord) => void;
-  onCancelProcessing: () => void;
-  onPay: (r: FinanceRecord) => void;
-  onConfirmPay: (r: FinanceRecord) => void;
-  onCancelPay: () => void;
-  processingId: string | null;
-  upiId: string;
-  setUpiId: (v: string) => void;
-  payingId: string | null;
-  paymentRef: string;
-  setPaymentRef: (v: string) => void;
   auditId: string | null;
   onToggleAudit: (id: string) => void;
 }) {
@@ -586,22 +526,6 @@ function FinanceTable({
               colSpan={13}
               extra={
                 <div className="flex flex-wrap items-center gap-2">
-                  {r.status === "pending" && (
-                    <button
-                      onClick={() => onStartProcessing(r)}
-                      className="inline-flex items-center gap-1 rounded-md bg-amber/10 px-2.5 py-1 text-xs font-medium text-amber"
-                    >
-                      <PlayCircle size={13} /> Start processing
-                    </button>
-                  )}
-                  {r.status === "processing" && (
-                    <button
-                      onClick={() => onPay(r)}
-                      className="inline-flex items-center gap-1 rounded-md bg-blue-500/10 px-2.5 py-1 text-xs font-medium text-blue-500"
-                    >
-                      <Wallet size={13} /> Mark paid
-                    </button>
-                  )}
                   <button
                     onClick={() => onToggleAudit(r.id)}
                     className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-accent-soft ${
@@ -684,70 +608,6 @@ function FinanceTable({
           <tr>
             <td colSpan={13} className="px-4 py-10 text-center text-sm text-muted">
               No financial records in this view.
-            </td>
-          </tr>
-        )}
-        {processingId && (
-          <tr>
-            <td colSpan={13} className="px-4 py-3">
-              <div className="space-y-2 rounded-lg border border-amber/30 bg-amber/5 p-3">
-                <p className="text-xs font-medium text-amber">Enter UPI ID for manual payment</p>
-                <input
-                  value={upiId}
-                  onChange={(e) => setUpiId(e.target.value)}
-                  placeholder="e.g. user@upi"
-                  className="w-full rounded-md border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-foreground"
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      const r = financeRecords.find((x) => x.id === processingId);
-                      if (r) onConfirmProcessing(r);
-                    }}
-                    className="inline-flex items-center gap-1 rounded-md bg-amber/10 px-2.5 py-1 text-xs font-medium text-amber"
-                  >
-                    <PlayCircle size={13} /> Confirm processing
-                  </button>
-                  <button
-                    onClick={onCancelProcessing}
-                    className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium"
-                  >
-                    <X size={13} /> Cancel
-                  </button>
-                </div>
-              </div>
-            </td>
-          </tr>
-        )}
-        {payingId && (
-          <tr>
-            <td colSpan={13} className="px-4 py-3">
-              <div className="space-y-2 rounded-lg border border-blue-500/30 bg-blue-500/5 p-3">
-                <p className="text-xs font-medium text-blue-500">Enter payment reference (NEFT/IMPS/UPI ref no.)</p>
-                <input
-                  value={paymentRef}
-                  onChange={(e) => setPaymentRef(e.target.value)}
-                  placeholder="e.g. NEFT-2026-001"
-                  className="w-full rounded-md border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-foreground"
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      const r = financeRecords.find((x) => x.id === payingId);
-                      if (r) onConfirmPay(r);
-                    }}
-                    className="inline-flex items-center gap-1 rounded-md bg-blue-500/10 px-2.5 py-1 text-xs font-medium text-blue-500"
-                  >
-                    <Wallet size={13} /> Confirm paid
-                  </button>
-                  <button
-                    onClick={onCancelPay}
-                    className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium"
-                  >
-                    <X size={13} /> Cancel
-                  </button>
-                </div>
-              </div>
             </td>
           </tr>
         )}

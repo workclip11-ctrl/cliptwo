@@ -1035,8 +1035,6 @@ interface StoreActions {
   approveClip: (id: string, actor?: string) => void;
   rejectClip: (id: string, reason: string, details?: string, actor?: string) => void;
   holdClip: (id: string, reason: string, actor?: string) => void;
-  processFinance: (recordId: string, upiId?: string, actor?: string) => void;
-  payFinance: (recordId: string, paymentRef?: string, actor?: string) => void;
   requestPayout: () => void;
   processPayoutRequest: (payoutId: string, actor?: string) => void;
   completePayoutRequest: (payoutId: string, paymentRef?: string, actor?: string) => void;
@@ -1761,73 +1759,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             console.error("RPC admin_clip_action (hold) failed:", error.message);
             setState((s) => ({ ...s, clips: prevClips, lastError: `Hold clip failed: ${error.message}` }));
           }
-          },
-
-       processFinance: async (recordId, upiId, actor) => {
-          const me = await getCurrentUser();
-          if (!await isUserAdmin(me?.id)) {
-            console.error("Authorization: non-admin user cannot process finance");
-            return;
-          }
-          const prevFinance = stateRef.current.financeRecords;
-          setState((s) => ({
-            ...s,
-            financeRecords: s.financeRecords.map((r) =>
-              r.id === recordId ? { ...r, status: "processing" as const, processingAt: Date.now(), upiIdSnapshot: upiId ?? r.upiIdSnapshot } : r,
-            ),
-          }));
-          if (!isSupabaseConfigured) return;
-          const { data, error } = await supabase.rpc("process_finance", {
-            p_record_id: recordId,
-            p_upi_id: upiId ?? null,
-            p_actor: actor ?? null,
-          });
-          if (error) {
-            console.error("RPC process_finance failed:", error.message);
-            setState((s) => ({ ...s, financeRecords: prevFinance, lastError: `Process finance failed: ${error.message}` }));
-            return;
-          }
-          const record = data as Record<string, unknown>;
-          if (record?.id) {
-            setState((s) => ({
-              ...s,
-              financeRecords: s.financeRecords.map((r) => r.id === recordId ? mapFinanceRecord(record) : r),
-            }));
-          }
-          },
-
-       payFinance: async (recordId, paymentRef, actor) => {
-          const me = await getCurrentUser();
-          if (!await isUserAdmin(me?.id)) {
-            console.error("Authorization: non-admin user cannot pay finance");
-            return;
-          }
-          const prevFinance = stateRef.current.financeRecords;
-          setState((s) => ({
-            ...s,
-            financeRecords: s.financeRecords.map((r) =>
-              r.id === recordId ? { ...r, status: "paid" as const, paidAt: Date.now(), paymentReference: paymentRef ?? r.paymentReference, paidBy: me?.id } : r,
-            ),
-          }));
-          if (!isSupabaseConfigured) return;
-          const { data, error } = await supabase.rpc("pay_finance", {
-            p_record_id: recordId,
-            p_payment_reference: paymentRef ?? null,
-            p_actor: actor ?? null,
-          });
-          if (error) {
-            console.error("RPC pay_finance failed:", error.message);
-            setState((s) => ({ ...s, financeRecords: prevFinance, lastError: `Pay finance failed: ${error.message}` }));
-            return;
-          }
-          const record = data as Record<string, unknown>;
-          if (record?.id) {
-            setState((s) => ({
-              ...s,
-              financeRecords: s.financeRecords.map((r) => r.id === recordId ? mapFinanceRecord(record) : r),
-            }));
-          }
-          },
+           },
 
        requestPayout: async () => {
           const me = await getCurrentUser();

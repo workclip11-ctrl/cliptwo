@@ -308,10 +308,11 @@ BEGIN
   END IF;
 
   -- Calculate current committed spend from financial_records (net_amount)
-  -- reserved = sum of net_amount where status in ('pending','processing','paid')
+  -- reserved = sum of net_amount where status in ('pending','processing')
+  -- (paid records are already consumed by payouts)
   SELECT COALESCE(SUM(net_amount), 0) INTO v_current_spend
   FROM public.financial_records
-  WHERE campaign_id = p_campaign_id AND status IN ('pending', 'processing', 'paid');
+  WHERE campaign_id = p_campaign_id AND status IN ('pending', 'processing');
 
   IF p_new_budget < v_current_spend THEN
     RAISE EXCEPTION 'Budget (₹%) cannot be lower than committed/spent amount (₹%)', p_new_budget, v_current_spend;
