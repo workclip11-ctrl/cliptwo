@@ -3082,11 +3082,17 @@ begin
     raise exception 'No valid fields to update';
   end if;
 
-  -- 10. Perform the update
+  -- 10. Perform the update with explicit type casting per column.
+  --     v_update already has correctly typed JSONB values (numeric, integer,
+  --     boolean, date, jsonb) from step 9. Using ->> (text) would undo that.
+  --     Using -> (jsonb) preserves the type so PostgreSQL can assign directly.
   execute format(
     'UPDATE public.campaigns SET %s WHERE id = $1 RETURNING to_jsonb(campaigns.*)',
-    (select string_agg(key || ' = $2->>' || quote_literal(key), ', ')
-     from jsonb_object_keys(v_update) key)
+    (select string_agg(
+      key || ' = $2->' || quote_literal(key),
+      ', '
+    )
+    from jsonb_object_keys(v_update) key)
   )
   using p_campaign_id, v_update
   into v_result;
