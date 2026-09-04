@@ -318,27 +318,28 @@ GRANT SELECT ON public.site_settings_public TO authenticated;
 -- 15. Revoke PUBLIC execute on sensitive functions
 -- Some functions should not be callable by anonymous users.
 -- ────────────────────────────────────────────────────────────────────────────
-REVOKE EXECUTE ON FUNCTION public.user_exists(text) FROM anon;
+DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.user_exists(text) FROM anon; EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 16. Cleanup: Revoke execute on legacy functions that are superseded
 -- These functions from admin-schema.sql are replaced by financial-rewrite.sql
 -- and finance-consolidation.sql. Revoke their execute to prevent confusion.
+-- Uses exception handling since some functions may have been dropped already.
 -- ────────────────────────────────────────────────────────────────────────────
-DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.create_earning(uuid, text) FROM authenticated; END $$;
-DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.update_earning_status(uuid, text, text) FROM authenticated; END $$;
-DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.get_wallet_balance(uuid) FROM authenticated; END $$;
-DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.get_wallet_entries(uuid, integer, integer) FROM authenticated; END $$;
-DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.adjust_wallet(uuid, integer, text) FROM authenticated; END $$;
-DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.reverse_ledger_entry(uuid, text) FROM authenticated; END $$;
-DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.get_clipper_earnings(uuid) FROM authenticated; END $$;
-DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.request_payout() FROM authenticated; END $$;
-DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.process_payout(uuid, text) FROM authenticated; END $$;
-DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.complete_payout(uuid, text) FROM authenticated; END $$;
-DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.fail_payout(uuid, text) FROM authenticated; END $$;
-DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.reverse_payout(uuid, text) FROM authenticated; END $$;
-DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.get_user_payouts(uuid, integer, integer) FROM authenticated; END $$;
-DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.test_max_payout_enforcement() FROM authenticated; END $$;
+DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.create_earning(uuid, text) FROM authenticated; EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.update_earning_status(uuid, text, text) FROM authenticated; EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.get_wallet_balance(uuid) FROM authenticated; EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.get_wallet_entries(uuid, integer, integer) FROM authenticated; EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.adjust_wallet(uuid, integer, text) FROM authenticated; EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.reverse_ledger_entry(uuid, text) FROM authenticated; EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.get_clipper_earnings(uuid) FROM authenticated; EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.request_payout() FROM authenticated; EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.process_payout(uuid, text) FROM authenticated; EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.complete_payout(uuid, text) FROM authenticated; EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.fail_payout(uuid, text) FROM authenticated; EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.reverse_payout(uuid, text) FROM authenticated; EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.get_user_payouts(uuid, integer, integer) FROM authenticated; EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.test_max_payout_enforcement() FROM authenticated; EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- DONE
