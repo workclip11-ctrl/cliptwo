@@ -1412,7 +1412,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         supabase.from("clips").select("*"),
         supabase.from("profiles").select("*"),
         supabase.from("social_accounts").select("*"),
-        supabase.from("site_settings").select("*").eq("id", 1).maybeSingle(),
+        supabase.from("site_settings_public").select("*").eq("id", 1).maybeSingle(),
         // SECURITY: Use get_safe_finance_records() instead of direct table access.
         // This function strips sensitive fields (clipper_id, upi_id_snapshot,
         // payment_reference, paid_by) for creators, while returning full data
