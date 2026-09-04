@@ -70,7 +70,7 @@ function fmtDate(ts?: number) {
 }
 
 export default function SocialAccountsPage() {
-  const { socialAccounts, updateSocialAccount } = useStore();
+  const { socialAccounts, updateSocialAccount, clips } = useStore();
   const { user } = useAuth();
   const myAccounts = socialAccounts.filter(
     (a) => a.userId && a.userId === user?.id,
@@ -107,6 +107,8 @@ export default function SocialAccountsPage() {
   const [modal, setModal] = useState<Platform | null>(null);
   const [verifying, setVerifying] = useState<string | null>(null);
   const [oauthError, setOauthError] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState<string | null>(null);
+  const [syncResult, setSyncResult] = useState<{ platform: string; message: string; error?: boolean } | null>(null);
 
   /** Get the current tab's Supabase access token for Bearer auth. */
   async function getAccessToken(): Promise<string | null> {
@@ -312,9 +314,96 @@ export default function SocialAccountsPage() {
   }
 
   // ── Sync now ──────────────────────────────────────────────────────────────
+  // Calls POST /api/metrics/sync with the current tab's Bearer access token.
+  // Syncs all approved clips for this platform that belong to the current user.
 
   async function syncNow(acc: SocialAccount) {
-    updateSocialAccount(acc.id, { lastSyncAt: Date.now() });
+    if (!user) return;
+    setSyncing(acc.platform);
+    setSyncResult(null);
+
+    try {
+      const accessToken = await getAccessToken();
+      if (!accessToken) {
+        throw new Error("Your Cliptwo session has expired. Please log in again.");
+      }
+
+      // Find the user's approved clips for this platform from local store
+      const myApprovedClips = clips.filter(
+        (c) => c.userId === user.id && c.platform === acc.platform && c.status === "approved",
+      );
+
+      if (myApprovedClips.length === 0) {
+        setSyncResult({
+          platform: acc.platform,
+          message: "No approved clips to sync for this platform.",
+          error: true,
+        });
+        return;
+      }
+
+      const clipIds = myApprovedClips.map((c) => c.id);
+
+      const res = await fetch("/api/metrics/sync", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ clipIds }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Sync failed");
+      }
+
+      // Process results
+      const results = data.results as Array<{
+        clipId: string;
+        status: string;
+        metrics?: { views: number; likes: number; comments: number; shares: number };
+        error?: string;
+      }>;
+
+      const synced = results.filter((r) => r.status === "synced");
+      const errors = results.filter((r) => r.status === "error" || r.status === "rejected");
+      const skipped = results.filter((r) => r.status === "skipped");
+
+      if (synced.length > 0) {
+        const totalViews = synced.reduce((sum, r) => sum + (r.metrics?.views ?? 0), 0);
+        setSyncResult({
+          platform: acc.platform,
+          message: `Synced ${synced.length} clip${synced.length > 1 ? "s" : ""} — ${totalViews.toLocaleString()} verified views`,
+        });
+      } else if (errors.length > 0) {
+        setSyncResult({
+          platform: acc.platform,
+          message: errors.map((e) => e.error).join("; "),
+          error: true,
+        });
+      } else if (skipped.length > 0) {
+        setSyncResult({
+          platform: acc.platform,
+          message: skipped.map((s) => s.error).join("; "),
+          error: true,
+        });
+      } else {
+        setSyncResult({
+          platform: acc.platform,
+          message: "Sync completed.",
+        });
+      }
+
+      // Reload social accounts and clips from DB to get fresh data
+      void reloadSocialAccounts();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Sync failed";
+      setSyncResult({ platform: acc.platform, message: msg, error: true });
+    } finally {
+      setSyncing(null);
+    }
   }
 
   return (
@@ -444,9 +533,15 @@ export default function SocialAccountsPage() {
                       <>
                         <button
                           onClick={() => syncNow(acc)}
-                          className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium hover:bg-accent-soft"
+                          disabled={syncing === acc.platform}
+                          className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium hover:bg-accent-soft disabled:opacity-50"
                         >
-                          <RefreshCw size={13} /> Sync now
+                          {syncing === acc.platform ? (
+                            <Loader2 size={13} className="animate-spin" />
+                          ) : (
+                            <RefreshCw size={13} />
+                          )}
+                          {syncing === acc.platform ? "Syncing…" : "Sync now"}
                         </button>
                         {!acc.verified && (
                           <button
@@ -482,6 +577,18 @@ export default function SocialAccountsPage() {
                         </button>
                       )}
                   </div>
+
+                  {syncResult && syncResult.platform === acc.platform && (
+                    <div
+                      className={`mt-3 rounded-md border p-2 text-xs ${
+                        syncResult.error
+                          ? "border-red/30 bg-red/5 text-red"
+                          : "border-green/30 bg-accent-soft text-green"
+                      }`}
+                    >
+                      {syncResult.message}
+                    </div>
+                  )}
                 </>
               ) : (
                 <button

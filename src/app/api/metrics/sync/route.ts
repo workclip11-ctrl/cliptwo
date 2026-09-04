@@ -24,24 +24,23 @@ export async function POST(request: Request) {
       platform?: Platform;
     };
 
-    // Verify admin or service_role
+    // Verify authenticated user
     const authUser = await getAuthenticatedUser(request);
 
     if (!authUser) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    // Check admin role
     const adminClient = createServiceClient();
+
+    // Check if user is admin (admins can sync any clips)
     const { data: profile } = await adminClient
       .from("profiles")
       .select("role")
       .eq("id", authUser.id)
       .single();
 
-    if (profile?.role !== "admin") {
-      return NextResponse.json({ error: "Admin access required" }, { status: 403 });
-    }
+    const isAdmin = profile?.role === "admin";
 
     // Determine which clips to sync
     let targetClipIds: string[] = [];
@@ -75,6 +74,12 @@ export async function POST(request: Request) {
 
         if (clipError || !clip) {
           results.push({ clipId: cid, status: "error", error: "Clip not found" });
+          continue;
+        }
+
+        // Non-admins can only sync their own clips
+        if (!isAdmin && clip.user_id !== authUser.id) {
+          results.push({ clipId: cid, status: "error", error: "Not authorized to sync this clip" });
           continue;
         }
 
