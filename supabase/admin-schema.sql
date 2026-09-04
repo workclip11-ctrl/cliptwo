@@ -324,12 +324,12 @@ create trigger set_created_by
 -- Server-side role check + created_by from auth.uid()
 -- ---------------------------------------------------------------------------
 create or replace function public.create_campaign(
-  p_id uuid default null,
   p_title text,
   p_brief text,
   p_platform text,
   p_payout numeric,
   p_creator text,
+  p_id uuid default null,
   p_niche text default null,
   p_budget numeric default 0,
   p_days_left integer default 30,
@@ -416,7 +416,7 @@ end;
 $$;
 
 grant execute on function public.create_campaign(
-  uuid, text, text, text, numeric, text, text, numeric, integer, text, text, text,
+  text, text, text, numeric, text, uuid, text, numeric, integer, text, text, text,
   jsonb, text, date, date, numeric, text, text, text, text, text, text,
   jsonb, jsonb, jsonb, jsonb, jsonb, jsonb, jsonb, jsonb, numeric, text,
   text, text, jsonb, text
