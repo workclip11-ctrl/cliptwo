@@ -2977,6 +2977,8 @@ declare
   v_is_admin boolean;
   v_update jsonb;
   v_result jsonb;
+  v_set text;
+  v_key text;
   v_FINANCIAL_FIELDS text[] := array['payout', 'max_payout_per_clip'];
   v_IMMUTABLE_FIELDS text[] := array[
     'id', 'created_by', 'created_at', 'archived_by', 'archived_at'
@@ -3042,25 +3044,27 @@ begin
     end if;
   end loop;
 
-  -- 9. Build safe update object (only known editable columns)
+  -- 9. Build safe update object (only known editable columns, raw values)
+  --    Step 10 applies explicit type casts per column. Step 9 validates
+  --    that values exist and filters to the whitelist only.
   v_update := '{}'::jsonb;
   if p_patch ? 'title' then v_update := v_update || jsonb_build_object('title', p_patch->>'title'); end if;
   if p_patch ? 'brief' then v_update := v_update || jsonb_build_object('brief', p_patch->>'brief'); end if;
   if p_patch ? 'platform' then v_update := v_update || jsonb_build_object('platform', p_patch->>'platform'); end if;
-  if p_patch ? 'payout' then v_update := v_update || jsonb_build_object('payout', (p_patch->>'payout')::numeric); end if;
+  if p_patch ? 'payout' then v_update := v_update || jsonb_build_object('payout', p_patch->>'payout'); end if;
   if p_patch ? 'niche' then v_update := v_update || jsonb_build_object('niche', p_patch->>'niche'); end if;
-  if p_patch ? 'budget' then v_update := v_update || jsonb_build_object('budget', (p_patch->>'budget')::numeric); end if;
-  if p_patch ? 'spent' then v_update := v_update || jsonb_build_object('spent', (p_patch->>'spent')::numeric); end if;
-  if p_patch ? 'daysLeft' then v_update := v_update || jsonb_build_object('days_left', (p_patch->>'daysLeft')::integer); end if;
+  if p_patch ? 'budget' then v_update := v_update || jsonb_build_object('budget', p_patch->>'budget'); end if;
+  if p_patch ? 'spent' then v_update := v_update || jsonb_build_object('spent', p_patch->>'spent'); end if;
+  if p_patch ? 'daysLeft' then v_update := v_update || jsonb_build_object('days_left', p_patch->>'daysLeft'); end if;
   if p_patch ? 'sourceLink' then v_update := v_update || jsonb_build_object('source_link', p_patch->>'sourceLink'); end if;
   if p_patch ? 'rules' then v_update := v_update || jsonb_build_object('rules', p_patch->>'rules'); end if;
   if p_patch ? 'category' then v_update := v_update || jsonb_build_object('category', p_patch->>'category'); end if;
   if p_patch ? 'platforms' then v_update := v_update || jsonb_build_object('platforms', p_patch->'platforms'); end if;
-  if p_patch ? 'verified' then v_update := v_update || jsonb_build_object('verified', (p_patch->>'verified')::boolean); end if;
+  if p_patch ? 'verified' then v_update := v_update || jsonb_build_object('verified', p_patch->>'verified'); end if;
   if p_patch ? 'objective' then v_update := v_update || jsonb_build_object('objective', p_patch->>'objective'); end if;
-  if p_patch ? 'startDate' then v_update := v_update || jsonb_build_object('start_date', (p_patch->>'startDate')::date); end if;
-  if p_patch ? 'endDate' then v_update := v_update || jsonb_build_object('end_date', (p_patch->>'endDate')::date); end if;
-  if p_patch ? 'maxPayoutPerClip' then v_update := v_update || jsonb_build_object('max_payout_per_clip', (p_patch->>'maxPayoutPerClip')::numeric); end if;
+  if p_patch ? 'startDate' then v_update := v_update || jsonb_build_object('start_date', p_patch->>'startDate'); end if;
+  if p_patch ? 'endDate' then v_update := v_update || jsonb_build_object('end_date', p_patch->>'endDate'); end if;
+  if p_patch ? 'maxPayoutPerClip' then v_update := v_update || jsonb_build_object('max_payout_per_clip', p_patch->>'maxPayoutPerClip'); end if;
   if p_patch ? 'recommendedDuration' then v_update := v_update || jsonb_build_object('recommended_duration', p_patch->>'recommendedDuration'); end if;
   if p_patch ? 'hook' then v_update := v_update || jsonb_build_object('hook', p_patch->>'hook'); end if;
   if p_patch ? 'captionReq' then v_update := v_update || jsonb_build_object('caption_req', p_patch->>'captionReq'); end if;
@@ -3071,7 +3075,7 @@ begin
   if p_patch ? 'approval' then v_update := v_update || jsonb_build_object('approval', p_patch->'approval'); end if;
   if p_patch ? 'thumbnails' then v_update := v_update || jsonb_build_object('thumbnails', p_patch->'thumbnails'); end if;
   if p_patch ? 'brandAssets' then v_update := v_update || jsonb_build_object('brand_assets', p_patch->'brandAssets'); end if;
-  if p_patch ? 'spendCap' then v_update := v_update || jsonb_build_object('spend_cap', (p_patch->>'spendCap')::numeric); end if;
+  if p_patch ? 'spendCap' then v_update := v_update || jsonb_build_object('spend_cap', p_patch->>'spendCap'); end if;
   if p_patch ? 'timezone' then v_update := v_update || jsonb_build_object('timezone', p_patch->>'timezone'); end if;
   if p_patch ? 'whatToMake' then v_update := v_update || jsonb_build_object('what_to_make', p_patch->>'whatToMake'); end if;
   if p_patch ? 'style' then v_update := v_update || jsonb_build_object('style', p_patch->>'style'); end if;
@@ -3082,17 +3086,69 @@ begin
     raise exception 'No valid fields to update';
   end if;
 
-  -- 10. Perform the update with explicit type casting per column.
-  --     v_update already has correctly typed JSONB values (numeric, integer,
-  --     boolean, date, jsonb) from step 9. Using ->> (text) would undo that.
-  --     Using -> (jsonb) preserves the type so PostgreSQL can assign directly.
+  -- 10. Build typed SET clause using explicit PostgreSQL casts.
+  --     $2->>'key' returns TEXT; $2->'key' returns JSONB.
+  --     Neither can be assigned directly to numeric/integer/boolean/date columns.
+  --     We must cast explicitly: ($2->>'key')::numeric, etc.
+  --     JSONB columns use $2->'key' to preserve structure.
+  v_set := '';
+  for v_key in select jsonb_object_keys(v_update)
+  loop
+    if v_set <> '' then v_set := v_set || ', '; end if;
+
+    v_set := v_set || case v_key
+      -- NUMERIC columns
+      WHEN 'budget'              THEN 'budget = ($2->>''budget'')::numeric'
+      WHEN 'payout'              THEN 'payout = ($2->>''payout'')::numeric'
+      WHEN 'spent'               THEN 'spent = ($2->>''spent'')::numeric'
+      WHEN 'max_payout_per_clip' THEN 'max_payout_per_clip = ($2->>''max_payout_per_clip'')::numeric'
+      WHEN 'spend_cap'           THEN 'spend_cap = ($2->>''spend_cap'')::numeric'
+      -- INTEGER columns
+      WHEN 'days_left'           THEN 'days_left = ($2->>''days_left'')::integer'
+      -- BOOLEAN columns
+      WHEN 'verified'            THEN 'verified = ($2->>''verified'')::boolean'
+      -- DATE columns
+      WHEN 'start_date'          THEN 'start_date = ($2->>''start_date'')::date'
+      WHEN 'end_date'            THEN 'end_date = ($2->>''end_date'')::date'
+      -- TEXT columns (->> returns text, no cast needed)
+      WHEN 'title'               THEN 'title = $2->>''title'''
+      WHEN 'brief'               THEN 'brief = $2->>''brief'''
+      WHEN 'platform'            THEN 'platform = $2->>''platform'''
+      WHEN 'niche'               THEN 'niche = $2->>''niche'''
+      WHEN 'source_link'         THEN 'source_link = $2->>''source_link'''
+      WHEN 'rules'               THEN 'rules = $2->>''rules'''
+      WHEN 'category'            THEN 'category = $2->>''category'''
+      WHEN 'objective'           THEN 'objective = $2->>''objective'''
+      WHEN 'recommended_duration' THEN 'recommended_duration = $2->>''recommended_duration'''
+      WHEN 'hook'                THEN 'hook = $2->>''hook'''
+      WHEN 'caption_req'         THEN 'caption_req = $2->>''caption_req'''
+      WHEN 'aspect_ratio'        THEN 'aspect_ratio = $2->>''aspect_ratio'''
+      WHEN 'cta'                 THEN 'cta = $2->>''cta'''
+      WHEN 'branding'            THEN 'branding = $2->>''branding'''
+      WHEN 'timezone'            THEN 'timezone = $2->>''timezone'''
+      WHEN 'what_to_make'        THEN 'what_to_make = $2->>''what_to_make'''
+      WHEN 'style'               THEN 'style = $2->>''style'''
+      -- JSONB columns (-> returns JSONB, assign directly)
+      WHEN 'platforms'           THEN 'platforms = $2->''platforms'''
+      WHEN 'view_rules'          THEN 'view_rules = $2->''view_rules'''
+      WHEN 'approval'            THEN 'approval = $2->''approval'''
+      WHEN 'thumbnails'          THEN 'thumbnails = $2->''thumbnails'''
+      WHEN 'brand_assets'        THEN 'brand_assets = $2->''brand_assets'''
+      WHEN 'rights'              THEN 'rights = $2->''rights'''
+      -- Unknown key — skip (should not happen due to whitelist above)
+      ELSE NULL
+    end;
+
+  end loop;
+
+  if v_set is null or v_set = '' then
+    raise exception 'No valid fields to update';
+  end if;
+
+  -- 11. Perform the update with fully typed assignments
   execute format(
     'UPDATE public.campaigns SET %s WHERE id = $1 RETURNING to_jsonb(campaigns.*)',
-    (select string_agg(
-      key || ' = $2->' || quote_literal(key),
-      ', '
-    )
-    from jsonb_object_keys(v_update) key)
+    v_set
   )
   using p_campaign_id, v_update
   into v_result;
