@@ -298,10 +298,10 @@ export default function NewCampaignWizard() {
         if (url) uploadedBrandAssets.push({ label: brandFile.name, url });
       }
 
-      // Build and submit the campaign with the uploaded URLs
+      // Await campaign creation — do not show success until RPC succeeds
       // Pass tempCampaignId so the RPC creates the campaign with the same ID
       // used for storage path consistency.
-      addCampaign(
+      const createdId = await addCampaign(
         buildCampaign({
           sourceAssets: uploadedSourceAssets,
           thumbnails: uploadedThumbnails,
@@ -310,13 +310,23 @@ export default function NewCampaignWizard() {
         status,
         tempCampaignId,
       );
-      setSavedMsg(
-        status === "draft"
-          ? "Draft saved. You can finish and publish it later."
-          : "Campaign published.",
-      );
-      setTimeout(() => router.push("/creator/campaigns"), 900);
-    } catch {
+
+      if (createdId) {
+        setSavedMsg(
+          status === "draft"
+            ? "Draft saved. You can finish and publish it later."
+            : "Campaign published.",
+        );
+        setTimeout(() => router.push("/creator/campaigns"), 900);
+      }
+    } catch (err) {
+      // Campaign creation failed — keep user on page, show real error.
+      // Optimistic campaign already removed by store.addCampaign on failure.
+      console.error("Campaign creation failed:", err);
+      setErrors({
+        submit: err instanceof Error ? err.message : "Campaign creation failed. Please try again.",
+      });
+    } finally {
       setIsSubmitting(false);
     }
   }
@@ -377,6 +387,12 @@ export default function NewCampaignWizard() {
       {savedMsg && (
         <div className="rounded-xl border border-green/30 bg-accent-soft p-3 text-sm text-green">
           {savedMsg}
+        </div>
+      )}
+
+      {errors.submit && (
+        <div className="rounded-xl border border-red/30 bg-red-soft p-3 text-sm text-red">
+          {errors.submit}
         </div>
       )}
 

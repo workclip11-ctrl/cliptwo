@@ -227,7 +227,9 @@ END $$;
 -- RPC: approve_clip — Admin approves a clip, creating a financial record.
 -- This is the ONLY way a financial record is created.
 -- Atomic: locks campaign, checks budget, creates record, all in one txn.
--- Creates record as 'processing' (finalized, available for withdrawal).
+-- Creates record as 'pending' (awaiting verified metrics for finalization).
+-- The earning moves to 'processing' only after verified views > 0 via
+-- finalize_clip_earning() (called by ingest_clip_metrics when metrics arrive).
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.approve_clip(
   p_clip_id uuid,
@@ -320,7 +322,9 @@ BEGIN
     END IF;
   END IF;
 
-  -- INSERT financial record as 'processing' (finalized, available for withdrawal)
+  -- INSERT financial record as 'pending' (awaiting verified metrics)
+  -- When verified views > 0 arrive via ingest_clip_metrics(), the earning
+  -- will be finalized to 'processing' by finalize_clip_earning().
   INSERT INTO public.financial_records (
     clip_id, campaign_id, clipper_id,
     locked_cpm, locked_max_payout, verified_views,
@@ -330,7 +334,7 @@ BEGIN
     p_clip_id, v_clip.campaign_id, v_clip.user_id,
     v_locked_cpm, v_clip.locked_max_payout, v_verified_views,
     v_gross, v_platform_fee, v_net,
-    'processing',
+    'pending',
     jsonb_build_object(
       'action', 'created',
       'by', coalesce(p_actor, (SELECT email FROM public.profiles WHERE id = auth.uid())),

@@ -37,7 +37,7 @@ import type {
   PayoutRequest,
 } from "./types";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
-import { financeOf, canAcceptSubmission } from "@/lib/finance";
+import { financeOf } from "@/lib/finance";
 import { initAuditLogs } from "@/lib/audit";
 
 const isoDaysAgo = (n: number) => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
@@ -1031,7 +1031,7 @@ interface StoreActions {
     c: Omit<Campaign, "id" | "createdAt" | "status">,
     status?: CampaignStatus,
     campaignId?: string,
-  ) => void;
+  ) => Promise<string | null>;
   addClip: (k: Omit<Clip, "id" | "submittedAt" | "status" | "views">) => void;
   approveClip: (id: string, actor?: string) => void;
   rejectClip: (id: string, reason: string, details?: string, actor?: string) => void;
@@ -1533,7 +1533,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       clearError: () => {
         setState((s) => ({ ...s, lastError: undefined }));
       },
-      addCampaign: (c, status = "open", campaignId) => {
+      addCampaign: async (c, status = "open", campaignId) => {
         // SECURITY: Every campaign must have a creator (created_by).
         // The caller must provide created_by. If missing, the campaign is
         // rejected in production (Supabase enforces NOT NULL via RPC).
@@ -1548,90 +1548,72 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         };
         setState((s) => ({ ...s, campaigns: [optimistic, ...s.campaigns] }));
 
-        if (!isSupabaseConfigured) return;
-        (async () => {
-          // SECURITY: Use RPC for server-side creator role validation
-          const { data, error } = await supabase.rpc("create_campaign", {
-            p_id: campaignId,
-            p_title: c.title,
-            p_brief: c.brief,
-            p_platform: c.platform,
-            p_payout: c.payout,
-            p_creator: c.creator,
-            p_niche: c.niche ?? null,
-            p_budget: c.budget ?? 0,
-            p_days_left: c.daysLeft ?? 30,
-            p_source_link: c.sourceLink ?? null,
-            p_rules: c.rules ?? null,
-            p_category: c.category ?? null,
-            p_platforms: c.platforms ?? null,
-            p_objective: c.objective ?? null,
-            p_start_date: c.startDate ?? null,
-            p_end_date: c.endDate ?? null,
-            p_max_payout_per_clip: c.maxPayoutPerClip ?? null,
-            p_recommended_duration: c.recommendedDuration ?? null,
-            p_hook: c.hook ?? null,
-            p_caption_req: c.captionReq ?? null,
-            p_aspect_ratio: c.aspectRatio ?? null,
-            p_cta: c.cta ?? null,
-            p_branding: c.branding ?? null,
-            p_do_list: c.doList ?? null,
-            p_dont_list: c.dontList ?? null,
-            p_source_assets: c.sourceAssets ?? null,
-            p_example_clips: c.exampleClips ?? null,
-            p_view_rules: c.viewRules ?? null,
-            p_approval: c.approval ?? null,
-            p_thumbnails: c.thumbnails ?? null,
-            p_brand_assets: c.brandAssets ?? null,
-            p_spend_cap: c.spendCap ?? null,
-            p_timezone: c.timezone ?? null,
-            p_what_to_make: c.whatToMake ?? null,
-            p_style: c.style ?? null,
-            p_rights: c.rights ?? null,
-            p_status: status,
-          });
-          if (error) {
-            console.error("RPC create_campaign failed:", error.message);
-            setState((s) => ({
-              ...s,
-              campaigns: s.campaigns.filter((x) => x.id !== optimistic.id),
-              lastError: `Failed to create campaign: ${error.message}`,
-            }));
-            return;
-          }
-          if (data) {
-            setState((s) => ({
-              ...s,
-              campaigns: [
-                mapCampaign(data as Record<string, unknown>),
-                ...s.campaigns.filter((x) => x.id !== optimistic.id),
-              ],
-            }));
-          }
-        })();
+        if (!isSupabaseConfigured) return campaignIdValue;
+
+        // SECURITY: Use RPC for server-side creator role validation
+        const { data, error } = await supabase.rpc("create_campaign", {
+          p_id: campaignId,
+          p_title: c.title,
+          p_brief: c.brief,
+          p_platform: c.platform,
+          p_payout: c.payout,
+          p_creator: c.creator,
+          p_niche: c.niche ?? null,
+          p_budget: c.budget ?? 0,
+          p_days_left: c.daysLeft ?? 30,
+          p_source_link: c.sourceLink ?? null,
+          p_rules: c.rules ?? null,
+          p_category: c.category ?? null,
+          p_platforms: c.platforms ?? null,
+          p_objective: c.objective ?? null,
+          p_start_date: c.startDate ?? null,
+          p_end_date: c.endDate ?? null,
+          p_max_payout_per_clip: c.maxPayoutPerClip ?? null,
+          p_recommended_duration: c.recommendedDuration ?? null,
+          p_hook: c.hook ?? null,
+          p_caption_req: c.captionReq ?? null,
+          p_aspect_ratio: c.aspectRatio ?? null,
+          p_cta: c.cta ?? null,
+          p_branding: c.branding ?? null,
+          p_do_list: c.doList ?? null,
+          p_dont_list: c.dontList ?? null,
+          p_source_assets: c.sourceAssets ?? null,
+          p_example_clips: c.exampleClips ?? null,
+          p_view_rules: c.viewRules ?? null,
+          p_approval: c.approval ?? null,
+          p_thumbnails: c.thumbnails ?? null,
+          p_brand_assets: c.brandAssets ?? null,
+          p_spend_cap: c.spendCap ?? null,
+          p_timezone: c.timezone ?? null,
+          p_what_to_make: c.whatToMake ?? null,
+          p_style: c.style ?? null,
+          p_rights: c.rights ?? null,
+          p_status: status,
+        });
+        if (error) {
+          // Remove optimistic campaign from state on failure
+          setState((s) => ({
+            ...s,
+            campaigns: s.campaigns.filter((x) => x.id !== optimistic.id),
+            lastError: `Failed to create campaign: ${error.message}`,
+          }));
+          throw new Error(error.message);
+        }
+        if (data) {
+          setState((s) => ({
+            ...s,
+            campaigns: [
+              mapCampaign(data as Record<string, unknown>),
+              ...s.campaigns.filter((x) => x.id !== optimistic.id),
+            ],
+          }));
+        }
+        return campaignIdValue;
       },
 
       addClip: (k) => {
-        // --- Server-side budget enforcement for new submissions ---
-        // Prevent new submissions when campaign is closed, paused, or at budget.
         const cur = stateRef.current;
         const camp = cur.campaigns.find((c) => c.id === k.campaignId);
-        if (camp) {
-          if (camp.status !== "open") {
-            console.error(
-              `Budget protection: rejecting submission for campaign "${camp.title}". ` +
-                `Campaign status is "${camp.status}".`,
-            );
-            return;
-          }
-          if (!canAcceptSubmission(camp, cur.financeRecords)) {
-            console.error(
-              `Budget protection: rejecting submission for campaign "${camp.title}". ` +
-                `Campaign has reached its budget.`,
-            );
-            return;
-          }
-        }
 
         const optimistic: Clip = {
           ...k,
@@ -1647,27 +1629,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
         if (!isSupabaseConfigured) return;
         (async () => {
-          const { data: u } = await supabase.auth.getUser();
-          const handle =
-            (u.user?.user_metadata?.name as string) ||
-            u.user?.email ||
-            k.clipper;
-          const { data, error } = await supabase
-            .from("clips")
-            .insert({
-              campaign_id: k.campaignId,
-              clipper: handle,
-              caption: k.caption,
-              video_url: k.videoUrl,
-              platform: k.platform ?? "Instagram",
-              user_id: u.user?.id ?? null,
-              locked_cpm: camp?.payout ?? null,
-              locked_max_payout: camp?.maxPayoutPerClip ?? null,
-            })
-            .select()
-            .single();
+          // Server-side validation: submit_clip RPC checks role, campaign status,
+          // budget, platform, duplicate URLs, and locks the campaign row.
+          const { data, error } = await supabase.rpc("submit_clip", {
+            p_campaign_id: k.campaignId,
+            p_caption: k.caption,
+            p_video_url: k.videoUrl,
+            p_platform: k.platform ?? "Instagram",
+          });
           if (error) {
-            console.error("Clip insert failed:", error.message);
+            // Rollback optimistic clip on failure
             setState((s) => ({
               ...s,
               clips: s.clips.filter((x) => x.id !== optimistic.id),
@@ -1676,6 +1647,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             return;
           }
           if (data) {
+            // Replace optimistic clip with server-returned clip
             setState((s) => ({
               ...s,
               clips: [

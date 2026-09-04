@@ -52,9 +52,9 @@ export default function ClipperWalletPage() {
   const myPayouts = payoutRequests.filter((p) => p.userId === user?.id);
 
   const fin = financeOf(myFinanceRecords);
-  const available = fin.paid;
+  const available = fin.processing;
   const pendingEarnings = fin.pending;
-  const processing = fin.processing;
+  const paidOut = fin.paid;
   const totalEarned = fin.total;
 
   const profile = profiles.find((p) => p.id === user?.id);
@@ -133,14 +133,14 @@ export default function ClipperWalletPage() {
           <p className="mt-1 font-mono text-xl font-semibold text-amber">
             {rup(pendingEarnings / 100)}
           </p>
-          <p className="mt-1 text-[11px] text-muted">Awaiting admin review</p>
+          <p className="mt-1 text-[11px] text-muted">Awaiting verified metrics</p>
         </div>
         <div className="rounded-2xl border bg-card p-4">
-          <p className="text-xs text-muted">Processing</p>
+          <p className="text-xs text-muted">Paid out</p>
           <p className="mt-1 font-mono text-xl font-semibold text-blue-500">
-            {rup(processing / 100)}
+            {rup(paidOut / 100)}
           </p>
-          <p className="mt-1 text-[11px] text-muted">Payout in flight</p>
+          <p className="mt-1 text-[11px] text-muted">Claimed by payouts</p>
         </div>
         <div className="rounded-2xl border bg-card p-4">
           <p className="text-xs text-muted">Total earned</p>
@@ -386,7 +386,7 @@ export default function ClipperWalletPage() {
                     Add your UPI ID above to enable payouts
                   </span>
                 ) : (
-                  "Only released (paid) balance can be withdrawn — pending or processing earnings are not yet payable."
+                  "Only finalized (processing) balance can be withdrawn — pending earnings are not yet finalized."
                 )}
               </p>
             )}

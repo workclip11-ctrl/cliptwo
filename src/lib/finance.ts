@@ -31,9 +31,9 @@ export function netCreator(amount: number): number {
 // through `financeOf` / `campaignSpent` below.
 //
 // Finance lifecycle:
-//   pending   → financial record created (clip approved)
-//   processing → admin initiated manual UPI payment
-//   paid      → admin confirmed UPI payment
+//   pending   → clip approved, earning awaiting verified metrics
+//   processing → finalized, available for withdrawal (verified views > 0)
+//   paid      → claimed by a payout request
 // ---------------------------------------------------------------------------
 
 export const FINANCE_ACTIVE_STATUSES: FinanceStatus[] = ["pending", "processing", "paid"];

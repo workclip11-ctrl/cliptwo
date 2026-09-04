@@ -1245,6 +1245,7 @@ declare
   v_clip record;
   v_metric_id uuid;
   v_metric jsonb;
+  v_finalized jsonb;
 begin
   -- Get clip
   select * into v_clip from public.clips where id = p_clip_id;
@@ -1284,6 +1285,14 @@ begin
       verified_views = p_views,
       updated_at = now()
     where id = p_clip_id;
+
+    -- AUTO-FINALIZE: If clip is approved and has a pending financial record,
+    -- move the earning from pending → processing now that verified views > 0.
+    -- If verified_views is still 0, the record remains pending.
+    if p_views > 0 and v_clip.status = 'approved' then
+      v_finalized := public.finalize_clip_earning(p_clip_id);
+      -- v_finalized is null if no pending record or no views; that's fine.
+    end if;
   end if;
 
   -- Return the created metric
@@ -3092,7 +3101,282 @@ DO $$ BEGIN
     CHECK (net_amount >= 0);
 EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
-DO $$ BEGIN
-  ALTER TABLE public.payouts ADD CONSTRAINT payouts_retry_count_nonneg
-    CHECK (retry_count >= 0);
-EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
+-- ---------------------------------------------------------------------------
+-- RPC: submit_clip — Server-side clip submission with full validation.
+-- Replaces direct client INSERT into clips. Validates campaign status,
+-- budget, platform, fields, and duplicate URLs. Locks campaign row to
+-- prevent concurrent budget overruns.
+-- ---------------------------------------------------------------------------
+create or replace function public.submit_clip(
+  p_campaign_id uuid,
+  p_caption text,
+  p_video_url text,
+  p_platform text default 'Instagram'
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_id uuid;
+  v_clip record;
+  v_campaign record;
+  v_locked_cpm numeric;
+  v_locked_max_payout numeric;
+  v_reserved numeric;
+  v_budget numeric;
+  v_normalized_url text;
+begin
+  -- 1. Require authenticated user
+  v_user_id := auth.uid();
+  if v_user_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  -- 2. Require caller profile role = clipper and active
+  if not exists (
+    select 1 from public.profiles
+    where id = v_user_id and role = 'clipper' and status = 'active'
+  ) then
+    raise exception 'Only active clippers can submit clips';
+  end if;
+
+  -- 3. Force clips.user_id = auth.uid()
+  -- (Not from client input)
+
+  -- 4. Load and lock the campaign row
+  select * into v_campaign
+  from public.campaigns
+  where id = p_campaign_id
+  for update;
+
+  if not found then
+    raise exception 'Campaign not found: %', p_campaign_id;
+  end if;
+
+  -- 5. Require campaign status = 'open'
+  if v_campaign.status != 'open' then
+    raise exception 'Campaign is not open (status: %)', v_campaign.status;
+  end if;
+
+  -- 6. Verify campaign still has available budget using authoritative financial_records
+  v_budget := v_campaign.budget;
+  if v_budget is not null and v_budget > 0 then
+    select coalesce(sum(gross_amount), 0) into v_reserved
+    from public.financial_records
+    where campaign_id = p_campaign_id
+      and status in ('pending', 'processing');
+
+    -- Also count this new clip's estimated earning against budget
+    -- Use the campaign CPM to estimate
+    v_locked_cpm := case
+      when v_campaign.payout is not null then round(v_campaign.payout * 100)::integer
+      else 0
+    end;
+    -- We cannot know verified views yet, but we must reserve space.
+    -- For budget checking: if reserved already >= budget, reject immediately.
+    if v_reserved >= (v_budget * 100) then
+      raise exception 'Campaign budget fully reserved. No new submissions allowed.';
+    end if;
+  end if;
+
+  -- 7. Validate the submitted platform against the campaign's allowed platforms
+  if v_campaign.platforms is not null then
+    if not (v_campaign.platforms ? p_platform) then
+      raise exception 'Platform "%" is not allowed for this campaign', p_platform;
+    end if;
+  end if;
+
+  -- 8. Validate required clip fields
+  if p_caption is null or trim(p_caption) = '' then
+    raise exception 'Caption is required';
+  end if;
+  if p_video_url is null or trim(p_video_url) = '' then
+    raise exception 'Video URL is required';
+  end if;
+  if p_platform is null or trim(p_platform) = '' then
+    raise exception 'Platform is required';
+  end if;
+
+  -- 9. Prevent obviously invalid URLs
+  v_normalized_url := trim(p_video_url);
+  if v_normalized_url not like 'http://%' and v_normalized_url not like 'https://%' then
+    raise exception 'Invalid video URL: must start with http:// or https://';
+  end if;
+
+  -- 10. Prevent duplicate submission of the exact same video URL by the same clipper
+  if exists (
+    select 1 from public.clips
+    where campaign_id = p_campaign_id
+      and user_id = v_user_id
+      and video_url = v_normalized_url
+  ) then
+    raise exception 'You have already submitted this video URL for this campaign';
+  end if;
+
+  -- 11. Store the campaign's current payout terms into locked fields
+  v_locked_cpm := case
+    when v_campaign.payout is not null then round(v_campaign.payout * 100)::integer
+    else null
+  end;
+  v_locked_max_payout := case
+    when v_campaign.max_payout_per_clip is not null then round(v_campaign.max_payout_per_clip * 100)::integer
+    else null
+  end;
+
+  -- 12. Insert the clip atomically
+  insert into public.clips (
+    campaign_id, user_id, clipper, caption, video_url, platform,
+    locked_cpm, locked_max_payout, status
+  ) values (
+    p_campaign_id,
+    v_user_id,
+    coalesce(
+      (select name from public.profiles where id = v_user_id),
+      (select email from auth.users where id = v_user_id),
+      'clipper'
+    ),
+    trim(p_caption),
+    v_normalized_url,
+    p_platform,
+    v_locked_cpm,
+    v_locked_max_payout,
+    'pending'
+  )
+  returning to_jsonb(clips.*) into v_clip;
+
+  return v_clip;
+end;
+$$;
+
+grant execute on function public.submit_clip(uuid, text, text, text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- RPC: finalize_clip_earning — Finalize a pending earning after verified views.
+-- Called by ingest_clip_metrics() when verified_views > 0.
+-- Moves financial_records.status: pending → processing.
+-- Never creates a second record. Never reverses processing or paid.
+-- Grants: service_role only (called from ingest_clip_metrics, which is
+-- SECURITY DEFINER with service_role execution).
+-- ---------------------------------------------------------------------------
+create or replace function public.finalize_clip_earning(
+  p_clip_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_clip record;
+  v_record record;
+  v_campaign record;
+  v_locked_cpm integer;
+  v_verified_views integer;
+  v_gross integer;
+  v_platform_fee integer;
+  v_net integer;
+  v_max_payout integer;
+  v_budget numeric;
+  v_reserved numeric;
+  v_new_total numeric;
+  v_result jsonb;
+begin
+  -- 1. Load the clip (must be approved)
+  select * into v_clip from public.clips where id = p_clip_id;
+  if not found then
+    raise exception 'Clip not found: %', p_clip_id;
+  end if;
+
+  if v_clip.status != 'approved' then
+    raise exception 'Clip is not approved (status: %)', v_clip.status;
+  end if;
+
+  -- 2. Find the pending financial record for this clip
+  select * into v_record
+  from public.financial_records
+  where clip_id = p_clip_id and status = 'pending';
+
+  if not found then
+    -- No pending record — either already finalized or not yet created.
+    -- Return null to indicate no action taken.
+    return null;
+  end if;
+
+  -- 3. Read verified views from the authoritative clips table
+  v_verified_views := v_clip.verified_views;
+  if v_verified_views is null or v_verified_views <= 0 then
+    -- No verified views yet — leave the record as pending
+    return null;
+  end if;
+
+  -- 4. Load and lock the campaign for budget enforcement
+  select * into v_campaign
+  from public.campaigns
+  where id = v_clip.campaign_id
+  for update;
+
+  if not found then
+    raise exception 'Campaign not found: %', v_clip.campaign_id;
+  end if;
+
+  -- 5. Calculate gross from locked CPM and verified views
+  v_locked_cpm := v_record.locked_cpm;
+  v_gross := (v_verified_views * v_locked_cpm) / 1000;
+
+  -- 6. Apply max payout cap (from locked terms)
+  v_max_payout := v_record.locked_max_payout;
+  if v_max_payout is not null and v_max_payout > 0 and v_gross > v_max_payout then
+    v_gross := v_max_payout;
+  end if;
+
+  -- 7. Platform fee: 10% of gross
+  v_platform_fee := round(v_gross * 0.10)::integer;
+
+  -- 8. Net to clipper
+  v_net := v_gross - v_platform_fee;
+
+  -- 9. Budget enforcement (atomic) — same logic as approve_clip
+  v_budget := v_campaign.budget;
+  if v_budget is not null and v_budget > 0 then
+    -- Reserved = all non-paid records for this campaign EXCLUDING this record
+    -- (since we're updating it, not adding a new one)
+    select coalesce(sum(gross_amount), 0) into v_reserved
+    from public.financial_records
+    where campaign_id = v_clip.campaign_id
+      and status in ('pending', 'processing')
+      and id != v_record.id;
+
+    v_new_total := v_reserved + v_gross;
+    if v_new_total > (v_budget * 100) then
+      raise exception 'Campaign budget exceeded: reserved ₹% + new ₹% > budget ₹%',
+        v_reserved / 100, v_gross / 100, v_budget;
+    end if;
+  end if;
+
+  -- 10. Update the existing financial record: pending → processing
+  -- Never creates a second record. Never reverses.
+  update public.financial_records set
+    verified_views = v_verified_views,
+    gross_amount = v_gross,
+    platform_fee = v_platform_fee,
+    net_amount = v_net,
+    status = 'processing',
+    processing_at = now(),
+    audit = coalesce(audit, '[]'::jsonb) || jsonb_build_object(
+      'action', 'finalized',
+      'verified_views', v_verified_views,
+      'gross', v_gross,
+      'platform_fee', v_platform_fee,
+      'net', v_net,
+      'at', now()
+    )
+  where id = v_record.id
+  returning to_jsonb(financial_records.*) into v_result;
+
+  return v_result;
+end;
+$$;
+
+grant execute on function public.finalize_clip_earning(uuid) to service_role;
