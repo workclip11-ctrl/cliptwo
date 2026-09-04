@@ -4,10 +4,17 @@
 // Handles OAuth callback: validates state, exchanges code for tokens,
 // stores encrypted tokens in social_connections, verifies ownership,
 // and redirects user back to the accounts page.
+//
+// Security model:
+//   - Authenticates user via normal Supabase auth client
+//   - Uses service-role client for social_accounts/social_connections/social_oauth_states
+//     (RLS policies were removed; these operations require elevated access)
+//   - Verifies state ownership (state.user_id === authenticated user)
+//   - Never exposes tokens to the browser
 // ---------------------------------------------------------------------------
 
 import { NextResponse, type NextRequest } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { getProvider } from "@/lib/social-providers";
 import { encryptToken, tokenExpiresIn } from "@/lib/token-crypto";
 import type { Platform } from "@/lib/types";
@@ -58,10 +65,24 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // ── Step 1: Authenticate the user ──────────────────────────────────
     const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    // 1. Validate the OAuth state (CSRF protection)
-    const { data: stateRecord, error: stateError } = await supabase
+    if (authError || !user) {
+      return NextResponse.redirect(
+        new URL(`${baseRedirect}?error=not_authenticated&platform=${platform}`, request.url),
+      );
+    }
+
+    // ── Step 2: Service-role client for trusted DB operations ───────────
+    // RLS policies on social_accounts, social_connections, social_oauth_states
+    // have been removed. This endpoint is a trusted server route that must
+    // use elevated access after verifying the user.
+    const adminClient = createServiceClient();
+
+    // ── Step 3: Validate the OAuth state (CSRF protection) ─────────────
+    const { data: stateRecord, error: stateError } = await adminClient
       .from("social_oauth_states")
       .select("*")
       .eq("state", state)
@@ -73,10 +94,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check expiry
+    // ── Step 4: Verify state ownership ─────────────────────────────────
+    // The state must belong to the authenticated user.
+    // Do NOT consume another user's OAuth state.
+    if (stateRecord.user_id !== user.id) {
+      return NextResponse.redirect(
+        new URL(`${baseRedirect}?error=invalid_state&platform=${platform}`, request.url),
+      );
+    }
+
+    // ── Step 5: Check expiry ───────────────────────────────────────────
     if (new Date(stateRecord.expires_at).getTime() < Date.now()) {
-      // Clean up expired state
-      await supabase.from("social_oauth_states").delete().eq("state", state);
+      await adminClient.from("social_oauth_states").delete().eq("state", state);
       return NextResponse.redirect(
         new URL(`${baseRedirect}?error=state_expired&platform=${platform}`, request.url),
       );
@@ -85,29 +114,29 @@ export async function GET(request: NextRequest) {
     const userId = stateRecord.user_id;
     const redirectPath = validateRedirectPath(stateRecord.redirect_to);
 
-    // Security: verify the state was generated for this platform
+    // ── Step 6: Verify platform matches ────────────────────────────────
     if (stateRecord.platform !== platform) {
       return NextResponse.redirect(
         new URL(`${baseRedirect}?error=platform_mismatch&platform=${platform}`, request.url),
       );
     }
 
-    // Delete the used state (one-time use)
-    await supabase.from("social_oauth_states").delete().eq("state", state);
+    // ── Step 7: Delete the used state (one-time use) ───────────────────
+    await adminClient.from("social_oauth_states").delete().eq("state", state);
 
-    // 2. Exchange code for tokens
+    // ── Step 8: Exchange code for tokens ───────────────────────────────
     const provider = getProvider(platform);
     const tokenResult = await provider.exchangeCode(code, state);
 
-    // 3. Encrypt tokens before storage
+    // ── Step 9: Encrypt tokens before storage ──────────────────────────
     const accessTokenEnc = encryptToken(tokenResult.accessToken);
     const refreshTokenEnc = tokenResult.refreshToken
       ? encryptToken(tokenResult.refreshToken)
       : null;
     const expiresAt = tokenExpiresIn(tokenResult.expiresIn);
 
-    // 4. Check if social_account already exists for this user+platform
-    const { data: existingAccount } = await supabase
+    // ── Step 10: Check if social_account already exists ────────────────
+    const { data: existingAccount } = await adminClient
       .from("social_accounts")
       .select("id")
       .eq("user_id", userId)
@@ -119,7 +148,7 @@ export async function GET(request: NextRequest) {
     if (existingAccount) {
       // Update existing account
       socialAccountId = existingAccount.id;
-      const { error: acctErr } = await supabase
+      const { error: acctErr } = await adminClient
         .from("social_accounts")
         .update({
           handle: tokenResult.handle,
@@ -129,14 +158,15 @@ export async function GET(request: NextRequest) {
           connected_at: new Date().toISOString(),
           error: null,
         })
-        .eq("id", socialAccountId);
+        .eq("id", socialAccountId)
+        .eq("user_id", userId);
       if (acctErr) {
         console.error(`[oauth/callback/${platform}] social_accounts update failed:`, acctErr.message);
         throw new Error(`Failed to update social account: ${acctErr.message}`);
       }
 
-      // Update or create connection
-      const { error: connErr } = await supabase.from("social_connections").upsert(
+      // Upsert connection with encrypted tokens
+      const { error: connErr } = await adminClient.from("social_connections").upsert(
         {
           social_account_id: socialAccountId,
           user_id: userId,
@@ -156,7 +186,7 @@ export async function GET(request: NextRequest) {
       }
     } else {
       // Create new social account
-      const { data: newAccount } = await supabase
+      const { data: newAccount, error: insertErr } = await adminClient
         .from("social_accounts")
         .insert({
           user_id: userId,
@@ -170,14 +200,14 @@ export async function GET(request: NextRequest) {
         .select("id")
         .single();
 
-      if (!newAccount) {
-        throw new Error("Failed to create social account");
+      if (insertErr || !newAccount) {
+        throw new Error(`Failed to create social account: ${insertErr?.message ?? "unknown"}`);
       }
 
       socialAccountId = newAccount.id;
 
       // Create connection with encrypted tokens
-      const { error: connErr } = await supabase.from("social_connections").insert({
+      const { error: connErr } = await adminClient.from("social_connections").insert({
         social_account_id: socialAccountId,
         user_id: userId,
         platform,
@@ -193,26 +223,27 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 5. Verify ownership (server-side)
+    // ── Step 11: Verify ownership (server-side) ────────────────────────
     const verification = await provider.verifyOwnership(
       tokenResult.accessToken,
       tokenResult.handle,
     );
 
     if (verification.verified) {
-      const { error: verifyAcctErr } = await supabase
+      const { error: verifyAcctErr } = await adminClient
         .from("social_accounts")
         .update({
           verified: true,
           provider_account_id: verification.providerAccountId,
           avatar_url: verification.avatarUrl ?? null,
         })
-        .eq("id", socialAccountId);
+        .eq("id", socialAccountId)
+        .eq("user_id", userId);
       if (verifyAcctErr) {
         console.error(`[oauth/callback/${platform}] verification update failed:`, verifyAcctErr.message);
       }
 
-      const { error: verifyConnErr } = await supabase
+      const { error: verifyConnErr } = await adminClient
         .from("social_connections")
         .update({
           verified_at: new Date().toISOString(),
@@ -224,7 +255,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 6. Redirect back to accounts page with success
+    // ── Step 12: Redirect back to accounts page with success ───────────
     const redirectUrl = new URL(redirectPath, request.url);
     redirectUrl.searchParams.set("connected", platform.toLowerCase());
     redirectUrl.searchParams.set("verified", verification.verified ? "true" : "false");

@@ -3,8 +3,12 @@
 // Revokes provider tokens, removes encrypted token storage, and updates
 // the social account status to "disconnected".
 //
-// Uses service_role to read encrypted tokens from social_connections
-// (RLS blocks browser SELECT on token columns).
+// Security model:
+//   - Authenticates user via normal Supabase auth client
+//   - Uses service-role client for social_accounts/social_connections writes
+//     (RLS policies were removed; these operations require elevated access)
+//   - Verifies ownership before any modification
+//   - Never exposes tokens to the browser
 // ---------------------------------------------------------------------------
 
 import { NextResponse } from "next/server";
@@ -25,16 +29,18 @@ export async function POST(request: Request) {
       );
     }
 
+    // ── Step 1: Authenticate the user ──────────────────────────────────
     const supabase = await createClient();
-
-    // Verify authenticated user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    // 1. Get the social account
-    const { data: account, error: accountError } = await supabase
+    // ── Step 2: Service-role client for trusted DB operations ───────────
+    const adminClient = createServiceClient();
+
+    // ── Step 3: Get the social account (verify ownership) ──────────────
+    const { data: account, error: accountError } = await adminClient
       .from("social_accounts")
       .select("*")
       .eq("id", socialAccountId)
@@ -52,14 +58,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // 2. Try to revoke the token with the provider (best-effort)
-    // Use service_role to read encrypted tokens (RLS blocks browser SELECT)
+    // ── Step 4: Try to revoke the token with the provider ──────────────
     try {
       const platform = account.platform as "Instagram" | "YouTube";
       const provider = getProvider(platform);
 
-      // Read encrypted token from social_connections using service_role
-      const adminClient = createServiceClient();
       const { data: connection } = await adminClient
         .from("social_connections")
         .select("access_token_enc")
@@ -74,21 +77,22 @@ export async function POST(request: Request) {
       // Best-effort — even if revocation fails, we clear local state
     }
 
-    // 3. Delete the encrypted token storage
-    await supabase
+    // ── Step 5: Delete the encrypted token storage ─────────────────────
+    await adminClient
       .from("social_connections")
       .delete()
       .eq("social_account_id", socialAccountId);
 
-    // 4. Update the social account status
-    await supabase
+    // ── Step 6: Update the social account status ───────────────────────
+    await adminClient
       .from("social_accounts")
       .update({
         status: "disconnected",
         verified: false,
         error: null,
       })
-      .eq("id", socialAccountId);
+      .eq("id", socialAccountId)
+      .eq("user_id", user.id);
 
     return NextResponse.json({ success: true });
   } catch (e) {

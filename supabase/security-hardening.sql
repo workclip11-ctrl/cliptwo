@@ -4,16 +4,20 @@
 -- Run AFTER: schema.sql, admin-schema.sql, financial-rewrite.sql,
 --            finance-consolidation.sql, integrity-constraints.sql
 --
+-- Run BEFORE: rls-tests.sql
+--
 -- Fixes:
 -- 1. Read RPCs: add auth.uid() ownership checks (IDOR fixes)
 -- 2. Notifications: restrict INSERT to admin-only (prevent notification forgery)
 -- 3. Payouts: remove direct INSERT RLS (force through request_payout() RPC)
--- 4. Site settings: create public view without secrets
--- 5. Social accounts: remove direct client INSERT (force through server)
--- 6. Social connections: remove direct client writes (server-only)
--- 7. Social OAuth states: remove direct client access (server-only)
--- 8. Revoke PUBLIC execute on sensitive functions
--- 9. Cleanup legacy functions still grantable to authenticated
+-- 4. Payout requests: remove direct INSERT RLS (force through request_payout())
+-- 5. Site settings: create public view without secrets
+-- 6. Social accounts: remove direct client INSERT (force through OAuth flow)
+-- 7. Social connections: remove direct client writes (server-only)
+-- 8. Social OAuth states: remove direct client access (server-only)
+-- 9. Revoke execute on anon-only sensitive functions
+-- 10. Revoke execute on legacy superseded functions
+-- 11. Ensure request_payout() remains executable by authenticated
 -- ===========================================================================
 
 -- ────────────────────────────────────────────────────────────────────────────
@@ -63,6 +67,8 @@ AS $$
   END;
 $$;
 
+GRANT EXECUTE ON FUNCTION public.get_wallet_balance(uuid) TO authenticated;
+
 -- ────────────────────────────────────────────────────────────────────────────
 -- 2. FIX: get_clipper_finance_records — add ownership check
 -- ────────────────────────────────────────────────────────────────────────────
@@ -90,6 +96,8 @@ AS $$
   ) fr;
 $$;
 
+GRANT EXECUTE ON FUNCTION public.get_clipper_finance_records(uuid, integer, integer) TO authenticated;
+
 -- ────────────────────────────────────────────────────────────────────────────
 -- 3. FIX: get_payout_requests — add ownership check
 -- ────────────────────────────────────────────────────────────────────────────
@@ -108,7 +116,7 @@ AS $$
       coalesce(jsonb_agg(pr.*), '[]'::jsonb)
     ELSE
       '[]'::jsonb
-  END
+    END
   FROM (
     SELECT * FROM public.payout_requests
     WHERE user_id = p_user_id
@@ -116,6 +124,8 @@ AS $$
     LIMIT p_limit OFFSET p_offset
   ) pr;
 $$;
+
+GRANT EXECUTE ON FUNCTION public.get_payout_requests(uuid, integer, integer) TO authenticated;
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 4. FIX: get_all_payout_requests — admin-only
@@ -144,115 +154,25 @@ AS $$
   ) pr;
 $$;
 
--- ────────────────────────────────────────────────────────────────────────────
--- 5. FIX: get_clipper_earnings — add ownership check (legacy, still exists)
--- ────────────────────────────────────────────────────────────────────────────
-CREATE OR REPLACE FUNCTION public.get_clipper_earnings(p_clipper_id uuid)
-RETURNS jsonb
-LANGUAGE sql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT CASE
-    WHEN auth.uid() = p_clipper_id OR public.is_admin() THEN
-      jsonb_build_object(
-        'total_gross', coalesce(sum(gross_amount), 0),
-        'total_fees', coalesce(sum(platform_fee), 0),
-        'total_net', coalesce(sum(net_amount), 0),
-        'total_creator_fees', coalesce(sum(creator_fee), 0),
-        'currency', 'INR',
-        'earning_count', count(*),
-        'paid_count', count(*) filter (where status = 'paid'),
-        'pending_count', count(*) filter (where status in ('pending', 'approved')),
-        'paid_amount', coalesce(sum(net_amount) filter (where status = 'paid'), 0),
-        'pending_amount', coalesce(sum(net_amount) filter (where status in ('pending', 'approved')), 0)
-      )
-    ELSE
-      jsonb_build_object('error', 'Unauthorized', 'total_gross', 0)
-  END
-  FROM public.earnings
-  WHERE clipper_id = p_clipper_id;
-$$;
+GRANT EXECUTE ON FUNCTION public.get_all_payout_requests(text, integer, integer) TO authenticated;
 
 -- ────────────────────────────────────────────────────────────────────────────
--- 6. FIX: get_wallet_entries — add ownership check (legacy, still exists)
--- ────────────────────────────────────────────────────────────────────────────
-CREATE OR REPLACE FUNCTION public.get_wallet_entries(
-  p_user_id uuid,
-  p_limit integer default 50,
-  p_offset integer default 0
-)
-RETURNS jsonb
-LANGUAGE sql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT CASE
-    WHEN auth.uid() = p_user_id OR public.is_admin() THEN
-      coalesce(jsonb_agg(row_to_json(le)), '[]'::jsonb)
-    ELSE
-      '[]'::jsonb
-  END
-  FROM (
-    select id, user_id, type, amount, currency, reference_type,
-           reference_id, idempotency_key, created_at, metadata
-    from public.wallet_ledger
-    where user_id = p_user_id
-    order by created_at desc
-    limit p_limit offset p_offset
-  ) le;
-$$;
-
--- ────────────────────────────────────────────────────────────────────────────
--- 7. FIX: get_user_payouts — add ownership check (legacy, still exists)
--- ────────────────────────────────────────────────────────────────────────────
-CREATE OR REPLACE FUNCTION public.get_user_payouts(
-  p_user_id uuid,
-  p_limit integer default 20,
-  p_offset integer default 0
-)
-RETURNS jsonb
-LANGUAGE sql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT CASE
-    WHEN auth.uid() = p_user_id OR public.is_admin() THEN
-      coalesce(jsonb_agg(row_to_json(p)), '[]'::jsonb)
-    ELSE
-      '[]'::jsonb
-  END
-  FROM (
-    select id, user_id, amount, net_amount, currency, status, method,
-           upi_id, provider, provider_ref, idempotency_key,
-           requested_at, processed_at, paid_at, failed_at, reversed_at,
-           failure_reason, retry_count, metadata
-    from public.payouts
-    where user_id = p_user_id
-    order by requested_at desc
-    limit p_limit offset p_offset
-  ) p;
-$$;
-
--- ────────────────────────────────────────────────────────────────────────────
--- 8. FIX: Notifications — prevent notification forgery
+-- 5. FIX: Notifications — prevent notification forgery
 -- Users should NOT be able to insert notifications for other users.
 -- Only admin/system should create notifications.
--- Change INSERT policy to admin-only.
 -- ────────────────────────────────────────────────────────────────────────────
 DROP POLICY IF EXISTS "notifications_insert" ON public.notifications;
 CREATE POLICY "notifications_insert" ON public.notifications
   FOR INSERT WITH CHECK (public.is_admin());
 
--- Also restrict UPDATE to only the 'read' column for non-admins
--- (Users can mark their own notifications as read, but not modify title/message)
+-- Users can mark their own notifications as read, but not modify title/message
 DROP POLICY IF EXISTS "notifications_update" ON public.notifications;
 CREATE POLICY "notifications_update" ON public.notifications
   FOR UPDATE USING (auth.uid() = user_id OR public.is_admin())
   WITH CHECK (auth.uid() = user_id OR public.is_admin());
 
 -- ────────────────────────────────────────────────────────────────────────────
--- 9. FIX: Payouts — remove direct INSERT for authenticated users
+-- 6. FIX: Payouts — remove direct INSERT for authenticated users
 -- The old payouts table allows direct INSERT via RLS, bypassing the
 -- request_payout() RPC's balance validation and advisory lock.
 -- All payout creation must go through request_payout().
@@ -262,7 +182,7 @@ DROP POLICY IF EXISTS "payouts_insert" ON public.payouts;
 -- request_payout() uses SECURITY DEFINER to bypass RLS.
 
 -- ────────────────────────────────────────────────────────────────────────────
--- 10. FIX: Payout requests — remove direct INSERT for authenticated users
+-- 7. FIX: Payout requests — remove direct INSERT for authenticated users
 -- The payout_requests INSERT policy allows direct client inserts with
 -- auth.uid() = user_id, bypassing request_payout()'s validation.
 -- All payout creation must go through request_payout().
@@ -272,37 +192,37 @@ DROP POLICY IF EXISTS "payout_requests_insert" ON public.payout_requests;
 -- request_payout() uses SECURITY DEFINER to bypass RLS.
 
 -- ────────────────────────────────────────────────────────────────────────────
--- 11. FIX: Social accounts — remove direct client INSERT
+-- 8. FIX: Social accounts — remove direct client INSERT
 -- Users should connect social accounts through server-side OAuth flow,
 -- not by inserting rows directly. Direct inserts could bypass OAuth
 -- verification and allow setting verified=true.
 -- ────────────────────────────────────────────────────────────────────────────
 DROP POLICY IF EXISTS "social_accounts_insert" ON public.social_accounts;
--- Users can still disconnect (DELETE) their own accounts.
+-- Users can still SELECT own, UPDATE own non-trusted fields, DELETE own.
 -- Connection is initiated via the OAuth flow (server-side).
 
 -- ────────────────────────────────────────────────────────────────────────────
--- 12. FIX: Social connections — remove direct client writes
+-- 9. FIX: Social connections — remove direct client writes
 -- Token data is server-only. Users should not INSERT or UPDATE
 -- connections directly. OAuth callback creates/updates them server-side.
 -- Users can disconnect (DELETE) their own connections.
 -- ────────────────────────────────────────────────────────────────────────────
 DROP POLICY IF EXISTS "social_connections_insert" ON public.social_connections;
 DROP POLICY IF EXISTS "social_connections_update" ON public.social_connections;
--- DELETE is kept: users can disconnect their own connections.
+-- DELETE is kept: users can disconnect their own connections via API.
 
 -- ────────────────────────────────────────────────────────────────────────────
--- 13. FIX: Social OAuth states — remove direct client access
+-- 10. FIX: Social OAuth states — remove direct client access
 -- OAuth states are temporary security records used by the callback.
 -- They should NOT be readable or writable by the browser.
--- The OAuth callback uses SECURITY DEFINER to access them.
+-- The OAuth callback uses service-role to access them.
 -- ────────────────────────────────────────────────────────────────────────────
 DROP POLICY IF EXISTS "social_oauth_states_insert" ON public.social_oauth_states;
 DROP POLICY IF EXISTS "social_oauth_states_delete" ON public.social_oauth_states;
 -- No SELECT policy exists (RLS blocks all reads by default).
 
 -- ────────────────────────────────────────────────────────────────────────────
--- 14. FIX: Site settings — create a public view without secrets
+-- 11. FIX: Site settings — create a public view without secrets
 -- The site_settings table exposes razorpay_key to all users via world-readable
 -- SELECT policy. Create a safe public view and restrict the table.
 -- ────────────────────────────────────────────────────────────────────────────
@@ -315,31 +235,107 @@ GRANT SELECT ON public.site_settings_public TO anon;
 GRANT SELECT ON public.site_settings_public TO authenticated;
 
 -- ────────────────────────────────────────────────────────────────────────────
--- 15. Revoke PUBLIC execute on sensitive functions
--- Some functions should not be callable by anonymous users.
+-- 12. Revoke anon execute on user_exists (email enumeration)
 -- ────────────────────────────────────────────────────────────────────────────
-DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.user_exists(text) FROM anon; EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN
+  REVOKE EXECUTE ON FUNCTION public.user_exists(text) FROM anon;
+EXCEPTION WHEN undefined_function THEN NULL;
+END $$;
 
 -- ────────────────────────────────────────────────────────────────────────────
--- 16. Cleanup: Revoke execute on legacy functions that are superseded
+-- 13. Revoke execute on legacy superseded functions
 -- These functions from admin-schema.sql are replaced by financial-rewrite.sql
--- and finance-consolidation.sql. Revoke their execute to prevent confusion.
--- Uses exception handling since some functions may have been dropped already.
+-- and finance-consolidation.sql. They are NOT called by any active code.
+-- Uses specific exception handling for each known function signature.
 -- ────────────────────────────────────────────────────────────────────────────
-DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.create_earning(uuid, text) FROM authenticated; EXCEPTION WHEN OTHERS THEN NULL; END $$;
-DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.update_earning_status(uuid, text, text) FROM authenticated; EXCEPTION WHEN OTHERS THEN NULL; END $$;
-DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.get_wallet_balance(uuid) FROM authenticated; EXCEPTION WHEN OTHERS THEN NULL; END $$;
-DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.get_wallet_entries(uuid, integer, integer) FROM authenticated; EXCEPTION WHEN OTHERS THEN NULL; END $$;
-DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.adjust_wallet(uuid, integer, text) FROM authenticated; EXCEPTION WHEN OTHERS THEN NULL; END $$;
-DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.reverse_ledger_entry(uuid, text) FROM authenticated; EXCEPTION WHEN OTHERS THEN NULL; END $$;
-DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.get_clipper_earnings(uuid) FROM authenticated; EXCEPTION WHEN OTHERS THEN NULL; END $$;
-DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.request_payout() FROM authenticated; EXCEPTION WHEN OTHERS THEN NULL; END $$;
-DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.process_payout(uuid, text) FROM authenticated; EXCEPTION WHEN OTHERS THEN NULL; END $$;
-DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.complete_payout(uuid, text) FROM authenticated; EXCEPTION WHEN OTHERS THEN NULL; END $$;
-DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.fail_payout(uuid, text) FROM authenticated; EXCEPTION WHEN OTHERS THEN NULL; END $$;
-DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.reverse_payout(uuid, text) FROM authenticated; EXCEPTION WHEN OTHERS THEN NULL; END $$;
-DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.get_user_payouts(uuid, integer, integer) FROM authenticated; EXCEPTION WHEN OTHERS THEN NULL; END $$;
-DO $$ BEGIN REVOKE EXECUTE ON FUNCTION public.test_max_payout_enforcement() FROM authenticated; EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+-- Legacy earnings functions (replaced by financial_records)
+DO $$ BEGIN
+  REVOKE EXECUTE ON FUNCTION public.create_earning(uuid, text) FROM authenticated;
+EXCEPTION WHEN undefined_function THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  REVOKE EXECUTE ON FUNCTION public.update_earning_status(uuid, text, text) FROM authenticated;
+EXCEPTION WHEN undefined_function THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  REVOKE EXECUTE ON FUNCTION public.get_clipper_earnings(uuid) FROM authenticated;
+EXCEPTION WHEN undefined_function THEN NULL;
+END $$;
+
+-- Legacy wallet ledger functions (replaced by financial_records)
+DO $$ BEGIN
+  REVOKE EXECUTE ON FUNCTION public.get_wallet_entries(uuid, integer, integer) FROM authenticated;
+EXCEPTION WHEN undefined_function THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  REVOKE EXECUTE ON FUNCTION public.adjust_wallet(uuid, integer, text) FROM authenticated;
+EXCEPTION WHEN undefined_function THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  REVOKE EXECUTE ON FUNCTION public.reverse_ledger_entry(uuid, text) FROM authenticated;
+EXCEPTION WHEN undefined_function THEN NULL;
+END $$;
+
+-- Legacy payout functions (replaced by payout_requests)
+DO $$ BEGIN
+  REVOKE EXECUTE ON FUNCTION public.process_payout(uuid, text) FROM authenticated;
+EXCEPTION WHEN undefined_function THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  REVOKE EXECUTE ON FUNCTION public.complete_payout(uuid, text) FROM authenticated;
+EXCEPTION WHEN undefined_function THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  REVOKE EXECUTE ON FUNCTION public.fail_payout(uuid, text) FROM authenticated;
+EXCEPTION WHEN undefined_function THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  REVOKE EXECUTE ON FUNCTION public.reverse_payout(uuid, text) FROM authenticated;
+EXCEPTION WHEN undefined_function THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  REVOKE EXECUTE ON FUNCTION public.get_user_payouts(uuid, integer, integer) FROM authenticated;
+EXCEPTION WHEN undefined_function THEN NULL;
+END $$;
+
+-- Legacy test function
+DO $$ BEGIN
+  REVOKE EXECUTE ON FUNCTION public.test_max_payout_enforcement() FROM authenticated;
+EXCEPTION WHEN undefined_function THEN NULL;
+END $$;
+
+-- ────────────────────────────────────────────────────────────────────────────
+-- 14. Ensure request_payout() is executable by authenticated
+-- This is the legitimate new payout RPC. Must remain accessible.
+-- ────────────────────────────────────────────────────────────────────────────
+GRANT EXECUTE ON FUNCTION public.request_payout() TO authenticated;
+
+-- Ensure admin payout functions are executable (they verify admin internally)
+GRANT EXECUTE ON FUNCTION public.process_payout_request(uuid, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.complete_payout_request(uuid, text, text) TO authenticated;
+
+-- Ensure admin clip functions are executable (they verify admin internally)
+GRANT EXECUTE ON FUNCTION public.approve_clip(uuid, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_clip_action(uuid, text, text, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_user_action(uuid, text, text, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_campaign_action(uuid, text, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.campaign_action(uuid, text, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.adjust_campaign_budget(uuid, numeric, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.deactivate_own_account() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.update_clip_status(uuid, text, text, text, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.update_clip_views(uuid, integer, jsonb) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_latest_verified_metrics(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_clip_metrics(uuid, integer) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_campaign_budget(uuid) TO authenticated;
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- DONE
