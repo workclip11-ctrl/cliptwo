@@ -4,7 +4,7 @@
 // the social account status to "disconnected".
 //
 // Security model:
-//   - Authenticates user via normal Supabase auth client
+//   - Authenticates user via Bearer token (per-tab) or cookie fallback
 //   - Uses service-role client for social_accounts/social_connections writes
 //     (RLS policies were removed; these operations require elevated access)
 //   - Verifies ownership before any modification
@@ -12,7 +12,8 @@
 // ---------------------------------------------------------------------------
 
 import { NextResponse } from "next/server";
-import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { getAuthenticatedUser } from "@/lib/supabase/auth-helpers";
+import { createServiceClient } from "@/lib/supabase/server";
 import { getProvider } from "@/lib/social-providers";
 import { decryptToken } from "@/lib/token-crypto";
 
@@ -30,9 +31,8 @@ export async function POST(request: Request) {
     }
 
     // ── Step 1: Authenticate the user ──────────────────────────────────
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const authUser = await getAuthenticatedUser(request);
+    if (!authUser) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     }
 
     // Ownership check: users can only disconnect their own accounts
-    if (account.user_id !== user.id) {
+    if (account.user_id !== authUser.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -92,7 +92,7 @@ export async function POST(request: Request) {
         error: null,
       })
       .eq("id", socialAccountId)
-      .eq("user_id", user.id);
+      .eq("user_id", authUser.id);
 
     return NextResponse.json({ success: true });
   } catch (e) {

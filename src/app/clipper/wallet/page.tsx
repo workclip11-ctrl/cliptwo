@@ -20,6 +20,7 @@ import { rup, fmtViews } from "@/lib/format";
 import { financeOf } from "@/lib/finance";
 import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
 
 const MIN_WITHDRAWAL = 100;
 const PAGE = 8;
@@ -76,9 +77,18 @@ export default function ClipperWalletPage() {
     setRequestSuccess(null);
 
     try {
+      let headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (isSupabaseConfigured) {
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        if (token) {
+          headers = { ...headers, Authorization: `Bearer ${token}` };
+        }
+      }
+
       const res = await fetch("/api/payout/request", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
       });
 
       const body = await res.json();

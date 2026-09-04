@@ -108,6 +108,13 @@ export default function SocialAccountsPage() {
   const [verifying, setVerifying] = useState<string | null>(null);
   const [oauthError, setOauthError] = useState<string | null>(null);
 
+  /** Get the current tab's Supabase access token for Bearer auth. */
+  async function getAccessToken(): Promise<string | null> {
+    if (!isSupabaseConfigured) return null;
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token ?? null;
+  }
+
   // Handle OAuth callback results from URL params and reload from DB
   const handleOAuthCallback = useCallback(() => {
     const params = new URLSearchParams(window.location.search);
@@ -144,9 +151,17 @@ export default function SocialAccountsPage() {
     setConnecting(platform);
 
     try {
+      const accessToken = await getAccessToken();
+      if (!accessToken) {
+        throw new Error("Your Cliptwo session has expired. Please log in again.");
+      }
+
       const res = await fetch("/api/social/oauth/initiate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
         body: JSON.stringify({ platform }),
       });
 
@@ -175,9 +190,17 @@ export default function SocialAccountsPage() {
     setOauthError(null);
 
     try {
+      const accessToken = await getAccessToken();
+      if (!accessToken) {
+        throw new Error("Your Cliptwo session has expired. Please log in again.");
+      }
+
       const res = await fetch("/api/social/oauth/initiate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
         body: JSON.stringify({ platform: acc.platform }),
       });
 
@@ -200,9 +223,18 @@ export default function SocialAccountsPage() {
 
   async function disconnect(acc: SocialAccount) {
     try {
+      const accessToken = await getAccessToken();
+      if (!accessToken) {
+        console.error("Disconnect failed: session expired");
+        return;
+      }
+
       const res = await fetch("/api/social/disconnect", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
         body: JSON.stringify({ socialAccountId: acc.id }),
       });
       if (!res.ok) {
@@ -224,9 +256,21 @@ export default function SocialAccountsPage() {
   async function verifyAccount(acc: SocialAccount) {
     setVerifying(acc.id);
     try {
+      const accessToken = await getAccessToken();
+      if (!accessToken) {
+        updateSocialAccount(acc.id, {
+          status: "connection_error",
+          error: "Session expired. Please log in again.",
+        });
+        return;
+      }
+
       const res = await fetch("/api/social/verify", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
         body: JSON.stringify({ socialAccountId: acc.id }),
       });
 

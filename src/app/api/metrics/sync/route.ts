@@ -9,7 +9,8 @@
 // ---------------------------------------------------------------------------
 
 import { NextResponse } from "next/server";
-import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { getAuthenticatedUser } from "@/lib/supabase/auth-helpers";
+import { createServiceClient } from "@/lib/supabase/server";
 import { getMetricProvider, isMetricProviderConfigured } from "@/lib/metric-providers";
 import { getProvider } from "@/lib/social-providers";
 import { decryptToken, encryptToken, isTokenExpired } from "@/lib/token-crypto";
@@ -23,22 +24,19 @@ export async function POST(request: Request) {
       platform?: Platform;
     };
 
-    const supabase = await createClient();
-
     // Verify admin or service_role
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const authUser = await getAuthenticatedUser(request);
 
-    if (!user) {
+    if (!authUser) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
     // Check admin role
-    const { data: profile } = await supabase
+    const adminClient = createServiceClient();
+    const { data: profile } = await adminClient
       .from("profiles")
       .select("role")
-      .eq("id", user.id)
+      .eq("id", authUser.id)
       .single();
 
     if (profile?.role !== "admin") {
@@ -66,12 +64,10 @@ export async function POST(request: Request) {
       error?: string;
     }> = [];
 
-    const adminClient = createServiceClient();
-
     for (const cid of targetClipIds) {
       try {
         // Get clip details
-        const { data: clip, error: clipError } = await supabase
+        const { data: clip, error: clipError } = await adminClient
           .from("clips")
           .select("id, platform, video_url, user_id")
           .eq("id", cid)

@@ -6,15 +6,15 @@
 // and redirects user back to the accounts page.
 //
 // Security model:
-//   - Authenticates user via normal Supabase auth client
-//   - Uses service-role client for social_accounts/social_connections/social_oauth_states
-//     (RLS policies were removed; these operations require elevated access)
-//   - Verifies state ownership (state.user_id === authenticated user)
+//   - Does NOT require browser session cookies (per-tab auth is in sessionStorage)
+//   - User identity comes exclusively from the one-time OAuth state row
+//   - State is cryptographically random, short-lived, one-time-use, bound to user
+//   - Uses service-role client for all DB operations
 //   - Never exposes tokens to the browser
 // ---------------------------------------------------------------------------
 
 import { NextResponse, type NextRequest } from "next/server";
-import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/server";
 import { getProvider } from "@/lib/social-providers";
 import { encryptToken, tokenExpiresIn } from "@/lib/token-crypto";
 import type { Platform } from "@/lib/types";
@@ -65,23 +65,12 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // ── Step 1: Authenticate the user ──────────────────────────────────
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.redirect(
-        new URL(`${baseRedirect}?error=not_authenticated&platform=${platform}`, request.url),
-      );
-    }
-
-    // ── Step 2: Service-role client for trusted DB operations ───────────
-    // RLS policies on social_accounts, social_connections, social_oauth_states
-    // have been removed. This endpoint is a trusted server route that must
-    // use elevated access after verifying the user.
+    // ── Step 1: Service-role client for all DB operations ───────────────
     const adminClient = createServiceClient();
 
-    // ── Step 3: Validate the OAuth state (CSRF protection) ─────────────
+    // ── Step 2: Validate the OAuth state (CSRF protection) ─────────────
+    // The one-time state is the SOLE source of user identity in this
+    // callback. No browser session/cookie auth is required.
     const { data: stateRecord, error: stateError } = await adminClient
       .from("social_oauth_states")
       .select("*")
@@ -94,16 +83,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // ── Step 4: Verify state ownership ─────────────────────────────────
-    // The state must belong to the authenticated user.
-    // Do NOT consume another user's OAuth state.
-    if (stateRecord.user_id !== user.id) {
-      return NextResponse.redirect(
-        new URL(`${baseRedirect}?error=invalid_state&platform=${platform}`, request.url),
-      );
-    }
-
-    // ── Step 5: Check expiry ───────────────────────────────────────────
+    // ── Step 3: Check expiry ───────────────────────────────────────────
     if (new Date(stateRecord.expires_at).getTime() < Date.now()) {
       await adminClient.from("social_oauth_states").delete().eq("state", state);
       return NextResponse.redirect(
@@ -111,31 +91,31 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const userId = stateRecord.user_id;
-    const redirectPath = validateRedirectPath(stateRecord.redirect_to);
-
-    // ── Step 6: Verify platform matches ────────────────────────────────
+    // ── Step 4: Verify platform matches ────────────────────────────────
     if (stateRecord.platform !== platform) {
       return NextResponse.redirect(
         new URL(`${baseRedirect}?error=platform_mismatch&platform=${platform}`, request.url),
       );
     }
 
-    // ── Step 7: Delete the used state (one-time use) ───────────────────
+    const userId = stateRecord.user_id;
+    const redirectPath = validateRedirectPath(stateRecord.redirect_to);
+
+    // ── Step 5: Delete the used state (one-time use) ───────────────────
     await adminClient.from("social_oauth_states").delete().eq("state", state);
 
-    // ── Step 8: Exchange code for tokens ───────────────────────────────
+    // ── Step 6: Exchange code for tokens ───────────────────────────────
     const provider = getProvider(platform);
     const tokenResult = await provider.exchangeCode(code, state, stateRecord.code_verifier ?? undefined);
 
-    // ── Step 9: Encrypt tokens before storage ──────────────────────────
+    // ── Step 7: Encrypt tokens before storage ──────────────────────────
     const accessTokenEnc = encryptToken(tokenResult.accessToken);
     const refreshTokenEnc = tokenResult.refreshToken
       ? encryptToken(tokenResult.refreshToken)
       : null;
     const expiresAt = tokenExpiresIn(tokenResult.expiresIn);
 
-    // ── Step 10: Check if social_account already exists ────────────────
+    // ── Step 8: Check if social_account already exists ────────────────
     const { data: existingAccount } = await adminClient
       .from("social_accounts")
       .select("id")
@@ -234,7 +214,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // ── Step 11: Verify ownership (server-side) ────────────────────────
+    // ── Step 9: Verify ownership (server-side) ────────────────────────
     const verification = await provider.verifyOwnership(
       tokenResult.accessToken,
       tokenResult.handle,
@@ -266,7 +246,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // ── Step 12: Redirect back to accounts page with success ───────────
+    // ── Step 10: Redirect back to accounts page with success ───────────
     const redirectUrl = new URL(redirectPath, request.url);
     redirectUrl.searchParams.set("connected", platform.toLowerCase());
     redirectUrl.searchParams.set("verified", verification.verified ? "true" : "false");

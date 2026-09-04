@@ -7,13 +7,15 @@
 // Kick: returns 400 with "not available" message.
 //
 // Security model:
-//   - Authenticates user via normal Supabase auth client
+//   - Authenticates user via Bearer access token from per-tab browser session
+//   - Falls back to cookie-based auth for non-browser callers
 //   - Uses service-role client for social_oauth_states insert (RLS removed)
 //   - Never exposes service-role key to the browser
 // ---------------------------------------------------------------------------
 
 import { NextResponse } from "next/server";
-import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { getAuthenticatedUser } from "@/lib/supabase/auth-helpers";
+import { createServiceClient } from "@/lib/supabase/server";
 import { getProvider, isProviderConfigured } from "@/lib/social-providers";
 import type { Platform } from "@/lib/types";
 
@@ -62,29 +64,28 @@ export async function POST(request: Request) {
     }
 
     // ── Step 1: Authenticate the user ──────────────────────────────────
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    // Supports per-tab browser sessions via Bearer token AND cookie-based
+    // auth for Vercel cron / server-side callers.
+    const authUser = await getAuthenticatedUser(request);
 
-    if (!user) {
-      console.error("[oauth/initiate] Authentication failed — no user session");
+    if (!authUser) {
+      console.error("[oauth/initiate] Authentication failed — no valid session or token");
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    console.log(`[oauth/initiate] Authenticated user: ${user.id}`);
+    console.log(`[oauth/initiate] Authenticated user: ${authUser.id}`);
 
     // ── Step 2: Service-role client for trusted DB operations ───────────
     const adminClient = createServiceClient();
 
     // ── Step 3: Generate cryptographically random state ─────────────────
-    const state = `${user.id}_${platform}_${Date.now()}_${crypto.randomUUID()}`;
+    const state = `${authUser.id}_${platform}_${Date.now()}_${crypto.randomUUID()}`;
     const provider = getProvider(platform);
 
     // YouTube requires async PKCE code_challenge generation
     const authResult = provider.getAuthorizationUrlAsync
-      ? await provider.getAuthorizationUrlAsync(user.id, state)
-      : provider.getAuthorizationUrl(user.id, state);
+      ? await provider.getAuthorizationUrlAsync(authUser.id, state)
+      : provider.getAuthorizationUrl(authUser.id, state);
 
     const { authorizationUrl, codeVerifier } = authResult;
 
@@ -94,7 +95,7 @@ export async function POST(request: Request) {
     const { error: stateError } = await adminClient
       .from("social_oauth_states")
       .insert({
-        user_id: user.id,
+        user_id: authUser.id,
         platform,
         state,
         code_verifier: codeVerifier ?? null,

@@ -9,7 +9,8 @@
 // ---------------------------------------------------------------------------
 
 import { NextResponse } from "next/server";
-import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { getAuthenticatedUser } from "@/lib/supabase/auth-helpers";
+import { createServiceClient } from "@/lib/supabase/server";
 import { getProvider } from "@/lib/social-providers";
 import { decryptToken, isTokenExpired } from "@/lib/token-crypto";
 
@@ -26,18 +27,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-    if (authError || !user) {
+    const authUser = await getAuthenticatedUser(request);
+    if (!authUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const adminClient = createServiceClient();
+
     // 1. Get the social account
-    const { data: account, error: accountError } = await supabase
+    const { data: account, error: accountError } = await adminClient
       .from("social_accounts")
       .select("*")
       .eq("id", socialAccountId)
@@ -50,7 +48,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (account.user_id !== user.id) {
+    if (account.user_id !== authUser.id) {
       return NextResponse.json(
         { error: "Account not found" },
         { status: 404 },
@@ -58,8 +56,6 @@ export async function POST(request: Request) {
     }
 
     // 2. Get the encrypted tokens from social_connections using service_role
-    // RLS blocks browser from reading tokens — service_role bypasses RLS
-    const adminClient = createServiceClient();
     const { data: connection, error: connError } = await adminClient
       .from("social_connections")
       .select("access_token_enc, refresh_token_enc, expires_at")
@@ -104,7 +100,7 @@ export async function POST(request: Request) {
           provider_account_id: verification.providerAccountId,
         })
         .eq("id", socialAccountId)
-        .eq("user_id", user.id);
+        .eq("user_id", authUser.id);
 
       // Update connection verification timestamp
       await adminClient

@@ -2,7 +2,7 @@
 // POST /api/payout/request
 //
 // Server-side payout request handler.
-// 1. Authenticates via Supabase session (server-side cookie)
+// 1. Authenticates via Bearer token (per-tab) or cookie fallback
 // 2. Calls request_payout() RPC which:
 //    - Reads user ID from auth.uid()
 //    - Reads verified UPI from profiles
@@ -18,10 +18,25 @@
 // ---------------------------------------------------------------------------
 
 import { NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
+import { getAuthenticatedUser } from "@/lib/supabase/auth-helpers";
 
 export async function POST(request: Request) {
   try {
+    const authUser = await getAuthenticatedUser(request);
+
+    if (!authUser) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    // Use service-role client to call request_payout() RPC
+    // The RPC uses auth.uid() internally — we need to set the auth context
+    // Since request_payout() uses auth.uid(), we call it via a client that
+    // has the user's session. For Bearer auth, we use the service-role client
+    // but the RPC must work with the authenticated user.
+    //
+    // Actually, request_payout() uses auth.uid() which reads from the JWT.
+    // With service-role, auth.uid() returns the service role user, not the
+    // actual user. We need to use the anon client with the user's token.
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -32,32 +47,26 @@ export async function POST(request: Request) {
       );
     }
 
-    const cookieHeader = request.headers.get("cookie") ?? "";
+    // Try Bearer token first
+    const authHeader = request.headers.get("authorization");
+    let rpcClient;
 
-    const supabase = createServerClient(supabaseUrl, supabaseKey, {
-      cookies: {
-        getAll() {
-          if (!cookieHeader) return [];
-          return cookieHeader.split(";").map((c) => {
-            const [name, ...rest] = c.trim().split("=");
-            return { name: name ?? "", value: rest.join("=") };
-          });
+    if (authHeader?.startsWith("Bearer ")) {
+      const { createClient: createSupabaseClient } = await import("@supabase/supabase-js");
+      rpcClient = createSupabaseClient(supabaseUrl, supabaseKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+        global: {
+          headers: { Authorization: authHeader },
         },
-        setAll() {},
-      },
-    });
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      });
+    } else {
+      // Fallback: cookie-based (import from server.ts)
+      const { createClient } = await import("@/lib/supabase/server");
+      rpcClient = await createClient();
     }
 
     // Call request_payout() RPC — all validation happens server-side
-    const { data, error: rpcError } = await supabase.rpc("request_payout");
+    const { data, error: rpcError } = await rpcClient.rpc("request_payout");
 
     if (rpcError) {
       return NextResponse.json(

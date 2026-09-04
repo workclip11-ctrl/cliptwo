@@ -8,7 +8,8 @@
 // ---------------------------------------------------------------------------
 
 import { NextResponse } from "next/server";
-import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { getAuthenticatedUser } from "@/lib/supabase/auth-helpers";
+import { createServiceClient } from "@/lib/supabase/server";
 import { getMetricProvider, isMetricProviderConfigured } from "@/lib/metric-providers";
 import { getProvider } from "@/lib/social-providers";
 import { decryptToken, encryptToken, isTokenExpired } from "@/lib/token-crypto";
@@ -22,16 +23,16 @@ export async function GET(request: Request) {
     const isVercelCron = cronSecret && authHeader === `Bearer ${cronSecret}`;
 
     if (!isVercelCron) {
-      // Fall back to admin session check
-      const supabase = await createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      // Fall back to admin session check via Bearer token or cookie
+      const authUser = await getAuthenticatedUser(request);
+      if (!authUser) {
         return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
       }
-      const { data: profile } = await supabase
+      const adminClient = createServiceClient();
+      const { data: profile } = await adminClient
         .from("profiles")
         .select("role")
-        .eq("id", user.id)
+        .eq("id", authUser.id)
         .single();
       if (profile?.role !== "admin") {
         return NextResponse.json({ error: "Admin access required" }, { status: 403 });
