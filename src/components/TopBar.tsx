@@ -50,10 +50,11 @@ function NotificationBell({ userId }: { userId: string }) {
       await supabase
         .from("notifications")
         .update({ read: true })
-        .eq("id", n.id);
+        .eq("id", n.id)
+        .eq("user_id", userId);
     }
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  }, [notifications]);
+  }, [notifications, userId]);
 
   return (
     <div className="relative" ref={ref}>

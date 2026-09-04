@@ -2164,6 +2164,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
       updateProfileStatus: async (id, status, actor, reason) => {
+        const me = await getCurrentUser();
+        if (!me || !await isUserAdmin(me.id)) {
+          console.error("Authorization: non-admin cannot update profile status");
+          return;
+        }
         if (!isSupabaseConfigured) return;
         const { error } = await supabase.rpc("admin_user_action", {
           p_user_id: id,
@@ -2186,6 +2191,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
       verifyProfile: async (id, actor, verified) => {
+        const me = await getCurrentUser();
+        if (!me || !await isUserAdmin(me.id)) {
+          console.error("Authorization: non-admin cannot verify profiles");
+          return;
+        }
         if (!isSupabaseConfigured) return;
         const { error } = await supabase.rpc("admin_user_action", {
           p_user_id: id,
@@ -2207,6 +2217,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
       setProfileRisk: async (id, actor, flagged, note) => {
+        const me = await getCurrentUser();
+        if (!me || !await isUserAdmin(me.id)) {
+          console.error("Authorization: non-admin cannot set risk flags");
+          return;
+        }
         if (!isSupabaseConfigured) return;
         const { error } = await supabase.rpc("admin_user_action", {
           p_user_id: id,
@@ -2229,6 +2244,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
 
       saveAdminNotes: async (id, notes, _actor) => {
+        const me = await getCurrentUser();
+        if (!me || !await isUserAdmin(me.id)) {
+          console.error("Authorization: non-admin cannot save admin notes");
+          return;
+        }
         if (!isSupabaseConfigured) return;
         const { error } = await supabase.rpc("admin_user_action", {
           p_user_id: id,
