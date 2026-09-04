@@ -1104,7 +1104,7 @@ security definer
 set search_path = public
 as $$
 declare
-  v_clip record;
+  v_result jsonb;
 begin
   -- Only admins can update views
   if not public.is_admin() then
@@ -1116,9 +1116,9 @@ begin
     engagement = coalesce(p_engagement, engagement),
     updated_at = now()
   where id = p_clip_id
-  returning to_jsonb(clips.*) into v_clip;
+  returning to_jsonb(clips.*) into v_result;
 
-  return v_clip;
+  return v_result;
 end;
 $$;
 
@@ -3178,7 +3178,7 @@ set search_path = public
 as $$
 declare
   v_user_id uuid;
-  v_clip record;
+  v_result jsonb;
   v_campaign record;
   v_locked_cpm numeric;
   v_locked_max_payout numeric;
@@ -3304,9 +3304,9 @@ begin
     v_locked_max_payout,
     'pending'
   )
-  returning to_jsonb(clips.*) into v_clip;
+  returning to_jsonb(clips.*) into v_result;
 
-  return v_clip;
+  return v_result;
 end;
 $$;
 
