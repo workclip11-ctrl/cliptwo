@@ -585,7 +585,6 @@ begin
     p_clip_id, v_new_status,
     case when p_action = 'reject' then p_reason else null end,
     case when p_action = 'reject' then p_details else null end,
-    null,
     case when p_action = 'hold' then p_reason else null end
   );
 
@@ -1086,70 +1085,9 @@ $$;
 
 grant execute on function public.adjust_campaign_budget(uuid, numeric, text) to authenticated;
 
--- ---------------------------------------------------------------------------
--- RPC: Secure clip status update (admin-only)
--- All status transitions go through this function, never direct UPDATE.
--- ---------------------------------------------------------------------------
-create or replace function public.update_clip_status(
-  p_clip_id uuid,
-  p_status text,
-  p_rejection_reason text default null,
-  p_rejection_details text default null,
-  p_failure_reason text default null,
-  p_held_reason text default null
-)
-returns jsonb
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_clip record;
-  v_actor uuid;
-begin
-  -- Get current user
-  v_actor := auth.uid();
-  if v_actor is null then
-    raise exception 'Not authenticated';
-  end if;
-
-  -- Verify admin role
-  if not public.is_admin() then
-    raise exception 'Only admins can update clip status';
-  end if;
-
-  -- Validate status — moderation only. Financial state lives in financial_records.
-  if p_status not in ('pending', 'approved', 'rejected', 'held') then
-    raise exception 'Invalid status: %. Only pending, approved, rejected, held are allowed. Use approve_clip() for approval.', p_status;
-  end if;
-
-  -- Get current clip
-  select * into v_clip from public.clips where id = p_clip_id;
-  if not found then
-    raise exception 'Clip not found';
-  end if;
-
-  -- Update the clip (moderation fields only)
-  update public.clips set
-    status = p_status,
-    rejection_reason = coalesce(p_rejection_reason, rejection_reason),
-    rejection_details = coalesce(p_rejection_details, rejection_details),
-    failure_reason = coalesce(p_failure_reason, failure_reason),
-    held_reason = coalesce(p_held_reason, held_reason),
-    updated_at = now(),
-    audit = coalesce(audit, '[]'::jsonb) || jsonb_build_object(
-      'action', 'status_changed',
-      'by', (select email from public.profiles where id = v_actor),
-      'at', now(),
-      'from', v_clip.status,
-      'to', p_status
-    )
-  where id = p_clip_id
-  returning to_jsonb(clips.*) into v_clip;
-
-  return v_clip;
-end;
-$$;
+-- NOTE: update_clip_status is defined by finance-consolidation.sql (5-param
+-- moderation-only version). Do NOT define it here — it would create a second
+-- overload that still accepts 'approved' as a direct status pathway.
 
 -- ---------------------------------------------------------------------------
 -- RPC: Secure clip view update (admin-only)
@@ -1184,8 +1122,6 @@ begin
 end;
 $$;
 
--- Grant execute to authenticated users (RLS still applies within the function)
-grant execute on function public.update_clip_status(uuid, text, text, text, text, text) to authenticated;
 grant execute on function public.update_clip_views(uuid, integer, jsonb) to authenticated;
 
 -- ---------------------------------------------------------------------------
@@ -3610,10 +3546,14 @@ DROP FUNCTION IF EXISTS public.complete_payout(uuid, text);
 DROP FUNCTION IF EXISTS public.fail_payout(uuid, text);
 DROP FUNCTION IF EXISTS public.reverse_payout(uuid, text);
 
--- Revoke execute from legacy update_clip_status (old signature with 8 params)
+-- Revoke + drop legacy update_clip_status overloads (old 8-param and 6-param)
 DO $$ BEGIN
   REVOKE EXECUTE ON FUNCTION public.update_clip_status(uuid, text, text, text, text, text, text, text) FROM authenticated;
 EXCEPTION WHEN undefined_function THEN NULL; END $$;
 
--- Drop old update_clip_status with legacy 8-param signature (replaced above with 6-param)
+DO $$ BEGIN
+  REVOKE EXECUTE ON FUNCTION public.update_clip_status(uuid, text, text, text, text, text) FROM authenticated;
+EXCEPTION WHEN undefined_function THEN NULL; END $$;
+
 DROP FUNCTION IF EXISTS public.update_clip_status(uuid, text, text, text, text, text, text, text);
+DROP FUNCTION IF EXISTS public.update_clip_status(uuid, text, text, text, text, text);
