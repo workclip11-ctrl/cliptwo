@@ -120,19 +120,19 @@ CREATE POLICY "payout_requests_update" ON public.payout_requests
 -- Drop old financial columns from clips (they belong in financial_records)
 DO $$ BEGIN
   ALTER TABLE public.clips DROP COLUMN IF EXISTS txn_id;
-EXCEPTION WHEN OTHERS THEN NULL; END $$;
+EXCEPTION WHEN undefined_column THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.clips DROP COLUMN IF EXISTS payout_ref;
-EXCEPTION WHEN OTHERS THEN NULL; END $$;
+EXCEPTION WHEN undefined_column THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.clips DROP COLUMN IF EXISTS payout_date;
-EXCEPTION WHEN OTHERS THEN NULL; END $$;
+EXCEPTION WHEN undefined_column THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE public.clips DROP COLUMN IF EXISTS failure_reason;
-EXCEPTION WHEN OTHERS THEN NULL; END $$;
+EXCEPTION WHEN undefined_column THEN NULL; END $$;
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- STEP 4: Migrate existing earnings data → financial_records
@@ -161,7 +161,7 @@ DO $$ BEGIN
     FROM public.earnings e
     ON CONFLICT DO NOTHING;
   END IF;
-EXCEPTION WHEN OTHERS THEN NULL; END $$;
+END $$;
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- STEP 5: Migrate existing payouts → payout_requests
@@ -194,7 +194,7 @@ DO $$ BEGIN
     FROM public.payouts p
     ON CONFLICT DO NOTHING;
   END IF;
-EXCEPTION WHEN OTHERS THEN NULL; END $$;
+END $$;
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- STEP 6: Create new RPCs for the financial architecture
@@ -317,7 +317,12 @@ BEGIN
   -- Update clip status to approved
   UPDATE public.clips SET
     status = 'approved',
-    updated_at = now()
+    updated_at = now(),
+    audit = coalesce(audit, '[]'::jsonb) || jsonb_build_object(
+      'action', 'approved',
+      'by', coalesce(p_actor, (SELECT email FROM public.profiles WHERE id = auth.uid())),
+      'at', now()
+    )
   WHERE id = p_clip_id;
 
   RETURN v_record;
@@ -476,11 +481,12 @@ BEGIN
   FROM public.financial_records
   WHERE clipper_id = v_user_id AND status = 'paid';
 
-  -- Subtract already-requested amounts
+  -- Subtract ALL active payout requests (pending + processing + paid)
+  -- This prevents double-payout: once paid, funds are permanently consumed.
   v_balance := v_balance - coalesce((
     SELECT coalesce(sum(net_amount), 0)
     FROM public.payout_requests
-    WHERE user_id = v_user_id AND status IN ('pending', 'processing')
+    WHERE user_id = v_user_id AND status IN ('pending', 'processing', 'paid')
   ), 0);
 
   -- 6. Enforce minimum ₹100 (10000 paise)
@@ -489,10 +495,15 @@ BEGIN
   END IF;
 
   -- 7. Get the paid finance record IDs that will be covered
+  -- Exclude records already referenced by ANY existing payout request
   SELECT array_agg(id) INTO v_record_ids
   FROM public.financial_records
   WHERE clipper_id = v_user_id AND status = 'paid'
-  LIMIT 100;
+    AND id <> ALL(coalesce(
+      (SELECT array_agg(unnest) FROM public.payout_requests,
+       unnest(finance_record_ids) WHERE user_id = v_user_id),
+      '{}'
+    ));
 
   -- 8. Create payout request
   INSERT INTO public.payout_requests (
@@ -613,70 +624,12 @@ $$;
 GRANT EXECUTE ON FUNCTION public.complete_payout_request(uuid, text, text) TO authenticated;
 
 -- ---------------------------------------------------------------------------
--- RPC: fail_payout_request — Admin/provider marks payout as failed.
--- Reverses the payout_debit by creating a refund entry in wallet_ledger.
--- processing → rejected
+-- fail_payout_request REMOVED.
+-- The new financial architecture supports only: pending → processing → paid.
+-- There is no rejected/failed payout state. If a processing payout cannot be
+-- completed, the admin leaves it in 'processing' and surfaces the issue
+-- manually. Funds remain reserved until the admin resolves the situation.
 -- ---------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.fail_payout_request(
-  p_payout_id uuid,
-  p_reason text DEFAULT NULL
-)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_payout record;
-  v_result jsonb;
-BEGIN
-  IF NOT public.is_admin() THEN
-    RAISE EXCEPTION 'Only admins can fail payout requests';
-  END IF;
-
-  SELECT * INTO v_payout
-  FROM public.payout_requests
-  WHERE id = p_payout_id AND status = 'processing';
-
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'Payout request not found or not in processing status';
-  END IF;
-
-  -- Update payout status to rejected
-  UPDATE public.payout_requests SET
-    status = 'rejected',
-    audit = coalesce(audit, '[]'::jsonb) || jsonb_build_object(
-      'action', 'rejected',
-      'by', coalesce((SELECT email FROM public.profiles WHERE id = auth.uid()), 'system'),
-      'at', now(),
-      'reason', p_reason
-    )
-  WHERE id = p_payout_id AND status = 'processing'
-  RETURNING to_jsonb(payout_requests.*) INTO v_result;
-
-  -- Refund: reverse the payout_debit by crediting funds back
-  IF NOT EXISTS (
-    SELECT 1 FROM public.wallet_ledger
-    WHERE idempotency_key = 'payout-refund-' || p_payout_id::text
-  ) THEN
-    INSERT INTO public.wallet_ledger (
-      user_id, type, amount, currency, reference_type, reference_id,
-      idempotency_key, metadata
-    ) VALUES (
-      v_payout.user_id, 'payout_refund', v_payout.net_amount, 'INR', 'payout_request', p_payout_id,
-      'payout-refund-' || p_payout_id::text,
-      jsonb_build_object(
-        'payout_id', p_payout_id,
-        'reason', coalesce(p_reason, 'Payout failed, funds returned to wallet')
-      )
-    );
-  END IF;
-
-  RETURN v_result;
-END;
-$$;
-
-GRANT EXECUTE ON FUNCTION public.fail_payout_request(uuid, text) TO authenticated;
 
 -- ---------------------------------------------------------------------------
 -- RPC: get_wallet_balance — Derive balance from authoritative financial records.
@@ -698,7 +651,7 @@ AS $$
       - coalesce((
       SELECT sum(pr.net_amount)
       FROM public.payout_requests pr
-      WHERE pr.user_id = p_user_id AND pr.status IN ('pending', 'processing')
+      WHERE pr.user_id = p_user_id AND pr.status IN ('pending', 'processing', 'paid')
     ), 0),
     'currency', 'INR',
     'total_earned', coalesce((
@@ -714,7 +667,7 @@ AS $$
     'total_requested', coalesce((
       SELECT sum(pr.net_amount)
       FROM public.payout_requests pr
-      WHERE pr.user_id = p_user_id AND pr.status IN ('pending', 'processing')
+      WHERE pr.user_id = p_user_id AND pr.status IN ('pending', 'processing', 'paid')
     ), 0)
   );
 $$;
@@ -838,23 +791,24 @@ DO $$ BEGIN
   ALTER TABLE public.clips DROP CONSTRAINT IF EXISTS clips_status_check;
   ALTER TABLE public.clips ADD CONSTRAINT clips_status_check
     CHECK (status IN ('pending', 'approved', 'rejected', 'held'));
-EXCEPTION WHEN OTHERS THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- STEP 8: Remove old financial RPCs (replaced by new ones above)
 -- ────────────────────────────────────────────────────────────────────────────
-DO $$ BEGIN DROP FUNCTION IF EXISTS public.create_earning(uuid, text); EXCEPTION WHEN OTHERS THEN NULL; END $$;
-DO $$ BEGIN DROP FUNCTION IF EXISTS public.update_earning_status(uuid, text, text); EXCEPTION WHEN OTHERS THEN NULL; END $$;
-DO $$ BEGIN DROP FUNCTION IF EXISTS public.process_payout(uuid, text); EXCEPTION WHEN OTHERS THEN NULL; END $$;
-DO $$ BEGIN DROP FUNCTION IF EXISTS public.complete_payout(uuid, text); EXCEPTION WHEN OTHERS THEN NULL; END $$;
-DO $$ BEGIN DROP FUNCTION IF EXISTS public.fail_payout(uuid, text); EXCEPTION WHEN OTHERS THEN NULL; END $$;
-DO $$ BEGIN DROP FUNCTION IF EXISTS public.reverse_payout(uuid, text); EXCEPTION WHEN OTHERS THEN NULL; END $$;
-DO $$ BEGIN DROP FUNCTION IF EXISTS public.reverse_ledger_entry(uuid, text); EXCEPTION WHEN OTHERS THEN NULL; END $$;
-DO $$ BEGIN DROP FUNCTION IF EXISTS public.adjust_wallet(uuid, integer, text); EXCEPTION WHEN OTHERS THEN NULL; END $$;
-DO $$ BEGIN DROP FUNCTION IF EXISTS public.get_wallet_entries(uuid, integer, integer); EXCEPTION WHEN OTHERS THEN NULL; END $$;
-DO $$ BEGIN DROP FUNCTION IF EXISTS public.get_clipper_earnings(uuid); EXCEPTION WHEN OTHERS THEN NULL; END $$;
-DO $$ BEGIN DROP FUNCTION IF EXISTS public.get_user_payouts(uuid, integer, integer); EXCEPTION WHEN OTHERS THEN NULL; END $$;
-DO $$ BEGIN DROP FUNCTION IF EXISTS public.test_max_payout_enforcement(); EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN DROP FUNCTION IF EXISTS public.create_earning(uuid, text); END $$;
+DO $$ BEGIN DROP FUNCTION IF EXISTS public.update_earning_status(uuid, text, text); END $$;
+DO $$ BEGIN DROP FUNCTION IF EXISTS public.process_payout(uuid, text); END $$;
+DO $$ BEGIN DROP FUNCTION IF EXISTS public.complete_payout(uuid, text); END $$;
+DO $$ BEGIN DROP FUNCTION IF EXISTS public.fail_payout(uuid, text); END $$;
+DO $$ BEGIN DROP FUNCTION IF EXISTS public.reverse_payout(uuid, text); END $$;
+DO $$ BEGIN DROP FUNCTION IF EXISTS public.reverse_ledger_entry(uuid, text); END $$;
+DO $$ BEGIN DROP FUNCTION IF EXISTS public.adjust_wallet(uuid, integer, text); END $$;
+DO $$ BEGIN DROP FUNCTION IF EXISTS public.get_wallet_entries(uuid, integer, integer); END $$;
+DO $$ BEGIN DROP FUNCTION IF EXISTS public.get_clipper_earnings(uuid); END $$;
+DO $$ BEGIN DROP FUNCTION IF EXISTS public.get_user_payouts(uuid, integer, integer); END $$;
+DO $$ BEGIN DROP FUNCTION IF EXISTS public.test_max_payout_enforcement(); END $$;
+DO $$ BEGIN DROP FUNCTION IF EXISTS public.fail_payout_request(uuid, text); END $$;
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- STEP 9: Update wallet_ledger types (remove old financial types)
@@ -862,15 +816,15 @@ DO $$ BEGIN DROP FUNCTION IF EXISTS public.test_max_payout_enforcement(); EXCEPT
 DO $$ BEGIN
   ALTER TABLE public.wallet_ledger DROP CONSTRAINT IF EXISTS wallet_ledger_type_check;
   ALTER TABLE public.wallet_ledger ADD CONSTRAINT wallet_ledger_type_check
-    CHECK (type IN ('earning_credit', 'adjustment', 'payout_debit', 'payout_refund'));
-EXCEPTION WHEN OTHERS THEN NULL; END $$;
+    CHECK (type IN ('earning_credit', 'adjustment', 'payout_debit'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- STEP 10: Update clip updated_at column (ensure it exists)
 -- ────────────────────────────────────────────────────────────────────────────
 DO $$ BEGIN
   ALTER TABLE public.clips ADD COLUMN IF NOT EXISTS updated_at timestamptz;
-EXCEPTION WHEN OTHERS THEN NULL; END $$;
+END $$;
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- DONE

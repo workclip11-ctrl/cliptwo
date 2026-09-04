@@ -52,8 +52,9 @@ BEGIN
   END IF;
 
   -- Moderation-only statuses (financial state lives in financial_records)
-  IF p_status NOT IN ('pending', 'approved', 'rejected', 'held') THEN
-    RAISE EXCEPTION 'Invalid status: %. Only moderation statuses allowed.', p_status;
+  -- 'approved' is excluded: only approve_clip() can set that status.
+  IF p_status NOT IN ('pending', 'rejected', 'held') THEN
+    RAISE EXCEPTION 'Invalid status: %. Only pending, rejected, held are allowed. Use approve_clip() for approval.', p_status;
   END IF;
 
   SELECT * INTO v_clip FROM public.clips WHERE id = p_clip_id;
@@ -92,7 +93,6 @@ GRANT EXECUTE ON FUNCTION public.update_clip_status(uuid, text, text, text, text
 -- Financial actions (payable, processing, paid, failed, retry, release, revert)
 -- are removed. Clip approval goes through approve_clip() which creates
 -- financial_records atomically. This function now only handles:
---   approve → sets clip to approved (caller should also call approve_clip)
 --   reject  → sets clip to rejected
 --   hold    → sets clip to held
 -- ────────────────────────────────────────────────────────────────────────────
@@ -117,9 +117,9 @@ BEGIN
   IF v_actor IS NULL THEN RAISE EXCEPTION 'Not authenticated'; END IF;
   IF NOT public.is_admin() THEN RAISE EXCEPTION 'Only admins can perform clip actions'; END IF;
 
-  -- Moderation-only actions (financial lifecycle is in financial_records)
-  IF p_action NOT IN ('approve', 'reject', 'hold') THEN
-    RAISE EXCEPTION 'Invalid action: %. Only approve, reject, hold are allowed.', p_action;
+  -- ONLY reject and hold. Approval MUST go through approve_clip().
+  IF p_action NOT IN ('reject', 'hold') THEN
+    RAISE EXCEPTION 'Invalid action: %. Only reject and hold are allowed. Use approve_clip() for approval.', p_action;
   END IF;
 
   SELECT * INTO v_clip FROM public.clips WHERE id = p_clip_id;
@@ -127,7 +127,6 @@ BEGIN
   v_old_status := v_clip.status;
 
   v_new_status := CASE p_action
-    WHEN 'approve' THEN 'approved'
     WHEN 'reject' THEN 'rejected'
     WHEN 'hold' THEN 'held'
   END;
@@ -353,4 +352,4 @@ DO $$ BEGIN
   ALTER TABLE public.clips DROP CONSTRAINT IF EXISTS clips_status_check;
   ALTER TABLE public.clips ADD CONSTRAINT clips_status_check
     CHECK (status IN ('pending', 'approved', 'rejected', 'held'));
-EXCEPTION WHEN OTHERS THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;

@@ -666,10 +666,12 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 -- ── payout_requests ────────────────────────────────────────────────────────
+-- Status must be: pending, processing, paid. No rejected/failed states.
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='payout_requests') THEN
+    ALTER TABLE public.payout_requests DROP CONSTRAINT IF EXISTS payout_requests_status_check;
     ALTER TABLE public.payout_requests ADD CONSTRAINT payout_requests_status_check
-      CHECK (status IN ('pending', 'processing', 'paid', 'rejected')) NOT VALID;
+      CHECK (status IN ('pending', 'processing', 'paid')) NOT VALID;
   END IF;
 EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
@@ -703,7 +705,7 @@ END $$;;
 -- constrains valid entry types instead.
 DO $$ BEGIN
   ALTER TABLE public.wallet_ledger DROP CONSTRAINT IF EXISTS wallet_ledger_amount_nonneg;
-EXCEPTION WHEN OTHERS THEN NULL; END $$;
+EXCEPTION WHEN undefined_object THEN NULL; END $$;
 
 -- ── Platform constraints (YouTube, Instagram, Kick only) ─────────────────────
 
