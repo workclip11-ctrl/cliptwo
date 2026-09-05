@@ -44,7 +44,7 @@ function fmtDate(t?: string) {
 }
 
 function rupPaise(n: number) {
-  return "\u20b9" + Math.round(n / 100).toLocaleString("en-IN");
+  return "\u20B9" + Math.round(n / 100).toLocaleString("en-IN");
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -285,7 +285,7 @@ export default function TestPayoutSandboxPage() {
               className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700"
             >
               <Banknote size={16} />
-              Seed \u20b91,000 Test Balance
+              Seed ₹1,000 Test Balance
             </button>
             <button
               onClick={handleReset}
@@ -310,7 +310,7 @@ export default function TestPayoutSandboxPage() {
               <h3 className="text-sm font-semibold text-foreground">Create Test Payout</h3>
               <div className="mt-3 flex items-end gap-3">
                 <div>
-                  <label className="text-xs text-muted">Amount (\u20b9)</label>
+                  <label className="text-xs text-muted">Amount (₹)</label>
                   <input
                     type="number"
                     value={createAmount}
@@ -429,9 +429,9 @@ export default function TestPayoutSandboxPage() {
               <div>
                 <h3 className="text-sm font-semibold text-foreground">How the Test Sandbox Works</h3>
                 <ol className="mt-2 space-y-1 text-xs text-muted list-decimal list-inside">
-                  <li>Seed a test balance (virtual \u20b91,000 in sandbox tables only).</li>
+                  <li>Seed a test balance (virtual ₹1,000 in sandbox tables only).</li>
                   <li>Create a test payout request (deducts from sandbox balance).</li>
-                  <li>Click &quot;Start Test Processing&quot; (pending \u2192 processing).</li>
+                  <li>Click &quot;Start Test Processing&quot; (pending → processing).</li>
                   <li>Enter a TEST-UTR (e.g., TEST-12345678) and click &quot;Mark Test Paid&quot;.</li>
                   <li>Reset Test Data to clear all sandbox data when done.</li>
                 </ol>

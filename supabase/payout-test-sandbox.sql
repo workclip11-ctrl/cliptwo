@@ -196,7 +196,7 @@ BEGIN
       'at', now()
     )
   )
-  RETURNING * INTO v_result;
+  RETURNING to_jsonb(payout_test_requests.*) INTO v_result;
 
   RETURN v_result;
 END;
@@ -232,7 +232,7 @@ BEGIN
     )
   WHERE id = p_request_id AND status = 'pending'
     AND admin_user_id = auth.uid()
-  RETURNING * INTO v_result;
+  RETURNING to_jsonb(payout_test_requests.*) INTO v_result;
 
   IF v_result IS NULL THEN
     RAISE EXCEPTION 'Test payout request not found or not in pending status';
@@ -285,7 +285,7 @@ BEGIN
     )
   WHERE id = p_request_id AND status = 'processing'
     AND admin_user_id = auth.uid()
-  RETURNING * INTO v_result;
+  RETURNING to_jsonb(payout_test_requests.*) INTO v_result;
 
   IF v_result IS NULL THEN
     RAISE EXCEPTION 'Test payout request not found or not in processing status';
