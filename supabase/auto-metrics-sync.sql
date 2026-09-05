@@ -135,6 +135,34 @@ $$;
 GRANT EXECUTE ON FUNCTION public.acquire_sync_lock(text, uuid, integer) TO service_role;
 GRANT EXECUTE ON FUNCTION public.release_sync_lock(text, uuid) TO service_role;
 
+-- Renew a lease lock (heartbeat). Extends expires_at while the lock is still held.
+-- Returns true if renewed (we still own it), false if not (expired or taken by another).
+-- Called periodically during long-running syncs to prevent lease expiry.
+CREATE OR REPLACE FUNCTION public.renew_sync_lock(
+  p_lock_key text,
+  p_owner_id uuid,
+  p_ttl_seconds integer DEFAULT 600
+) RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_updated integer;
+BEGIN
+  UPDATE public.sync_locks
+  SET expires_at = now() + make_interval(secs => p_ttl_seconds)
+  WHERE lock_key = p_lock_key
+    AND owner_id = p_owner_id
+    AND expires_at > now();
+
+  GET DIAGNOSTICS v_updated = ROW_COUNT;
+  RETURN v_updated > 0;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.renew_sync_lock(text, uuid, integer) TO service_role;
+
 -- ===========================================================================
 -- AFTER DEPLOYMENT — Run these to configure your secrets
 -- ===========================================================================

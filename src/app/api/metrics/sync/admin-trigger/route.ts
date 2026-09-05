@@ -244,6 +244,17 @@ export async function POST(request: Request) {
             });
           }
         }));
+
+        // Renew lease after each batch to prevent expiry during long syncs
+        const { data: renewed } = await adminClient.rpc("renew_sync_lock", {
+          p_lock_key: LOCK_KEY,
+          p_owner_id: ownerId,
+          p_ttl_seconds: LOCK_TTL_SECONDS,
+        });
+        if (!renewed) {
+          console.log("[admin-metrics-sync] Lock lost during renewal — stopping");
+          break;
+        }
       }
 
       const synced = results.filter((r) => r.status === "synced").length;

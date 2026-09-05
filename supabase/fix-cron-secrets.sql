@@ -56,6 +56,31 @@ $$;
 GRANT EXECUTE ON FUNCTION public.acquire_sync_lock(text, uuid, integer) TO service_role;
 GRANT EXECUTE ON FUNCTION public.release_sync_lock(text, uuid) TO service_role;
 
+-- Renew function (heartbeat for long-running syncs)
+CREATE OR REPLACE FUNCTION public.renew_sync_lock(
+  p_lock_key text,
+  p_owner_id uuid,
+  p_ttl_seconds integer DEFAULT 600
+) RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_updated integer;
+BEGIN
+  UPDATE public.sync_locks
+  SET expires_at = now() + make_interval(secs => p_ttl_seconds)
+  WHERE lock_key = p_lock_key
+    AND owner_id = p_owner_id
+    AND expires_at > now();
+  GET DIAGNOSTICS v_updated = ROW_COUNT;
+  RETURN v_updated > 0;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.renew_sync_lock(text, uuid, integer) TO service_role;
+
 -- 3. Insert the cron secrets
 INSERT INTO app_settings (key, value) VALUES
   ('cron_secret', '463c31fba17fc64ca5dbc84435f80b6298aa3516517a4bc59eddb27843aae838'),
