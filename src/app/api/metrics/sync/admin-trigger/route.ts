@@ -1,19 +1,25 @@
 // ---------------------------------------------------------------------------
 // POST /api/metrics/sync/admin-trigger
 // Admin-only endpoint for immediate system-wide metrics sync.
-// Uses advisory lock to prevent overlapping sync jobs.
+// Uses database-backed lease lock to prevent overlapping sync jobs.
+// The lock is stored in sync_locks table (same table as cron endpoint),
+// so it reliably prevents overlap across Supabase connection pool boundaries.
 // Reports detailed progress back to the admin.
 //
 // Authorization: Admin session only (Bearer token).
 // ---------------------------------------------------------------------------
 
 import { NextResponse } from "next/server";
+import { randomUUID } from "crypto";
 import { getAuthenticatedUser } from "@/lib/supabase/auth-helpers";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getMetricProvider, isMetricProviderConfigured } from "@/lib/metric-providers";
 import { getProvider } from "@/lib/social-providers";
 import { decryptToken, encryptToken, isTokenExpired } from "@/lib/token-crypto";
 import type { Platform } from "@/lib/types";
+
+const LOCK_KEY = "metrics_sync";
+const LOCK_TTL_SECONDS = 600; // 10 minutes
 
 export async function POST(request: Request) {
   try {
@@ -35,8 +41,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Admin access required" }, { status: 403 });
     }
 
-    // Acquire advisory lock to prevent overlapping syncs
-    const { data: lockAcquired } = await adminClient.rpc("try_acquire_sync_lock");
+    // ── Database-backed lease lock ─────────────────────────────────────────
+    // Same LOCK_KEY as the cron endpoint — both compete for the same row.
+    // If the cron job is running, this request gets false and is rejected.
+    const ownerId = randomUUID();
+
+    const { data: lockAcquired } = await adminClient.rpc("acquire_sync_lock", {
+      p_lock_key: LOCK_KEY,
+      p_owner_id: ownerId,
+      p_ttl_seconds: LOCK_TTL_SECONDS,
+    });
+
     if (!lockAcquired) {
       return NextResponse.json({
         success: false,
@@ -54,7 +69,7 @@ export async function POST(request: Request) {
         .eq("status", "approved");
 
       if (clipError || !clips || clips.length === 0) {
-        await adminClient.rpc("release_sync_lock");
+        await adminClient.rpc("release_sync_lock", { p_lock_key: LOCK_KEY, p_owner_id: ownerId });
         return NextResponse.json({
           success: true,
           message: "No approved clips to process",
@@ -238,7 +253,8 @@ export async function POST(request: Request) {
 
       console.log(`[admin-metrics-sync] Completed: ${synced} synced, ${skipped} skipped, ${errors} errors, ${duration}ms`);
 
-      await adminClient.rpc("release_sync_lock");
+      // Release lock (only if we still own it)
+      await adminClient.rpc("release_sync_lock", { p_lock_key: LOCK_KEY, p_owner_id: ownerId });
 
       return NextResponse.json({
         success: true,
@@ -250,7 +266,8 @@ export async function POST(request: Request) {
         results,
       });
     } catch (e) {
-      await adminClient.rpc("release_sync_lock");
+      // Release lock on error
+      await adminClient.rpc("release_sync_lock", { p_lock_key: LOCK_KEY, p_owner_id: ownerId });
       throw e;
     }
   } catch (e) {

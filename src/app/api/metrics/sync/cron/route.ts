@@ -4,12 +4,15 @@
 // Also accepts GET for backward compatibility with Vercel cron.
 //
 // Authorization: CRON_SECRET Bearer token (pg_cron / Vercel cron) or admin session.
-// Uses advisory lock to prevent overlap with admin-trigger manual sync.
+// Uses database-backed lease lock to prevent overlap with admin-trigger manual sync.
+// The lock is stored in sync_locks table (not session-level advisory lock),
+// so it reliably persists across Supabase connection pool boundaries.
 // Processes ALL approved clips in batches to avoid timeouts.
 // Uses service_role for all DB operations.
 // ---------------------------------------------------------------------------
 
 import { NextResponse } from "next/server";
+import { randomUUID } from "crypto";
 import { getAuthenticatedUser } from "@/lib/supabase/auth-helpers";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getMetricProvider, isMetricProviderConfigured } from "@/lib/metric-providers";
@@ -18,6 +21,8 @@ import { decryptToken, encryptToken, isTokenExpired } from "@/lib/token-crypto";
 import type { Platform } from "@/lib/types";
 
 const BATCH_SIZE = 50;
+const LOCK_KEY = "metrics_sync";
+const LOCK_TTL_SECONDS = 600; // 10 minutes
 
 async function handleSync(request: Request) {
   try {
@@ -45,8 +50,18 @@ async function handleSync(request: Request) {
 
     const adminClient = createServiceClient();
 
-    // ── Advisory lock (prevents overlap with admin-trigger sync) ────────────
-    const { data: lockAcquired } = await adminClient.rpc("try_acquire_sync_lock");
+    // ── Database-backed lease lock ─────────────────────────────────────────
+    // Each request generates a unique owner_id. The lock is stored in
+    // sync_locks table, which persists across connection pool boundaries.
+    // If a crashed process holds the lock, it auto-expires after LOCK_TTL_SECONDS.
+    const ownerId = randomUUID();
+
+    const { data: lockAcquired } = await adminClient.rpc("acquire_sync_lock", {
+      p_lock_key: LOCK_KEY,
+      p_owner_id: ownerId,
+      p_ttl_seconds: LOCK_TTL_SECONDS,
+    });
+
     if (!lockAcquired) {
       return NextResponse.json({
         success: true,
@@ -195,7 +210,8 @@ async function handleSync(request: Request) {
 
       console.log(`[cron-metrics-sync] Completed: ${synced} synced, ${skipped} skipped, ${errors} errors, ${results.length} total`);
 
-      await adminClient.rpc("release_sync_lock");
+      // Release lock (only if we still own it)
+      await adminClient.rpc("release_sync_lock", { p_lock_key: LOCK_KEY, p_owner_id: ownerId });
 
       return NextResponse.json({
         success: true,
@@ -206,7 +222,8 @@ async function handleSync(request: Request) {
         results,
       });
     } catch (e) {
-      await adminClient.rpc("release_sync_lock");
+      // Release lock on error
+      await adminClient.rpc("release_sync_lock", { p_lock_key: LOCK_KEY, p_owner_id: ownerId });
       throw e;
     }
   } catch (e) {
