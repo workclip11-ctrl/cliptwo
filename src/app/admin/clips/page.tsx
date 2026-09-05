@@ -584,7 +584,7 @@ function ApprovedClipsTable({
                   <p className="mt-1 text-xs text-muted">Held: {clip.heldReason}</p>
                 )}
               </td>
-              <td className="px-4 py-3 text-right font-mono">{fmtViews(r.verifiedViews)}</td>
+              <td className="px-4 py-3 text-right font-mono">{fmtViews(clip?.verifiedViews ?? 0)}</td>
               <td className="px-4 py-3 text-right font-mono">{rup(cpm)}</td>
               <td className="px-4 py-3 text-right font-mono">{rup(r.grossAmount / 100)}</td>
               <td className="px-4 py-3 text-right font-mono text-muted">
