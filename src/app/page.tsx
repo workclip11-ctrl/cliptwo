@@ -765,7 +765,7 @@ export default function Home() {
             { num: fmtNum(stats.totalViews), label: "views tracked" },
             { num: String(stats.clippers), label: "active clippers" },
             { num: String(stats.openCampaigns), label: "live campaigns" },
-            { num: rup(stats.paidOut), label: "paid out to clippers" },
+            { num: rup(stats.paidOut / 100), label: "paid out to clippers" },
           ].map((s) => (
             <div key={s.label} className="rounded-2xl border bg-card p-6 text-center shadow-sm">
               <p className="font-mono text-3xl font-bold tracking-tight">{s.num}</p>

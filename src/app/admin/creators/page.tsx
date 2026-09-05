@@ -81,14 +81,14 @@ function creatorStats(
     campaigns: myCampaigns.length,
     activeCampaigns: myCampaigns.filter((c) => c.status === "open").length,
     totalBudget: myCampaigns.reduce((s, c) => s + (c.budget ?? 0), 0),
-    totalSpent: fin.total,
+    totalSpent: fin.total / 100,
     verifiedViews: received
       .filter((k) => k.status === "approved" || k.status === "held")
       .reduce((s, k) => s + (k.verifiedViews ?? 0), 0),
     clipsReceived: received.length,
     clipsApproved: fin.totalCount,
-    outstanding: fin.total - fin.paid,
-    paid: fin.paid,
+    outstanding: (fin.total - fin.paid) / 100,
+    paid: fin.paid / 100,
     myCampaigns,
     received,
   };

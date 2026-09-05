@@ -80,7 +80,7 @@ export default function CreatorCampaignDetailPage() {
   const actor = user?.email ?? user?.name ?? "Creator";
   const campClips = clips.filter((k) => k.campaignId === id);
   const fin = financeOf(financeRecords, (r) => r.campaignId === id);
-  const currentSpend = fin.paid;
+  const currentSpend = fin.paid / 100; // Convert paise → rupees
   const verifiedViews = campClips.reduce((s, k) => s + (k.verifiedViews ?? 0), 0);
   const clipperSet = new Set(campClips.map((k) => k.userId ?? k.clipper));
   const avgCPM =

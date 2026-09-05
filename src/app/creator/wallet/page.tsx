@@ -22,7 +22,7 @@ export default function CreatorWalletPage() {
   );
 
   const totalBudget = myCampaigns.reduce((s, c) => s + (c.budget ?? 0), 0);
-  const totalSpent = myCampaigns.reduce((s, c) => s + campaignSpent(c, financeRecords), 0);
+  const totalSpent = myCampaigns.reduce((s, c) => s + campaignSpent(c, financeRecords), 0) / 100;
   const totalRemaining = totalBudget - totalSpent;
   const utilizationPct = totalBudget > 0 ? Math.min(100, Math.round((totalSpent / totalBudget) * 100)) : 0;
 

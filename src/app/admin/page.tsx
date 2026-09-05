@@ -21,15 +21,15 @@ export default function AdminDashboard() {
   const paidCount = fin.paidCount;
   const rejectedCount = clips.filter((k) => k.status === "rejected").length;
 
-  // Earnings that have actually been released to clippers.
-  const paidOut = fin.paid;
+  // Earnings that have actually been released to clippers (paise → rupees).
+  const paidOut = fin.paid / 100;
   // Approved (+ payable/processing) clips not yet paid — the admin's outstanding payable.
-  const payable = fin.total - fin.paid;
-  const totalEarned = fin.total;
+  const payable = (fin.total - fin.paid) / 100;
+  const totalEarned = fin.total / 100;
 
   const openCampaigns = campaigns.filter((c) => c.status === "open");
   const totalBudget = campaigns.reduce((s, c) => s + (c.budget ?? 0), 0);
-  const totalSpent = campaigns.reduce((s, c) => s + campaignSpent(c, financeRecords), 0);
+  const totalSpent = campaigns.reduce((s, c) => s + campaignSpent(c, financeRecords), 0) / 100;
 
   const recentClips = [...clips]
     .sort((a, b) => b.submittedAt - a.submittedAt)

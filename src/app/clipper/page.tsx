@@ -30,7 +30,7 @@ export default function ClipperPage() {
   const myAccounts = socialAccounts.filter((a) => a.userId && a.userId === user?.id);
   const fin = financeOf(financeRecords, (r) => r.clipperId === user?.id);
   const openCampaigns = campaigns.filter((c) => c.status === "open");
-  const earnings = fin.total;
+  const earnings = fin.total / 100;
   const approvedCount = fin.totalCount;
   const pendingCount = fin.pendingCount;
   const maxViews = Math.max(1, ...myClips.map((k) => k.verifiedViews ?? 0));

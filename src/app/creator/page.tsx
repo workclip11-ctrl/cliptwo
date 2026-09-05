@@ -35,9 +35,9 @@ export default function CreatorPage() {
   const fin = financeOf(financeRecords, (r) => myCampaignIds.has(r.campaignId));
   const pending = received.filter((k) => k.status === "pending");
   const pendingCount = fin.pendingCount;
-  const totalSpent = fin.paid;
-  const totalEarned = fin.total;
-  const outstanding = fin.pending;
+  const totalSpent = fin.paid / 100;
+  const totalEarned = fin.total / 100;
+  const outstanding = fin.pending / 100;
 
   const topClips = [...received]
     .filter((k) => k.status === "approved" || k.status === "held")

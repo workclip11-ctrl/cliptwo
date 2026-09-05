@@ -154,11 +154,11 @@ export function topClippers(received: Clip[], campaigns: Campaign[], n = 8): Top
   return [...m.values()].sort((a, b) => b.views - a.views).slice(0, n);
 }
 
-// Actual CPM for an earned clip; falls back to the campaign's agreed rate
-// (never a fabricated number) when the clip hasn't earned yet.
+// Authoritative CPM for a clip in RUPEES.
+// Uses the clip's locked CPM (stored in paise, converted to rupees)
+// or falls back to the campaign's payout rate (already in rupees).
 export function clipCPM(k: Clip, campaigns: Campaign[]): number {
   const camp = campaigns.find((c) => c.id === k.campaignId);
-  const earned = clipEarnings(k, campaigns);
-  if (earned > 0 && (k.verifiedViews ?? 0) > 0) return earned / ((k.verifiedViews ?? 0) / 1000);
+  if (k.lockedCpm != null && k.lockedCpm > 0) return k.lockedCpm / 100;
   return camp?.payout ?? 0;
 }

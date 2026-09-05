@@ -129,17 +129,17 @@ export default function AdminClips() {
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <SummaryCard
           icon={<Banknote size={18} className="text-amber" />}
-          amount={rup(pendingFin.total)}
+          amount={rup(pendingFin.total / 100)}
           label="Pending approval"
         />
         <SummaryCard
           icon={<PlayCircle size={18} className="text-amber" />}
-          amount={rup(processingFin.total)}
+          amount={rup(processingFin.total / 100)}
           label="In processing"
         />
         <SummaryCard
           icon={<Wallet size={18} className="text-blue-500" />}
-          amount={rup(paidFin.total)}
+          amount={rup(paidFin.total / 100)}
           label="Released to clippers"
         />
         <SummaryCard
@@ -147,7 +147,7 @@ export default function AdminClips() {
           amount={rup(financeRecords.filter((r) => {
             const clip = clips.find((c) => c.id === r.clipId);
             return clip?.status === "held";
-          }).reduce((s, r) => s + r.netAmount, 0))}
+          }).reduce((s, r) => s + r.netAmount, 0) / 100)}
           label="Held / disputed"
         />
       </div>
