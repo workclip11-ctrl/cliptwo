@@ -1,13 +1,44 @@
 // ---------------------------------------------------------------------------
-// POST /api/payout/test/balance
+// GET /api/payout/test/balance
 //
-// Seeds or resets the admin's test sandbox balance.
-// Body: { balancePaise?: number } — defaults to 100000 (₹1,000)
+// Returns the admin's current test sandbox balance.
 // ---------------------------------------------------------------------------
 
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/supabase/auth-helpers";
 import { createTestClient } from "../helper";
+
+export async function GET(request: Request) {
+  try {
+    const authUser = await getAuthenticatedUser(request);
+    if (!authUser) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    const client = await createTestClient(request);
+    if (!client) {
+      return NextResponse.json({ error: "Test sandbox not configured" }, { status: 503 });
+    }
+
+    const { data, error } = await client.rpc("payout_test_get_balance");
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    return NextResponse.json({ balance: data });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Internal server error";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/payout/test/balance
+//
+// Seeds or resets the admin's test sandbox balance.
+// Body: { balancePaise?: number } — defaults to 100000 (₹1,000)
+// ---------------------------------------------------------------------------
 
 export async function POST(request: Request) {
   try {
