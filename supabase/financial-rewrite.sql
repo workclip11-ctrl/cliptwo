@@ -586,6 +586,11 @@ BEGIN
     RAISE EXCEPTION 'Payout request not found or not in processing status';
   END IF;
 
+  -- Require UPI transaction reference before marking as paid
+  IF p_payment_reference IS NULL OR trim(p_payment_reference) = '' THEN
+    RAISE EXCEPTION 'UPI transaction reference (UTR) is required before marking payout as paid. Record the actual UPI transfer reference before confirming payment.';
+  END IF;
+
   -- Mark payout as paid
   UPDATE public.payout_requests SET
     status = 'paid',

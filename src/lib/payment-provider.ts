@@ -1,12 +1,17 @@
 // ---------------------------------------------------------------------------
 // Payment Provider Abstraction
 //
-// All payment operations happen server-side only. The browser NEVER sees
-// API credentials. Providers are pluggable — swap mock for real in prod.
+// Cliptwo uses MANUAL UPI payments performed by the Admin.
+// This file documents the payment interfaces for reference.
 //
-// MOCK PROVIDER: For development only. Simulates a 2-second processing delay
-// then returns success. Does NOT send real money. In production, the mock
-// provider throws an error if PAYMENT_PROVIDER is not set to a real provider.
+// The actual payout flow is:
+//   1. Clipper requests payout → payout_requests record created (status: pending)
+//   2. Admin reviews payout request
+//   3. Admin manually sends UPI payment to clipper's UPI ID
+//   4. Admin records UPI transaction reference (UTR/NEFT ref)
+//   5. Admin marks payout as paid → payout_requests.status = 'paid'
+//
+// No automated payment gateway is used.
 // ---------------------------------------------------------------------------
 
 export interface PayoutRequest {
@@ -38,58 +43,4 @@ export interface PaymentProvider {
   name: string;
   initiatePayout(request: PayoutRequest): Promise<PayoutResponse>;
   verifyWebhook(payload: WebhookPayload): boolean;
-}
-
-// ---------------------------------------------------------------------------
-// Mock Provider — development only, no real money moved
-// ---------------------------------------------------------------------------
-class MockPaymentProvider implements PaymentProvider {
-  name = "mock";
-
-  async initiatePayout(request: PayoutRequest): Promise<PayoutResponse> {
-    // Simulate network delay
-    await new Promise((r) => setTimeout(r, 2000));
-
-    // Simulate occasional failures (10% chance for testing)
-    const randomByte = new Uint8Array(1);
-    crypto.getRandomValues(randomByte);
-    const shouldFail = randomByte[0] < 26; // ~10% of 256
-
-    if (shouldFail) {
-      return {
-        success: false,
-        error: "Mock provider: simulated failure for testing",
-        status: "failed",
-      };
-    }
-
-    return {
-      success: true,
-      providerRef: `MOCK-${request.payoutId.slice(0, 8).toUpperCase()}-${Date.now()}`,
-      status: "completed",
-    };
-  }
-
-  verifyWebhook(_payload: WebhookPayload): boolean {
-    // Mock provider always accepts webhooks
-    return true;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Provider Factory — returns the configured provider
-// NEVER exposes credentials to the client.
-// ---------------------------------------------------------------------------
-export function getPaymentProvider(): PaymentProvider {
-  const providerName = process.env.PAYMENT_PROVIDER ?? "mock";
-
-  switch (providerName) {
-    case "mock":
-      return new MockPaymentProvider();
-    default:
-      console.warn(
-        `Unknown payment provider "${providerName}", falling back to mock`,
-      );
-      return new MockPaymentProvider();
-  }
 }

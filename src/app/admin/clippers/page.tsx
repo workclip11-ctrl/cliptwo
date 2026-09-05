@@ -30,7 +30,7 @@ import { rup, fmtViews, clipEarnings } from "@/lib/format";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { StatusPill } from "@/components/StatusPill";
 import { canAdmin, type AdminPermission } from "@/lib/permissions";
-import type { Appeal, Clip, Campaign, Profile, SocialAccount } from "@/lib/types";
+import type { Appeal, Clip, Campaign, Profile, SocialAccount, FinanceRecord } from "@/lib/types";
 
 const HIGH_PERF_EARNED = 5000;
 
@@ -81,6 +81,7 @@ function clipperStats(
   p: Profile,
   clips: Clip[],
   campaigns: Campaign[],
+  financeRecords: FinanceRecord[],
 ): Stats {
   const own = clips.filter((k) => k.clipper === p.username);
   const earned = own.filter((k) => k.status === "approved" || k.status === "held");
@@ -97,7 +98,7 @@ function clipperStats(
   const verifiedViews = earned.reduce((s, k) => s + (k.verifiedViews ?? 0), 0);
   const earnedAmt = earned.reduce((s, k) => s + clipEarnings(k, campaigns), 0);
   const paid = own
-    .filter(() => false)
+    .filter((k) => k.status === "approved" && financeRecords.some((r) => r.clipId === k.id && r.status === "paid"))
     .reduce((s, k) => s + clipEarnings(k, campaigns), 0);
   return { total: own.length, approved, rejected, approvalRate, verifiedViews, earned: earnedAmt, paid, own };
 }
@@ -109,7 +110,7 @@ function accountsFor(p: Profile, accounts: SocialAccount[]) {
 }
 
 export default function AdminClippers() {
-  const { profiles, clips, campaigns, financeRecords: _financeRecords, socialAccounts } = useStore();
+  const { profiles, clips, campaigns, financeRecords, socialAccounts } = useStore();
   const { user } = useAuth();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
@@ -129,7 +130,7 @@ export default function AdminClippers() {
       );
     });
     return matched.filter((p) => {
-      const s = clipperStats(p, clips, campaigns);
+      const s = clipperStats(p, clips, campaigns, financeRecords);
       switch (filter) {
         case "verified":
           return !!p.verified;
@@ -147,7 +148,7 @@ export default function AdminClippers() {
           return true;
       }
     });
-  }, [profiles, clips, campaigns, q, filter]);
+  }, [profiles, clips, campaigns, q, filter, financeRecords]);
 
   const selected = profiles.find((p) => p.id === selectedId) ?? null;
 
@@ -213,7 +214,7 @@ export default function AdminClippers() {
             </thead>
             <tbody className="divide-y">
               {rows.map((p) => {
-                const s = clipperStats(p, clips, campaigns);
+                const s = clipperStats(p, clips, campaigns, financeRecords);
                 const accs = accountsFor(p, socialAccounts);
                 return (
                   <tr
@@ -362,7 +363,7 @@ function ClipperDrawer({
     respondToAppeal,
     financeRecords,
   } = useStore();
-  const stats = clipperStats(profile, clips, campaigns);
+  const stats = clipperStats(profile, clips, campaigns, financeRecords);
   const accs = accountsFor(profile, socialAccounts);
   const submissionsRef = useRef<HTMLDivElement>(null);
 

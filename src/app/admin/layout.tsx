@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { LayoutGrid, Users, Film, Megaphone, Globe, Server, ShieldAlert, History, Menu } from "lucide-react";
+import { LayoutGrid, Users, Film, Megaphone, Globe, Server, ShieldAlert, History, Banknote, Menu } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
 import { AdminGuard } from "@/components/AdminGuard";
 import { MobileSidebar } from "@/components/MobileSidebar";
@@ -14,6 +14,7 @@ const NAV = [
   { href: "/admin/clippers", label: "Clippers", icon: Users },
   { href: "/admin/creators", label: "Creators", icon: Users },
   { href: "/admin/clips", label: "Review & payouts", icon: Film },
+  { href: "/admin/payouts", label: "Payouts", icon: Banknote },
   { href: "/admin/campaigns", label: "Campaigns", icon: Megaphone },
   { href: "/admin/website", label: "Website", icon: Globe },
   { href: "/admin/backend", label: "Backend", icon: Server },
