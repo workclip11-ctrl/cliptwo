@@ -1,9 +1,11 @@
 // ---------------------------------------------------------------------------
-// GET /api/metrics/sync/cron
-// Vercel-compatible cron endpoint for periodic metric synchronization.
-// Processes approved clips whose metrics need refreshing.
+// POST /api/metrics/sync/cron
+// Automatic background metric synchronization (called by pg_cron via net.http_post).
+// Also accepts GET for backward compatibility with Vercel cron.
 //
-// Authorization: Vercel Cron header (CRON_SECRET) or admin session.
+// Authorization: CRON_SECRET Bearer token (pg_cron / Vercel cron) or admin session.
+// Uses advisory lock to prevent overlap with admin-trigger manual sync.
+// Processes ALL approved clips in batches to avoid timeouts.
 // Uses service_role for all DB operations.
 // ---------------------------------------------------------------------------
 
@@ -15,21 +17,23 @@ import { getProvider } from "@/lib/social-providers";
 import { decryptToken, encryptToken, isTokenExpired } from "@/lib/token-crypto";
 import type { Platform } from "@/lib/types";
 
-export async function GET(request: Request) {
+const BATCH_SIZE = 50;
+
+async function handleSync(request: Request) {
   try {
-    // Verify authorization: Vercel cron or admin session
+    // ── Authorization ──────────────────────────────────────────────────────
     const authHeader = request.headers.get("authorization");
     const cronSecret = process.env.CRON_SECRET;
-    const isVercelCron = cronSecret && authHeader === `Bearer ${cronSecret}`;
+    const isCronAuth = cronSecret && authHeader === `Bearer ${cronSecret}`;
 
-    if (!isVercelCron) {
-      // Fall back to admin session check via Bearer token or cookie
+    if (!isCronAuth) {
+      // Fall back to admin session check
       const authUser = await getAuthenticatedUser(request);
       if (!authUser) {
         return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
       }
-      const adminClient = createServiceClient();
-      const { data: profile } = await adminClient
+      const authClient = createServiceClient();
+      const { data: profile } = await authClient
         .from("profiles")
         .select("role")
         .eq("id", authUser.id)
@@ -41,197 +45,180 @@ export async function GET(request: Request) {
 
     const adminClient = createServiceClient();
 
-    const { data: clips, error: clipError } = await adminClient
-      .from("clips")
-      .select("id, platform, video_url, user_id, verified_views")
-      .eq("status", "approved")
-      .limit(50);
-
-    if (clipError || !clips || clips.length === 0) {
+    // ── Advisory lock (prevents overlap with admin-trigger sync) ────────────
+    const { data: lockAcquired } = await adminClient.rpc("try_acquire_sync_lock");
+    if (!lockAcquired) {
       return NextResponse.json({
         success: true,
-        message: "No approved clips to process",
+        message: "Sync already in progress — skipping",
         processed: 0,
       });
     }
 
-    const results: Array<{
-      clipId: string;
-      status: string;
-      error?: string;
-    }> = [];
+    try {
+      // ── Fetch ALL approved clips in batches ───────────────────────────────
+      const results: Array<{ clipId: string; status: string; error?: string }> = [];
+      let offset = 0;
 
-    for (const clip of clips) {
-      try {
-        const clipPlatform = clip.platform as Platform;
+      while (true) {
+        const { data: batch, error: batchError } = await adminClient
+          .from("clips")
+          .select("id, platform, video_url, user_id, verified_views")
+          .eq("status", "approved")
+          .range(offset, offset + BATCH_SIZE - 1);
 
-        // Check if metric provider is available for this platform
-        if (!isMetricProviderConfigured(clipPlatform)) {
-          results.push({
-            clipId: clip.id,
-            status: "skipped",
-            error: `${clipPlatform} metrics API not available`,
-          });
-          continue;
-        }
+        if (batchError || !batch || batch.length === 0) break;
 
-        // Find social account for this user+platform
-        const { data: socialAccount } = await adminClient
-          .from("social_accounts")
-          .select("id, provider_account_id")
-          .eq("user_id", clip.user_id)
-          .eq("platform", clipPlatform)
-          .single();
-
-        if (!socialAccount) {
-          results.push({
-            clipId: clip.id,
-            status: "skipped",
-            error: `No connected ${clipPlatform} account`,
-          });
-          continue;
-        }
-
-        // Read access token
-        const { data: connection } = await adminClient
-          .from("social_connections")
-          .select("access_token_enc, expires_at")
-          .eq("social_account_id", socialAccount.id)
-          .single();
-
-        if (!connection?.access_token_enc) {
-          results.push({
-            clipId: clip.id,
-            status: "skipped",
-            error: `No tokens stored`,
-          });
-          continue;
-        }
-
-        let accessToken = decryptToken(connection.access_token_enc);
-
-        // Token refresh: if expired, try to refresh using the refresh token
-        if (isTokenExpired(connection.expires_at)) {
-          const { data: connFull } = await adminClient
-            .from("social_connections")
-            .select("refresh_token_enc")
-            .eq("social_account_id", socialAccount.id)
-            .single();
-
-          if (!connFull?.refresh_token_enc) {
-            results.push({
-              clipId: clip.id,
-              status: "skipped",
-              error: `Token expired and no refresh token available`,
-            });
-            continue;
-          }
-
+        for (const clip of batch) {
           try {
-            const refreshToken = decryptToken(connFull.refresh_token_enc);
-            const provider = getProvider(clipPlatform);
-            const refreshed = await provider.refreshToken(refreshToken);
+            const clipPlatform = clip.platform as Platform;
 
-            // Persist the new encrypted tokens
-            await adminClient
-              .from("social_connections")
-              .update({
-                access_token_enc: encryptToken(refreshed.accessToken),
-                refresh_token_enc: refreshed.refreshToken
-                  ? encryptToken(refreshed.refreshToken)
-                  : connFull.refresh_token_enc,
-                expires_at: new Date(Date.now() + refreshed.expiresIn * 1000).toISOString(),
-                updated_at: new Date().toISOString(),
-              })
-              .eq("social_account_id", socialAccount.id);
+            if (!isMetricProviderConfigured(clipPlatform)) {
+              results.push({ clipId: clip.id, status: "skipped", error: `${clipPlatform} metrics API not available` });
+              continue;
+            }
 
-            accessToken = refreshed.accessToken;
-          } catch {
-            // Mark connection as needing reconnect
-            await adminClient
+            // Find social account for this user+platform
+            const { data: socialAccount } = await adminClient
               .from("social_accounts")
-              .update({ status: "connection_error", error: "Token refresh failed — reconnect required" })
-              .eq("id", socialAccount.id)
-              .eq("user_id", clip.user_id);
+              .select("id, provider_account_id")
+              .eq("user_id", clip.user_id)
+              .eq("platform", clipPlatform)
+              .single();
 
-            results.push({
-              clipId: clip.id,
-              status: "skipped",
-              error: `Token refresh failed`,
+            if (!socialAccount) {
+              results.push({ clipId: clip.id, status: "skipped", error: `No connected ${clipPlatform} account` });
+              continue;
+            }
+
+            // Read access token
+            const { data: connection } = await adminClient
+              .from("social_connections")
+              .select("access_token_enc, expires_at")
+              .eq("social_account_id", socialAccount.id)
+              .single();
+
+            if (!connection?.access_token_enc) {
+              results.push({ clipId: clip.id, status: "skipped", error: "No tokens stored" });
+              continue;
+            }
+
+            let accessToken = decryptToken(connection.access_token_enc);
+
+            // Token refresh if expired
+            if (isTokenExpired(connection.expires_at)) {
+              const { data: connFull } = await adminClient
+                .from("social_connections")
+                .select("refresh_token_enc")
+                .eq("social_account_id", socialAccount.id)
+                .single();
+
+              if (!connFull?.refresh_token_enc) {
+                results.push({ clipId: clip.id, status: "skipped", error: "Token expired, no refresh token" });
+                continue;
+              }
+
+              try {
+                const refreshToken = decryptToken(connFull.refresh_token_enc);
+                const provider = getProvider(clipPlatform);
+                const refreshed = await provider.refreshToken(refreshToken);
+
+                await adminClient
+                  .from("social_connections")
+                  .update({
+                    access_token_enc: encryptToken(refreshed.accessToken),
+                    refresh_token_enc: refreshed.refreshToken
+                      ? encryptToken(refreshed.refreshToken)
+                      : connFull.refresh_token_enc,
+                    expires_at: new Date(Date.now() + refreshed.expiresIn * 1000).toISOString(),
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq("social_account_id", socialAccount.id);
+
+                accessToken = refreshed.accessToken;
+              } catch {
+                await adminClient
+                  .from("social_accounts")
+                  .update({ status: "connection_error", error: "Token refresh failed — reconnect required" })
+                  .eq("id", socialAccount.id)
+                  .eq("user_id", clip.user_id);
+
+                results.push({ clipId: clip.id, status: "skipped", error: "Token refresh failed" });
+                continue;
+              }
+            }
+
+            const provider = getMetricProvider(clipPlatform);
+            const metrics = await provider.fetchMetrics(clip.video_url, accessToken);
+
+            // YouTube ownership verification (fail-closed)
+            if (clipPlatform === "YouTube") {
+              if (!metrics.channelId || !socialAccount.provider_account_id) {
+                results.push({ clipId: clip.id, status: "rejected", error: "YouTube ownership could not be verified — missing channel identification" });
+                continue;
+              }
+              if (metrics.channelId !== socialAccount.provider_account_id) {
+                results.push({ clipId: clip.id, status: "rejected", error: "Video does not belong to connected YouTube channel" });
+                continue;
+              }
+            }
+
+            // Persist via ingest_clip_metrics (auto-finalizes earnings)
+            const { error: ingestError } = await adminClient.rpc("ingest_clip_metrics", {
+              p_clip_id: clip.id,
+              p_views: metrics.views,
+              p_likes: metrics.likes,
+              p_comments: metrics.comments,
+              p_shares: metrics.shares,
+              p_source: metrics.source,
+              p_verification_status: metrics.verificationStatus,
             });
-            continue;
+
+            if (ingestError) {
+              results.push({ clipId: clip.id, status: "error", error: ingestError.message });
+              continue;
+            }
+
+            results.push({ clipId: clip.id, status: "synced" });
+          } catch (e) {
+            results.push({ clipId: clip.id, status: "error", error: e instanceof Error ? e.message : "Sync failed" });
           }
         }
 
-        const provider = getMetricProvider(clipPlatform);
-
-        // Fetch metrics from the platform
-        const metrics = await provider.fetchMetrics(clip.video_url, accessToken);
-
-        // Ownership verification (fail-closed): for YouTube, BOTH channelId and
-        // provider_account_id must exist and match. Missing either = reject.
-        if (clipPlatform === "YouTube") {
-          if (!metrics.channelId || !socialAccount.provider_account_id) {
-            results.push({
-              clipId: clip.id,
-              status: "rejected",
-              error: "YouTube ownership could not be verified — missing channel identification",
-            });
-            continue;
-          }
-          if (metrics.channelId !== socialAccount.provider_account_id) {
-            results.push({
-              clipId: clip.id,
-              status: "rejected",
-              error: "Video does not belong to connected YouTube channel",
-            });
-            continue;
-          }
-        }
-
-        // Store via the ingest_clip_metrics RPC (which auto-finalizes earnings)
-        const { error: ingestError } = await adminClient.rpc("ingest_clip_metrics", {
-          p_clip_id: clip.id,
-          p_views: metrics.views,
-          p_likes: metrics.likes,
-          p_comments: metrics.comments,
-          p_shares: metrics.shares,
-          p_source: metrics.source,
-          p_verification_status: metrics.verificationStatus,
-        });
-
-        if (ingestError) {
-          results.push({ clipId: clip.id, status: "error", error: ingestError.message });
-          continue;
-        }
-
-        results.push({ clipId: clip.id, status: "synced" });
-      } catch (e) {
-        results.push({
-          clipId: clip.id,
-          status: "error",
-          error: e instanceof Error ? e.message : "Sync failed",
-        });
+        if (batch.length < BATCH_SIZE) break;
+        offset += BATCH_SIZE;
       }
+
+      const synced = results.filter((r) => r.status === "synced").length;
+      const skipped = results.filter((r) => r.status === "skipped").length;
+      const errors = results.filter((r) => r.status === "error").length;
+
+      console.log(`[cron-metrics-sync] Completed: ${synced} synced, ${skipped} skipped, ${errors} errors, ${results.length} total`);
+
+      await adminClient.rpc("release_sync_lock");
+
+      return NextResponse.json({
+        success: true,
+        processed: results.length,
+        synced,
+        skipped,
+        errors,
+        results,
+      });
+    } catch (e) {
+      await adminClient.rpc("release_sync_lock");
+      throw e;
     }
-
-    const synced = results.filter((r) => r.status === "synced").length;
-    const skipped = results.filter((r) => r.status === "skipped").length;
-    const errors = results.filter((r) => r.status === "error").length;
-
-    return NextResponse.json({
-      success: true,
-      processed: results.length,
-      synced,
-      skipped,
-      errors,
-      results,
-    });
   } catch (e) {
-    console.error("[metrics/sync/cron]", e);
-    return NextResponse.json(
-      { error: "Cron metric sync failed" },
-      { status: 500 },
-    );
+    console.error("[cron-metrics-sync]", e);
+    return NextResponse.json({ error: "Cron metric sync failed" }, { status: 500 });
   }
 }
+
+// POST: primary handler (called by pg_cron net.http_post)
+export async function POST(request: Request) {
+  return handleSync(request);
+}
+
+// GET: backward-compatible alias (Vercel cron, manual browser testing)
+export { POST as GET };
