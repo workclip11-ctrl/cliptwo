@@ -219,7 +219,7 @@ export default function CampaignDetail() {
                     </Link>
                     <p className="truncate text-xs text-muted">{k.caption}</p>
                     <p className="mt-1 text-xs text-muted">
-                      {fmtViews(k.views)} views · {clipEarnings(k, campaigns) ? rup(clipEarnings(k, campaigns)) : "—"}
+                      {fmtViews(k.verifiedViews ?? 0)} views · {clipEarnings(k, campaigns) ? rup(clipEarnings(k, campaigns)) : "—"}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">

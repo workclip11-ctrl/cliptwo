@@ -84,7 +84,7 @@ function creatorStats(
     totalSpent: fin.total,
     verifiedViews: received
       .filter((k) => k.status === "approved" || k.status === "held")
-      .reduce((s, k) => s + k.views, 0),
+      .reduce((s, k) => s + (k.verifiedViews ?? 0), 0),
     clipsReceived: received.length,
     clipsApproved: fin.totalCount,
     outstanding: fin.total - fin.paid,
@@ -317,7 +317,7 @@ function CreatorDrawer({
   const [showSuspend, setShowSuspend] = useState(false);
   const [suspendReason, setSuspendReason] = useState("");
 
-  const viewsSeries = seriesByDay(stats.received, (k) => k.views);
+  const viewsSeries = seriesByDay(stats.received, (k) => k.verifiedViews ?? 0);
   const spendSeries = seriesByDay(stats.received, (k) => clipEarnings(k, campaigns));
   const platformBreakdown = viewsByPlatform(stats.received);
   const currentCampaigns = stats.myCampaigns.filter(
@@ -522,7 +522,7 @@ function CreatorDrawer({
                             <PlatformIcon p={k.platform ?? "Instagram"} size={14} />
                           </td>
                           <td className="px-2 py-2 text-right font-mono">
-                            {fmtViews(k.views)}
+                            {fmtViews(k.verifiedViews ?? 0)}
                           </td>
                           <td className="px-2 py-2">
                             <StatusPill status={k.status} />

@@ -81,7 +81,7 @@ export default function CreatorCampaignDetailPage() {
   const campClips = clips.filter((k) => k.campaignId === id);
   const fin = financeOf(financeRecords, (r) => r.campaignId === id);
   const currentSpend = fin.paid;
-  const verifiedViews = campClips.reduce((s, k) => s + k.views, 0);
+  const verifiedViews = campClips.reduce((s, k) => s + (k.verifiedViews ?? 0), 0);
   const clipperSet = new Set(campClips.map((k) => k.userId ?? k.clipper));
   const avgCPM =
     verifiedViews > 0 && currentSpend > 0
@@ -103,7 +103,7 @@ export default function CreatorCampaignDetailPage() {
   const isPaused = camp.status === "paused";
   const isDraft = camp.status === "draft";
 
-  const viewsSeries = seriesByDay(campClips, (k) => k.views);
+  const viewsSeries = seriesByDay(campClips, (k) => k.verifiedViews ?? 0);
   const spendSeries = seriesByDay(campClips, (k) => clipEarnings(k, campaigns));
 
   const handleEdit = (patch: Partial<typeof camp>, note?: string) =>
@@ -659,7 +659,7 @@ function ClipList({
           <div className="min-w-0">
             <p className="truncate text-sm font-medium">{k.caption}</p>
             <p className="truncate text-xs text-muted">
-              @{k.clipper} · {fmtViews(k.views)} views
+              @{k.clipper} · {fmtViews(k.verifiedViews ?? 0)} views
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">

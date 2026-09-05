@@ -35,7 +35,7 @@ export function analyticsOverview(
   campaigns: Campaign[],
   myCampaigns: Campaign[],
 ): Overview {
-  const totalVerifiedViews = received.reduce((s, k) => s + k.views, 0);
+  const totalVerifiedViews = received.reduce((s, k) => s + (k.verifiedViews ?? 0), 0);
   const totalClips = received.length;
   const clipperSet = new Set(received.map((k) => k.userId ?? k.clipper));
   const activeClippers = clipperSet.size;
@@ -109,7 +109,7 @@ export function viewsByPlatform(received: Clip[]): SeriesPoint[] {
   const m = new Map<string, number>();
   for (const k of received) {
     const p = k.platform ?? "Other";
-    m.set(p, (m.get(p) ?? 0) + k.views);
+    m.set(p, (m.get(p) ?? 0) + (k.verifiedViews ?? 0));
   }
   return [...m.entries()]
     .map(([label, value]) => ({ label, value }))
@@ -133,7 +133,7 @@ export function spendByCampaign(
 }
 
 export function topClips(received: Clip[], n = 10): Clip[] {
-  return [...received].sort((a, b) => b.views - a.views).slice(0, n);
+  return [...received].sort((a, b) => (b.verifiedViews ?? 0) - (a.verifiedViews ?? 0)).slice(0, n);
 }
 
 export interface TopClipper {
@@ -147,7 +147,7 @@ export function topClippers(received: Clip[], campaigns: Campaign[], n = 8): Top
   for (const k of received) {
     const key = k.userId ?? k.clipper;
     const cur = m.get(key) ?? { handle: k.clipper, views: 0, earned: 0 };
-    cur.views += k.views;
+    cur.views += (k.verifiedViews ?? 0);
     cur.earned += clipEarnings(k, campaigns);
     m.set(key, cur);
   }
@@ -159,6 +159,6 @@ export function topClippers(received: Clip[], campaigns: Campaign[], n = 8): Top
 export function clipCPM(k: Clip, campaigns: Campaign[]): number {
   const camp = campaigns.find((c) => c.id === k.campaignId);
   const earned = clipEarnings(k, campaigns);
-  if (earned > 0 && k.views > 0) return earned / (k.views / 1000);
+  if (earned > 0 && (k.verifiedViews ?? 0) > 0) return earned / ((k.verifiedViews ?? 0) / 1000);
   return camp?.payout ?? 0;
 }

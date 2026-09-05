@@ -33,7 +33,7 @@ export default function ClipperPage() {
   const earnings = fin.total;
   const approvedCount = fin.totalCount;
   const pendingCount = fin.pendingCount;
-  const maxViews = Math.max(1, ...myClips.map((k) => k.views));
+  const maxViews = Math.max(1, ...myClips.map((k) => k.verifiedViews ?? 0));
 
   return (
     <div className="space-y-8">
@@ -262,7 +262,7 @@ export default function ClipperPage() {
                           {k.platform ? <PlatformIcon p={k.platform} size={15} /> : "—"}
                         </td>
                         <td className="px-4 py-3 text-right font-mono">
-                          {k.views ? fmtViews(k.views) : "—"}
+                          {k.verifiedViews ? fmtViews(k.verifiedViews) : "—"}
                         </td>
                         <td className="px-4 py-3 text-right font-mono">
                           {(financeRecords.find((r) => r.clipId === k.id)?.netAmount ?? 0) / 100 > 0 ? rup((financeRecords.find((r) => r.clipId === k.id)?.netAmount ?? 0) / 100) : "—"}
@@ -296,13 +296,13 @@ export default function ClipperPage() {
                     <div className="mb-1 flex items-center justify-between text-xs">
                       <span className="truncate font-medium">{camp?.title ?? "Clip"}</span>
                       <span className="font-mono text-muted">
-                        {k.views ? fmtViews(k.views) : "0"}
+                        {k.verifiedViews ? fmtViews(k.verifiedViews) : "0"}
                       </span>
                     </div>
                     <div className="h-2 w-full overflow-hidden rounded-full bg-accent-soft">
                       <div
                         className={`h-full rounded-full ${k.status === "approved" ? "bg-accent" : "bg-border"}`}
-                        style={{ width: `${(k.views / maxViews) * 100}%` }}
+                        style={{ width: `${((k.verifiedViews ?? 0) / maxViews) * 100}%` }}
                       />
                     </div>
                   </div>

@@ -434,7 +434,7 @@ function ReviewTable({
                 {k.platform && <PlatformIcon p={k.platform} size={15} />}
               </td>
               <td className="px-4 py-3 text-muted">{fmtDate(k.submittedAt)}</td>
-              <td className="px-4 py-3 text-right font-mono">{fmtViews(k.views)}</td>
+              <td className="px-4 py-3 text-right font-mono">{fmtViews(k.verifiedViews ?? 0)}</td>
               <td className="px-4 py-3">
                 <StatusPill status={k.status} />
               </td>

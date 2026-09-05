@@ -202,7 +202,7 @@ export default function ClipperSubmissionsPage() {
                   <div className="rounded-lg border bg-background p-2.5">
                     <p className="text-[11px] text-muted">Verified views</p>
                     <p className="mt-0.5 font-mono text-sm font-medium">
-                      {k.views ? fmtViews(k.views) : "—"}
+                      {k.verifiedViews ? fmtViews(k.verifiedViews) : "—"}
                     </p>
                   </div>
                   <div className="rounded-lg border bg-background p-2.5">
@@ -226,7 +226,9 @@ export default function ClipperSubmissionsPage() {
                   </div>
                   <div className="rounded-lg border bg-background p-2.5">
                     <p className="text-[11px] text-muted">Last view update</p>
-                    <p className="mt-0.5 font-mono text-sm font-medium">—</p>
+                    <p className="mt-0.5 font-mono text-sm font-medium">
+                      {k.updatedAt ? fmtDate(k.updatedAt) : "—"}
+                    </p>
                   </div>
                 </div>
 

@@ -422,7 +422,7 @@ export default function CampaignDetailPage() {
                       </Link>
                       <p className="truncate text-xs text-muted">{k.caption}</p>
                       <p className="mt-1 text-xs text-muted">
-                        {fmtViews(k.views)} views ·{" "}
+                        {fmtViews(k.verifiedViews ?? 0)} views ·{" "}
                         {clipEarnings(k, campaigns) ? rup(clipEarnings(k, campaigns)) : "—"}
                       </p>
                     </div>

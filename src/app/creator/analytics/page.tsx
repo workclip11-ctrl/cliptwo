@@ -61,7 +61,7 @@ export default function CreatorAnalyticsPage() {
     );
   }
 
-  const viewsSeries = seriesByDay(received, (k) => k.views);
+  const viewsSeries = seriesByDay(received, (k) => k.verifiedViews ?? 0);
   const spendSeries = seriesByDay(received, (k) => clipEarnings(k, campaigns));
   const clipsSeries = seriesByDay(received, () => 1);
   const platformViews = viewsByPlatform(received);

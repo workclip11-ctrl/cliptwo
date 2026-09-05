@@ -94,7 +94,7 @@ function clipperStats(
     approved + rejected > 0
       ? Math.round((approved / (approved + rejected)) * 100)
       : null;
-  const verifiedViews = earned.reduce((s, k) => s + k.views, 0);
+  const verifiedViews = earned.reduce((s, k) => s + (k.verifiedViews ?? 0), 0);
   const earnedAmt = earned.reduce((s, k) => s + clipEarnings(k, campaigns), 0);
   const paid = own
     .filter(() => false)
@@ -638,7 +638,7 @@ function ClipperDrawer({
                               <PlatformIcon p={k.platform ?? "Instagram"} size={14} />
                             </td>
                             <td className="px-2 py-2 text-right font-mono">
-                              {fmtViews(k.views)}
+                              {fmtViews(k.verifiedViews ?? 0)}
                             </td>
                             <td className="px-2 py-2">
                               <StatusPill status={k.status} />

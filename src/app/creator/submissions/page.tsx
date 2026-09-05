@@ -241,7 +241,7 @@ export default function CreatorSubmissionsPage() {
                   <Cell label="Verified views">
                     <span className="inline-flex items-center gap-1 font-mono">
                       <Eye size={12} className="text-muted" />
-                      {fmtViews(k.views)}
+                      {fmtViews(k.verifiedViews ?? 0)}
                     </span>
                   </Cell>
                   <Cell label="Est. payout">

@@ -70,7 +70,7 @@ function fmtDate(ts?: number) {
 }
 
 export default function SocialAccountsPage() {
-  const { socialAccounts, updateSocialAccount, clips } = useStore();
+  const { socialAccounts, updateSocialAccount, clips, refreshClips } = useStore();
   const { user } = useAuth();
   const myAccounts = socialAccounts.filter(
     (a) => a.userId && a.userId === user?.id,
@@ -398,6 +398,7 @@ export default function SocialAccountsPage() {
 
       // Reload social accounts and clips from DB to get fresh data
       void reloadSocialAccounts();
+      void refreshClips();
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Sync failed";
       setSyncResult({ platform: acc.platform, message: msg, error: true });

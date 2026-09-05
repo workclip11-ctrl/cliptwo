@@ -667,7 +667,7 @@ export default function Home() {
   // Database-backed statistics
   const stats = useMemo(() => {
     const openCampaigns = campaigns.filter((c) => c.status === "open" || c.status === "near_budget").length;
-    const totalViews = clips.reduce((s, k) => s + k.views, 0);
+    const totalViews = clips.reduce((s, k) => s + (k.verifiedViews ?? 0), 0);
     const clippers = new Set(clips.map((k) => k.clipper)).size;
     const fin = financeOf(financeRecords);
     const paidOut = fin.paid;
@@ -694,7 +694,7 @@ export default function Home() {
       const cur = byClipper.get(k.clipper) ?? { earned: 0, clips: 0, views: 0 };
       cur.earned += e;
       cur.clips += 1;
-      cur.views += k.views;
+      cur.views += (k.verifiedViews ?? 0);
       byClipper.set(k.clipper, cur);
     }
     return Array.from(byClipper.entries())

@@ -212,7 +212,7 @@ export default function CreatorPage() {
                     </p>
                   </td>
                   <td className="px-4 py-3 text-right font-mono">
-                    {fmtViews(k.views)}
+                    {fmtViews(k.verifiedViews ?? 0)}
                   </td>
                   <td className="px-4 py-3 text-right font-mono">
                     {rup((financeRecords.find((r) => r.clipId === k.id)?.netAmount ?? 0) / 100)}

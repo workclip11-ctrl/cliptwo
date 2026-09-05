@@ -63,7 +63,7 @@ export default function CampaignAnalyticsPage() {
   const campClips = received.filter((k) => k.campaignId === id);
   const ov = analyticsOverview(campClips, campaigns, [camp]);
 
-  const viewsSeries = seriesByDay(campClips, (k) => k.views);
+  const viewsSeries = seriesByDay(campClips, (k) => k.verifiedViews ?? 0);
   const spendSeries = seriesByDay(campClips, (k) => clipEarnings(k, campaigns));
   const clipsSeries = seriesByDay(campClips, () => 1);
   const platformViews = viewsByPlatform(campClips);

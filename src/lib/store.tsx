@@ -1080,6 +1080,7 @@ interface StoreActions {
   updateSocialAccount: (id: string, patch: Partial<SocialAccount>) => void;
   setSiteSettings: (s: SiteSettings) => void;
   toggleSaveCampaign: (id: string) => void;
+  refreshClips: () => Promise<void>;
 }
 
 // Maps Profile model keys to DB columns for admin updates. Only keys present
@@ -2430,6 +2431,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             : [...s.savedCampaigns, id],
         }));
       },
+      async refreshClips() {
+        if (!isSupabaseConfigured) return;
+        try {
+          const { data: clps } = await supabase.from("clips").select("*");
+          if (clps) setState((s) => ({ ...s, clips: clps.map(mapClip) }));
+        } catch {
+          /* ignore */
+        }
+      },
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -2465,7 +2475,7 @@ export function calculateClipperReputation(clips: Clip[], userId: string, campai
   const approvalRate = totalApproved > 0 ? (totalApproved / (totalApproved + totalRejected) * 100) : 0;
   
   const verifiedClips = clipperClips.filter((k) => k.status === "approved");
-  const totalVerifiedViews = verifiedClips.reduce((sum, k) => sum + k.views, 0);
+  const totalVerifiedViews = verifiedClips.reduce((sum, k) => sum + (k.verifiedViews ?? 0), 0);
   
   const successfulCampaigns = new Set(
     clipperClips.map((k) => k.campaignId)

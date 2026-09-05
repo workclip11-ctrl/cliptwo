@@ -159,7 +159,7 @@ export default function AdminDashboard() {
                     <p className="truncate text-xs text-muted">{c?.title ?? "Campaign"}</p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="font-mono text-xs">{fmtViews(k.views)}</span>
+                    <span className="font-mono text-xs">{fmtViews(k.verifiedViews ?? 0)}</span>
                     <StatusPill status={k.status} />
                   </div>
                 </div>
