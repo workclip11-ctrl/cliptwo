@@ -20,6 +20,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 
 import { rup, fmtViews, clipEarnings } from "@/lib/format";
 import type { ClipStatus } from "@/lib/types";
@@ -43,6 +44,7 @@ function fmtDate(t: number) {
 export default function CreatorSubmissionsPage() {
   const { campaigns, clips, profiles, socialAccounts } = useStore();
   const { user } = useAuth();
+  useAutoRefresh();
   const [filter, setFilter] = useState<ClipStatus | "all">("all");
   const [query, setQuery] = useState("");
   const [rulesId, setRulesId] = useState<string | null>(null);

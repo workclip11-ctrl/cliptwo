@@ -18,6 +18,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { rup, fmtViews } from "@/lib/format";
 import { financeOf, campaignSpent } from "@/lib/finance";
 
@@ -25,6 +26,7 @@ export default function ClipperPage() {
   const { campaigns, clips, socialAccounts, financeRecords } = useStore();
   const { user } = useAuth();
   const router = useRouter();
+  useAutoRefresh();
 
   const myClips = clips.filter((k) => k.userId && k.userId === user?.id);
   const myAccounts = socialAccounts.filter((a) => a.userId && a.userId === user?.id);

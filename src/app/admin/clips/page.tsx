@@ -18,6 +18,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { rup, fmtViews, clipEarnings } from "@/lib/format";
 import { financeOf, PLATFORM_FEE_RATE, campaignBudget } from "@/lib/finance";
 import { clipCPM } from "@/lib/analytics";
@@ -52,6 +53,7 @@ const TABS: Array<{ key: string; label: string; statuses: ClipStatus[] }> = [
 export default function AdminClips() {
   const { clips, campaigns, financeRecords, approveClip, rejectClip, holdClip } = useStore();
   const { user } = useAuth();
+  useAutoRefresh();
   const actor = user?.email ?? user?.name ?? "Admin";
 
   const searchParams = useSearchParams();

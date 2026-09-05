@@ -12,6 +12,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { rup, fmtViews } from "@/lib/format";
 
 import type { Clip } from "@/lib/types";
@@ -50,6 +51,7 @@ function fmtDate(ts: number) {
 export default function ClipperSubmissionsPage() {
   const { campaigns, clips, financeRecords } = useStore();
   const { user } = useAuth();
+  useAutoRefresh();
   const [tab, setTab] = useState<TabKey>("all");
   const [page, setPage] = useState(1);
   const [appealed, setAppealed] = useState<Record<string, boolean>>({});

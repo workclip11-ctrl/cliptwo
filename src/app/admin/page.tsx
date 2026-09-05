@@ -1,15 +1,54 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { Users, Megaphone, Wallet, Clock, CheckCircle2, Banknote } from "lucide-react";
+import { Users, Megaphone, Wallet, Clock, CheckCircle2, Banknote, RefreshCw, Loader2 } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { StatusPill } from "@/components/StatusPill";
 import { useStore } from "@/lib/store";
+import { useAuth } from "@/lib/auth";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { rup, fmtViews } from "@/lib/format";
 import { financeOf, campaignSpent } from "@/lib/finance";
 
 export default function AdminDashboard() {
-  const { campaigns, clips, profiles, financeRecords } = useStore();
+  const { campaigns, clips, profiles, financeRecords, refreshClips } = useStore();
+  const { user: _user } = useAuth();
+  useAutoRefresh();
+
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{
+    processed: number;
+    synced: number;
+    skipped: number;
+    errors: number;
+    duration: number;
+  } | null>(null);
+
+  async function triggerSync() {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch("/api/metrics/sync/admin-trigger", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Sync failed");
+      setSyncResult({
+        processed: data.processed,
+        synced: data.synced,
+        skipped: data.skipped,
+        errors: data.errors,
+        duration: data.duration,
+      });
+      void refreshClips();
+    } catch {
+      setSyncResult(null);
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   const clippers = profiles.filter((p) => p.role === "clipper");
   const creators = profiles.filter((p) => p.role === "creator");
@@ -45,6 +84,43 @@ export default function AdminDashboard() {
         <p className="mt-1 text-sm text-muted">
           Overview of users, campaigns and payouts across cliptwo.
         </p>
+      </div>
+
+      {/* Admin Sync Metrics Now — backup/manual override */}
+      <div className="rounded-2xl border bg-card p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium">Metrics sync</p>
+            <p className="text-xs text-muted">
+              Metrics sync automatically every 30 minutes. Use this to trigger an immediate system-wide sync.
+            </p>
+          </div>
+          <button
+            onClick={triggerSync}
+            disabled={syncing}
+            className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-accent-soft disabled:opacity-50"
+          >
+            {syncing ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <RefreshCw size={14} />
+            )}
+            {syncing ? "Syncing…" : "Sync Metrics Now"}
+          </button>
+        </div>
+        {syncResult && (
+          <div className="mt-3 rounded-lg border bg-background p-3 text-xs">
+            <p>
+              Processed <span className="font-mono font-medium">{syncResult.processed}</span> clips —{" "}
+              <span className="font-mono text-green">{syncResult.synced} updated</span>,{" "}
+              <span className="font-mono text-muted">{syncResult.skipped} skipped</span>,{" "}
+              <span className="font-mono text-red">{syncResult.errors} failed</span>
+            </p>
+            <p className="mt-1 text-muted">
+              Duration: {(syncResult.duration / 1000).toFixed(1)}s
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

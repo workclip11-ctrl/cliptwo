@@ -17,6 +17,7 @@ import { PlatformIcon } from "@/components/PlatformIcon";
 import { NewCampaignModal } from "@/components/NewCampaignModal";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
+import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { rup, fmtViews } from "@/lib/format";
 import { financeOf, campaignSpent } from "@/lib/finance";
 import type { Campaign, Clip, Platform } from "@/lib/types";
@@ -24,6 +25,7 @@ import type { Campaign, Clip, Platform } from "@/lib/types";
 export default function CreatorPage() {
   const { campaigns, clips, addCampaign, financeRecords } = useStore();
   const { user } = useAuth();
+  useAutoRefresh();
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<Campaign | null>(null);
 
