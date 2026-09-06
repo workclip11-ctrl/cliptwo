@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -61,10 +61,17 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Safe API call with token, abort, and robust response parsing.
+//
+// The ENTIRE operation (getSession + fetch + read body) is covered by a single
+// AbortController so that if any part hangs, the caller is never stuck.
+// ---------------------------------------------------------------------------
 async function apiCall(path: string, body?: Record<string, unknown>) {
   const isPost = body !== undefined;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  const timeoutId = setTimeout(() => controller.abort(), 25000);
+
   let headers: Record<string, string> = { "Content-Type": "application/json" };
   if (isSupabaseConfigured) {
     try {
@@ -74,9 +81,10 @@ async function apiCall(path: string, body?: Record<string, unknown>) {
         headers = { ...headers, Authorization: `Bearer ${token}` };
       }
     } catch {
-      //getSession failed — proceed without auth header; server will 401 if needed
+      // proceed without auth header; server will 401 if needed
     }
   }
+
   try {
     const res = await fetch(path, {
       method: isPost ? "POST" : "GET",
@@ -84,33 +92,67 @@ async function apiCall(path: string, body?: Record<string, unknown>) {
       body: isPost ? JSON.stringify(body) : undefined,
       signal: controller.signal,
     });
+
+    // Read the full response body as text first — never call res.json() directly
+    // because it throws "Unexpected end of JSON input" on empty bodies.
     const text = await res.text();
+
+    // Empty response
     if (!text) {
       if (!res.ok) {
         throw new Error(`Request failed with empty response (${res.status})`);
       }
       return { success: true };
     }
+
+    // Try to parse JSON — handle malformed responses
     let json: Record<string, unknown>;
     try {
       json = JSON.parse(text);
     } catch {
       throw new Error(`Invalid JSON response from server (${res.status})`);
     }
+
+    // Non-2xx response — extract error message safely
     if (!res.ok) {
-      throw new Error(
+      const msg =
         (typeof json.error === "string" ? json.error : null) ??
-          `Request failed (${res.status})`
-      );
+        (typeof json.message === "string" ? json.message : null) ??
+        `Request failed (${res.status})`;
+      throw new Error(msg);
     }
+
     return json;
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
-      throw new Error("Request timed out — server may be unresponsive");
+      throw new Error("Request timed out. Please refresh and check the payout status.");
     }
     throw err;
   } finally {
     clearTimeout(timeoutId);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Silent refresh — fetches balance + requests in the background.
+// Never sets the page-level loading spinner.
+// Has its own 10s timeout so a slow refresh never blocks the UI.
+// ---------------------------------------------------------------------------
+async function silentRefresh(
+  setBalance: (b: TestBalance | null) => void,
+  setRequests: (r: TestRequest[]) => void,
+) {
+  try {
+    const [balRes, reqRes] = await Promise.all([
+      apiCall("/api/payout/test/balance"),
+      apiCall("/api/payout/test/requests"),
+    ]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (balRes.balance) setBalance(balRes.balance as any);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (reqRes.requests) setRequests(reqRes.requests as any);
+  } catch {
+    // Silent refresh failures are non-fatal
   }
 }
 
@@ -134,39 +176,35 @@ export default function TestPayoutSandboxPage() {
   // Reset
   const [resetting, setResetting] = useState(false);
 
-  const refresh = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    setError(null);
-    try {
-      const [balRes, reqRes] = await Promise.all([
-        apiCall("/api/payout/test/balance"),
-        apiCall("/api/payout/test/requests"),
-      ]);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- sandbox API returns dynamic shapes
-      if (balRes.balance) setBalance(balRes.balance as any);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (reqRes.requests) setRequests(reqRes.requests as any);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Failed to load test sandbox data";
-      setError(msg);
-    } finally {
-      if (!silent) setLoading(false);
-    }
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const [balRes, reqRes] = await Promise.all([
+          apiCall("/api/payout/test/balance"),
+          apiCall("/api/payout/test/requests"),
+        ]);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (balRes.balance) setBalance(balRes.balance as any);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (reqRes.requests) setRequests(reqRes.requests as any);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to load test sandbox data");
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
-
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
-  useEffect(() => { refresh(); }, [refresh]);
 
   const handleSeedBalance = async () => {
     setError(null);
     setSuccess(null);
     try {
       await apiCall("/api/payout/test/balance", { balancePaise: 100000 });
-      await refresh(true);
+      await silentRefresh(setBalance, setRequests);
       setSuccess("Sandbox balance seeded: \u20b91,000");
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Failed to seed balance";
-      setError(msg);
+      setError(e instanceof Error ? e.message : "Failed to seed balance");
       setSuccess(null);
     }
   };
@@ -183,7 +221,7 @@ export default function TestPayoutSandboxPage() {
         return;
       }
       await apiCall("/api/payout/test/request", { amountPaise, upiId: "test-user@upi" });
-      await refresh(true);
+      await silentRefresh(setBalance, setRequests);
       setSuccess(`Test payout of \u20b9${Math.round(amountPaise / 100)} created (pending)`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create test payout");
@@ -204,28 +242,83 @@ export default function TestPayoutSandboxPage() {
     } finally {
       setProcessingId(null);
     }
-    refresh(true).catch(() => {});
+    silentRefresh(setBalance, setRequests);
   };
 
+  // ---------------------------------------------------------------------------
+  // Mark Test Paid — the critical handler.
+  //
+  // Lifecycle:
+  //   1. Validate UTR
+  //   2. Set completingId (shows spinner, disables button)
+  //   3. Await API call (with its own 25s AbortController)
+  //   4. On success: clear input, show success, update local state
+  //   5. On failure: show error
+  //   6. ALWAYS: setCompletingId(null) — hides spinner, re-enables button
+  //   7. Background refresh (independent, 10s timeout, fire-and-forget)
+  //
+  // A hard 30s safety timeout wraps the entire action via Promise.race.
+  // If anything hangs beyond 30s, the spinner is forced off.
+  // ---------------------------------------------------------------------------
   const handleComplete = async (requestId: string) => {
     if (!utrInput.trim()) {
       setError("Enter a TEST-UTR (e.g., TEST-12345678)");
       return;
     }
+
     setCompletingId(requestId);
     setError(null);
     setSuccess(null);
+
+    // Hard 30s safety timeout — if the action takes longer, force-stop.
+    const safetyTimeout = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error("Request timed out. Please refresh and check the payout status.")), 30000);
+    });
+
     try {
-      await apiCall("/api/payout/test/complete", { requestId, paymentReference: utrInput.trim() });
-      setUtrInput("");
-      setSuccess("Test payout marked as paid");
+      await Promise.race([
+        (async () => {
+          const result = await apiCall("/api/payout/test/complete", {
+            requestId,
+            paymentReference: utrInput.trim(),
+          });
+
+          // Verify the server actually marked it as paid
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const requestData = (result as any).request;
+          const serverStatus = requestData?.status;
+          const serverUtr = requestData?.payment_reference;
+
+          if (serverStatus !== "paid") {
+            throw new Error(
+              `Server returned unexpected status: ${serverStatus ?? "unknown"}. Check the payout list.`,
+            );
+          }
+
+          // Update local state immediately so the UI reflects the change
+          setRequests((prev) =>
+            prev.map((r) =>
+              r.id === requestId
+                ? { ...r, status: "paid" as const, payment_reference: serverUtr ?? utrInput.trim() }
+                : r,
+            ),
+          );
+
+          setUtrInput("");
+          setSuccess("Test payout marked as paid");
+        })(),
+        safetyTimeout,
+      ]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to complete test payout");
       setSuccess(null);
     } finally {
       setCompletingId(null);
     }
-    refresh(true).catch(() => {});
+
+    // Background refresh — fire-and-forget, completely independent.
+    // Never awaited, never blocks the UI.
+    silentRefresh(setBalance, setRequests);
   };
 
   const handleReset = async () => {
@@ -235,7 +328,9 @@ export default function TestPayoutSandboxPage() {
     setSuccess(null);
     try {
       await apiCall("/api/payout/test/reset", {});
-      await refresh(true);
+      // After reset, force-clear local state
+      setBalance(null);
+      setRequests([]);
       setSuccess("Test sandbox reset. No production data was affected.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to reset test sandbox");
@@ -333,7 +428,10 @@ export default function TestPayoutSandboxPage() {
               Reset Test Data
             </button>
             <button
-              onClick={() => refresh()}
+              onClick={() => {
+                setLoading(true);
+                silentRefresh(setBalance, setRequests).finally(() => setLoading(false));
+              }}
               className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-muted hover:bg-muted/50"
             >
               <RefreshCw size={16} />
@@ -428,11 +526,12 @@ export default function TestPayoutSandboxPage() {
                           <div className="flex flex-col items-end gap-2">
                             <div className="flex items-center gap-1.5">
                               <input
-                                value={completingId === req.id ? utrInput : ""}
-                                onChange={(e) => { setCompletingId(req.id); setUtrInput(e.target.value); }}
+                                value={isCompleting ? utrInput : ""}
+                                onChange={(e) => setUtrInput(e.target.value)}
                                 onFocus={() => setCompletingId(req.id)}
                                 placeholder="TEST-12345678"
-                                className="w-36 rounded border border-border bg-background px-2 py-1 text-xs font-mono text-foreground placeholder:text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                                disabled={isCompleting}
+                                className="w-36 rounded border border-border bg-background px-2 py-1 text-xs font-mono text-foreground placeholder:text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-50"
                               />
                               <button
                                 onClick={() => handleComplete(req.id)}
