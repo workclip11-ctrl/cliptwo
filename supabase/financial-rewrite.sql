@@ -439,9 +439,11 @@ BEGIN
   END IF;
 
   -- 6. Calculate available balance
-  -- Available = sum(processing records) - sum(all active payout requests)
+  -- Available = sum(processing records) - sum(pending/processing payout requests)
   -- processing = finalized earnings available for withdrawal
-  -- paid = already claimed by a completed payout, not available
+  -- paid records are excluded from the processing sum automatically (they are
+  -- no longer status='processing'), so paid payout requests must NOT be
+  -- subtracted — doing so double-counts and permanently bricks the balance.
   SELECT coalesce(sum(net_amount), 0) INTO v_balance
   FROM public.financial_records
   WHERE clipper_id = v_user_id AND status = 'processing';
@@ -449,7 +451,7 @@ BEGIN
   v_balance := v_balance - coalesce((
     SELECT coalesce(sum(net_amount), 0)
     FROM public.payout_requests
-    WHERE user_id = v_user_id AND status IN ('pending', 'processing', 'paid')
+    WHERE user_id = v_user_id AND status IN ('pending', 'processing')
   ), 0);
 
   -- 7. Enforce minimum ₹100 (10000 paise)
@@ -622,9 +624,10 @@ GRANT EXECUTE ON FUNCTION public.complete_payout_request(uuid, text, text) TO au
 
 -- ---------------------------------------------------------------------------
 -- RPC: get_wallet_balance — Derive balance from authoritative financial records.
--- Available = sum(processing records) - sum(all active payout requests)
+-- Available = sum(processing records) - sum(pending/processing payout requests)
 -- processing = finalized earnings available for withdrawal
--- paid = claimed by a completed payout, not available
+-- paid records are excluded from the processing sum automatically, so paid
+-- payout requests must NOT be subtracted (same logic as request_payout).
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.get_wallet_balance(p_user_id uuid)
 RETURNS jsonb
@@ -642,7 +645,7 @@ AS $$
       - coalesce((
       SELECT sum(pr.net_amount)
       FROM public.payout_requests pr
-      WHERE pr.user_id = p_user_id AND pr.status IN ('pending', 'processing', 'paid')
+      WHERE pr.user_id = p_user_id AND pr.status IN ('pending', 'processing')
     ), 0),
     'currency', 'INR',
     'total_earned', coalesce((

@@ -95,7 +95,8 @@ export default function CreatorWalletPage() {
               </thead>
               <tbody className="divide-y">
                 {myCampaigns.map((c) => {
-                  const spent = campaignSpent(c, financeRecords);
+                  const spentPaise = campaignSpent(c, financeRecords);
+                  const spent = spentPaise / 100;
                   const remaining = (c.budget ?? 0) - spent;
                   const pct = c.budget
                     ? Math.min(100, Math.round((spent / c.budget) * 100))

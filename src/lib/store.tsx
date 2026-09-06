@@ -1734,8 +1734,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
        processPayoutRequest: async (payoutId, actor) => {
           const me = await getCurrentUser();
           if (!await isUserAdmin(me?.id)) {
-            console.error("Authorization: non-admin user cannot process payout");
-            return;
+            throw new Error("Authorization: non-admin user cannot process payout");
           }
           const prevPayouts = stateRef.current.payoutRequests;
           setState((s) => ({
@@ -1751,8 +1750,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           });
           if (error) {
             console.error("RPC process_payout_request failed:", error.message);
-            setState((s) => ({ ...s, payoutRequests: prevPayouts, lastError: `Process payout failed: ${error.message}` }));
-            return;
+            setState((s) => ({ ...s, payoutRequests: prevPayouts }));
+            throw new Error(`Process payout failed: ${error.message}`);
           }
           const payout = data as Record<string, unknown>;
           if (payout?.id) {
@@ -1766,8 +1765,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
        completePayoutRequest: async (payoutId, paymentRef, actor) => {
           const me = await getCurrentUser();
           if (!await isUserAdmin(me?.id)) {
-            console.error("Authorization: non-admin user cannot complete payout");
-            return;
+            throw new Error("Authorization: non-admin user cannot complete payout");
           }
           const prevPayouts = stateRef.current.payoutRequests;
           setState((s) => ({
@@ -1784,8 +1782,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           });
           if (error) {
             console.error("RPC complete_payout_request failed:", error.message);
-            setState((s) => ({ ...s, payoutRequests: prevPayouts, lastError: `Complete payout failed: ${error.message}` }));
-            return;
+            setState((s) => ({ ...s, payoutRequests: prevPayouts }));
+            throw new Error(`Complete payout failed: ${error.message}`);
           }
           const payout = data as Record<string, unknown>;
           if (payout?.id) {

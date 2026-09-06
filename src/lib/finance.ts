@@ -116,22 +116,22 @@ export interface CampaignBudget {
 const NEAR_BUDGET_THRESHOLD = 0.9;
 
 export function campaignBudget(campaign: Campaign, records: FinanceRecord[]): CampaignBudget {
-  const budget = campaign.budget ?? 0;
+  const budgetPaise = (campaign.budget ?? 0) * 100;
   const fin = financeOf(records, (r) => r.campaignId === campaign.id);
   const spent = fin.paid;
   const committed = fin.pending + fin.processing;
   const reserved = spent + committed;
-  const remaining = Math.max(0, budget - reserved);
-  const utilizationPct = budget > 0 ? Math.min(100, (reserved / budget) * 100) : 0;
+  const remaining = Math.max(0, budgetPaise - reserved);
+  const utilizationPct = budgetPaise > 0 ? Math.min(100, (reserved / budgetPaise) * 100) : 0;
 
   let status: CampaignBudget["status"] = "ok";
-  if (budget > 0 && reserved >= budget) {
+  if (budgetPaise > 0 && reserved >= budgetPaise) {
     status = "budget_reached";
-  } else if (budget > 0 && utilizationPct >= NEAR_BUDGET_THRESHOLD * 100) {
+  } else if (budgetPaise > 0 && utilizationPct >= NEAR_BUDGET_THRESHOLD * 100) {
     status = "near_budget";
   }
 
-  return { total: budget, spent, committed, reserved, remaining, utilizationPct, status };
+  return { total: campaign.budget ?? 0, spent, committed, reserved, remaining, utilizationPct, status };
 }
 
 export function canAcceptMoreCommitted(campaign: Campaign, records: FinanceRecord[]): boolean {
