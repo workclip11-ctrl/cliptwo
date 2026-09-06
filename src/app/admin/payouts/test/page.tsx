@@ -134,8 +134,8 @@ export default function TestPayoutSandboxPage() {
   // Reset
   const [resetting, setResetting] = useState(false);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  const refresh = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const [balRes, reqRes] = await Promise.all([
@@ -150,7 +150,7 @@ export default function TestPayoutSandboxPage() {
       const msg = e instanceof Error ? e.message : "Failed to load test sandbox data";
       setError(msg);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
@@ -162,8 +162,7 @@ export default function TestPayoutSandboxPage() {
     setSuccess(null);
     try {
       await apiCall("/api/payout/test/balance", { balancePaise: 100000 });
-      // Reload from database to confirm persistence
-      await refresh();
+      await refresh(true);
       setSuccess("Sandbox balance seeded: \u20b91,000");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Failed to seed balance";
@@ -184,7 +183,7 @@ export default function TestPayoutSandboxPage() {
         return;
       }
       await apiCall("/api/payout/test/request", { amountPaise, upiId: "test-user@upi" });
-      await refresh();
+      await refresh(true);
       setSuccess(`Test payout of \u20b9${Math.round(amountPaise / 100)} created (pending)`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create test payout");
@@ -196,19 +195,16 @@ export default function TestPayoutSandboxPage() {
     setProcessingId(requestId);
     setError(null);
     setSuccess(null);
-    let safetyTimer: ReturnType<typeof setTimeout> | null = null;
     try {
-      safetyTimer = setTimeout(() => setProcessingId(null), 35000);
       await apiCall("/api/payout/test/process", { requestId });
       setSuccess("Test payout moved to processing");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to process test payout");
       setSuccess(null);
     } finally {
-      if (safetyTimer) clearTimeout(safetyTimer);
       setProcessingId(null);
     }
-    refresh().catch(() => {});
+    refresh(true).catch(() => {});
   };
 
   const handleComplete = async (requestId: string) => {
@@ -219,9 +215,7 @@ export default function TestPayoutSandboxPage() {
     setCompletingId(requestId);
     setError(null);
     setSuccess(null);
-    let safetyTimer: ReturnType<typeof setTimeout> | null = null;
     try {
-      safetyTimer = setTimeout(() => setCompletingId(null), 35000);
       await apiCall("/api/payout/test/complete", { requestId, paymentReference: utrInput.trim() });
       setUtrInput("");
       setSuccess("Test payout marked as paid");
@@ -229,10 +223,9 @@ export default function TestPayoutSandboxPage() {
       setError(e instanceof Error ? e.message : "Failed to complete test payout");
       setSuccess(null);
     } finally {
-      if (safetyTimer) clearTimeout(safetyTimer);
       setCompletingId(null);
     }
-    refresh().catch(() => {});
+    refresh(true).catch(() => {});
   };
 
   const handleReset = async () => {
@@ -242,7 +235,7 @@ export default function TestPayoutSandboxPage() {
     setSuccess(null);
     try {
       await apiCall("/api/payout/test/reset", {});
-      await refresh();
+      await refresh(true);
       setSuccess("Test sandbox reset. No production data was affected.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to reset test sandbox");
@@ -340,7 +333,7 @@ export default function TestPayoutSandboxPage() {
               Reset Test Data
             </button>
             <button
-              onClick={refresh}
+              onClick={() => refresh()}
               className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-muted hover:bg-muted/50"
             >
               <RefreshCw size={16} />
