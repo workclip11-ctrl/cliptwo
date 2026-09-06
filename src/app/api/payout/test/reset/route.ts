@@ -24,12 +24,18 @@ export async function POST(request: Request) {
     const { data, error } = await client.rpc("payout_test_reset");
 
     if (error) {
+      console.error("[payout-test-reset] RPC error:", error.message, error.code, error.details);
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
     return NextResponse.json({ result: data, success: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Internal server error";
+    console.error("[payout-test-reset] Exception:", message, err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+export async function GET() {
+  return NextResponse.json({ error: "Use POST for reset" }, { status: 405 });
 }

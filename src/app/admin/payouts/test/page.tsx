@@ -70,18 +70,34 @@ async function apiCall(path: string, body?: Record<string, unknown>) {
       headers = { ...headers, Authorization: `Bearer ${token}` };
     }
   }
+  const isPost = body !== undefined;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000);
   try {
     const res = await fetch(path, {
-      method: body ? "POST" : "GET",
+      method: isPost ? "POST" : "GET",
       headers,
-      body: body ? JSON.stringify(body) : undefined,
+      body: isPost ? JSON.stringify(body) : undefined,
       signal: controller.signal,
     });
-    const json = await res.json();
+    const text = await res.text();
+    if (!text) {
+      if (!res.ok) {
+        throw new Error(`Request failed with empty response (${res.status})`);
+      }
+      return { success: true };
+    }
+    let json: Record<string, unknown>;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      throw new Error(`Invalid JSON response from server (${res.status})`);
+    }
     if (!res.ok) {
-      throw new Error(json.error ?? `Request failed (${res.status})`);
+      throw new Error(
+        (typeof json.error === "string" ? json.error : null) ??
+          `Request failed (${res.status})`
+      );
     }
     return json;
   } catch (err) {
@@ -122,8 +138,10 @@ export default function TestPayoutSandboxPage() {
         apiCall("/api/payout/test/balance"),
         apiCall("/api/payout/test/requests"),
       ]);
-      if (balRes.balance) setBalance(balRes.balance);
-      if (reqRes.requests) setRequests(reqRes.requests);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- sandbox API returns dynamic shapes
+      if (balRes.balance) setBalance(balRes.balance as any);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (reqRes.requests) setRequests(reqRes.requests as any);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Failed to load test sandbox data";
       setError(msg);
@@ -213,7 +231,7 @@ export default function TestPayoutSandboxPage() {
     setError(null);
     setSuccess(null);
     try {
-      await apiCall("/api/payout/test/reset");
+      await apiCall("/api/payout/test/reset", {});
       await refresh();
       setSuccess("Test sandbox reset. No production data was affected.");
     } catch (e) {
