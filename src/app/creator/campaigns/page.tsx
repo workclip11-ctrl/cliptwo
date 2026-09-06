@@ -73,20 +73,30 @@ export default function CreatorCampaignsPage() {
                      </span>
                     <span
                       className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium ${
-                        c.status === "open"
+                        c.status === "open" && c.launchPaymentStatus === "verified"
                           ? "border-green/20 bg-green/10 text-green"
-                          : c.status === "draft"
-                            ? "border-amber/30 bg-amber/10 text-amber"
-                            : "border-muted/20 bg-accent-soft text-muted"
+                          : c.status === "draft" && c.launchPaymentStatus === "submitted"
+                            ? "border-blue/30 bg-blue/10 text-blue"
+                            : c.status === "draft" && c.launchPaymentStatus === "rejected"
+                              ? "border-red/30 bg-red/10 text-red"
+                              : c.status === "draft"
+                                ? "border-amber/30 bg-amber/10 text-amber"
+                                : "border-muted/20 bg-accent-soft text-muted"
                       }`}
                     >
-                      {c.status === "open"
-                        ? "Open"
-                        : c.status === "draft"
-                          ? "Draft"
-                          : c.status === "paused"
-                            ? "Paused"
-                            : "Closed"}
+                      {c.status === "open" && c.launchPaymentStatus === "verified"
+                        ? "Published"
+                        : c.status === "draft" && c.launchPaymentStatus === "submitted"
+                          ? "Payment pending"
+                          : c.status === "draft" && c.launchPaymentStatus === "rejected"
+                            ? "Payment rejected"
+                            : c.status === "draft"
+                              ? "Payment required"
+                              : c.status === "paused"
+                                ? "Paused"
+                                : c.status === "open"
+                                  ? "Open"
+                                  : "Closed"}
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-muted">

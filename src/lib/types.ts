@@ -9,6 +9,12 @@ export type CampaignStatus =
   | "budget_reached"
   | "near_budget";
 
+export type LaunchPaymentStatus =
+  | "pending"
+  | "submitted"
+  | "verified"
+  | "rejected";
+
 export interface CampaignSourceAsset {
   label: string;
   url: string;
@@ -95,6 +101,26 @@ export interface Campaign {
   style?: string;
   rights?: CampaignRights;
   audit?: AuditEntry[];
+  launchPaymentStatus?: LaunchPaymentStatus;
+}
+
+export interface CampaignLaunchPayment {
+  id: string;
+  campaignId: string;
+  creatorId: string;
+  campaignBudgetRupees: number;
+  platformFeePaise: number;
+  totalPayablePaise: number;
+  paymentStatus: LaunchPaymentStatus;
+  utrReference?: string;
+  rejectionReason?: string;
+  submittedAt?: string;
+  verifiedAt?: string;
+  verifiedBy?: string;
+  rejectedAt?: string;
+  rejectedBy?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ── Clip moderation status (content review only, no financial meaning) ──────
@@ -305,6 +331,9 @@ export type AuditAction =
   | "campaign_paused"
   | "campaign_ended"
   | "campaign_closed"
+  | "campaign_payment_submitted"
+  | "campaign_payment_verified"
+  | "campaign_payment_rejected"
   | "clip_approved"
   | "clip_rejected"
   | "clip_held"

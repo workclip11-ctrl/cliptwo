@@ -31,7 +31,9 @@ export default function ClipperPage() {
   const myClips = clips.filter((k) => k.userId && k.userId === user?.id);
   const myAccounts = socialAccounts.filter((a) => a.userId && a.userId === user?.id);
   const fin = financeOf(financeRecords, (r) => r.clipperId === user?.id);
-  const openCampaigns = campaigns.filter((c) => c.status === "open");
+  const openCampaigns = campaigns.filter(
+    (c) => c.status === "open" && c.launchPaymentStatus === "verified",
+  );
   const earnings = fin.total / 100;
   const approvedCount = fin.totalCount;
   const pendingCount = fin.pendingCount;

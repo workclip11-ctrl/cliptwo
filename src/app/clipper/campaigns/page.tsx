@@ -38,8 +38,11 @@ export default function ClipperCampaignsPage() {
   }, [campaigns]);
 
   const list = useMemo(() => {
+    // Only show campaigns that are open AND have verified launch payment
     const active = campaigns.filter(
-      (c) => c.status === "open" || c.status === "near_budget",
+      (c) =>
+        (c.status === "open" || c.status === "near_budget") &&
+        c.launchPaymentStatus === "verified",
     );
 
     const filtered = active.filter((c) => {

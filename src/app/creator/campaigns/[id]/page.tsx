@@ -9,6 +9,7 @@ import {
   Play,
   Ban,
   Wallet,
+  Clock,
   ArrowLeft,
   ExternalLink,
   Film,
@@ -150,6 +151,23 @@ export default function CreatorCampaignDetailPage() {
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-semibold tracking-tight">{camp.title}</h1>
             <StatusPill status={camp.status} />
+            {camp.launchPaymentStatus && camp.launchPaymentStatus !== "verified" && (
+              <span
+                className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${
+                  camp.launchPaymentStatus === "submitted"
+                    ? "border-blue/30 bg-blue/10 text-blue"
+                    : camp.launchPaymentStatus === "rejected"
+                      ? "border-red/30 bg-red/10 text-red"
+                      : "border-amber/30 bg-amber/10 text-amber"
+                }`}
+              >
+                {camp.launchPaymentStatus === "submitted"
+                  ? "Payment pending"
+                  : camp.launchPaymentStatus === "rejected"
+                    ? "Payment rejected"
+                    : "Payment required"}
+              </span>
+            )}
           </div>
           <p className="mt-1 text-sm text-muted">
             {camp.category ?? camp.niche ?? "Campaign"} · {camp.platform}
@@ -252,6 +270,55 @@ export default function CreatorCampaignDetailPage() {
           </p>
         )}
       </div>
+
+      {/* Launch payment status (for draft campaigns) */}
+      {isDraft && camp.launchPaymentStatus && (
+        <div
+          className={`rounded-2xl border p-4 ${
+            camp.launchPaymentStatus === "submitted"
+              ? "border-blue/30 bg-blue/5"
+              : camp.launchPaymentStatus === "rejected"
+                ? "border-red/30 bg-red/5"
+                : "border-amber/30 bg-amber/5"
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className={`rounded-full p-2 ${
+                camp.launchPaymentStatus === "submitted"
+                  ? "bg-blue/10"
+                  : camp.launchPaymentStatus === "rejected"
+                    ? "bg-red/10"
+                    : "bg-amber/10"
+              }`}
+            >
+              {camp.launchPaymentStatus === "submitted" ? (
+                <Clock size={16} className="text-blue" />
+              ) : camp.launchPaymentStatus === "rejected" ? (
+                <Ban size={16} className="text-red" />
+              ) : (
+                <Wallet size={16} className="text-amber" />
+              )}
+            </div>
+            <div>
+              <p className="text-sm font-medium">
+                {camp.launchPaymentStatus === "submitted"
+                  ? "Payment verification pending"
+                  : camp.launchPaymentStatus === "rejected"
+                    ? "Payment rejected — please resubmit"
+                    : "Payment required to publish"}
+              </p>
+              <p className="text-xs text-muted">
+                {camp.launchPaymentStatus === "submitted"
+                  ? "Your campaign will be published after admin verifies your payment."
+                  : camp.launchPaymentStatus === "rejected"
+                    ? "Contact admin or resubmit payment from the campaign creation page."
+                    : `Pay ${rup((budget ?? 0) + Math.floor((budget ?? 0) * 0.10))} to publish this campaign.`}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Performance */}
       <section className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">

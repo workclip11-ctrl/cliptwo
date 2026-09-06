@@ -16,6 +16,8 @@ import {
   ImageIcon,
   File,
   Link as LinkIcon,
+  CreditCard,
+  Clock,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
@@ -112,6 +114,15 @@ export default function NewCampaignWizard() {
   const [brandPreview, setBrandPreview] = useState("");
   const [brandUploading, setBrandUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Payment flow state
+  const [paymentPhase, setPaymentPhase] = useState<
+    "none" | "showing" | "submitted" | "error"
+  >("none");
+  const [createdCampaignId, setCreatedCampaignId] = useState<string>("");
+  const [utrReference, setUtrReference] = useState("");
+  const [paymentError, setPaymentError] = useState("");
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
 
   // Step 3
   const [platforms, setPlatforms] = useState<Platform[]>([]);
@@ -268,8 +279,6 @@ export default function NewCampaignWizard() {
     setIsSubmitting(true);
     try {
       // Upload files to storage before creating the campaign
-      // Generate a temporary campaign ID for storage path; the real campaign
-      // will be created with this ID via the create_campaign RPC.
       const tempCampaignId = crypto.randomUUID();
       const uploadedSourceAssets: CampaignSourceAsset[] = [];
       const uploadedThumbnails: string[] = [];
@@ -298,36 +307,66 @@ export default function NewCampaignWizard() {
         if (url) uploadedBrandAssets.push({ label: brandFile.name, url });
       }
 
-      // Await campaign creation — do not show success until RPC succeeds
-      // Pass tempCampaignId so the RPC creates the campaign with the same ID
-      // used for storage path consistency.
+      // When publishing: create as draft, then show payment screen
+      // The campaign will be published after admin verifies the launch payment
       const createdId = await addCampaign(
         buildCampaign({
           sourceAssets: uploadedSourceAssets,
           thumbnails: uploadedThumbnails,
           brandAssets: uploadedBrandAssets,
         }),
-        status,
+        status === "open" ? "draft" : status,
         tempCampaignId,
       );
 
       if (createdId) {
-        setSavedMsg(
-          status === "draft"
-            ? "Draft saved. You can finish and publish it later."
-            : "Campaign published.",
-        );
-        setTimeout(() => router.push("/creator/campaigns"), 900);
+        if (status === "open") {
+          // Show payment screen for launch fee
+          setCreatedCampaignId(createdId);
+          setPaymentPhase("showing");
+        } else {
+          setSavedMsg("Draft saved. You can finish and publish it later.");
+          setTimeout(() => router.push("/creator/campaigns"), 900);
+        }
       }
     } catch (err) {
-      // Campaign creation failed — keep user on page, show real error.
-      // Optimistic campaign already removed by store.addCampaign on failure.
       console.error("Campaign creation failed:", err);
       setErrors({
         submit: err instanceof Error ? err.message : "Campaign creation failed. Please try again.",
       });
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function submitPayment() {
+    if (isSubmittingPayment || !utrReference.trim()) return;
+    setIsSubmittingPayment(true);
+    setPaymentError("");
+
+    try {
+      const res = await fetch("/api/campaigns/payment/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          campaignId: createdCampaignId,
+          utrReference: utrReference.trim(),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Payment submission failed");
+      }
+
+      setPaymentPhase("submitted");
+    } catch (err) {
+      setPaymentError(
+        err instanceof Error ? err.message : "Payment submission failed. Please try again.",
+      );
+    } finally {
+      setIsSubmittingPayment(false);
     }
   }
 
@@ -344,6 +383,160 @@ export default function NewCampaignWizard() {
   const cpm = Number(payout) || 0;
   const bud = Number(budget) || 0;
   const potentialViews = cpm > 0 ? Math.round((bud / cpm) * 1000) : 0;
+
+  // ── Payment screens ─────────────────────────────────────────────────────
+  if (paymentPhase === "showing") {
+    const budgetRupees = Number(budget) || 0;
+    const platformFeeRupees = Math.floor(budgetRupees * 0.10);
+    const totalPayableRupees = budgetRupees + platformFeeRupees;
+
+    return (
+      <div className="mx-auto max-w-2xl space-y-6">
+        <button
+          type="button"
+          onClick={() => setPaymentPhase("none")}
+          className="inline-flex items-center gap-1 text-sm text-muted hover:text-foreground"
+        >
+          <ArrowLeft size={14} /> Back to campaign
+        </button>
+
+        <div className="rounded-2xl border bg-card p-6 space-y-6">
+          <div className="flex items-center gap-3">
+            <CreditCard size={24} className="text-accent" />
+            <div>
+              <h2 className="text-lg font-semibold">Campaign Launch Payment</h2>
+              <p className="text-sm text-muted">
+                Pay the platform fee to publish your campaign
+              </p>
+            </div>
+          </div>
+
+          {/* Payment summary */}
+          <div className="space-y-3 rounded-xl border bg-background p-4">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted">Campaign budget</span>
+              <span className="font-mono font-medium">{rup(budgetRupees)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted">Cliptwo platform fee (10%)</span>
+              <span className="font-mono font-medium">{rup(platformFeeRupees)}</span>
+            </div>
+            <div className="border-t pt-3 flex justify-between">
+              <span className="font-medium">Total to pay</span>
+              <span className="font-mono text-lg font-semibold">{rup(totalPayableRupees)}</span>
+            </div>
+          </div>
+
+          <p className="text-xs text-muted">
+            To publish this campaign, a 10% Cliptwo platform fee is charged in
+            addition to your campaign budget. Your {rup(budgetRupees)} campaign
+            budget remains fully allocated for clipper campaign payouts.
+          </p>
+
+          {/* QR Code placeholder */}
+          <div className="flex flex-col items-center gap-4 rounded-xl border bg-background p-6">
+            <p className="text-sm font-medium">
+              Pay {rup(totalPayableRupees)} using the QR code below
+            </p>
+            <div className="flex h-48 w-48 items-center justify-center rounded-lg border-2 border-dashed bg-muted/10">
+              <div className="text-center text-muted">
+                <CreditCard size={32} className="mx-auto mb-2 opacity-50" />
+                <p className="text-xs">UPI QR Code</p>
+                <p className="text-[10px]">Contact admin for UPI ID</p>
+              </div>
+            </div>
+            <p className="text-xs text-muted">
+              After completing the payment, enter your UTR / transaction reference below
+            </p>
+          </div>
+
+          {/* UTR Input */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">UTR / Transaction Reference</label>
+            <input
+              className={inputCls}
+              value={utrReference}
+              onChange={(e) => setUtrReference(e.target.value)}
+              placeholder="Enter UTR or transaction reference number"
+            />
+          </div>
+
+          {paymentError && (
+            <p className="text-sm text-red">{paymentError}</p>
+          )}
+
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setPaymentPhase("none")}
+              className="flex-1 rounded-lg border px-4 py-2.5 text-sm font-medium hover:bg-accent-soft"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={submitPayment}
+              disabled={isSubmittingPayment || !utrReference.trim()}
+              className="flex-1 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {isSubmittingPayment ? "Submitting..." : "I've Paid — Submit for Verification"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (paymentPhase === "submitted") {
+    const budgetRupees = Number(budget) || 0;
+    const platformFeeRupees = Math.floor(budgetRupees * 0.10);
+    const totalPayableRupees = budgetRupees + platformFeeRupees;
+
+    return (
+      <div className="mx-auto max-w-2xl space-y-6">
+        <div className="rounded-2xl border bg-card p-6 space-y-6">
+          <div className="flex flex-col items-center gap-3 text-center">
+            <div className="rounded-full bg-accent/10 p-3">
+              <Clock size={32} className="text-accent" />
+            </div>
+            <h2 className="text-lg font-semibold">Payment Submitted</h2>
+            <p className="text-sm text-muted">
+              Your campaign will be published after Cliptwo verifies your payment.
+            </p>
+          </div>
+
+          <div className="space-y-3 rounded-xl border bg-background p-4">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted">Amount paid</span>
+              <span className="font-mono font-medium">{rup(totalPayableRupees)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted">UTR / Reference</span>
+              <span className="font-mono text-xs">{utrReference}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted">Submitted</span>
+              <span className="text-xs">{new Date().toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted">Status</span>
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600">
+                <Clock size={12} /> Pending verification
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => router.push("/creator/campaigns")}
+            className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white"
+          >
+            Go to My Campaigns
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">

@@ -22,6 +22,7 @@ import type {
   ClipStatus,
   ClipEngagement,
   AuditEntry,
+  LaunchPaymentStatus,
   Platform,
   Profile,
   ProfileRole,
@@ -1167,6 +1168,9 @@ function mapCampaign(r: Record<string, unknown>): Campaign {
         ? (r.rights as CampaignRights)
         : undefined,
     audit: Array.isArray(r.audit) ? (r.audit as AuditEntry[]) : undefined,
+    launchPaymentStatus: r.launch_payment_status
+      ? (r.launch_payment_status as LaunchPaymentStatus)
+      : undefined,
   };
 }
 
@@ -1502,12 +1506,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         // rejected in production (Supabase enforces NOT NULL via RPC).
         // If campaignId is provided, use it (allows pre-specifying for storage path consistency).
         const campaignIdValue = campaignId ?? `c${Date.now()}`;
+        // If publishing (status=open), RPC will set status to draft and launch_payment_status to pending
+        const effectiveStatus = status === "open" ? "draft" : status;
         const optimistic: Campaign = {
           ...c,
           id: campaignIdValue,
           createdAt: Date.now(),
-          status,
+          status: effectiveStatus,
           created_by: c.created_by,
+          launchPaymentStatus: status === "open" ? "pending" : "pending",
         };
         setState((s) => ({ ...s, campaigns: [optimistic, ...s.campaigns] }));
 
