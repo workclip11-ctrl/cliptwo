@@ -70,16 +70,28 @@ async function apiCall(path: string, body?: Record<string, unknown>) {
       headers = { ...headers, Authorization: `Bearer ${token}` };
     }
   }
-  const res = await fetch(path, {
-    method: body ? "POST" : "GET",
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const json = await res.json();
-  if (!res.ok) {
-    throw new Error(json.error ?? `Request failed (${res.status})`);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  try {
+    const res = await fetch(path, {
+      method: body ? "POST" : "GET",
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.error ?? `Request failed (${res.status})`);
+    }
+    return json;
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error("Request timed out — server may be unresponsive");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
-  return json;
 }
 
 export default function TestPayoutSandboxPage() {
@@ -164,12 +176,14 @@ export default function TestPayoutSandboxPage() {
     setSuccess(null);
     try {
       await apiCall("/api/payout/test/process", { requestId });
-      await refresh();
       setSuccess("Test payout moved to processing");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to process test payout");
       setSuccess(null);
-    } finally { setProcessingId(null); }
+    } finally {
+      setProcessingId(null);
+      refresh().catch(() => {});
+    }
   };
 
   const handleComplete = async (requestId: string) => {
@@ -183,12 +197,14 @@ export default function TestPayoutSandboxPage() {
     try {
       await apiCall("/api/payout/test/complete", { requestId, paymentReference: utrInput.trim() });
       setUtrInput("");
-      await refresh();
       setSuccess("Test payout marked as paid");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to complete test payout");
       setSuccess(null);
-    } finally { setCompletingId(null); }
+    } finally {
+      setCompletingId(null);
+      refresh().catch(() => {});
+    }
   };
 
   const handleReset = async () => {

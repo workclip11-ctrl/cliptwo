@@ -190,10 +190,12 @@ BEGIN
     admin_user_id, amount_paise, status, upi_id, audit
   ) VALUES (
     v_admin_id, p_amount_paise, 'pending', p_upi_id,
-    jsonb_build_object(
-      'action', 'test_created',
-      'by', (SELECT email FROM public.profiles WHERE id = v_admin_id),
-      'at', now()
+    jsonb_build_array(
+      jsonb_build_object(
+        'action', 'test_created',
+        'by', (SELECT email FROM public.profiles WHERE id = v_admin_id),
+        'at', now()::text
+      )
     )
   )
   RETURNING to_jsonb(payout_test_requests.*) INTO v_result;
@@ -225,10 +227,12 @@ BEGIN
   UPDATE public.payout_test_requests SET
     status = 'processing',
     processing_at = now(),
-    audit = coalesce(audit, '[]'::jsonb) || jsonb_build_object(
-      'action', 'test_processing',
-      'by', (SELECT email FROM public.profiles WHERE id = auth.uid()),
-      'at', now()
+    audit = coalesce(audit, '[]'::jsonb) || jsonb_build_array(
+      jsonb_build_object(
+        'action', 'test_processing',
+        'by', (SELECT email FROM public.profiles WHERE id = auth.uid()),
+        'at', now()::text
+      )
     )
   WHERE id = p_request_id AND status = 'pending'
     AND admin_user_id = auth.uid()
@@ -277,11 +281,13 @@ BEGIN
     status = 'paid',
     payment_reference = trim(p_payment_reference),
     paid_at = now(),
-    audit = coalesce(audit, '[]'::jsonb) || jsonb_build_object(
-      'action', 'test_paid',
-      'by', (SELECT email FROM public.profiles WHERE id = auth.uid()),
-      'at', now(),
-      'payment_reference', trim(p_payment_reference)
+    audit = coalesce(audit, '[]'::jsonb) || jsonb_build_array(
+      jsonb_build_object(
+        'action', 'test_paid',
+        'by', (SELECT email FROM public.profiles WHERE id = auth.uid()),
+        'at', now()::text,
+        'payment_reference', trim(p_payment_reference)
+      )
     )
   WHERE id = p_request_id AND status = 'processing'
     AND admin_user_id = auth.uid()
@@ -317,7 +323,20 @@ BEGIN
     RAISE EXCEPTION 'Only admins can access the payout test sandbox';
   END IF;
 
-  SELECT coalesce(jsonb_agg(r.*), '[]'::jsonb) INTO v_result
+  SELECT coalesce(jsonb_agg(
+    jsonb_build_object(
+      'id', r.id,
+      'admin_user_id', r.admin_user_id,
+      'amount_paise', r.amount_paise,
+      'status', r.status,
+      'upi_id', r.upi_id,
+      'payment_reference', r.payment_reference,
+      'created_at', r.created_at,
+      'processing_at', r.processing_at,
+      'paid_at', r.paid_at,
+      'audit', r.audit
+    )
+  ), '[]'::jsonb) INTO v_result
   FROM (
     SELECT * FROM public.payout_test_requests
     WHERE admin_user_id = auth.uid()
