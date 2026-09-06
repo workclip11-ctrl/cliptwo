@@ -5,6 +5,10 @@
 // SECURITY: Tokens are NEVER returned to the browser. All token operations
 // happen server-side via API routes that use service_role.
 //
+// Instagram: Uses Instagram API with Instagram Login path (graph.instagram.com)
+// for profile/media endpoints. Token exchange still goes through Facebook's
+// OAuth endpoints (same for both Instagram Login and Facebook Login paths).
+//
 // Kick: No public OAuth API available yet. The provider throws if called.
 // ---------------------------------------------------------------------------
 
@@ -77,7 +81,23 @@ export interface SocialProvider {
   }>;
 }
 
-// ── Instagram (Meta Graph API) ──────────────────────────────────────────────
+// ── Instagram (Instagram API with Instagram Login) ──────────────────────────
+//
+// Uses Instagram Login path (graph.instagram.com) for profile, media, and
+// insights endpoints. Token exchange goes through Facebook's OAuth endpoints
+// which is the correct flow for Instagram Login as well.
+//
+// Permissions:
+//   - instagram_business_basic: read profile, media, comments, mentions
+//   - instagram_business_manage_insights: read account and media analytics
+//
+// Token lifecycle:
+//   - Short-lived token (1 hour) from OAuth code exchange
+// - Long-lived token (60 days) via fb_exchange_token grant
+//   - Refresh long-lived token via ig_refresh_token grant (another 60 days)
+//
+// Current Graph API version: v18.0
+// ---------------------------------------------------------------------------
 
 class InstagramProvider implements SocialProvider {
   platform: Platform = "Instagram";
@@ -102,8 +122,8 @@ class InstagramProvider implements SocialProvider {
     return `${base}/api/social/oauth/callback/instagram`;
   }
 
-  getAuthorizationUrl(userId: string, state: string): OAuthInitResult {
-    const scopes = ["instagram_basic", "instagram_content_publish"];
+  getAuthorizationUrl(_userId: string, state: string): OAuthInitResult {
+    const scopes = ["instagram_business_basic", "instagram_business_manage_insights"];
     const params = new URLSearchParams({
       client_id: this.clientId,
       redirect_uri: this.redirectUri,
@@ -113,7 +133,7 @@ class InstagramProvider implements SocialProvider {
     });
 
     return {
-      authorizationUrl: `https://www.facebook.com/v19.0/dialog/oauth?${params.toString()}`,
+      authorizationUrl: `https://www.facebook.com/v18.0/dialog/oauth?${params.toString()}`,
       state,
     };
   }
@@ -123,9 +143,9 @@ class InstagramProvider implements SocialProvider {
     _state: string,
     _codeVerifier?: string,
   ): Promise<OAuthCallbackResult> {
-    // 1. Exchange code for short-lived token
+    // 1. Exchange code for short-lived token (Facebook OAuth endpoint)
     const tokenRes = await fetch(
-      "https://graph.facebook.com/v19.0/oauth/access_token",
+      "https://graph.facebook.com/v18.0/oauth/access_token",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -147,9 +167,9 @@ class InstagramProvider implements SocialProvider {
 
     const tokenData = await tokenRes.json();
 
-    // 2. Exchange for long-lived token
+    // 2. Exchange for long-lived token (Facebook OAuth endpoint, fb_exchange_token grant)
     const longTokenRes = await fetch(
-      `https://graph.facebook.com/v19.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${this.clientId}&client_secret=${this.clientSecret}&fb_exchange_token=${tokenData.access_token}`,
+      `https://graph.facebook.com/v18.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${this.clientId}&client_secret=${this.clientSecret}&fb_exchange_token=${tokenData.access_token}`,
     );
 
     let accessToken = tokenData.access_token;
@@ -161,15 +181,23 @@ class InstagramProvider implements SocialProvider {
       expiresIn = longData.expires_in;
     }
 
-    // 3. Fetch user profile
+    // 3. Fetch user profile via Instagram API (graph.instagram.com)
     const profileRes = await fetch(
-      `https://graph.facebook.com/v19.0/me?fields=id,username&access_token=${accessToken}`,
+      `https://graph.instagram.com/me?fields=id,username&access_token=${accessToken}`,
     );
+
+    if (!profileRes.ok) {
+      const err = await profileRes.json().catch(() => ({}));
+      throw new Error(
+        `Instagram profile fetch failed: ${err.error?.message ?? profileRes.statusText}`,
+      );
+    }
+
     const profile = await profileRes.json();
 
     return {
       accessToken,
-      refreshToken: null, // Instagram doesn't provide refresh tokens
+      refreshToken: null, // Instagram uses long-lived token refresh, not refresh tokens
       expiresIn,
       scope: tokenData.scope ?? "",
       providerAccountId: profile.id,
@@ -183,7 +211,7 @@ class InstagramProvider implements SocialProvider {
   ): Promise<OwnershipVerificationResult> {
     try {
       const res = await fetch(
-        `https://graph.facebook.com/v19.0/me?fields=id,username&access_token=${accessToken}`,
+        `https://graph.instagram.com/me?fields=id,username&access_token=${accessToken}`,
       );
       if (!res.ok) {
         return {
@@ -215,12 +243,36 @@ class InstagramProvider implements SocialProvider {
   }
 
   async refreshToken(refreshToken: string): Promise<TokenRefreshResult> {
-    void refreshToken;
-    throw new Error("Instagram token refresh not implemented — reconnect required");
+    // Instagram Login uses ig_refresh_token grant to refresh long-lived tokens.
+    // The "refreshToken" parameter here is actually the long-lived access token.
+    // Instagram doesn't use separate refresh tokens — the long-lived token itself
+    // can be refreshed via the ig_refresh_token grant type.
+    const res = await fetch(
+      `https://graph.instagram.com/access_token?grant_type=ig_refresh_token&client_secret=${this.clientSecret}&access_token=${refreshToken}`,
+    );
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(
+        `Instagram token refresh failed: ${err.error?.message ?? res.statusText}`,
+      );
+    }
+
+    const data = await res.json();
+
+    return {
+      accessToken: data.access_token,
+      refreshToken: null, // Instagram doesn't use separate refresh tokens
+      expiresIn: data.expires_in,
+    };
   }
 
   async revokeToken(accessToken: string): Promise<void> {
+    // Instagram Login does not provide a direct token revocation endpoint.
+    // We clear the local token storage. The token will expire naturally
+    // (60 days for long-lived tokens).
     void accessToken;
+    // No API call — Meta does not provide a revoke endpoint for Instagram Login tokens.
   }
 
   async getProfile(accessToken: string): Promise<{
@@ -229,7 +281,7 @@ class InstagramProvider implements SocialProvider {
     providerAccountId: string;
   }> {
     const res = await fetch(
-      `https://graph.facebook.com/v19.0/me?fields=id,username&access_token=${accessToken}`,
+      `https://graph.instagram.com/me?fields=id,username&access_token=${accessToken}`,
     );
     const profile = await res.json();
     return {

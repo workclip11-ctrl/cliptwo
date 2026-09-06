@@ -136,56 +136,90 @@ export async function POST(request: Request) {
 
         let accessToken = decryptToken(connection.access_token_enc);
 
-        // Token refresh: if expired, try to refresh using the refresh token
+        // Token refresh: if expired, try to refresh using the provider's mechanism
         if (isTokenExpired(connection.expires_at)) {
-          const { data: connFull } = await adminClient
-            .from("social_connections")
-            .select("refresh_token_enc")
-            .eq("social_account_id", socialAccount.id)
-            .single();
+          // Instagram uses ig_refresh_token grant — the access token itself is used
+          // to generate a new long-lived token. No separate refresh token exists.
+          if (clipPlatform === "Instagram") {
+            try {
+              const provider = getProvider(clipPlatform);
+              const refreshed = await provider.refreshToken(accessToken);
 
-          if (!connFull?.refresh_token_enc) {
-            results.push({
-              clipId: cid,
-              status: "skipped",
-              error: `${clipPlatform} token expired and no refresh token available — reconnect the account`,
-            });
-            continue;
-          }
+              await adminClient
+                .from("social_connections")
+                .update({
+                  access_token_enc: encryptToken(refreshed.accessToken),
+                  expires_at: new Date(Date.now() + refreshed.expiresIn * 1000).toISOString(),
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("social_account_id", socialAccount.id);
 
-          try {
-            const refreshToken = decryptToken(connFull.refresh_token_enc);
-            const provider = getProvider(clipPlatform);
-            const refreshed = await provider.refreshToken(refreshToken);
+              accessToken = refreshed.accessToken;
+            } catch {
+              await adminClient
+                .from("social_accounts")
+                .update({ status: "connection_error", error: "Token refresh failed — reconnect required" })
+                .eq("id", socialAccount.id)
+                .eq("user_id", clip.user_id);
 
-            // Persist the new encrypted tokens
-            await adminClient
+              results.push({
+                clipId: cid,
+                status: "skipped",
+                error: "Instagram token refresh failed — reconnect the account",
+              });
+              continue;
+            }
+          } else {
+            // YouTube and other platforms use separate refresh tokens
+            const { data: connFull } = await adminClient
               .from("social_connections")
-              .update({
-                access_token_enc: encryptToken(refreshed.accessToken),
-                refresh_token_enc: refreshed.refreshToken
-                  ? encryptToken(refreshed.refreshToken)
-                  : connFull.refresh_token_enc,
-                expires_at: new Date(Date.now() + refreshed.expiresIn * 1000).toISOString(),
-                updated_at: new Date().toISOString(),
-              })
-              .eq("social_account_id", socialAccount.id);
+              .select("refresh_token_enc")
+              .eq("social_account_id", socialAccount.id)
+              .single();
 
-            accessToken = refreshed.accessToken;
-          } catch {
-            // Mark connection as needing reconnect
-            await adminClient
-              .from("social_accounts")
-              .update({ status: "connection_error", error: "Token refresh failed — reconnect required" })
-              .eq("id", socialAccount.id)
-              .eq("user_id", clip.user_id);
+            if (!connFull?.refresh_token_enc) {
+              results.push({
+                clipId: cid,
+                status: "skipped",
+                error: `${clipPlatform} token expired and no refresh token available — reconnect the account`,
+              });
+              continue;
+            }
 
-            results.push({
-              clipId: cid,
-              status: "skipped",
-              error: `${clipPlatform} token refresh failed — reconnect the account`,
-            });
-            continue;
+            try {
+              const refreshToken = decryptToken(connFull.refresh_token_enc);
+              const provider = getProvider(clipPlatform);
+              const refreshed = await provider.refreshToken(refreshToken);
+
+              // Persist the new encrypted tokens
+              await adminClient
+                .from("social_connections")
+                .update({
+                  access_token_enc: encryptToken(refreshed.accessToken),
+                  refresh_token_enc: refreshed.refreshToken
+                    ? encryptToken(refreshed.refreshToken)
+                    : connFull.refresh_token_enc,
+                  expires_at: new Date(Date.now() + refreshed.expiresIn * 1000).toISOString(),
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("social_account_id", socialAccount.id);
+
+              accessToken = refreshed.accessToken;
+            } catch {
+              // Mark connection as needing reconnect
+              await adminClient
+                .from("social_accounts")
+                .update({ status: "connection_error", error: "Token refresh failed — reconnect required" })
+                .eq("id", socialAccount.id)
+                .eq("user_id", clip.user_id);
+
+              results.push({
+                clipId: cid,
+                status: "skipped",
+                error: `${clipPlatform} token refresh failed — reconnect the account`,
+              });
+              continue;
+            }
           }
         }
 
