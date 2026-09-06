@@ -62,17 +62,21 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 async function apiCall(path: string, body?: Record<string, unknown>) {
-  let headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (isSupabaseConfigured) {
-    const { data } = await supabase.auth.getSession();
-    const token = data.session?.access_token;
-    if (token) {
-      headers = { ...headers, Authorization: `Bearer ${token}` };
-    }
-  }
   const isPost = body !== undefined;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000);
+  let headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (isSupabaseConfigured) {
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (token) {
+        headers = { ...headers, Authorization: `Bearer ${token}` };
+      }
+    } catch {
+      //getSession failed — proceed without auth header; server will 401 if needed
+    }
+  }
   try {
     const res = await fetch(path, {
       method: isPost ? "POST" : "GET",
@@ -192,16 +196,19 @@ export default function TestPayoutSandboxPage() {
     setProcessingId(requestId);
     setError(null);
     setSuccess(null);
+    let safetyTimer: ReturnType<typeof setTimeout> | null = null;
     try {
+      safetyTimer = setTimeout(() => setProcessingId(null), 35000);
       await apiCall("/api/payout/test/process", { requestId });
       setSuccess("Test payout moved to processing");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to process test payout");
       setSuccess(null);
     } finally {
+      if (safetyTimer) clearTimeout(safetyTimer);
       setProcessingId(null);
-      refresh().catch(() => {});
     }
+    refresh().catch(() => {});
   };
 
   const handleComplete = async (requestId: string) => {
@@ -212,7 +219,9 @@ export default function TestPayoutSandboxPage() {
     setCompletingId(requestId);
     setError(null);
     setSuccess(null);
+    let safetyTimer: ReturnType<typeof setTimeout> | null = null;
     try {
+      safetyTimer = setTimeout(() => setCompletingId(null), 35000);
       await apiCall("/api/payout/test/complete", { requestId, paymentReference: utrInput.trim() });
       setUtrInput("");
       setSuccess("Test payout marked as paid");
@@ -220,9 +229,10 @@ export default function TestPayoutSandboxPage() {
       setError(e instanceof Error ? e.message : "Failed to complete test payout");
       setSuccess(null);
     } finally {
+      if (safetyTimer) clearTimeout(safetyTimer);
       setCompletingId(null);
-      refresh().catch(() => {});
     }
+    refresh().catch(() => {});
   };
 
   const handleReset = async () => {
