@@ -1,8 +1,21 @@
 -- ===========================================================================
--- QUICK FIX: Insert cron secrets + sync lock table
+-- QUICK FIX: Create sync lock infrastructure
 -- ===========================================================================
 -- Run this AFTER you have run auto-metrics-sync.sql
 -- If auto-metrics-sync.sql already created these, this is idempotent.
+--
+-- CRON_SECRET CONFIGURATION (do NOT hardcode secrets in this file):
+--
+--   After running this migration, configure your cron secret via the
+--   Supabase SQL Editor (Dashboard → SQL Editor):
+--
+--   INSERT INTO app_settings (key, value)
+--   VALUES ('cron_secret', 'YOUR_SECRET_HERE'), ('base_url', 'https://cliptwo.vercel.app')
+--   ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+--
+--   Use the SAME value as your Vercel CRON_SECRET environment variable.
+--   This is the ONLY place the secret is configured — it lives in the
+--   database, not in Git.
 -- ===========================================================================
 
 -- 1. Create sync_locks table if it doesn't exist
@@ -81,12 +94,10 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.renew_sync_lock(text, uuid, integer) TO service_role;
 
--- 3. Insert the cron secrets
-INSERT INTO app_settings (key, value) VALUES
-  ('cron_secret', '463c31fba17fc64ca5dbc84435f80b6298aa3516517a4bc59eddb27843aae838'),
-  ('base_url', 'https://cliptwo.vercel.app')
-ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
-
--- 4. Verify
+-- 3. Verify
+-- After running, configure your cron secret via the Supabase SQL Editor:
+--   INSERT INTO app_settings (key, value)
+--   VALUES ('cron_secret', 'YOUR_SECRET_HERE'), ('base_url', 'https://cliptwo.vercel.app')
+--   ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
 SELECT * FROM app_settings;
 SELECT * FROM sync_locks;
