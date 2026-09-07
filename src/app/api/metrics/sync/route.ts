@@ -282,6 +282,20 @@ export async function POST(request: Request) {
           username: metrics.username,
         }));
 
+        // Skip ingest if insights failed — do NOT store views=0 as verified
+        if (metrics.verificationStatus !== "verified") {
+          console.log("[IG-DIAG] #4 skipping ingest — insights not verified:", JSON.stringify({
+            clipId: cid,
+            verificationStatus: metrics.verificationStatus,
+          }));
+          results.push({
+            clipId: cid,
+            status: "skipped",
+            error: `Insights unavailable (status: ${metrics.verificationStatus}). Metrics not stored.`,
+          });
+          continue;
+        }
+
         // Store via the ingest_clip_metrics RPC (service_role-only)
         const { data: ingestResult, error: ingestError } = await adminClient.rpc(
           "ingest_clip_metrics",

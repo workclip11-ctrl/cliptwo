@@ -183,6 +183,8 @@ class InstagramMetricProvider implements MetricProvider {
     //    views is the current metric (replaced deprecated impressions/plays)
     //    Available for VIDEO and REELS, may not be available for IMAGE
     let views = 0;
+    let insightsFailed = false;
+    let _insightsErrorReason = "";
 
     try {
       const insightsRes = await fetch(
@@ -202,42 +204,52 @@ class InstagramMetricProvider implements MetricProvider {
         return typeof v === "number" ? v : 0;
       })();
 
-      const parsedLikes = likes;
-      const parsedComments = comments;
-      const parsedShares = shares;
-
       console.log("[IG-DIAG] #3 insights response:", JSON.stringify({
         mediaId,
         httpStatus: insightsRes.status,
         httpStatusText: insightsRes.statusText,
         responseBody: insightsBody,
         parsedViews,
-        parsedLikes,
-        parsedComments,
-        parsedShares,
+        likes,
+        comments,
+        shares,
         metricFound: ((insightsBody as Record<string, unknown>)?.data as Array<Record<string, unknown>> | undefined)?.some((x) => x.name === "views") ?? false,
       }));
 
       if (insightsRes.ok) {
         views = parsedViews;
       } else {
-        // views metric may not be available for image posts
-        // This is expected — not all media types support views
+        // Insights request failed — do NOT treat views=0 as verified
+        insightsFailed = true;
         const err = insightsBody as Record<string, unknown> | null;
         const errObj = err?.error as Record<string, unknown> | undefined;
-        const errCode = errObj?.code;
+        const errMsg = String(errObj?.message ?? insightsRes.statusText);
 
-        // Error 100 = parameter error (metric not supported for this media type)
-        // This is expected for IMAGE posts
-        if (errCode !== 100) {
+        // Detect specific Meta error: media posted before Business account conversion
+        if (errMsg.toLowerCase().includes("posted before") && errMsg.toLowerCase().includes("business")) {
+          _insightsErrorReason = "media_posted_before_business_conversion";
+          console.error(
+            `[instagram-metrics] Insights unavailable for ${mediaId}: ` +
+            `media was posted before this account was converted to a Business account. ` +
+            `Views cannot be retrieved for this post.`,
+          );
+        } else if (errObj?.code === 100) {
+          // Error 100 = parameter error (metric not supported for this media type)
+          // This is expected for IMAGE posts — not a failure, just N/A
+          insightsFailed = false;
+          _insightsErrorReason = "metric_not_supported_for_media_type";
+        } else {
+          _insightsErrorReason = `api_error_${insightsRes.status}: ${errMsg}`;
           console.error(
             `[instagram-metrics] Insights fetch failed for ${mediaId}:`,
-            errObj?.message ?? insightsRes.statusText,
+            errMsg,
           );
         }
       }
     } catch (e) {
-      // Network error — views stay at 0, but log it for diagnostics
+      // Network error — views stay at 0, mark as failed
+      insightsFailed = true;
+      _insightsErrorReason = `network_error: ${e instanceof Error ? e.message : String(e)}`;
       console.error("[IG-DIAG] #3 insights network error:", JSON.stringify({
         mediaId,
         error: e instanceof Error ? e.message : String(e),
@@ -252,7 +264,7 @@ class InstagramMetricProvider implements MetricProvider {
       username: media.username,
       fetchedAt: new Date(),
       source: "platform_api",
-      verificationStatus: "verified",
+      verificationStatus: insightsFailed ? "failed" : "verified",
     };
   }
 
