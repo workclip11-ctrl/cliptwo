@@ -64,16 +64,19 @@ CREATE INDEX IF NOT EXISTS idx_campaign_launch_payments_creator
 ALTER TABLE public.campaign_launch_payments ENABLE ROW LEVEL SECURITY;
 
 -- Creator: can view own payment records
+DROP POLICY IF EXISTS campaign_launch_payments_select_creator ON public.campaign_launch_payments;
 CREATE POLICY campaign_launch_payments_select_creator
   ON public.campaign_launch_payments FOR SELECT
   USING (auth.uid() = creator_id);
 
 -- Admin: can view all payment records
+DROP POLICY IF EXISTS campaign_launch_payments_select_admin ON public.campaign_launch_payments;
 CREATE POLICY campaign_launch_payments_select_admin
   ON public.campaign_launch_payments FOR SELECT
   USING (public.is_admin());
 
 -- Creator: can insert payment records for their own campaigns
+DROP POLICY IF EXISTS campaign_launch_payments_insert_creator ON public.campaign_launch_payments;
 CREATE POLICY campaign_launch_payments_insert_creator
   ON public.campaign_launch_payments FOR INSERT
   WITH CHECK (
@@ -85,12 +88,14 @@ CREATE POLICY campaign_launch_payments_insert_creator
   );
 
 -- Creator: can update own payment records (for resubmission after rejection)
+DROP POLICY IF EXISTS campaign_launch_payments_update_creator ON public.campaign_launch_payments;
 CREATE POLICY campaign_launch_payments_update_creator
   ON public.campaign_launch_payments FOR UPDATE
   USING (auth.uid() = creator_id)
   WITH CHECK (auth.uid() = creator_id);
 
 -- Admin: can update all payment records (for verification/rejection)
+DROP POLICY IF EXISTS campaign_launch_payments_update_admin ON public.campaign_launch_payments;
 CREATE POLICY campaign_launch_payments_update_admin
   ON public.campaign_launch_payments FOR UPDATE
   USING (public.is_admin());
@@ -706,6 +711,7 @@ GRANT EXECUTE ON FUNCTION public.create_campaign(
 -- The submit_clip RPC above also checks launch_payment_status = 'verified'.
 -- Additional safety: create a view for clipper campaign discovery.
 
+DROP VIEW IF EXISTS public.clipper_available_campaigns;
 CREATE OR REPLACE VIEW public.clipper_available_campaigns AS
 SELECT c.*
 FROM public.campaigns c
