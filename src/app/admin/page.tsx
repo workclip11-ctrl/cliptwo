@@ -10,6 +10,7 @@ import { useAuth } from "@/lib/auth";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { rup, fmtViews } from "@/lib/format";
 import { financeOf, campaignSpent } from "@/lib/finance";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
 
 export default function AdminDashboard() {
   const { campaigns, clips, profiles, financeRecords, refreshClips } = useStore();
@@ -29,9 +30,17 @@ export default function AdminDashboard() {
     setSyncing(true);
     setSyncResult(null);
     try {
+      let headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (isSupabaseConfigured) {
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        if (token) {
+          headers = { ...headers, Authorization: `Bearer ${token}` };
+        }
+      }
       const res = await fetch("/api/metrics/sync/admin-trigger", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Sync failed");

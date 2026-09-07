@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { rup } from "@/lib/format";
 import { useAuth } from "@/lib/auth";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
 
 interface CampaignPayment {
   id: string;
@@ -92,9 +93,17 @@ export default function AdminCampaignPayments() {
 
     setActionLoading(paymentId);
     try {
+      let headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (isSupabaseConfigured) {
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        if (token) {
+          headers = { ...headers, Authorization: `Bearer ${token}` };
+        }
+      }
       const res = await fetch("/api/campaigns/payment/verify", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ paymentId }),
       });
       const data = await res.json();
@@ -112,9 +121,17 @@ export default function AdminCampaignPayments() {
 
     setActionLoading(paymentId);
     try {
+      let headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (isSupabaseConfigured) {
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        if (token) {
+          headers = { ...headers, Authorization: `Bearer ${token}` };
+        }
+      }
       const res = await fetch("/api/campaigns/payment/reject", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ paymentId, reason: rejectReason || null }),
       });
       const data = await res.json();

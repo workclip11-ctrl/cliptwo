@@ -26,6 +26,7 @@ import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup } from "@/lib/format";
 import { uploadCampaignFile } from "@/lib/upload";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
 import type {
   Campaign,
   CampaignApproval,
@@ -348,9 +349,17 @@ export default function NewCampaignWizard() {
     setPaymentError("");
 
     try {
+      let headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (isSupabaseConfigured) {
+        const { data } = await supabase.auth.getSession();
+        const token = data.session?.access_token;
+        if (token) {
+          headers = { ...headers, Authorization: `Bearer ${token}` };
+        }
+      }
       const res = await fetch("/api/campaigns/payment/submit", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           campaignId: createdCampaignId,
           utrReference: utrReference.trim(),
