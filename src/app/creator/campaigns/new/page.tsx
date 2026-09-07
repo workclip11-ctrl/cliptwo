@@ -439,7 +439,7 @@ export default function NewCampaignWizard() {
             <div className="relative">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/payment/cliptwo-payment-qr.png"
+                src="/payment/cliptwo-payment-qr.jpg"
                 alt="Cliptwo Campaign Payment QR"
                 className="h-56 w-56 sm:h-64 sm:w-64 rounded-lg border object-contain"
               />
