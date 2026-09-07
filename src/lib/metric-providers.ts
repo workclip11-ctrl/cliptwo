@@ -101,6 +101,15 @@ class InstagramMetricProvider implements MetricProvider {
         accessToken,
       );
 
+      // DIAG LOG #1: After shortcode resolution
+      console.log("[IG-DIAG] #1 shortcode resolution:", JSON.stringify({
+        shortcode,
+        accountIdentifier,
+        resolvedMediaId: resolved?.mediaId ?? null,
+        resolvedUsername: resolved?.username ?? null,
+        found: !!resolved,
+      }));
+
       if (!resolved) {
         throw new Error(
           `Could not resolve Instagram shortcode "${shortcode}" to a media ID. ` +
@@ -151,6 +160,19 @@ class InstagramMetricProvider implements MetricProvider {
 
     const media = await mediaRes.json();
 
+    // DIAG LOG #2: After media lookup
+    console.log("[IG-DIAG] #2 media lookup:", JSON.stringify({
+      mediaId,
+      media_type: media.media_type,
+      media_product_type: media.media_product_type,
+      username: media.username,
+      permalink: media.permalink,
+      like_count: media.like_count,
+      comments_count: media.comments_count,
+      shares_count: media.shares?.count,
+      caption: media.caption?.substring(0, 80),
+    }));
+
     // 2. Fetch engagement metrics from the media object
     //    likes, comments_count, shares are on the media object directly
     const likes = media.like_count ?? 0;
@@ -167,29 +189,59 @@ class InstagramMetricProvider implements MetricProvider {
         `${InstagramMetricProvider.API_BASE}/${mediaId}/insights?metric=views&access_token=${accessToken}`,
       );
 
+      // DIAG LOG #3: After insights API request
+      let insightsBody: unknown = null;
+      try { insightsBody = await insightsRes.json(); } catch { insightsBody = "<unreadable>"; }
+
+      const parsedViews = (() => {
+        if (!insightsRes.ok) return 0;
+        const b = insightsBody as Record<string, unknown> | null;
+        const d = b?.data as Array<Record<string, unknown>> | undefined;
+        const m = d?.find((x) => x.name === "views");
+        const v = (m?.values as Array<Record<string, unknown>> | undefined)?.[0]?.value;
+        return typeof v === "number" ? v : 0;
+      })();
+
+      const parsedLikes = likes;
+      const parsedComments = comments;
+      const parsedShares = shares;
+
+      console.log("[IG-DIAG] #3 insights response:", JSON.stringify({
+        mediaId,
+        httpStatus: insightsRes.status,
+        httpStatusText: insightsRes.statusText,
+        responseBody: insightsBody,
+        parsedViews,
+        parsedLikes,
+        parsedComments,
+        parsedShares,
+        metricFound: ((insightsBody as Record<string, unknown>)?.data as Array<Record<string, unknown>> | undefined)?.some((x) => x.name === "views") ?? false,
+      }));
+
       if (insightsRes.ok) {
-        const insights = await insightsRes.json();
-        const viewsMetric = insights.data?.find(
-          (d: { name: string }) => d.name === "views",
-        );
-        views = viewsMetric?.values?.[0]?.value ?? 0;
+        views = parsedViews;
       } else {
         // views metric may not be available for image posts
         // This is expected — not all media types support views
-        const err = await insightsRes.json().catch(() => ({}));
-        const errCode = err.error?.code;
+        const err = insightsBody as Record<string, unknown> | null;
+        const errObj = err?.error as Record<string, unknown> | undefined;
+        const errCode = errObj?.code;
 
         // Error 100 = parameter error (metric not supported for this media type)
         // This is expected for IMAGE posts
         if (errCode !== 100) {
           console.error(
             `[instagram-metrics] Insights fetch failed for ${mediaId}:`,
-            err.error?.message ?? insightsRes.statusText,
+            errObj?.message ?? insightsRes.statusText,
           );
         }
       }
-    } catch {
-      // Network error — views stay at 0
+    } catch (e) {
+      // Network error — views stay at 0, but log it for diagnostics
+      console.error("[IG-DIAG] #3 insights network error:", JSON.stringify({
+        mediaId,
+        error: e instanceof Error ? e.message : String(e),
+      }));
     }
 
     return {

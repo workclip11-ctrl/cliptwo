@@ -223,8 +223,21 @@ async function handleSync(request: Request) {
               }
             }
 
+            // DIAG LOG #4: Before ingest_clip_metrics
+            console.log("[IG-DIAG] #4 before ingest:", JSON.stringify({
+              clipId: clip.id,
+              platform: clipPlatform,
+              views: metrics.views,
+              likes: metrics.likes,
+              comments: metrics.comments,
+              shares: metrics.shares,
+              source: metrics.source,
+              verificationStatus: metrics.verificationStatus,
+              username: metrics.username,
+            }));
+
             // Persist via ingest_clip_metrics (auto-finalizes earnings)
-            const { error: ingestError } = await adminClient.rpc("ingest_clip_metrics", {
+            const { data: ingestResult, error: ingestError } = await adminClient.rpc("ingest_clip_metrics", {
               p_clip_id: clip.id,
               p_views: metrics.views,
               p_likes: metrics.likes,
@@ -233,6 +246,13 @@ async function handleSync(request: Request) {
               p_source: metrics.source,
               p_verification_status: metrics.verificationStatus,
             });
+
+            // DIAG LOG #5: After ingest_clip_metrics
+            console.log("[IG-DIAG] #5 after ingest:", JSON.stringify({
+              clipId: clip.id,
+              ingestError: ingestError?.message ?? null,
+              ingestResult,
+            }));
 
             if (ingestError) {
               results.push({ clipId: clip.id, status: "error", error: ingestError.message });

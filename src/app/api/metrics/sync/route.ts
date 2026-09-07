@@ -269,8 +269,21 @@ export async function POST(request: Request) {
           }
         }
 
+        // DIAG LOG #4: Before ingest_clip_metrics
+        console.log("[IG-DIAG] #4 before ingest:", JSON.stringify({
+          clipId: cid,
+          platform: clipPlatform,
+          views: metrics.views,
+          likes: metrics.likes,
+          comments: metrics.comments,
+          shares: metrics.shares,
+          source: metrics.source,
+          verificationStatus: metrics.verificationStatus,
+          username: metrics.username,
+        }));
+
         // Store via the ingest_clip_metrics RPC (service_role-only)
-        const { error: ingestError } = await adminClient.rpc(
+        const { data: ingestResult, error: ingestError } = await adminClient.rpc(
           "ingest_clip_metrics",
           {
             p_clip_id: cid,
@@ -282,6 +295,13 @@ export async function POST(request: Request) {
             p_verification_status: metrics.verificationStatus,
           },
         );
+
+        // DIAG LOG #5: After ingest_clip_metrics
+        console.log("[IG-DIAG] #5 after ingest:", JSON.stringify({
+          clipId: cid,
+          ingestError: ingestError?.message ?? null,
+          ingestResult,
+        }));
 
         if (ingestError) {
           results.push({ clipId: cid, status: "error", error: ingestError.message });
