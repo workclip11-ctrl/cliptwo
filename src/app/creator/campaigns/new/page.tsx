@@ -433,20 +433,24 @@ export default function NewCampaignWizard() {
             budget remains fully allocated for clipper campaign payouts.
           </p>
 
-          {/* QR Code placeholder */}
+          {/* QR Code */}
           <div className="flex flex-col items-center gap-4 rounded-xl border bg-background p-6">
-            <p className="text-sm font-medium">
-              Pay {rup(totalPayableRupees)} using the QR code below
-            </p>
-            <div className="flex h-48 w-48 items-center justify-center rounded-lg border-2 border-dashed bg-muted/10">
-              <div className="text-center text-muted">
-                <CreditCard size={32} className="mx-auto mb-2 opacity-50" />
-                <p className="text-xs">UPI QR Code</p>
-                <p className="text-[10px]">Contact admin for UPI ID</p>
-              </div>
+            <p className="text-sm font-medium">Scan to Pay</p>
+            <div className="relative">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/payment/cliptwo-payment-qr.png"
+                alt="Cliptwo Campaign Payment QR"
+                className="h-56 w-56 sm:h-64 sm:w-64 rounded-lg border object-contain"
+              />
             </div>
-            <p className="text-xs text-muted">
-              After completing the payment, enter your UTR / transaction reference below
+            <div className="text-center space-y-1">
+              <p className="text-lg font-semibold font-mono">{rup(totalPayableRupees)}</p>
+              <p className="text-xs text-muted">Cliptwo Campaign Payment</p>
+            </div>
+            <p className="text-xs text-center text-muted max-w-xs">
+              Please verify the payment amount before completing the transaction.
+              Your campaign will be published only after Cliptwo verifies your payment.
             </p>
           </div>
 
