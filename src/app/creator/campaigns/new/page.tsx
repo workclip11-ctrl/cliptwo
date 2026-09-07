@@ -1,7 +1,10 @@
 "use client";
 
+"use client";
+
 import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { QRCodeSVG } from "qrcode.react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -433,17 +436,22 @@ export default function NewCampaignWizard() {
             budget remains fully allocated for clipper campaign payouts.
           </p>
 
-          {/* QR Code */}
+          {/* Dynamic UPI QR Code */}
           <div className="flex flex-col items-center gap-4 rounded-xl border bg-background p-6">
             <p className="text-sm font-medium">Scan to Pay</p>
-            <div className="relative">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/payment/cliptwo-payment-qr.png"
-                alt="Cliptwo Campaign Payment QR"
-                className="h-56 w-56 sm:h-64 sm:w-64 rounded-lg border object-contain"
-              />
-            </div>
+            {(() => {
+              const upiUri = `upi://pay?pa=9315851024@ptyes&pn=Cliptwo&am=${totalPayableRupees}&cu=INR`;
+              return (
+                <div className="rounded-lg border bg-white p-3">
+                  <QRCodeSVG
+                    value={upiUri}
+                    size={224}
+                    level="M"
+                    includeMargin={false}
+                  />
+                </div>
+              );
+            })()}
             <div className="text-center space-y-1">
               <p className="text-lg font-semibold font-mono">{rup(totalPayableRupees)}</p>
               <p className="text-xs text-muted">Cliptwo Campaign Payment</p>
