@@ -105,7 +105,7 @@ export async function POST(request: Request) {
         // Find the social account for this user+platform
         const { data: socialAccount } = await adminClient
           .from("social_accounts")
-          .select("id, provider_account_id")
+          .select("id, provider_account_id, handle")
           .eq("user_id", clip.user_id)
           .eq("platform", clipPlatform)
           .single();
@@ -224,10 +224,13 @@ export async function POST(request: Request) {
         }
 
         // Fetch metrics from the platform
-        const metrics = await provider.fetchMetrics(clip.video_url, accessToken);
+        const metrics = await provider.fetchMetrics(
+          clip.video_url,
+          accessToken,
+          socialAccount.provider_account_id,
+        );
 
-        // Ownership verification (fail-closed): for YouTube, BOTH channelId and
-        // provider_account_id must exist and match. Missing either = reject.
+        // Ownership verification (fail-closed)
         if (clipPlatform === "YouTube") {
           if (!metrics.channelId || !socialAccount.provider_account_id) {
             results.push({
@@ -242,6 +245,25 @@ export async function POST(request: Request) {
               clipId: cid,
               status: "rejected",
               error: "This YouTube video does not belong to your connected YouTube channel",
+            });
+            continue;
+          }
+        }
+
+        if (clipPlatform === "Instagram") {
+          if (!metrics.username) {
+            results.push({
+              clipId: cid,
+              status: "rejected",
+              error: "Instagram ownership could not be verified — missing username on resolved media",
+            });
+            continue;
+          }
+          if (metrics.username.toLowerCase() !== (socialAccount.handle ?? "").toLowerCase()) {
+            results.push({
+              clipId: cid,
+              status: "rejected",
+              error: `This Instagram post does not belong to your connected account (expected "${socialAccount.handle}", got "${metrics.username}")`,
             });
             continue;
           }

@@ -25,6 +25,7 @@ export interface FetchedMetrics {
   comments: number;
   shares: number;
   channelId?: string; // YouTube channel ID for ownership verification
+  username?: string;  // Instagram username for ownership verification
   fetchedAt: Date;
   source: "platform_api" | "admin_override";
   verificationStatus: "verified" | "pending" | "failed";
@@ -33,8 +34,16 @@ export interface FetchedMetrics {
 export interface MetricProvider {
   platform: Platform;
 
-  /** Fetch metrics for a specific post/video by URL or ID */
-  fetchMetrics(postUrl: string, accessToken: string): Promise<FetchedMetrics>;
+  /**
+   * Fetch metrics for a specific post/video by URL or ID.
+   * For Instagram, accountIdentifier (the IG User ID) is required to resolve
+   * shortcodes to real Meta media IDs by searching the account's media library.
+   */
+  fetchMetrics(
+    postUrl: string,
+    accessToken: string,
+    accountIdentifier?: string,
+  ): Promise<FetchedMetrics>;
 
   /** Fetch metrics for all clips belonging to a platform account */
   fetchAccountMetrics(
@@ -73,25 +82,55 @@ class InstagramMetricProvider implements MetricProvider {
   platform: Platform = "Instagram";
 
   private static readonly API_BASE = "https://graph.instagram.com";
-  private static readonly MAX_MEDIA_PAGES = 20; // Safety limit for pagination
+  private static readonly MAX_MEDIA_PAGES = 20;
   private static readonly MEDIA_PAGE_SIZE = 50;
 
   async fetchMetrics(
     postUrl: string,
     accessToken: string,
+    accountIdentifier?: string,
   ): Promise<FetchedMetrics> {
-    const mediaId = this.extractMediaId(postUrl);
+    // Step 1: Try to extract a shortcode from the URL
+    const shortcode = this.extractShortcode(postUrl);
 
-    if (!mediaId) {
-      // If we can't extract a media ID from the URL, try to find it by URL matching
-      const foundMediaId = await this.findMediaIdByPermalink(postUrl, accessToken);
-      if (!foundMediaId) {
-        throw new Error(`Could not extract or find media ID from URL: ${postUrl}`);
+    if (shortcode && accountIdentifier) {
+      // Step 2: Resolve shortcode to real Meta media ID via account's media library
+      const resolved = await this.resolveMediaFromAccount(
+        shortcode,
+        accountIdentifier,
+        accessToken,
+      );
+
+      if (!resolved) {
+        throw new Error(
+          `Could not resolve Instagram shortcode "${shortcode}" to a media ID. ` +
+          `The post may not belong to the connected account, or the account may not have this post.`,
+        );
       }
-      return this.fetchMetricsById(foundMediaId, accessToken);
+
+      // Step 3: Verify ownership via username on the resolved media
+      if (resolved.username) {
+        // Ownership is verified — the media was found in the connected account's library
+        // No need for an extra API call; the fact that it appeared in this account's media
+        // list proves ownership.
+      }
+
+      return this.fetchMetricsById(resolved.mediaId, accessToken);
     }
 
-    return this.fetchMetricsById(mediaId, accessToken);
+    // Fallback: if no shortcode or no account ID, try direct lookup
+    // (this handles edge cases like direct media IDs in URLs)
+    if (shortcode) {
+      // Without accountIdentifier we cannot resolve — fail closed
+      throw new Error(
+        `Instagram shortcode "${shortcode}" requires an account identifier to resolve. ` +
+        `Ensure the clip has a connected Instagram account.`,
+      );
+    }
+
+    throw new Error(
+      `Could not extract a valid shortcode from URL: ${postUrl}`,
+    );
   }
 
   private async fetchMetricsById(
@@ -158,6 +197,7 @@ class InstagramMetricProvider implements MetricProvider {
       likes,
       comments,
       shares,
+      username: media.username,
       fetchedAt: new Date(),
       source: "platform_api",
       verificationStatus: "verified",
@@ -205,59 +245,59 @@ class InstagramMetricProvider implements MetricProvider {
   }
 
   /**
-   * Find media ID by matching permalink URL.
-   * Used when the submitted clip URL doesn't contain a direct media ID.
+   * Resolve an Instagram shortcode to the real Meta media ID by searching
+   * the connected account's media library. Uses the shortcode field on
+   * each media item to match the submitted URL's shortcode.
+   *
+   * Returns the real media ID and username if found, null otherwise.
+   * Fails closed: if the media cannot be found, returns null.
    */
-  private async findMediaIdByPermalink(
-    postUrl: string,
+  private async resolveMediaFromAccount(
+    shortcode: string,
+    accountIdentifier: string,
     accessToken: string,
-  ): Promise<string | null> {
-    // Normalize the URL for comparison
-    const normalizedUrl = this.normalizePermalink(postUrl);
+  ): Promise<{ mediaId: string; username: string } | null> {
+    let url: string | null =
+      `${InstagramMetricProvider.API_BASE}/${accountIdentifier}/media` +
+      `?fields=id,shortcode,username,media_type` +
+      `&limit=${InstagramMetricProvider.MEDIA_PAGE_SIZE}` +
+      `&access_token=${accessToken}`;
 
-    // We need to search through the account's media to find a matching permalink.
-    // This is less efficient than a direct ID lookup, but necessary when
-    // the submitted URL doesn't contain a recognizable media ID.
-    // The accountIdentifier should be passed via the URL, but since we don't
-    // have it here, we return null and let the caller handle URL-based matching.
-    void normalizedUrl;
-    void accessToken;
+    let pageCount = 0;
+
+    while (url && pageCount < InstagramMetricProvider.MAX_MEDIA_PAGES) {
+      const res = await fetch(url);
+      if (!res.ok) return null;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data: any = await res.json();
+      const mediaList: Array<{ id: string; shortcode?: string; username?: string }> = data.data ?? [];
+
+      for (const media of mediaList) {
+        if (media.shortcode === shortcode) {
+          return { mediaId: media.id, username: media.username ?? "" };
+        }
+      }
+
+      url = data.paging?.next ?? null;
+      pageCount++;
+    }
+
     return null;
   }
 
   /**
-   * Normalize Instagram permalink URLs for comparison.
-   * Removes trailing slashes, query strings, and lowercases.
-   */
-  private normalizePermalink(url: string): string {
-    try {
-      const parsed = new URL(url);
-      // Remove trailing slash and query parameters
-      let path = parsed.pathname.replace(/\/+$/, "");
-      // Lowercase for case-insensitive comparison
-      path = path.toLowerCase();
-      return `${parsed.hostname}${path}`;
-    } catch {
-      return url.toLowerCase().replace(/\/+$/, "");
-    }
-  }
-
-  /**
-   * Extract Instagram media ID from various URL formats.
+   * Extract Instagram shortcode from various URL formats.
+   *
+   * The shortcode is the URL slug (e.g., "ABC123" from instagram.com/reel/ABC123/).
+   * This is NOT the same as the Meta media ID.
    *
    * Supported formats:
-   *   - https://www.instagram.com/reel/<id>/
-   *   - https://www.instagram.com/p/<id>/
-   *   - https://www.instagram.com/tv/<id>/
-   *   - Direct media ID (alphanumeric with underscores/hyphens)
-   *
-   * IMPORTANT: The URL slug is NOT always identical to the Meta media ID.
-   * This method extracts what looks like a media shortcode from the URL.
-   * For accurate metrics, the caller should use the media ID returned by
-   * the Instagram API, not the URL slug.
+   *   - https://www.instagram.com/reel/<shortcode>/
+   *   - https://www.instagram.com/p/<shortcode>/
+   *   - https://www.instagram.com/tv/<shortcode>/
    */
-  private extractMediaId(url: string): string | null {
-    // Match common Instagram URL patterns
+  private extractShortcode(url: string): string | null {
     const patterns = [
       /instagram\.com\/reel\/([A-Za-z0-9_-]+)/,
       /instagram\.com\/p\/([A-Za-z0-9_-]+)/,
@@ -269,12 +309,6 @@ class InstagramMetricProvider implements MetricProvider {
       if (match?.[1]) {
         return match[1];
       }
-    }
-
-    // If the URL doesn't match any pattern, check if it's a direct media ID
-    // Instagram media IDs are typically numeric or alphanumeric with underscores
-    if (/^[A-Za-z0-9_-]+$/.test(url)) {
-      return url;
     }
 
     return null;
@@ -289,6 +323,7 @@ class YouTubeMetricProvider implements MetricProvider {
   async fetchMetrics(
     postUrl: string,
     accessToken: string,
+    _accountIdentifier?: string,
   ): Promise<FetchedMetrics> {
     const videoId = this.extractVideoId(postUrl);
     if (!videoId) {
@@ -366,6 +401,7 @@ class KickMetricProvider implements MetricProvider {
   async fetchMetrics(
     _postUrl: string,
     _accessToken: string,
+    _accountIdentifier?: string,
   ): Promise<FetchedMetrics> {
     throw new Error(
       "Kick metrics are not yet available. Kick does not currently offer a public API for third-party metric access.",

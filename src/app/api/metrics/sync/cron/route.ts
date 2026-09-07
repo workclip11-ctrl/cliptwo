@@ -96,7 +96,7 @@ async function handleSync(request: Request) {
             // Find social account for this user+platform
             const { data: socialAccount } = await adminClient
               .from("social_accounts")
-              .select("id, provider_account_id")
+              .select("id, provider_account_id, handle")
               .eq("user_id", clip.user_id)
               .eq("platform", clipPlatform)
               .single();
@@ -194,9 +194,13 @@ async function handleSync(request: Request) {
             }
 
             const provider = getMetricProvider(clipPlatform);
-            const metrics = await provider.fetchMetrics(clip.video_url, accessToken);
+            const metrics = await provider.fetchMetrics(
+              clip.video_url,
+              accessToken,
+              socialAccount.provider_account_id,
+            );
 
-            // YouTube ownership verification (fail-closed)
+            // Ownership verification (fail-closed)
             if (clipPlatform === "YouTube") {
               if (!metrics.channelId || !socialAccount.provider_account_id) {
                 results.push({ clipId: clip.id, status: "rejected", error: "YouTube ownership could not be verified — missing channel identification" });
@@ -204,6 +208,17 @@ async function handleSync(request: Request) {
               }
               if (metrics.channelId !== socialAccount.provider_account_id) {
                 results.push({ clipId: clip.id, status: "rejected", error: "Video does not belong to connected YouTube channel" });
+                continue;
+              }
+            }
+
+            if (clipPlatform === "Instagram") {
+              if (!metrics.username) {
+                results.push({ clipId: clip.id, status: "rejected", error: "Instagram ownership could not be verified — missing username on resolved media" });
+                continue;
+              }
+              if (metrics.username.toLowerCase() !== (socialAccount.handle ?? "").toLowerCase()) {
+                results.push({ clipId: clip.id, status: "rejected", error: `Instagram post does not belong to connected account (expected "${socialAccount.handle}", got "${metrics.username}")` });
                 continue;
               }
             }
