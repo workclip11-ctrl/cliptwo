@@ -53,12 +53,9 @@ export default function ClipperLayout({ children }: { children: ReactNode }) {
           />
 
           {/* Desktop sidebar */}
-          <aside className="hidden w-56 shrink-0 sm:block">
+          <aside className="hidden w-52 shrink-0 lg:block">
             <div className="sticky top-20">
-              <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-widest text-muted">
-                Menu
-              </p>
-              <nav className="flex flex-col gap-1">
+              <nav className="flex flex-col gap-0.5">
                 {NAV.map((n) => {
                   const active = n.exact
                     ? pathname === n.href
@@ -67,13 +64,14 @@ export default function ClipperLayout({ children }: { children: ReactNode }) {
                     <Link
                       key={n.href}
                       href={n.href}
-                      className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                      className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors ${
                         active
-                          ? "bg-accent-soft text-foreground"
-                          : "text-muted hover:bg-accent-soft/60 hover:text-foreground"
+                          ? "bg-foreground text-white"
+                          : "text-muted hover:bg-accent-soft hover:text-foreground"
                       }`}
                     >
-                      <n.icon size={16} /> {n.label}
+                      <n.icon size={15} strokeWidth={active ? 2 : 1.5} />{" "}
+                      {n.label}
                     </Link>
                   );
                 })}
