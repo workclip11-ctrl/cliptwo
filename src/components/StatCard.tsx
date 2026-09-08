@@ -15,20 +15,26 @@ export function StatCard({
 }) {
   return (
     <div
-      className={`group relative rounded-xl border bg-card p-5 transition-shadow hover:shadow-[0_1px_3px_rgba(0,0,0,0.06)] ${
+      className={`group relative rounded-xl border bg-card px-5 py-4 transition-all hover:shadow-[0_1px_4px_rgba(0,0,0,0.06)] ${
         accent ? "border-foreground/10" : ""
       }`}
     >
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-medium text-muted">{label}</p>
+      <div className="flex items-center gap-3">
         {icon ? (
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent-soft text-muted transition-colors group-hover:bg-foreground/[0.06]">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-muted transition-colors group-hover:bg-foreground/[0.06]">
             {icon}
           </span>
         ) : null}
+        <p className="text-[11px] font-medium uppercase tracking-wider text-muted">
+          {label}
+        </p>
       </div>
-      <p className="mt-3 text-2xl font-semibold tracking-tight">{value}</p>
-      {hint ? <p className="mt-1 text-xs text-muted">{hint}</p> : null}
+      <p className="mt-2.5 pl-0.5 text-2xl font-bold tracking-tight">
+        {value}
+      </p>
+      {hint ? (
+        <p className="mt-1 pl-0.5 text-[11px] text-muted">{hint}</p>
+      ) : null}
     </div>
   );
 }

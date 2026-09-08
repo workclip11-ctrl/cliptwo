@@ -34,7 +34,7 @@ export default function ClipperLayout({ children }: { children: ReactNode }) {
     <AuthGuard role="clipper">
       <main className="min-h-screen bg-background">
         <TopBar />
-        <div className="mx-auto flex max-w-6xl gap-8 px-4 py-6 sm:px-6 sm:py-8">
+        <div className="mx-auto flex max-w-6xl gap-6 px-4 py-5 sm:px-6 sm:py-6">
           {/* Mobile hamburger */}
           <button
             onClick={() => setSidebarOpen(true)}
@@ -53,9 +53,9 @@ export default function ClipperLayout({ children }: { children: ReactNode }) {
           />
 
           {/* Desktop sidebar */}
-          <aside className="hidden w-52 shrink-0 lg:block">
+          <aside className="hidden w-48 shrink-0 lg:block">
             <div className="sticky top-20">
-              <nav className="flex flex-col gap-0.5">
+              <nav className="flex flex-col gap-px">
                 {NAV.map((n) => {
                   const active = n.exact
                     ? pathname === n.href
@@ -64,13 +64,17 @@ export default function ClipperLayout({ children }: { children: ReactNode }) {
                     <Link
                       key={n.href}
                       href={n.href}
-                      className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors ${
+                      className={`flex items-center gap-2 rounded-lg px-3 py-[7px] text-[13px] font-medium transition-all duration-150 ${
                         active
-                          ? "bg-foreground text-white"
+                          ? "bg-foreground text-white shadow-sm"
                           : "text-muted hover:bg-accent-soft hover:text-foreground"
                       }`}
                     >
-                      <n.icon size={15} strokeWidth={active ? 2 : 1.5} />{" "}
+                      <n.icon
+                        size={15}
+                        strokeWidth={active ? 2 : 1.5}
+                        className={active ? "text-white" : ""}
+                      />
                       {n.label}
                     </Link>
                   );
