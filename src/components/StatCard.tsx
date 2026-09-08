@@ -15,13 +15,13 @@ export function StatCard({
 }) {
   return (
     <div
-      className={`group relative rounded-xl border bg-card px-5 py-4 transition-all hover:shadow-[0_1px_4px_rgba(0,0,0,0.06)] ${
-        accent ? "border-foreground/10" : ""
+      className={`group flex flex-col justify-between rounded-xl border bg-card px-5 py-4 transition-all duration-200 hover:border-foreground/10 hover:shadow-[0_1px_4px_rgba(0,0,0,0.06)] ${
+        accent ? "border-foreground/8" : ""
       }`}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5">
         {icon ? (
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-muted transition-colors group-hover:bg-foreground/[0.06]">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent-soft text-muted transition-colors duration-200 group-hover:bg-foreground/[0.06]">
             {icon}
           </span>
         ) : null}
@@ -29,12 +29,14 @@ export function StatCard({
           {label}
         </p>
       </div>
-      <p className="mt-2.5 pl-0.5 text-2xl font-bold tracking-tight">
-        {value}
-      </p>
-      {hint ? (
-        <p className="mt-1 pl-0.5 text-[11px] text-muted">{hint}</p>
-      ) : null}
+      <div className="mt-3">
+        <p className="text-[26px] font-bold leading-none tracking-tight">
+          {value}
+        </p>
+        {hint ? (
+          <p className="mt-1.5 text-[11px] text-muted">{hint}</p>
+        ) : null}
+      </div>
     </div>
   );
 }
