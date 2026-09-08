@@ -13,7 +13,7 @@ import { PlatformIcon } from "@/components/PlatformIcon";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
-import { rup, fmtViews } from "@/lib/format";
+import { rup, fmtViews, clipEarnings } from "@/lib/format";
 
 import type { Clip } from "@/lib/types";
 
@@ -43,10 +43,15 @@ export default function ClipperSubmissionsPage() {
   const [tab, setTab] = useState<TabKey>("all");
   const [page, setPage] = useState(1);
   const [appealed, setAppealed] = useState<Record<string, boolean>>({});
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   function selectTab(key: TabKey) {
     setTab(key);
     setPage(1);
+  }
+
+  function toggleDetails(id: string) {
+    setExpanded((s) => ({ ...s, [id]: !s[id] }));
   }
 
   const myClips = clips.filter((k) => k.userId && k.userId === user?.id);
@@ -68,7 +73,8 @@ export default function ClipperSubmissionsPage() {
   const visible = sorted.slice(0, page * PAGE_SIZE);
   const hasMore = visible.length < sorted.length;
 
-  const netOf = (k: Clip) => (financeRecords.find((r) => r.clipId === k.id)?.netAmount ?? 0) / 100;
+  const netOf = (k: Clip) =>
+    (financeRecords.find((r) => r.clipId === k.id)?.netAmount ?? 0) / 100;
   const totalEarnedNet = myClips
     .filter((k) => k.status === "approved" || k.status === "held")
     .reduce((s, k) => s + netOf(k), 0);
@@ -78,48 +84,47 @@ export default function ClipperSubmissionsPage() {
   const pendingReview = myClips.filter((k) => k.status === "pending").length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
+      {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">My Submissions</h1>
         <p className="mt-1 text-sm text-muted">
-          {myClips.length} clip{myClips.length === 1 ? "" : "s"} you&apos;ve submitted.
+          Track your clips, approvals, views, and earnings.
         </p>
       </div>
 
-      {/* Summary */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border bg-card p-4">
-          <p className="text-xs text-muted">Total earned</p>
-          <p className="mt-1 font-mono text-lg font-semibold">{rup(totalEarnedNet)}</p>
+      {/* Compact summary */}
+      <div className="flex items-center gap-5 text-sm">
+        <div>
+          <span className="text-muted">Total earned </span>
+          <span className="font-mono font-medium">{rup(totalEarnedNet)}</span>
         </div>
-        <div className="rounded-xl border bg-card p-4">
-          <p className="text-xs text-muted">Paid out</p>
-          <p className="mt-1 font-mono text-lg font-semibold text-green">
-            {rup(totalPaidNet)}
-          </p>
+        <div>
+          <span className="text-muted">Paid out </span>
+          <span className="font-mono font-medium text-green">{rup(totalPaidNet)}</span>
         </div>
-        <div className="rounded-xl border bg-card p-4">
-          <p className="text-xs text-muted">Pending</p>
-          <p className="mt-1 font-mono text-lg font-semibold text-amber">
-            {pendingReview}
-          </p>
+        <div>
+          <span className="text-muted">Pending </span>
+          <span className="font-mono font-medium text-amber">{pendingReview}</span>
         </div>
       </div>
 
       {/* Tabs */}
       <div className="-mx-4 flex overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:overflow-visible">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => selectTab(t.key)}
-              className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-sm font-medium transition ${
-                tab === t.key
-                  ? "border-accent bg-accent-soft text-foreground"
-                  : "text-muted hover:bg-accent-soft"
-              }`}
-            >
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => selectTab(t.key)}
+            className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+              tab === t.key
+                ? "border-accent bg-accent-soft text-foreground"
+                : "text-muted hover:bg-accent-soft"
+            }`}
+          >
             {t.label}
-            <span className="rounded-full bg-background px-1.5 text-xs">{counts[t.key]}</span>
+            <span className="rounded-full bg-background px-1.5 text-xs">
+              {counts[t.key]}
+            </span>
           </button>
         ))}
       </div>
@@ -129,124 +134,199 @@ export default function ClipperSubmissionsPage() {
           No clips in this view.
         </p>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {visible.map((k) => {
             const campaign = campaigns.find((c) => c.id === k.campaignId);
-            const e = netOf(k);
-            const earnedShown = e;
-            const paidShown = 0;
+            const earned = clipEarnings(k, campaigns);
+            const fin = financeRecords.find((r) => r.clipId === k.id);
+            const paidAmount =
+              fin?.status === "paid" ? (fin.netAmount ?? 0) / 100 : 0;
             const cpm = campaign?.payout ?? 0;
+            const thumb = campaign?.thumbnails?.[0];
+            const isOpen = expanded[k.id];
+
+            /* Status microcopy */
+            let statusNote = "";
+            if (k.status === "pending") statusNote = "Waiting for review";
+            else if (k.status === "approved") statusNote = "Earning";
+            else if (k.status === "held") statusNote = "On hold";
+            else if (k.status === "rejected") statusNote = "Rejected";
 
             return (
-              <div key={k.id} className="rounded-2xl border bg-card p-4">
-                <div className="flex gap-4">
+              <div key={k.id} className="rounded-xl border bg-card p-3 sm:p-4">
+                <div className="flex gap-3">
                   {/* Thumbnail */}
                   <Link
                     href={`/clip/${k.id}`}
-                    className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-accent-soft"
+                    className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-accent-soft sm:h-28 sm:w-32"
                   >
-                    {campaign?.thumbnails?.[0] ? (
+                    {thumb ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img
-                        src={campaign.thumbnails[0]}
+                        src={thumb}
                         alt=""
-                        className="h-full w-full object-cover"
+                        className="h-full w-full object-cover transition-transform duration-200 hover:scale-105"
                       />
                     ) : (
-                      <PlatformIcon p={k.platform ?? "Instagram"} size={26} />
+                      <div className="flex h-full w-full items-center justify-center">
+                        <PlatformIcon
+                          p={k.platform ?? "Instagram"}
+                          size={22}
+                        />
+                      </div>
                     )}
                   </Link>
 
+                  {/* Main content */}
                   <div className="min-w-0 flex-1">
+                    {/* Row 1: title + status */}
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div className="min-w-0">
                         <Link
                           href={`/campaigns/${k.campaignId}`}
-                          className="font-semibold hover:underline underline-offset-2"
+                          className="text-sm font-semibold hover:underline underline-offset-2"
                         >
                           {campaign?.title ?? "Campaign"}
                         </Link>
-                        <p className="line-clamp-1 text-xs text-muted">{k.caption}</p>
+                        <p className="line-clamp-1 text-xs text-muted">
+                          {k.caption}
+                        </p>
                       </div>
-                      <StatusPill status={k.status} />
+                      <div className="flex items-center gap-1.5">
+                        <StatusPill status={k.status} />
+                      </div>
                     </div>
 
-                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+                    {/* Row 2: meta */}
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-muted">
                       <span className="inline-flex items-center gap-1">
-                        <PlatformIcon p={k.platform ?? "Instagram"} size={13} />
+                        <PlatformIcon
+                          p={k.platform ?? "Instagram"}
+                          size={11}
+                        />
                         {k.platform ?? "Instagram"}
                       </span>
+                      <span>·</span>
                       <span>Submitted {fmtDate(k.submittedAt)}</span>
-                      {campaign && (
-                        <span className="inline-flex items-center gap-1">
-                          Campaign:{" "}
-                          <StatusPill status={campaign.status} />
-                        </span>
+                      {statusNote && (
+                        <>
+                          <span>·</span>
+                          <span>{statusNote}</span>
+                        </>
                       )}
                     </div>
 
-                    <a
-                      href={k.videoUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-1 inline-flex max-w-full items-center gap-1 truncate font-mono text-xs text-accent hover:underline"
-                    >
-                      {k.videoUrl} <ExternalLink size={11} />
-                    </a>
+                    {/* Row 3: views + earnings — dominant */}
+                    <div className="mt-2.5 flex items-baseline gap-4">
+                      <div>
+                        <span className="font-mono text-lg font-bold tracking-tight">
+                          {k.verifiedViews ? fmtViews(k.verifiedViews) : "—"}
+                        </span>
+                        <span className="ml-1 text-[11px] text-muted">
+                          verified views
+                        </span>
+                      </div>
+                      {earned > 0 && (
+                        <div>
+                          <span className="font-mono text-lg font-bold tracking-tight">
+                            {rup(earned)}
+                          </span>
+                          <span className="ml-1 text-[11px] text-muted">
+                            earned
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {/* Stats grid */}
-                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
-                  <div className="rounded-lg border bg-background p-2.5">
-                    <p className="text-[11px] text-muted">Verified views</p>
-                    <p className="mt-0.5 font-mono text-sm font-medium">
-                      {k.verifiedViews ? fmtViews(k.verifiedViews) : "—"}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border bg-background p-2.5">
-                    <p className="text-[11px] text-muted">CPM</p>
-                    <p className="mt-0.5 font-mono text-sm font-medium">
-                      {rup(cpm)}
-                      <span className="text-[10px] text-muted">/1K</span>
-                    </p>
-                  </div>
-                  <div className="rounded-lg border bg-background p-2.5">
-                    <p className="text-[11px] text-muted">Est. / earned</p>
-                    <p className="mt-0.5 font-mono text-sm font-medium">
-                      {rup(earnedShown)}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border bg-background p-2.5">
-                    <p className="text-[11px] text-muted">Paid</p>
-                    <p className="mt-0.5 font-mono text-sm font-medium text-green">
-                      {rup(paidShown)}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border bg-background p-2.5">
-                    <p className="text-[11px] text-muted">Last view update</p>
-                    <p className="mt-0.5 font-mono text-sm font-medium">
-                      {k.updatedAt ? fmtDate(k.updatedAt) : "—"}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Rejection reason */}
+                {/* Rejection block */}
                 {k.status === "rejected" && (
                   <div className="mt-3 rounded-lg border border-red/20 bg-red/5 p-3 text-sm">
                     <p className="flex items-center gap-1.5 font-medium text-red">
                       <MessageSquareWarning size={14} /> Rejected
                     </p>
-                    <p className="mt-1 text-muted">
-                      <span className="font-medium text-foreground">Reason:</span>{" "}
-                      {k.rejectionReason ?? "—"}
-                    </p>
+                    {k.rejectionReason && (
+                      <p className="mt-1 text-muted">
+                        <span className="font-medium text-foreground">
+                          Reason:{" "}
+                        </span>
+                        {k.rejectionReason}
+                      </p>
+                    )}
                     {k.rejectionDetails && (
                       <p className="mt-0.5 text-muted">
-                        <span className="font-medium text-foreground">Details:</span>{" "}
+                        <span className="font-medium text-foreground">
+                          Details:{" "}
+                        </span>
                         {k.rejectionDetails}
                       </p>
                     )}
+                  </div>
+                )}
+
+                {/* Held note */}
+                {k.status === "held" && k.heldReason && (
+                  <div className="mt-3 rounded-lg border border-amber/20 bg-amber/5 p-3 text-sm text-muted">
+                    <span className="font-medium text-foreground">
+                      Hold reason:{" "}
+                    </span>
+                    {k.heldReason}
+                  </div>
+                )}
+
+                {/* Details toggle */}
+                <button
+                  onClick={() => toggleDetails(k.id)}
+                  className="mt-2 inline-flex items-center gap-1 text-xs text-muted hover:text-foreground"
+                >
+                  <ChevronDown
+                    size={13}
+                    className={`transition-transform ${isOpen ? "rotate-180" : ""}`}
+                  />
+                  {isOpen ? "Hide details" : "View details"}
+                </button>
+
+                {/* Expanded details */}
+                {isOpen && (
+                  <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1.5 border-t border-border/50 pt-3 text-xs sm:grid-cols-3">
+                    <div>
+                      <span className="text-muted">CPM </span>
+                      <span className="font-medium">
+                        {rup(cpm)}
+                        <span className="text-muted">/1K</span>
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted">Earned </span>
+                      <span className="font-medium">{rup(earned)}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted">Paid </span>
+                      <span className="font-medium text-green">
+                        {rup(paidAmount)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted">Last updated </span>
+                      <span className="font-medium">
+                        {k.updatedAt ? fmtDate(k.updatedAt) : "—"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted">Campaign </span>
+                      <span className="font-medium">
+                        {campaign?.status ?? "—"}
+                      </span>
+                    </div>
+                    <a
+                      href={k.videoUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 truncate font-medium text-accent hover:underline"
+                    >
+                      Clip URL <ExternalLink size={11} />
+                    </a>
                   </div>
                 )}
 
@@ -254,30 +334,31 @@ export default function ClipperSubmissionsPage() {
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <Link
                     href={`/clip/${k.id}`}
-                    className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-accent-soft"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
                   >
-                    <Film size={14} /> View clip
+                    <Film size={13} /> View clip
                   </Link>
                   <Link
                     href={`/campaigns/${k.campaignId}`}
-                    className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-accent-soft"
+                    className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium text-muted hover:bg-accent-soft"
                   >
-                    <ExternalLink size={14} /> View campaign
+                    <ExternalLink size={13} /> View campaign
                   </Link>
                   {k.status === "rejected" && (
                     <button
                       onClick={() =>
                         setAppealed((a) => ({ ...a, [k.id]: true }))
                       }
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-accent px-3 py-1.5 text-sm font-medium text-accent hover:bg-accent-soft"
+                      className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium text-muted hover:bg-accent-soft"
                     >
-                      <MessageSquareWarning size={14} /> Appeal rejection
+                      <MessageSquareWarning size={13} /> Appeal rejection
                     </button>
                   )}
                 </div>
                 {appealed[k.id] && (
                   <p className="mt-2 text-xs text-green">
-                    Appeal submitted — our team will review and respond within 7 days.
+                    Appeal submitted — our team will review and respond within 7
+                    days.
                   </p>
                 )}
               </div>
