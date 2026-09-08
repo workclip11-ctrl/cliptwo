@@ -28,18 +28,6 @@ type TabKey = (typeof TABS)[number]["key"];
 
 const PAGE_SIZE = 8;
 
-const GRADIENTS = [
-  "from-sky-500/25 to-indigo-500/25",
-  "from-rose-500/25 to-orange-500/25",
-  "from-emerald-500/25 to-teal-500/25",
-  "from-violet-500/25 to-fuchsia-500/25",
-];
-function gradientFor(id: string) {
-  let h = 0;
-  for (const ch of id) h = (h + ch.charCodeAt(0)) % GRADIENTS.length;
-  return GRADIENTS[h];
-}
-
 function fmtDate(ts: number) {
   return new Date(ts).toLocaleDateString("en-IN", {
     day: "numeric",
@@ -152,12 +140,21 @@ export default function ClipperSubmissionsPage() {
             return (
               <div key={k.id} className="rounded-2xl border bg-card p-4">
                 <div className="flex gap-4">
-                  {/* Thumbnail placeholder */}
+                  {/* Thumbnail */}
                   <Link
                     href={`/clip/${k.id}`}
-                    className={`flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${gradientFor(k.id)} text-foreground/70`}
+                    className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-accent-soft"
                   >
-                    <PlatformIcon p={k.platform ?? "Instagram"} size={26} />
+                    {campaign?.thumbnails?.[0] ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={campaign.thumbnails[0]}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <PlatformIcon p={k.platform ?? "Instagram"} size={26} />
+                    )}
                   </Link>
 
                   <div className="min-w-0 flex-1">
