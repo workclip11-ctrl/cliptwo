@@ -27,9 +27,12 @@ export function CampaignCard({
   const remaining = b.remaining;
   const thumb = campaign.thumbnails?.[0];
 
+  const isUrgent = (campaign.daysLeft ?? 99) <= 3;
+  const isLowBudget = b.total > 0 && b.utilizationPct > 80;
+
   const inner = (
     <>
-      {/* Thumbnail — media-first */}
+      {/* Thumbnail */}
       <div className="relative aspect-video w-full overflow-hidden bg-accent-soft">
         {thumb ? (
           /* eslint-disable-next-line @next/next/no-img-element */
@@ -55,7 +58,7 @@ export function CampaignCard({
             </span>
           )}
         </div>
-        {/* Save button */}
+        {/* Save */}
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -73,44 +76,48 @@ export function CampaignCard({
       </div>
 
       {/* Content */}
-      <div className="p-3.5">
+      <div className="flex flex-1 flex-col p-3.5">
+        {/* Title + creator */}
         <div className="flex items-start justify-between gap-2">
-          <h3 className="text-[13px] font-bold leading-snug group-hover:underline underline-offset-2">
-            {campaign.title}
-          </h3>
+          <div className="min-w-0">
+            <h3 className="text-[13px] font-bold leading-snug group-hover:underline underline-offset-2">
+              {campaign.title}
+            </h3>
+            <p className="mt-0.5 text-[11px] text-muted">
+              by {campaign.creator}
+            </p>
+          </div>
           <StatusPill status={campaign.status} />
         </div>
-        <p className="mt-0.5 text-[11px] text-muted">
-          by {campaign.creator}
-        </p>
 
-        {/* Metrics */}
-        <div className="mt-2.5 flex items-center gap-0 rounded-lg border bg-background">
-          <div className="flex-1 py-1.5 text-center">
-            <p className="font-mono text-[12px] font-bold">
-              {rup(campaign.payout)}
-            </p>
-            <p className="text-[9px] text-muted">CPM</p>
-          </div>
-          <div className="h-5 w-px bg-border" />
-          <div className="flex-1 py-1.5 text-center">
-            <p className="font-mono text-[12px] font-bold">
-              {b.total > 0 ? rup(remaining) : "Flexible"}
-            </p>
-            <p className="text-[9px] text-muted">Left</p>
-          </div>
-          <div className="h-5 w-px bg-border" />
-          <div className="flex-1 py-1.5 text-center">
-            <p className="font-mono text-[12px] font-bold">
-              {campaign.daysLeft}d
-            </p>
-            <p className="text-[9px] text-muted">Days</p>
-          </div>
+        {/* CPM — dominant metric */}
+        <div className="mt-3 flex items-baseline gap-1.5">
+          <span className="font-mono text-lg font-bold tracking-tight">
+            {rup(campaign.payout)}
+          </span>
+          <span className="text-[11px] text-muted">/ 1K views</span>
+        </div>
+
+        {/* Secondary metrics */}
+        <div className="mt-2 flex items-center gap-3 text-[11px] text-muted">
+          <span className={isLowBudget ? "font-medium text-amber" : ""}>
+            {b.total > 0 ? `${rup(remaining)} left` : "Flexible budget"}
+          </span>
+          <span className="text-border">·</span>
+          <span className={isUrgent ? "font-medium text-amber" : ""}>
+            {campaign.daysLeft}d left
+          </span>
+          {campaign.viewRules?.minViews != null && campaign.viewRules.minViews > 0 && (
+            <>
+              <span className="text-border">·</span>
+              <span>Min {campaign.viewRules.minViews.toLocaleString()} views</span>
+            </>
+          )}
         </div>
 
         {/* Budget bar */}
         {b.total > 0 && (
-          <div className="mt-2 h-[3px] w-full overflow-hidden rounded-full bg-accent-soft">
+          <div className="mt-2.5 h-[3px] w-full overflow-hidden rounded-full bg-accent-soft">
             <div
               className={`h-full rounded-full ${
                 b.status === "budget_reached"
@@ -124,15 +131,11 @@ export function CampaignCard({
           </div>
         )}
 
-        {/* Min views */}
-        {campaign.viewRules?.minViews != null && campaign.viewRules.minViews > 0 && (
-          <p className="mt-1.5 text-[10px] text-muted">
-            Min views: {campaign.viewRules.minViews.toLocaleString()}
-          </p>
-        )}
+        {/* Spacer */}
+        <div className="flex-1" />
 
         {/* CTA row */}
-        <div className="mt-3 flex items-center justify-between">
+        <div className="mt-3 flex items-center justify-between border-t border-border/50 pt-3">
           <span className="text-[11px] text-muted">
             {clippersIn > 0 ? `${clippersIn} clippers` : "Be the first"}
           </span>

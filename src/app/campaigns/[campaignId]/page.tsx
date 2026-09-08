@@ -30,18 +30,6 @@ import { rup, fmtViews, clipEarnings } from "@/lib/format";
 import { campaignSpent } from "@/lib/finance";
 import type { Clip, Platform } from "@/lib/types";
 
-const GRADIENTS = [
-  "from-sky-500/25 to-indigo-500/25",
-  "from-rose-500/25 to-orange-500/25",
-  "from-emerald-500/25 to-teal-500/25",
-  "from-violet-500/25 to-fuchsia-500/25",
-];
-function gradientFor(id: string) {
-  let h = 0;
-  for (const ch of id) h = (h + ch.charCodeAt(0)) % GRADIENTS.length;
-  return GRADIENTS[h];
-}
-
 function Section({
   title,
   icon,
@@ -52,9 +40,9 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border bg-card p-5">
-      <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted">
-        <span className="text-foreground/70">{icon}</span>
+    <section className="rounded-xl border bg-card p-5">
+      <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
+        <span className="text-muted">{icon}</span>
         {title}
       </h2>
       {children}
@@ -64,7 +52,7 @@ function Section({
 
 function Row({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b py-2.5 last:border-0">
+    <div className="flex items-start justify-between gap-4 border-b border-border/50 py-2.5 last:border-0">
       <span className="text-sm text-muted">{label}</span>
       <span className="text-right text-sm font-medium">{value || "—"}</span>
     </div>
@@ -98,7 +86,7 @@ export default function CampaignDetailPage() {
       <main className="min-h-screen">
         <TopBar />
         <div className="mx-auto max-w-3xl px-6 py-20 text-center">
-          <h1 className="text-2xl font-semibold">Campaign not found</h1>
+          <h1 className="text-2xl font-bold">Campaign not found</h1>
           <p className="mt-2 text-sm text-muted">
             This campaign may have been removed.
           </p>
@@ -125,11 +113,14 @@ export default function CampaignDetailPage() {
   const category = campaign.category ?? campaign.niche ?? "—";
   const vr = campaign.viewRules;
   const ap = campaign.approval;
+  const thumb = campaign.thumbnails?.[0];
+  const isUrgent = (campaign.daysLeft ?? 99) <= 7;
 
   return (
     <main className="min-h-screen">
       <TopBar />
-      <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
+      <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-8">
+        {/* Back */}
         <div className="flex items-center gap-3 text-sm text-muted">
           <button
             type="button"
@@ -140,17 +131,40 @@ export default function CampaignDetailPage() {
           </button>
         </div>
 
-        {/* Header */}
-        <div
-          className={`mt-4 flex h-40 items-center justify-center rounded-2xl bg-gradient-to-br ${gradientFor(campaign.id)} text-foreground/70`}
-        >
-          <PlatformIcon p={campaign.platform} size={42} />
-        </div>
+        {/* ─── Hero ─── */}
+        <div className="mt-6 grid gap-6 sm:grid-cols-[1fr_1fr]">
+          {/* Image */}
+          <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-accent-soft">
+            {thumb ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={thumb}
+                alt={campaign.title}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center">
+                <PlatformIcon p={campaign.platform} size={42} />
+              </div>
+            )}
+            {/* Badges */}
+            <div className="absolute left-3 top-3 flex items-center gap-1.5">
+              {platforms.map((p) => (
+                <span
+                  key={p}
+                  className="inline-flex items-center gap-1 rounded-md bg-white/90 px-2 py-[3px] text-[10px] font-medium text-foreground shadow-sm backdrop-blur"
+                >
+                  <PlatformIcon p={p} size={10} /> {p}
+                </span>
+              ))}
+            </div>
+          </div>
 
-        <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
-          <div>
+          {/* Info */}
+          <div className="flex flex-col">
+            {/* Title + status */}
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-semibold tracking-tight">{campaign.title}</h1>
+              <h1 className="text-xl font-bold tracking-tight">{campaign.title}</h1>
               <StatusPill status={campaign.status} />
               {campaign.verified && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-green/20 bg-green/10 px-2 py-0.5 text-xs font-medium text-green">
@@ -161,99 +175,100 @@ export default function CampaignDetailPage() {
             <p className="mt-1 text-sm text-muted">
               by {campaign.creator} · {category}
             </p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {platforms.map((p) => (
-                <span
-                  key={p}
-                  className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-0.5 text-xs font-medium"
-                >
-                  <PlatformIcon p={p} size={13} /> {p}
-                </span>
-              ))}
+
+            {/* Payout — dominant */}
+            <div className="mt-4">
+              <p className="font-mono text-3xl font-bold tracking-tight">
+                {rup(campaign.payout)}
+              </p>
+              <p className="text-sm text-muted">per 1,000 views</p>
             </div>
-          </div>
-          <div className="text-right">
-            <p className="font-mono text-2xl font-medium text-amber">{rup(campaign.payout)}</p>
-            <p className="text-[11px] text-muted">per 1,000 views</p>
+
+            {/* Secondary metrics */}
+            <div className="mt-4 flex flex-wrap items-center gap-4 text-sm">
+              {campaign.budget ? (
+                <div>
+                  <p className="font-medium">{rup(remaining)}</p>
+                  <p className="text-xs text-muted">remaining</p>
+                </div>
+              ) : null}
+              <div>
+                <p className={`font-medium ${isUrgent ? "text-amber" : ""}`}>
+                  {campaign.daysLeft}d left
+                </p>
+                <p className="text-xs text-muted">
+                  {campaign.endDate ? `Ends ${campaign.endDate}` : "Deadline"}
+                </p>
+              </div>
+              {vr?.minViews != null && vr.minViews > 0 && (
+                <div>
+                  <p className="font-medium">{fmtViews(vr.minViews)}</p>
+                  <p className="text-xs text-muted">min views</p>
+                </div>
+              )}
+            </div>
+
+            {/* Budget bar */}
+            {(campaign.budget ?? 0) > 0 && (
+              <div className="mt-4">
+                <div className="mb-1 flex items-center justify-between text-[11px] text-muted">
+                  <span>{rup(spent)} spent</span>
+                  <span>{pct}% used</span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-accent-soft">
+                  <div
+                    className={`h-full rounded-full ${
+                      pct >= 90 ? "bg-red" : pct >= 70 ? "bg-amber" : "bg-foreground"
+                    }`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Primary CTA */}
+            {campaign.status === "open" && isClipper && (
+              <button
+                onClick={join}
+                className="mt-5 flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-4 py-3 text-sm font-medium text-white hover:opacity-90"
+              >
+                <Plus size={15} /> Submit a Clip
+              </button>
+            )}
+
+            {/* Secondary actions */}
+            <div className="mt-3 flex items-center gap-2">
+              <button
+                onClick={() => toggleSaveCampaign(id)}
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-accent-soft ${saved ? "text-accent" : ""}`}
+              >
+                <Bookmark size={14} className={saved ? "fill-accent" : ""} />{" "}
+                {saved ? "Saved" : "Save"}
+              </button>
+              <button
+                onClick={() => setReported(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium text-muted hover:bg-accent-soft"
+              >
+                <Flag size={14} /> Report
+              </button>
+              <Link
+                href="/clipper/settings"
+                className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium text-muted hover:bg-accent-soft"
+              >
+                <HelpCircle size={14} /> Ask
+              </Link>
+            </div>
+            {reported && (
+              <p className="mt-2 text-xs text-amber">
+                Thanks — our team will review this report.
+              </p>
+            )}
           </div>
         </div>
 
-        {/* Primary CTA */}
-        {campaign.status === "open" && isClipper && (
-          <button
-            onClick={join}
-            className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 sm:w-auto"
-          >
-            <Plus size={15} /> Submit a Clip
-          </button>
-        )}
-
-        {/* Secondary actions */}
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => toggleSaveCampaign(id)}
-            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-accent-soft ${saved ? "text-accent" : ""}`}
-          >
-            <Bookmark size={14} className={saved ? "fill-accent" : ""} />{" "}
-            {saved ? "Saved" : "Save campaign"}
-          </button>
-          <button
-            onClick={() => setReported(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-accent-soft"
-          >
-            <Flag size={14} /> Report
-          </button>
-          <Link
-            href="/clipper/settings"
-            className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-accent-soft"
-          >
-            <HelpCircle size={14} /> Ask a question
-          </Link>
-        </div>
-        {reported && (
-          <p className="mt-2 rounded-lg border border-amber/20 bg-amber/10 px-3 py-2 text-xs text-amber">
-            Thanks — our team will review this report.
-          </p>
-        )}
-
-        <div className="mt-6 space-y-4">
-          {/* Payment information */}
-          <Section title="Payment information" icon={<Wallet size={15} />}>
-            <Row label="CPM / payout" value={`${rup(campaign.payout)} / 1K views`} />
-            <Row label="Total budget" value={rup(campaign.budget ?? 0)} />
-            <Row label="Amount spent" value={rup(spent)} />
-            <Row label="Remaining budget" value={rup(remaining)} />
-            <Row
-              label="Max payout / clip"
-              value={campaign.maxPayoutPerClip ? rup(campaign.maxPayoutPerClip) : "—"}
-            />
-            <div className="mt-3">
-              <div className="mb-1 flex items-center justify-between text-[11px] text-muted">
-                <span>{rup(spent)} spent</span>
-                <span>{rup(remaining)} left</span>
-              </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-accent-soft">
-                <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
-              </div>
-            </div>
-          </Section>
-
-          {/* Timeline */}
-          <Section title="Campaign timeline" icon={<Calendar size={15} />}>
-            <Row label="Start date" value={campaign.startDate ?? "—"} />
-            <Row label="End date" value={campaign.endDate ?? "—"} />
-            <Row
-              label="Days remaining"
-              value={
-                <span className="inline-flex items-center gap-1">
-                  <Clock size={13} className="text-muted" /> {campaign.daysLeft ?? "—"}d
-                </span>
-              }
-            />
-            <Row label="Status" value={<StatusPill status={campaign.status} />} />
-          </Section>
-
-          {/* Objective */}
+        {/* ─── Content sections ─── */}
+        <div className="mt-8 space-y-4">
+          {/* Campaign objective */}
           <Section title="Campaign objective" icon={<Target size={15} />}>
             <p className="text-sm text-muted">
               {campaign.objective ?? campaign.brief ?? "Not specified."}
@@ -267,7 +282,7 @@ export default function CampaignDetailPage() {
                 href={campaign.sourceLink}
                 target="_blank"
                 rel="noreferrer"
-                className="mt-1 inline-flex items-center gap-1.5 text-sm font-medium text-accent hover:underline underline-offset-2"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-accent hover:underline underline-offset-2"
               >
                 <Film size={14} /> Open source video
               </a>
@@ -296,16 +311,56 @@ export default function CampaignDetailPage() {
 
           {/* Creative brief */}
           <Section title="Creative brief" icon={<Sparkles size={15} />}>
-            <Row label="What to create" value={campaign.brief} />
-            <Row label="Recommended duration" value={campaign.recommendedDuration} />
-            <Row label="Hook requirements" value={campaign.hook} />
-            <Row label="Caption / subtitles" value={campaign.captionReq} />
-            <Row label="Aspect ratio" value={campaign.aspectRatio} />
-            <Row label="CTA" value={campaign.cta} />
-            <Row label="Branding" value={campaign.branding} />
+            <div className="space-y-3">
+              {campaign.brief && (
+                <div>
+                  <p className="text-xs font-medium text-muted">What to create</p>
+                  <p className="mt-0.5 text-sm">{campaign.brief}</p>
+                </div>
+              )}
+              {campaign.recommendedDuration && (
+                <div>
+                  <p className="text-xs font-medium text-muted">Duration</p>
+                  <p className="mt-0.5 text-sm">{campaign.recommendedDuration}</p>
+                </div>
+              )}
+              {campaign.hook && (
+                <div>
+                  <p className="text-xs font-medium text-muted">Hook</p>
+                  <p className="mt-0.5 text-sm">{campaign.hook}</p>
+                </div>
+              )}
+              {campaign.captionReq && (
+                <div>
+                  <p className="text-xs font-medium text-muted">Caption</p>
+                  <p className="mt-0.5 text-sm">{campaign.captionReq}</p>
+                </div>
+              )}
+              {campaign.aspectRatio && (
+                <div>
+                  <p className="text-xs font-medium text-muted">Format</p>
+                  <p className="mt-0.5 text-sm">{campaign.aspectRatio}</p>
+                </div>
+              )}
+              {campaign.cta && (
+                <div>
+                  <p className="text-xs font-medium text-muted">CTA</p>
+                  <p className="mt-0.5 text-sm">{campaign.cta}</p>
+                </div>
+              )}
+              {campaign.branding && (
+                <div>
+                  <p className="text-xs font-medium text-muted">Branding</p>
+                  <p className="mt-0.5 text-sm">{campaign.branding}</p>
+                </div>
+              )}
+              {!campaign.brief && !campaign.recommendedDuration && !campaign.hook && (
+                <p className="text-sm text-muted">Not specified.</p>
+              )}
+            </div>
           </Section>
 
-          {/* DO / DON'T */}
+          {/* Do / Don't */}
           <div className="grid gap-4 sm:grid-cols-2">
             <Section title="Do" icon={<Check size={15} className="text-green" />}>
               {campaign.doList?.length ? (
@@ -335,7 +390,7 @@ export default function CampaignDetailPage() {
             </Section>
           </div>
 
-          {/* View / payment rules */}
+          {/* View + payment rules */}
           <Section title="View & payment rules" icon={<Wallet size={15} />}>
             <Row label="What counts as a verified view" value={vr?.verifiedView} />
             <Row
@@ -358,7 +413,6 @@ export default function CampaignDetailPage() {
             <Row label="Minimum views" value={vr?.minViews ? fmtViews(vr.minViews) : "—"} />
             <Row label="Maximum payout" value={vr?.maxPayout ? rup(vr.maxPayout) : "—"} />
             <Row label="If post is deleted / private" value={vr?.deletedPolicy} />
-
           </Section>
 
           {/* Approval process */}
@@ -367,7 +421,7 @@ export default function CampaignDetailPage() {
             <Row label="Expected review time" value={ap?.reviewTime} />
             <Row label="Approval criteria" value={ap?.criteria} />
             {ap?.rejectionReasons?.length ? (
-              <div className="flex items-start justify-between gap-4 border-b py-2.5 last:border-0">
+              <div className="flex items-start justify-between gap-4 border-b border-border/50 py-2.5 last:border-0">
                 <span className="text-sm text-muted">Rejection reasons</span>
                 <span className="text-right text-sm font-medium">
                   {ap.rejectionReasons.map((r) => (
@@ -382,6 +436,21 @@ export default function CampaignDetailPage() {
               </div>
             ) : null}
             <Row label="Appeal process" value={ap?.appeal} />
+          </Section>
+
+          {/* Timeline */}
+          <Section title="Timeline" icon={<Calendar size={15} />}>
+            <Row label="Start date" value={campaign.startDate ?? "—"} />
+            <Row label="End date" value={campaign.endDate ?? "—"} />
+            <Row
+              label="Days remaining"
+              value={
+                <span className="inline-flex items-center gap-1">
+                  <Clock size={13} className="text-muted" /> {campaign.daysLeft ?? "—"}d
+                </span>
+              }
+            />
+            <Row label="Status" value={<StatusPill status={campaign.status} />} />
           </Section>
 
           {/* Example clips */}
@@ -407,7 +476,7 @@ export default function CampaignDetailPage() {
             </Section>
           ) : null}
 
-          {/* Submissions on this campaign */}
+          {/* Submissions */}
           <Section title={`Submissions (${campClips.length})`} icon={<Film size={15} />}>
             <div className="space-y-3">
               {campClips.map((k: Clip) => (

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Search, SlidersHorizontal, X, Heart } from "lucide-react";
 import { CampaignCard } from "@/components/CampaignCard";
 import { useStore } from "@/lib/store";
+import { rup } from "@/lib/format";
 import type { Platform } from "@/lib/types";
 
 const PLATFORMS: Platform[] = ["Instagram", "YouTube", "Kick"];
@@ -38,7 +39,6 @@ export default function ClipperCampaignsPage() {
   }, [campaigns]);
 
   const list = useMemo(() => {
-    // Only show campaigns that are open AND have verified launch payment
     const active = campaigns.filter(
       (c) =>
         (c.status === "open" || c.status === "near_budget") &&
@@ -122,17 +122,33 @@ export default function ClipperCampaignsPage() {
     setMaxDays("");
   };
 
+  // Opportunity summary — only real data
+  const allActive = useMemo(
+    () =>
+      campaigns.filter(
+        (c) =>
+          (c.status === "open" || c.status === "near_budget") &&
+          c.launchPaymentStatus === "verified",
+      ),
+    [campaigns],
+  );
+  const highestCpm = allActive.length
+    ? Math.max(...allActive.map((c) => c.payout))
+    : 0;
+  const endingSoon = allActive.filter((c) => (c.daysLeft ?? 99) <= 7).length;
+
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Campaigns</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Campaigns</h1>
         <p className="mt-1 text-sm text-muted">
-          Open campaigns from creators looking for clippers. Tap a card to view
-          the brief.
+          Find campaigns worth clipping.
         </p>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:flex-wrap">
+      {/* Toolbar */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative min-w-0 flex-1 sm:max-w-md">
           <Search
             size={15}
@@ -146,11 +162,11 @@ export default function ClipperCampaignsPage() {
           />
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex gap-2">
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value)}
-            className="flex-1 rounded-lg border bg-background px-3 py-2.5 text-sm outline-none focus:border-foreground sm:flex-initial"
+            className="rounded-lg border bg-background px-3 py-2.5 text-sm outline-none focus:border-foreground"
           >
             {SORT_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -161,7 +177,7 @@ export default function ClipperCampaignsPage() {
 
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors sm:flex-initial ${
+            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors ${
               showFilters || activeFilterCount > 0
                 ? "border-foreground bg-accent-soft text-foreground"
                 : "text-muted hover:bg-accent-soft/60"
@@ -178,7 +194,7 @@ export default function ClipperCampaignsPage() {
 
           <button
             onClick={() => setShowSaved(!showSaved)}
-            className={`inline-flex flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors sm:flex-initial ${
+            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors ${
               showSaved
                 ? "border-foreground bg-accent-soft text-foreground"
                 : "text-muted hover:bg-accent-soft/60"
@@ -195,9 +211,10 @@ export default function ClipperCampaignsPage() {
         </div>
       </div>
 
+      {/* Filters */}
       {showFilters && (
         <div className="rounded-xl border bg-card p-4">
-          <div className="flex items-center justify-between mb-3">
+          <div className="mb-3 flex items-center justify-between">
             <p className="text-sm font-medium">Filters</p>
             {activeFilterCount > 0 && (
               <button
@@ -303,6 +320,7 @@ export default function ClipperCampaignsPage() {
         </div>
       )}
 
+      {/* Active filter chips */}
       {(activeFilterCount > 0 || showSaved || q) && (
         <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
           <span>
@@ -343,10 +361,53 @@ export default function ClipperCampaignsPage() {
         </div>
       )}
 
+      {/* Opportunity summary */}
+      {allActive.length > 0 && !showSaved && !q && activeFilterCount === 0 && (
+        <div className="flex items-center gap-4 text-xs text-muted">
+          <span>
+            <span className="font-medium text-foreground">{allActive.length}</span> campaigns
+          </span>
+          {highestCpm > 0 && (
+            <>
+              <span className="text-border">·</span>
+              <span>
+                Highest CPM <span className="font-medium text-foreground">{rup(highestCpm)}</span>
+              </span>
+            </>
+          )}
+          {endingSoon > 0 && (
+            <>
+              <span className="text-border">·</span>
+              <span>
+                <span className="font-medium text-amber">{endingSoon}</span> ending soon
+              </span>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Grid or empty */}
       {list.length === 0 ? (
-        <p className="text-sm text-muted">
-          No campaigns match your filters. Try broadening your search.
-        </p>
+        <div className="rounded-xl border border-dashed bg-card py-12 text-center">
+          <p className="text-sm font-medium">
+            {showSaved ? "No saved campaigns" : "No campaigns found"}
+          </p>
+          <p className="mt-1 text-xs text-muted">
+            {showSaved
+              ? "Save campaigns to find them here later."
+              : activeFilterCount > 0
+                ? "Try removing a filter or broadening your search."
+                : "Check back soon for new campaigns."}
+          </p>
+          {activeFilterCount > 0 && (
+            <button
+              onClick={clearFilters}
+              className="mt-3 inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium hover:bg-accent-soft"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {list.map((c, i) => (
