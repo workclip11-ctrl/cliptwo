@@ -6,11 +6,8 @@ import { useRouter } from "next/navigation";
 import {
   Scissors,
   Film,
-  Sparkles,
   ShieldCheck,
   IndianRupee,
-  Zap,
-  Ban,
   Check,
   Send,
   ChevronDown,
@@ -19,14 +16,14 @@ import {
   Eye,
   TrendingUp,
   AlertTriangle,
-  Calculator,
+  Zap,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { CampaignCard } from "@/components/CampaignCard";
 import { CampaignModal } from "@/components/CampaignModal";
-import { rup, clipEarnings } from "@/lib/format";
-import { financeOf, PLATFORM_FEE_RATE } from "@/lib/finance";
+import { rup } from "@/lib/format";
+import { financeOf } from "@/lib/finance";
 import type { Campaign } from "@/lib/types";
 
 const NICHES = ["Podcast", "Gaming", "Finance", "Comedy", "Fitness", "Tech"];
@@ -116,7 +113,7 @@ const FAQ_CATEGORIES = [
       },
       {
         q: "What happens when the budget is exhausted?",
-        a: "When your budget is fully committed, the campaign status changes to \"Budget Reached\" and new submissions are blocked. You can increase the budget to reopen the campaign.",
+        a: 'When your budget is fully committed, the campaign status changes to "Budget Reached" and new submissions are blocked. You can increase the budget to reopen the campaign.',
       },
     ],
   },
@@ -179,175 +176,23 @@ const CREATOR_JOURNEY = [
   { num: "04", label: "Pay only for real views", title: "Budget spends only on approved clips", body: "Your budget only depletes as clips are approved and views accumulate. If a clip underperforms, you simply don't pay for it.", visual: "budget" },
 ];
 
-const CAMPAIGN_PREVIEW = [
-  { title: "The Grind Podcast — Ep. 143", niche: "Podcast", cpm: 220 },
-  { title: "Valorant Ranked Grind", niche: "Gaming", cpm: 160 },
-  { title: "Money Mindset Series", niche: "Finance", cpm: 280 },
-];
-
-function fmtNum(n: number) {
-  if (n >= 100000) return (n / 100000).toFixed(1) + "L";
-  if (n >= 1000) return (n / 1000).toFixed(1) + "K";
-  return String(n);
-}
-
-function HeroVisual() {
-  return (
-    <div className="relative mx-auto w-full max-w-md lg:max-w-lg">
-      {/* Background glow */}
-      <div className="absolute -inset-12 -z-20 rounded-full bg-gradient-to-br from-accent/20 via-transparent to-purple-500/10 blur-3xl" />
-
-      {/* Main phone frame */}
-      <div className="relative mx-auto w-[280px] sm:w-[320px]">
-        {/* Phone body */}
-        <div className="relative overflow-hidden rounded-[2.5rem] border border-border/50 bg-card shadow-2xl shadow-black/10">
-          {/* Notch */}
-          <div className="absolute left-1/2 top-0 z-10 h-6 w-28 -translate-x-1/2 rounded-b-2xl bg-card" />
-
-          {/* Screen content */}
-          <div className="relative aspect-[9/19] overflow-hidden bg-gradient-to-b from-background to-accent-soft/30">
-            {/* Status bar */}
-            <div className="flex items-center justify-between px-6 pt-8 pb-2">
-              <span className="text-[10px] font-medium text-muted">9:41</span>
-              <div className="flex gap-1">
-                <div className="h-1 w-1 rounded-full bg-muted" />
-                <div className="h-1 w-1 rounded-full bg-muted" />
-                <div className="h-1 w-1 rounded-full bg-muted" />
-              </div>
-            </div>
-
-            {/* Video thumbnail - no text overlay */}
-            <div className="mx-4 mt-2 overflow-hidden rounded-2xl">
-              <div className="relative flex aspect-[9/14] items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700">
-                {/* Video timeline effect */}
-                <div className="absolute inset-x-4 top-1/2 h-px bg-white/20" />
-                <div className="absolute left-4 top-1/2 h-3 w-1 -translate-y-1/2 rounded-full bg-white/30" />
-                <div className="absolute right-4 top-1/2 h-3 w-1 -translate-y-1/2 rounded-full bg-white/30" />
-
-                {/* Timeline markers */}
-                <div className="absolute left-8 right-8 top-1/2 flex justify-between">
-                  {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
-                    <div key={i} className={`h-1.5 w-0.5 rounded-full ${i < 5 ? "bg-accent" : "bg-white/20"}`} />
-                  ))}
-                </div>
-
-                {/* Progress bar */}
-                <div className="absolute left-8 right-8 top-[55%] h-1 overflow-hidden rounded-full bg-white/10">
-                  <div className="h-full w-[62%] rounded-full bg-gradient-to-r from-accent to-accent/60" />
-                </div>
-
-                {/* Playhead */}
-                <div className="absolute left-[62%] top-[55%] h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-lg" />
-
-                {/* Center scissors icon */}
-                <div className="relative z-10 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-md">
-                  <svg className="h-8 w-8 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="6" cy="6" r="3" />
-                    <circle cx="6" cy="18" r="3" />
-                    <line x1="20" y1="4" x2="8.12" y2="15.88" />
-                    <line x1="14.47" y1="14.48" x2="20" y2="20" />
-                    <line x1="8.12" y1="8.12" x2="12" y2="12" />
-                  </svg>
-                </div>
-
-                {/* Video frames */}
-                <div className="absolute left-4 top-6 flex gap-1.5">
-                  <div className="h-8 w-12 rounded bg-gradient-to-br from-accent/40 to-accent/20" />
-                  <div className="h-8 w-12 rounded bg-gradient-to-br from-purple-400/40 to-purple-400/20" />
-                  <div className="h-8 w-12 rounded bg-gradient-to-br from-pink-400/40 to-pink-400/20" />
-                </div>
-
-                {/* Duration badge */}
-                <div className="absolute right-4 top-6 rounded bg-black/40 px-2 py-0.5 text-[9px] font-mono text-white/80">
-                  0:42
-                </div>
-              </div>
-            </div>
-
-            {/* Info below thumbnail */}
-            <div className="px-5 pt-4 pb-4">
-              <div className="flex items-center gap-3">
-                <span className="inline-flex items-center gap-1 rounded-full bg-green/20 px-2.5 py-1 text-[10px] font-semibold text-green">
-                  <Zap size={8} /> Live
-                </span>
-                <span className="font-mono text-[11px] text-muted">CPM ₹220</span>
-              </div>
-              <p className="mt-3 text-sm font-semibold">The Grind Podcast — Ep. 142</p>
-              <p className="mt-1 text-[11px] text-muted">by Rohan Malhotra</p>
-              <div className="mt-4 grid grid-cols-3 gap-2.5">
-                {[
-                  ["Clips", "14"],
-                  ["Views", "1.8L"],
-                  ["Paid", "₹18.4K"],
-                ].map(([l, v]) => (
-                  <div key={l} className="rounded-xl bg-accent-soft px-2.5 py-2 text-center">
-                    <p className="text-[10px] text-muted">{l}</p>
-                    <p className="mt-0.5 font-mono text-xs font-bold">{v}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-muted/30">
-                <div className="h-full w-[46%] rounded-full bg-accent" />
-              </div>
-              <p className="mt-1.5 font-mono text-[10px] text-muted">₹18,400 / ₹40,000</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Floating card - left */}
-        <div className="absolute -left-16 top-12 w-32 rotate-[-6deg] rounded-xl border bg-card p-3 shadow-xl shadow-black/5 sm:-left-20 sm:w-36">
-          <div className="flex items-center gap-1.5">
-            <span className="flex h-5 w-5 items-center justify-center rounded bg-amber/10">
-              <IndianRupee size={10} className="text-amber" />
-            </span>
-            <span className="text-[9px] font-medium text-muted">Earned</span>
-          </div>
-          <p className="mt-1.5 font-mono text-sm font-bold">₹12,400</p>
-          <div className="mt-1 h-0.5 w-full overflow-hidden rounded-full bg-muted/20">
-            <div className="h-full w-3/4 rounded-full bg-amber" />
-          </div>
-        </div>
-
-        {/* Floating card - right */}
-        <div className="absolute -right-16 top-28 w-32 rotate-[6deg] rounded-xl border bg-card p-3 shadow-xl shadow-black/5 sm:-right-20 sm:w-36">
-          <div className="flex items-center gap-1.5">
-            <span className="flex h-5 w-5 items-center justify-center rounded bg-green/10">
-              <TrendingUp size={10} className="text-green" />
-            </span>
-            <span className="text-[9px] font-medium text-muted">Views</span>
-          </div>
-          <p className="mt-1.5 font-mono text-sm font-bold">1.8L</p>
-          <div className="mt-1 h-0.5 w-full overflow-hidden rounded-full bg-muted/20">
-            <div className="h-full w-full rounded-full bg-green" />
-          </div>
-        </div>
-
-        {/* Floating badge - bottom */}
-        <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 rounded-full border bg-card px-4 py-1.5 shadow-lg">
-          <div className="flex items-center gap-2">
-            <BadgeCheck size={14} className="text-green" />
-            <span className="text-[11px] font-medium">Verified & Paid</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function JourneyVisual({ stageKey }: { stageKey: string }) {
   if (stageKey === "campaigns") {
     return (
-      <div className="grid gap-2 sm:grid-cols-2">
-        {CAMPAIGN_PREVIEW.map((c) => (
-          <div key={c.title} className="rounded-xl border bg-background p-3.5">
-            <div className="flex items-center justify-between">
-              <span className="inline-flex items-center gap-1 rounded-full bg-green/10 px-2 py-0.5 text-[10px] font-medium text-green">
-                <Zap size={9} /> 12d left
-              </span>
-              <span className="font-mono text-sm font-medium text-amber">{rup(c.cpm)}</span>
+      <div className="space-y-2.5">
+        {[
+          { title: "Podcast clips — Ep. 143", niche: "Podcast", cpm: 220, platform: "Instagram" as const },
+          { title: "Valorant ranked montage", niche: "Gaming", cpm: 160, platform: "YouTube" as const },
+        ].map((c) => (
+          <div key={c.title} className="flex items-center gap-3 rounded-[10px] border border-border/40 bg-background px-4 py-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-accent-soft">
+              <PlatformIcon p={c.platform} size={16} />
             </div>
-            <p className="mt-2 text-sm font-medium">{c.title}</p>
-            <p className="text-xs text-muted">{c.niche}</p>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[14px] font-medium">{c.title}</p>
+              <p className="text-[12px] text-muted">{c.niche}</p>
+            </div>
+            <span className="font-mono text-[14px] font-semibold">{rup(c.cpm)}</span>
           </div>
         ))}
       </div>
@@ -355,19 +200,18 @@ function JourneyVisual({ stageKey }: { stageKey: string }) {
   }
   if (stageKey === "connect") {
     return (
-      <div className="divide-y rounded-xl border">
+      <div className="space-y-2">
         {[
-          ["@thegrindclips", "Instagram", "verified"],
-          ["@editzbypriya", "YouTube", "verified"],
-          ["@clipsdaily.in", "Instagram", "connecting"],
-        ].map(([h, p, s]) => (
-          <div key={h} className="flex items-center justify-between px-4 py-3 text-sm">
-            <span className="flex items-center gap-2">
-              <PlatformIcon p={p} />
-              <span className="font-mono text-sm">{h}</span>
+          { handle: "@thegrindclips", platform: "Instagram" as const, verified: true },
+          { handle: "@editzbypriya", platform: "YouTube" as const, verified: true },
+        ].map((a) => (
+          <div key={a.handle} className="flex items-center justify-between rounded-[10px] border border-border/40 bg-background px-4 py-3">
+            <span className="flex items-center gap-2.5">
+              <PlatformIcon p={a.platform} size={16} />
+              <span className="font-mono text-[14px]">{a.handle}</span>
             </span>
-            <span className={`text-xs font-medium ${s === "verified" ? "text-green" : "text-amber"}`}>
-              {s === "verified" ? "Verified" : "Connecting…"}
+            <span className="flex items-center gap-1 text-[12px] font-medium text-green">
+              <BadgeCheck size={13} /> Verified
             </span>
           </div>
         ))}
@@ -376,15 +220,14 @@ function JourneyVisual({ stageKey }: { stageKey: string }) {
   }
   if (stageKey === "payout") {
     return (
-      <div className="rounded-xl border p-4">
-        <div className="flex items-center gap-2 font-mono text-sm">
-          <IndianRupee size={16} className="text-amber" />
+      <div className="rounded-[10px] border border-border/40 bg-background p-4">
+        <div className="flex items-center gap-2 font-mono text-[14px]">
+          <IndianRupee size={15} className="text-amber" />
           priya@okhdfcbank
-          <BadgeCheck size={15} className="ml-auto text-green" />
-          <span className="text-xs font-semibold text-green">Verified</span>
+          <BadgeCheck size={14} className="ml-auto text-green" />
         </div>
-        <p className="mt-3 text-xs text-muted">
-          Payouts settle here automatically when a cycle closes — no manual bank transfer chasing.
+        <p className="mt-2 text-[13px] text-muted">
+          Payouts settle here when a cycle closes.
         </p>
       </div>
     );
@@ -392,10 +235,10 @@ function JourneyVisual({ stageKey }: { stageKey: string }) {
   if (stageKey === "submit") {
     return (
       <div className="space-y-3">
-        <div className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm text-muted">
+        <div className="flex items-center gap-2 rounded-[10px] border border-border/40 bg-background px-4 py-3 text-[13px] text-muted">
           instagram.com/reel/xk29a
         </div>
-        <button className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white">
+        <button className="inline-flex items-center gap-1.5 rounded-[8px] bg-foreground px-4 py-2 text-[13px] font-medium text-background">
           <Send size={13} /> Submit for review
         </button>
       </div>
@@ -403,25 +246,24 @@ function JourneyVisual({ stageKey }: { stageKey: string }) {
   }
   if (stageKey === "cashout") {
     return (
-      <div className="overflow-hidden rounded-xl border">
-        <table className="w-full text-sm">
+      <div className="overflow-hidden rounded-[10px] border border-border/40">
+        <table className="w-full text-[13px]">
           <thead>
-            <tr className="border-b text-left text-xs text-muted">
-              <th className="px-4 py-2 font-medium">Campaign</th>
-              <th className="px-4 py-2 font-medium">Status</th>
-              <th className="px-4 py-2 text-right font-medium">Amount</th>
+            <tr className="border-b border-border/30 text-left text-[12px] text-muted">
+              <th className="px-4 py-2.5 font-medium">Campaign</th>
+              <th className="px-4 py-2.5 font-medium">Status</th>
+              <th className="px-4 py-2.5 text-right font-medium">Amount</th>
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody className="divide-y divide-border/30">
             {[
-              ["The Grind Podcast · Aug", "paid", 4048],
-              ["Money Mindset · Aug", "pending", 1820],
-              ["Valorant Grind · Jul", "paid", 940],
+              ["Podcast · Aug", "paid", 4048],
+              ["Finance · Aug", "pending", 1820],
             ].map(([c, s, a]) => (
               <tr key={c as string}>
                 <td className="px-4 py-2.5">{c}</td>
                 <td className="px-4 py-2.5">
-                  <span className={`text-xs font-medium ${s === "paid" ? "text-green" : "text-amber"}`}>{s}</span>
+                  <span className={`text-[12px] font-medium ${s === "paid" ? "text-green" : "text-amber"}`}>{s}</span>
                 </td>
                 <td className="px-4 py-2.5 text-right font-mono">{rup(a as number)}</td>
               </tr>
@@ -437,30 +279,25 @@ function JourneyVisual({ stageKey }: { stageKey: string }) {
         {[
           ["CPM", "₹220 / 1,000 views"],
           ["Budget", "₹40,000"],
-          ["Niche", "Podcast"],
         ].map(([k, v]) => (
-          <div key={k} className="flex items-center justify-between rounded-lg border bg-background px-3 py-2 text-sm">
+          <div key={k} className="flex items-center justify-between rounded-[10px] border border-border/40 bg-background px-4 py-2.5 text-[13px]">
             <span className="text-muted">{k}</span>
-            <span className="font-mono">{v}</span>
+            <span className="font-mono font-medium">{v}</span>
           </div>
         ))}
-        <button className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white">
-          Fund &amp; launch campaign
-        </button>
       </div>
     );
   }
   if (stageKey === "submissions") {
     return (
-      <div className="divide-y rounded-xl border">
+      <div className="space-y-2">
         {[
-          ["Priya Nair", "approved"],
-          ["Dev Shah", "pending"],
-          ["Arjun Rao", "pending"],
-        ].map(([n, s]) => (
-          <div key={n} className="flex items-center justify-between px-4 py-3 text-sm">
-            <span className="font-medium">{n}</span>
-            <span className={`text-xs font-medium ${s === "approved" ? "text-green" : "text-amber"}`}>{s}</span>
+          { name: "Priya Nair", status: "approved" },
+          { name: "Dev Shah", status: "pending" },
+        ].map((s) => (
+          <div key={s.name} className="flex items-center justify-between rounded-[10px] border border-border/40 bg-background px-4 py-3 text-[13px]">
+            <span className="font-medium">{s.name}</span>
+            <span className={`text-[12px] font-medium ${s.status === "approved" ? "text-green" : "text-amber"}`}>{s.status}</span>
           </div>
         ))}
       </div>
@@ -468,14 +305,14 @@ function JourneyVisual({ stageKey }: { stageKey: string }) {
   }
   if (stageKey === "review") {
     return (
-      <div className="flex items-center justify-between rounded-xl border px-4 py-3 text-sm">
+      <div className="flex items-center justify-between rounded-[10px] border border-border/40 bg-background px-4 py-3 text-[13px]">
         <span className="flex items-center gap-2">
           <span className="font-medium">Arjun Rao</span>
-          <span className="font-mono text-xs text-muted">instagram.com/reel/pw001</span>
+          <span className="font-mono text-[12px] text-muted">reel/pw001</span>
         </span>
         <span className="flex gap-1.5">
-          <span className="flex h-7 w-7 items-center justify-center rounded-md border text-green"><Check size={14} /></span>
-          <span className="flex h-7 w-7 items-center justify-center rounded-md border text-red"><Ban size={14} /></span>
+          <span className="flex h-7 w-7 items-center justify-center rounded-[6px] border border-border/60 text-green"><Check size={14} /></span>
+          <span className="flex h-7 w-7 items-center justify-center rounded-[6px] border border-border/60 text-red"><AlertTriangle size={14} /></span>
         </span>
       </div>
     );
@@ -484,10 +321,9 @@ function JourneyVisual({ stageKey }: { stageKey: string }) {
     return (
       <div>
         <div className="h-1.5 w-full overflow-hidden rounded-full bg-accent-soft">
-          <div className="h-full w-[46%] rounded-full bg-accent" />
+          <div className="h-full w-[46%] rounded-full bg-foreground" />
         </div>
-        <p className="mt-1.5 font-mono text-[11px] text-muted">₹18,400 / ₹40,000 spent</p>
-        <p className="mt-3 text-xs text-muted">Only approved clips draw down your budget — nothing pays out on a guess.</p>
+        <p className="mt-1.5 font-mono text-[12px] text-muted">₹18,400 / ₹40,000 spent</p>
       </div>
     );
   }
@@ -502,45 +338,37 @@ function Journey() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <div className="inline-flex rounded-xl border bg-card p-1">
+      <div className="inline-flex rounded-[10px] border border-border/40 bg-card p-1">
         <button
-          onClick={() => {
-            setTab("clipper");
-            setStep(0);
-          }}
-          className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${tab === "clipper" ? "bg-accent-soft text-foreground" : "text-muted"}`}
+          onClick={() => { setTab("clipper"); setStep(0); }}
+          className={`flex items-center gap-1.5 rounded-[8px] px-4 py-2 text-[14px] font-medium transition-colors cursor-pointer ${tab === "clipper" ? "bg-foreground text-background" : "text-muted hover:text-foreground"}`}
         >
           <Scissors size={14} /> I&apos;m a clipper
         </button>
         <button
-          onClick={() => {
-            setTab("creator");
-            setStep(0);
-          }}
-          className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${tab === "creator" ? "bg-accent-soft text-foreground" : "text-muted"}`}
+          onClick={() => { setTab("creator"); setStep(0); }}
+          className={`flex items-center gap-1.5 rounded-[8px] px-4 py-2 text-[14px] font-medium transition-colors cursor-pointer ${tab === "creator" ? "bg-foreground text-background" : "text-muted hover:text-foreground"}`}
         >
           <Film size={14} /> I&apos;m a creator
         </button>
       </div>
 
-      <p className="mt-4 text-sm text-muted">Click a stage to preview it.</p>
-
-      <div className="mt-4 grid gap-6 lg:grid-cols-[200px_1fr]">
+      <div className="mt-8 grid gap-8 lg:grid-cols-[200px_1fr]">
         <div className="flex flex-col">
           {journey.map((s, i) => (
             <button
               key={s.num}
               onClick={() => setStep(i)}
-              className={`border-l-2 py-3 pl-4 text-left transition-colors ${i === step ? "border-accent" : "border-border"}`}
+              className={`border-l-2 py-3 pl-4 text-left transition-colors cursor-pointer ${i === step ? "border-foreground" : "border-border/40"}`}
             >
               <span className={`font-mono text-[11px] ${i === step ? "text-foreground" : "text-muted"}`}>{s.num}</span>
-              <span className={`block text-sm font-medium ${i === step ? "text-foreground" : "text-muted"}`}>{s.label}</span>
+              <span className={`block text-[14px] font-medium ${i === step ? "text-foreground" : "text-muted"}`}>{s.label}</span>
             </button>
           ))}
         </div>
-        <div className="rounded-2xl border bg-card p-6">
-          <h3 className="text-lg font-semibold">{stage.title}</h3>
-          <p className="mt-2 max-w-md text-sm text-muted">{stage.body}</p>
+        <div className="rounded-[14px] border border-border/40 bg-card p-6">
+          <h3 className="text-[18px] font-bold tracking-tight">{stage.title}</h3>
+          <p className="mt-2 max-w-md text-[14px] leading-relaxed text-muted">{stage.body}</p>
           <div className="mt-6">
             <JourneyVisual stageKey={stage.visual} />
           </div>
@@ -556,99 +384,44 @@ function FAQ() {
   const cat = FAQ_CATEGORIES.find((c) => c.title === tab) ?? FAQ_CATEGORIES[0];
   return (
     <div>
-      <div className="mx-auto mb-6 flex w-fit rounded-full border bg-card p-1">
+      <div className="mx-auto mb-8 flex w-fit gap-1 rounded-[10px] border border-border/40 bg-card p-1">
         {FAQ_CATEGORIES.map((c) => (
           <button
             key={c.title}
-            onClick={() => {
-              setTab(c.title);
-              setOpen(null);
-            }}
-            className={`relative rounded-full px-5 py-2 text-sm font-medium transition-colors ${
-              tab === c.title
-                ? "bg-accent text-white"
-                : "text-muted hover:text-foreground"
+            onClick={() => { setTab(c.title); setOpen(null); }}
+            className={`rounded-[8px] px-5 py-2 text-[14px] font-medium transition-colors cursor-pointer ${
+              tab === c.title ? "bg-foreground text-background" : "text-muted hover:text-foreground"
             }`}
           >
             {c.title}
           </button>
         ))}
       </div>
-      <div className="divide-y rounded-xl border bg-card">
+      <div className="divide-y divide-border/30 rounded-[14px] border border-border/40 bg-card">
         {cat.items.map((f) => (
           <div key={f.q}>
             <button
               onClick={() => setOpen(open === f.q ? null : f.q)}
-              className="flex w-full items-center justify-between px-5 py-4 text-left text-[15px] font-medium"
+              className="flex w-full items-center justify-between px-6 py-5 text-left text-[15px] font-medium cursor-pointer"
             >
               {f.q}
               <ChevronDown
                 size={18}
-                className={`shrink-0 text-muted transition-transform ${open === f.q ? "rotate-180" : ""}`}
+                className={`shrink-0 text-muted transition-transform duration-200 ${open === f.q ? "rotate-180" : ""}`}
               />
             </button>
-            {open === f.q && (
-              <p className="px-5 pb-4 text-sm leading-relaxed text-muted">
+            <div
+              className={`overflow-hidden transition-all duration-200 ${
+                open === f.q ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
+              }`}
+            >
+              <p className="px-6 pb-5 text-[14px] leading-relaxed text-muted">
                 {f.a}
               </p>
-            )}
+            </div>
           </div>
         ))}
       </div>
-    </div>
-  );
-}
-
-function EarningsCalculator() {
-  const [views, setViews] = useState(10000);
-  const [cpm, setCpm] = useState(200);
-  const gross = Math.round((views / 1000) * cpm);
-  const fee = Math.round(gross * PLATFORM_FEE_RATE);
-  const net = gross - fee;
-  return (
-    <div className="rounded-2xl border bg-card p-6">
-      <div className="flex items-center gap-2 mb-4">
-        <Calculator size={18} className="text-amber" />
-        <h3 className="text-lg font-semibold">Earnings calculator</h3>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className="mb-1 block text-xs text-muted">Verified views</label>
-          <input
-            type="number"
-            value={views}
-            onChange={(e) => setViews(Math.max(0, Number(e.target.value)))}
-            className="w-full rounded-lg border bg-background px-3 py-2 text-sm font-mono outline-none focus:border-foreground"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs text-muted">Campaign CPM (₹)</label>
-          <input
-            type="number"
-            value={cpm}
-            onChange={(e) => setCpm(Math.max(0, Number(e.target.value)))}
-            className="w-full rounded-lg border bg-background px-3 py-2 text-sm font-mono outline-none focus:border-foreground"
-          />
-        </div>
-      </div>
-      <div className="mt-5 grid grid-cols-3 gap-3">
-        <div className="rounded-xl bg-accent-soft p-3 text-center">
-          <p className="text-[11px] text-muted">Gross earnings</p>
-          <p className="font-mono text-lg font-semibold">{rup(gross)}</p>
-        </div>
-        <div className="rounded-xl bg-accent-soft p-3 text-center">
-          <p className="text-[11px] text-muted">Platform fee ({Math.round(PLATFORM_FEE_RATE * 100)}%)</p>
-          <p className="font-mono text-lg font-semibold text-muted">{rup(fee)}</p>
-        </div>
-        <div className="rounded-xl bg-accent-soft p-3 text-center">
-          <p className="text-[11px] text-muted">You receive</p>
-          <p className="font-mono text-lg font-semibold text-green">{rup(net)}</p>
-        </div>
-      </div>
-      <p className="mt-3 text-xs text-muted">
-        Actual payout depends on campaign rules, view verification, and approval.
-        This is an estimate only.
-      </p>
     </div>
   );
 }
@@ -664,7 +437,6 @@ export default function Home() {
     siteSettings.heroSubtitle ||
     "cliptwo connects creators who have long-form content with clippers who cut it into clips — paid per verified view, settled straight to UPI.";
 
-  // Database-backed statistics
   const stats = useMemo(() => {
     const openCampaigns = campaigns.filter((c) => c.status === "open" || c.status === "near_budget").length;
     const totalViews = clips.reduce((s, k) => s + (k.verifiedViews ?? 0), 0);
@@ -674,7 +446,6 @@ export default function Home() {
     return { openCampaigns, totalViews, clippers, paidOut };
   }, [clips, campaigns, financeRecords]);
 
-  // Featured campaigns from database
   const featuredIds = siteSettings.featuredIds;
   const featured = useMemo(() => {
     const open = campaigns.filter(
@@ -686,149 +457,247 @@ export default function Home() {
     return open.slice(0, 4);
   }, [campaigns, featuredIds]);
 
-  // Top earners for success stories (real data only)
-  const topEarners = useMemo(() => {
-    const byClipper = new Map<string, { earned: number; clips: number; views: number }>();
-    for (const k of clips) {
-      const e = clipEarnings(k, campaigns);
-      const cur = byClipper.get(k.clipper) ?? { earned: 0, clips: 0, views: 0 };
-      cur.earned += e;
-      cur.clips += 1;
-      cur.views += (k.verifiedViews ?? 0);
-      byClipper.set(k.clipper, cur);
-    }
-    return Array.from(byClipper.entries())
-      .map(([name, data]) => ({ name, ...data }))
-      .sort((a, b) => b.earned - a.earned)
-      .slice(0, 3);
-  }, [clips, campaigns]);
-
   return (
     <main className="min-h-screen">
-      <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3.5">
-          <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
-            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-accent text-xs text-white">
-              <Scissors size={13} />
+      {/* ── Header ── */}
+      <header className="sticky top-0 z-40 border-b border-border/40 bg-background/80 backdrop-blur-md">
+        <div className="mx-auto flex max-w-[1120px] items-center justify-between px-6 py-4">
+          <Link href="/" className="flex items-center gap-2.5 font-bold tracking-tight cursor-pointer">
+            <span className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-foreground text-[13px] text-background">
+              <Scissors size={14} />
             </span>
-            cliptwo
+            <span className="text-[17px]">cliptwo</span>
           </Link>
-          <nav className="hidden items-center gap-7 text-sm text-muted sm:flex">
-            <a href="#how" className="hover:text-foreground">How it works</a>
-            <a href="#why" className="hover:text-foreground">Why cliptwo</a>
-            <a href="#faq" className="hover:text-foreground">FAQ</a>
+          <nav className="hidden items-center gap-7 text-[14px] text-muted md:flex">
+            <a href="#how" className="transition-colors hover:text-foreground cursor-pointer">How it works</a>
+            <a href="#why" className="transition-colors hover:text-foreground cursor-pointer">Why cliptwo</a>
+            <a href="#faq" className="transition-colors hover:text-foreground cursor-pointer">FAQ</a>
           </nav>
-          <div className="flex items-center gap-2">
-            <Link href="/login" className="rounded-lg border px-3.5 py-1.5 text-sm font-medium hover:bg-accent-soft">
+          <div className="flex items-center gap-2.5">
+            <Link href="/login" className="rounded-[8px] border border-border/60 px-4 py-2 text-[14px] font-medium transition-colors hover:bg-accent-soft cursor-pointer">
               Log in
             </Link>
-            <Link href="/login?mode=signup" className="rounded-lg bg-accent px-3.5 py-1.5 text-sm font-medium text-white hover:opacity-90">
-              Get started
+            <Link href="/login?mode=signup" className="rounded-[8px] bg-foreground px-4 py-2 text-[14px] font-medium text-background transition-opacity hover:opacity-90 cursor-pointer">
+              Sign up
             </Link>
           </div>
         </div>
       </header>
 
       {/* ── Hero ── */}
-      <section className="mx-auto grid max-w-6xl gap-12 px-6 py-20 lg:grid-cols-2 lg:items-center">
+      <section className="mx-auto grid max-w-[1120px] gap-16 px-6 py-24 lg:grid-cols-2 lg:items-center">
         <div>
-          <span className="inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1 text-xs font-medium text-muted shadow-sm">
-            <Sparkles size={13} /> India&apos;s clipping marketplace
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border/40 bg-card px-3.5 py-1 text-[12px] font-medium text-muted">
+            India&apos;s clipping marketplace
           </span>
-          <h1 className="mt-6 text-4xl font-bold tracking-tight sm:text-5xl lg:text-[3.5rem] lg:leading-[1.1]">
+          <h1 className="mt-7 text-[36px] font-bold tracking-tight leading-[1.15] sm:text-[44px] lg:text-[52px]">
             {heroTitle}
           </h1>
-          <p className="mt-5 max-w-md text-lg leading-relaxed text-muted">
+          <p className="mt-6 max-w-md text-[17px] leading-relaxed text-muted">
             {heroSubtitle}
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Link href="/login?role=clipper" className="inline-flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-accent/25 transition-all hover:scale-[1.02] hover:shadow-xl hover:shadow-accent/30">
-              <Scissors size={15} /> For Clippers
+          <div className="mt-9 flex flex-wrap gap-3">
+            <Link href="/login?role=clipper" className="inline-flex h-12 items-center gap-2.5 rounded-[10px] bg-foreground px-7 text-[15px] font-semibold text-background transition-opacity hover:opacity-90 cursor-pointer">
+              <Scissors size={16} /> Start clipping
             </Link>
-            <Link href="/login?role=creator" className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-6 py-3 text-sm font-semibold transition-all hover:scale-[1.02] hover:shadow-lg">
-              <Film size={15} /> For Creators
+            <Link href="/login?role=creator" className="inline-flex h-12 items-center gap-2.5 rounded-[10px] border border-border/60 bg-card px-7 text-[15px] font-semibold transition-colors hover:bg-accent-soft cursor-pointer">
+              <Film size={16} /> Launch a campaign
             </Link>
           </div>
-          <div className="mt-8 flex flex-wrap items-center gap-6 text-sm text-muted">
+          <div className="mt-9 flex flex-wrap items-center gap-6 text-[14px] text-muted">
             <span className="flex items-center gap-2"><ShieldCheck size={16} className="text-green" /> Admin-reviewed clips</span>
             <span className="flex items-center gap-2"><IndianRupee size={16} className="text-amber" /> UPI-native payouts</span>
           </div>
         </div>
-        <HeroVisual />
-      </section>
 
-      {/* ── Real platform statistics (hidden) ── */}
-      {false && (
-      <section className="mx-auto max-w-6xl px-6 pb-4">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          {[
-            { num: fmtNum(stats.totalViews), label: "views tracked" },
-            { num: String(stats.clippers), label: "active clippers" },
-            { num: String(stats.openCampaigns), label: "live campaigns" },
-            { num: rup(stats.paidOut / 100), label: "paid out to clippers" },
-          ].map((s) => (
-            <div key={s.label} className="rounded-2xl border bg-card p-6 text-center shadow-sm">
-              <p className="font-mono text-3xl font-bold tracking-tight">{s.num}</p>
-              <p className="mt-1.5 text-xs font-medium text-muted">{s.label}</p>
+        {/* Phone mockup — real ClipTwo product screen */}
+        <div className="relative mx-auto w-full max-w-md lg:max-w-lg">
+          <div className="relative mx-auto w-[280px] sm:w-[300px]">
+            {/* Phone body */}
+            <div className="relative overflow-hidden rounded-[2.5rem] border border-border/30 bg-card shadow-2xl shadow-black/8">
+              {/* Notch */}
+              <div className="absolute left-1/2 top-0 z-10 h-6 w-28 -translate-x-1/2 rounded-b-2xl bg-card" />
+
+              {/* Screen */}
+              <div className="relative aspect-[9/19] overflow-hidden bg-background">
+                {/* Status bar */}
+                <div className="flex items-center justify-between px-6 pt-8 pb-2">
+                  <span className="text-[10px] font-medium text-muted">9:41</span>
+                  <div className="flex gap-1">
+                    <div className="h-1 w-1 rounded-full bg-muted" />
+                    <div className="h-1 w-1 rounded-full bg-muted" />
+                    <div className="h-1 w-1 rounded-full bg-muted" />
+                  </div>
+                </div>
+
+                {/* App header */}
+                <div className="px-4 pt-2 pb-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[13px] font-bold tracking-tight">cliptwo</span>
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent-soft text-[10px] font-bold">R</span>
+                  </div>
+                  <p className="mt-2 text-[10px] text-muted">Browse campaigns</p>
+                </div>
+
+                {/* Campaign thumbnail — dominant visual */}
+                <div className="mx-3 overflow-hidden rounded-[12px]">
+                  <div className="relative aspect-[16/10] bg-gradient-to-br from-slate-800 via-slate-700 to-slate-600">
+                    {/* Real thumbnail if available */}
+                    {featured[0]?.thumbnails?.[0] ? (
+                      <img src={featured[0].thumbnails[0]} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full items-center justify-center">
+                        <Scissors size={28} className="text-white/20" />
+                      </div>
+                    )}
+                    {/* Duration badge */}
+                    <div className="absolute right-2 bottom-2 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-mono text-white/90">
+                      0:42
+                    </div>
+                  </div>
+                </div>
+
+                {/* Campaign info */}
+                <div className="px-4 pt-3">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-green/15 px-2 py-0.5 text-[9px] font-semibold text-green">
+                      <Zap size={7} /> Live
+                    </span>
+                    <span className="font-mono text-[10px] text-muted">CPM ₹220</span>
+                  </div>
+                  <p className="mt-2 text-[12px] font-semibold leading-tight">
+                    {featured[0]?.title || "Podcast clips — Ep. 143"}
+                  </p>
+                  <p className="mt-0.5 text-[10px] text-muted">
+                    by {featured[0]?.creator || "Rohan Malhotra"}
+                  </p>
+                </div>
+
+                {/* Platform + budget */}
+                <div className="px-4 pt-3">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="flex items-center gap-1 text-muted">
+                      <PlatformIcon p="Instagram" size={10} /> Instagram
+                    </span>
+                    <span className="font-mono text-muted">₹18,400 / ₹40,000</span>
+                  </div>
+                  <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-muted/20">
+                    <div className="h-full w-[46%] rounded-full bg-foreground" />
+                  </div>
+                </div>
+
+                {/* Action button */}
+                <div className="px-4 pt-4">
+                  <button className="flex h-9 w-full items-center justify-center rounded-[8px] bg-foreground text-[11px] font-semibold text-background">
+                    View campaign
+                  </button>
+                </div>
+
+                {/* Bottom nav hint */}
+                <div className="absolute inset-x-0 bottom-0 border-t border-border/30 bg-card px-6 py-3">
+                  <div className="flex items-center justify-between text-[9px] text-muted">
+                    <span className="flex flex-col items-center gap-0.5 font-medium text-foreground">
+                      <Zap size={12} /> Discover
+                    </span>
+                    <span className="flex flex-col items-center gap-0.5">
+                      <Film size={12} /> My clips
+                    </span>
+                    <span className="flex flex-col items-center gap-0.5">
+                      <IndianRupee size={12} /> Wallet
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
-          ))}
+
+            {/* Floating card — earned */}
+            <div className="absolute -left-12 top-16 w-32 rotate-[-4deg] rounded-[10px] border border-border/30 bg-card p-3 shadow-lg shadow-black/5 sm:-left-16 sm:w-36">
+              <div className="flex items-center gap-1.5">
+                <span className="flex h-5 w-5 items-center justify-center rounded-[6px] bg-amber/10">
+                  <IndianRupee size={10} className="text-amber" />
+                </span>
+                <span className="text-[10px] font-medium text-muted">Earned</span>
+              </div>
+              <p className="mt-1.5 font-mono text-[14px] font-bold">{rup(stats.paidOut / 100 || 12400)}</p>
+            </div>
+
+            {/* Floating card — views */}
+            <div className="absolute -right-12 top-32 w-32 rotate-[4deg] rounded-[10px] border border-border/30 bg-card p-3 shadow-lg shadow-black/5 sm:-right-16 sm:w-36">
+              <div className="flex items-center gap-1.5">
+                <span className="flex h-5 w-5 items-center justify-center rounded-[6px] bg-green/10">
+                  <TrendingUp size={10} className="text-green" />
+                </span>
+                <span className="text-[10px] font-medium text-muted">Views</span>
+              </div>
+              <p className="mt-1.5 font-mono text-[14px] font-bold">
+                {stats.totalViews >= 1000 ? (stats.totalViews / 1000).toFixed(1) + "K" : "1.8K"}
+              </p>
+            </div>
+
+            {/* Verified badge */}
+            <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-border/30 bg-card px-4 py-1.5 shadow-md">
+              <div className="flex items-center gap-1.5">
+                <BadgeCheck size={13} className="text-green" />
+                <span className="text-[11px] font-medium">Verified &amp; Paid</span>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
-      )}
 
-      <div className="mt-6 border-y bg-card">
+      {/* ── Ticker ── */}
+      <div className="border-y border-border/30 bg-card">
         <div className="overflow-hidden">
           <div className="flex w-max animate-ticker">
             {[...TICKER, ...TICKER, ...TICKER, ...TICKER, ...TICKER, ...TICKER].map((t, i) => (
-              <span key={i} className="flex items-center gap-2 px-8 text-xs font-semibold uppercase tracking-wide text-muted">
-                <span className="text-accent">●</span> {t}
+              <span key={i} className="flex items-center gap-2 px-8 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                <span className="text-foreground/30">●</span> {t}
               </span>
             ))}
           </div>
         </div>
       </div>
 
-      <div className="mx-auto max-w-5xl px-6 py-10 text-center">
+      {/* ── Platforms ── */}
+      <div className="mx-auto max-w-[1120px] px-6 py-12 text-center">
         <p className="text-[11px] font-semibold uppercase tracking-widest text-muted">
           Built for every niche, and every platform that matters
         </p>
         <div className="mt-5 flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
           {NICHES.map((n) => (
-            <span key={n} className="flex items-center gap-1.5 text-sm font-semibold text-muted">
-              <Sparkles size={13} className="text-muted" /> {n}
-            </span>
+            <span key={n} className="text-[13px] font-medium text-muted">{n}</span>
           ))}
-          <span className="flex items-center gap-1.5 text-sm font-semibold text-muted"><PlatformIcon p="Instagram" size={15} /> Instagram</span>
-          <span className="flex items-center gap-1.5 text-sm font-semibold text-muted"><PlatformIcon p="YouTube" size={15} /> YouTube</span>
-          <span className="flex items-center gap-1.5 text-sm font-semibold text-muted"><PlatformIcon p="Kick" size={15} /> Kick</span>
+          <span className="flex items-center gap-1.5 text-[13px] font-medium text-muted"><PlatformIcon p="Instagram" size={14} /> Instagram</span>
+          <span className="flex items-center gap-1.5 text-[13px] font-medium text-muted"><PlatformIcon p="YouTube" size={14} /> YouTube</span>
+          <span className="flex items-center gap-1.5 text-[13px] font-medium text-muted/50"><PlatformIcon p="Kick" size={14} /> Kick <span className="text-[10px]">(coming soon)</span></span>
         </div>
       </div>
 
       {/* ── How it works ── */}
-      <section id="how" className="mx-auto max-w-6xl px-6 py-20">
-        <p className="text-center text-xs font-semibold uppercase tracking-widest text-muted">How it works</p>
-        <h2 className="mx-auto mt-4 max-w-xl text-center text-3xl font-bold tracking-tight sm:text-4xl">One loop, two sides.</h2>
-        <p className="mx-auto mt-4 max-w-lg text-center text-lg leading-relaxed text-muted">
+      <section id="how" className="mx-auto max-w-[1120px] px-6 py-24">
+        <p className="text-center text-[11px] font-semibold uppercase tracking-widest text-muted">How it works</p>
+        <h2 className="mx-auto mt-4 max-w-xl text-center text-[32px] font-bold tracking-tight sm:text-[40px]">One loop, two sides.</h2>
+        <p className="mx-auto mt-4 max-w-lg text-center text-[16px] leading-relaxed text-muted">
           The platform&apos;s only job is to run this loop reliably — without either side chasing the other for money or footage.
         </p>
-        <div className="mt-12">
+        <div className="mt-14">
           <Journey />
         </div>
       </section>
 
       {/* ── Live campaigns ── */}
       {featured.length > 0 && (
-        <section className="mx-auto max-w-6xl px-6 py-20">
+        <section className="mx-auto max-w-[1120px] px-6 py-24">
           <div className="flex items-end justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-muted">Live now</p>
-              <h2 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">Active campaigns</h2>
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted">Live now</p>
+              <h2 className="mt-4 text-[32px] font-bold tracking-tight sm:text-[40px]">Active campaigns</h2>
             </div>
             <button
               onClick={() => router.push("/campaigns")}
-              className="inline-flex items-center gap-1.5 rounded-xl border bg-card px-5 py-2.5 text-sm font-semibold transition-all hover:scale-[1.02] hover:shadow-lg"
+              className="inline-flex h-10 items-center gap-1.5 rounded-[8px] border border-border/60 bg-card px-5 text-[14px] font-semibold transition-colors hover:bg-accent-soft cursor-pointer"
             >
-              Browse all <ArrowRight size={15} />
+              Browse all <ArrowRight size={14} />
             </button>
           </div>
           <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -840,108 +709,42 @@ export default function Home() {
       )}
 
       {/* ── Why ClipTwo ── */}
-      <section id="why" className="border-y bg-card">
-        <div className="mx-auto max-w-6xl px-6 py-20">
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted">Why cliptwo</p>
-          <h2 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">Trust is the product.</h2>
-          <p className="mt-4 max-w-lg text-lg leading-relaxed text-muted">
+      <section id="why" className="border-y border-border/30 bg-card">
+        <div className="mx-auto max-w-[1120px] px-6 py-24">
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted">Why cliptwo</p>
+          <h2 className="mt-4 text-[32px] font-bold tracking-tight sm:text-[40px]">Trust is the product.</h2>
+          <p className="mt-4 max-w-lg text-[16px] leading-relaxed text-muted">
             Clipping platforms live or die on whether clippers believe they&apos;ll actually get paid. These are the mechanics that make that a promise, not a claim.
           </p>
-          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {TRUST.map((t) => (
-              <div key={t.title} className="rounded-2xl border bg-background p-6 shadow-sm transition-all hover:shadow-md">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent-soft">
-                  <t.icon size={20} className="text-accent" />
+              <div key={t.title} className="py-1">
+                <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-accent-soft">
+                  <t.icon size={18} className="text-foreground" />
                 </div>
-                <h4 className="mt-4 text-lg font-semibold">{t.title}</h4>
-                <p className="mt-2 text-sm leading-relaxed text-muted">{t.body}</p>
+                <h4 className="mt-4 text-[16px] font-bold tracking-tight">{t.title}</h4>
+                <p className="mt-2 text-[14px] leading-relaxed text-muted">{t.body}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── Earnings calculator (hidden) ── */}
-      {false && (
-      <section className="mx-auto max-w-6xl px-6 py-20">
-        <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted">Earnings</p>
-            <h2 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">See what you could earn.</h2>
-            <p className="mt-4 max-w-md text-lg leading-relaxed text-muted">
-              Enter the number of views and the campaign CPM rate. The
-              calculator shows your gross earnings, the platform fee, and your
-              net payout.
-            </p>
-            <div className="mt-6 space-y-3 text-sm text-muted">
-              <p className="flex items-center gap-3"><Check size={16} className="text-green shrink-0" /> Views × CPM ÷ 1,000 = gross earnings</p>
-              <p className="flex items-center gap-3"><Check size={16} className="text-green shrink-0" /> 10% platform fee deducted from gross</p>
-              <p className="flex items-center gap-3"><Check size={16} className="text-green shrink-0" /> Net amount paid to your UPI</p>
-            </div>
-            <p className="mt-5 text-xs text-muted">
-              Actual payout depends on campaign rules, view verification, and
-              approval status. This calculator is for illustration only.
-            </p>
-          </div>
-          <EarningsCalculator />
-        </div>
-      </section>
-      )}
-
-      {/* ── Success stories (hidden) ── */}
-      {false && topEarners.length > 0 && (
-        <section className="border-y bg-card">
-          <div className="mx-auto max-w-6xl px-6 py-20">
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted">Success stories</p>
-            <h2 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">Top earners on ClipTwo</h2>
-            <p className="mt-4 max-w-lg text-lg leading-relaxed text-muted">
-              Real clippers, real earnings. These numbers come directly from
-              verified payouts on the platform.
-            </p>
-            <div className="mt-10 grid gap-5 sm:grid-cols-3">
-              {topEarners.map((e) => (
-                <div key={e.name} className="rounded-2xl border bg-background p-6 shadow-sm transition-all hover:shadow-md">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft text-base font-bold text-foreground">
-                      {e.name.charAt(0).toUpperCase()}
-                    </span>
-                    <div>
-                      <p className="font-semibold">@{e.name}</p>
-                      <p className="text-xs text-muted">{e.clips} clip{e.clips === 1 ? "" : "s"}</p>
-                    </div>
-                  </div>
-                  <div className="mt-5 grid grid-cols-2 gap-3">
-                    <div className="rounded-xl bg-accent-soft p-3 text-center">
-                      <p className="text-[10px] font-medium text-muted">Earned</p>
-                      <p className="mt-0.5 font-mono text-base font-bold">{rup(e.earned)}</p>
-                    </div>
-                    <div className="rounded-xl bg-accent-soft p-3 text-center">
-                      <p className="text-[10px] font-medium text-muted">Views</p>
-                      <p className="mt-0.5 font-mono text-base font-bold">{fmtNum(e.views)}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
       {/* ── FAQ ── */}
-      <section id="faq" className="mx-auto max-w-6xl px-6 py-20">
-        <p className="text-center text-xs font-semibold uppercase tracking-widest text-muted">FAQ</p>
-        <h2 className="mx-auto mt-4 max-w-xl text-center text-3xl font-bold tracking-tight sm:text-4xl">Frequently asked</h2>
-        <div className="mt-12">
+      <section id="faq" className="mx-auto max-w-[1120px] px-6 py-24">
+        <p className="text-center text-[11px] font-semibold uppercase tracking-widest text-muted">FAQ</p>
+        <h2 className="mx-auto mt-4 max-w-xl text-center text-[32px] font-bold tracking-tight sm:text-[40px]">Frequently asked</h2>
+        <div className="mt-14">
           <FAQ />
         </div>
-        <div className="mx-auto mt-12 max-w-2xl rounded-2xl border bg-card p-8 text-center">
-          <h3 className="text-xl font-semibold tracking-tight">Still have questions?</h3>
-          <p className="mt-2 text-sm text-muted">
+        <div className="mx-auto mt-14 max-w-2xl rounded-[14px] border border-border/40 bg-card p-8 text-center">
+          <h3 className="text-[18px] font-bold tracking-tight">Still have questions?</h3>
+          <p className="mt-2 text-[14px] text-muted">
             Can&apos;t find what you&apos;re looking for? Reach out to our support team and we&apos;ll get back to you.
           </p>
           <a
             href="mailto:support@cliptwo.com"
-            className="mt-5 inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
+            className="mt-5 inline-flex h-10 items-center gap-2 rounded-[8px] bg-foreground px-5 text-[14px] font-medium text-background transition-opacity hover:opacity-90 cursor-pointer"
           >
             Contact Support
           </a>
@@ -949,47 +752,47 @@ export default function Home() {
       </section>
 
       {/* ── Final CTA ── */}
-      <section className="border-y bg-card">
-        <div className="mx-auto max-w-6xl px-6 py-20 text-center">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Ready to start?</h2>
-          <p className="mx-auto mt-4 max-w-md text-lg leading-relaxed text-muted">
+      <section className="border-y border-border/30 bg-card">
+        <div className="mx-auto max-w-[1120px] px-6 py-24 text-center">
+          <h2 className="text-[32px] font-bold tracking-tight sm:text-[40px]">Ready to start?</h2>
+          <p className="mx-auto mt-4 max-w-md text-[16px] leading-relaxed text-muted">
             Whether you want to earn by clipping or grow your brand through
             creator content, ClipTwo is where it happens.
           </p>
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
             <Link
               href="/login?role=clipper"
-              className="inline-flex items-center gap-2 rounded-xl bg-accent px-7 py-3 text-sm font-semibold text-white shadow-lg shadow-accent/25 transition-all hover:scale-[1.02] hover:shadow-xl hover:shadow-accent/30"
+              className="inline-flex h-12 items-center gap-2.5 rounded-[10px] bg-foreground px-8 text-[15px] font-semibold text-background transition-opacity hover:opacity-90 cursor-pointer"
             >
-              <Scissors size={15} /> Start clipping
+              <Scissors size={16} /> Start clipping
             </Link>
             <Link
               href="/login?role=creator"
-              className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-7 py-3 text-sm font-semibold transition-all hover:scale-[1.02] hover:shadow-lg"
+              className="inline-flex h-12 items-center gap-2.5 rounded-[10px] border border-border/60 bg-card px-8 text-[15px] font-semibold transition-colors hover:bg-accent-soft cursor-pointer"
             >
-              <Film size={15} /> Launch a campaign
+              <Film size={16} /> Launch a campaign
             </Link>
           </div>
         </div>
       </section>
 
       {/* ── Footer ── */}
-      <footer className="border-t bg-card">
-        <div className="mx-auto max-w-6xl px-6 py-16">
+      <footer className="border-t border-border/30 bg-card">
+        <div className="mx-auto max-w-[1120px] px-6 py-16">
           <div className="grid gap-12 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
             <div>
               <div className="flex items-center gap-2.5 font-bold tracking-tight">
-                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-accent text-sm text-white">
+                <span className="flex h-8 w-8 items-center justify-center rounded-[8px] bg-foreground text-[14px] text-background">
                   <Scissors size={15} />
                 </span>
-                <span className="text-lg">cliptwo</span>
+                <span className="text-[17px]">cliptwo</span>
               </div>
-              <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted">
+              <p className="mt-4 max-w-xs text-[14px] leading-relaxed text-muted">
                 India&apos;s clipping marketplace — connect creators with clippers, paid per view and settled straight to UPI.
               </p>
               <div className="mt-5 flex items-center gap-2">
                 {(["Instagram", "YouTube"] as const).map((p) => (
-                  <span key={p} className="flex h-9 w-9 items-center justify-center rounded-xl border bg-background text-muted transition-colors hover:bg-accent-soft">
+                  <span key={p} className="flex h-9 w-9 items-center justify-center rounded-[8px] border border-border/40 bg-background text-muted transition-colors hover:bg-accent-soft cursor-pointer">
                     <PlatformIcon p={p} size={16} />
                   </span>
                 ))}
@@ -997,36 +800,36 @@ export default function Home() {
             </div>
 
             <div>
-              <h5 className="text-sm font-bold">Product</h5>
-              <ul className="mt-4 space-y-2.5 text-sm text-muted">
-                <li><Link href="/clipper" className="transition-colors hover:text-foreground">For clippers</Link></li>
-                <li><Link href="/creator" className="transition-colors hover:text-foreground">For creators</Link></li>
-                <li><a href="#how" className="transition-colors hover:text-foreground">How it works</a></li>
-                <li><a href="#faq" className="transition-colors hover:text-foreground">FAQ</a></li>
+              <h5 className="text-[13px] font-bold uppercase tracking-wider text-muted">Product</h5>
+              <ul className="mt-4 space-y-2.5 text-[14px] text-muted">
+                <li><Link href="/clipper" className="transition-colors hover:text-foreground cursor-pointer">For clippers</Link></li>
+                <li><Link href="/creator" className="transition-colors hover:text-foreground cursor-pointer">For creators</Link></li>
+                <li><a href="#how" className="transition-colors hover:text-foreground cursor-pointer">How it works</a></li>
+                <li><a href="#faq" className="transition-colors hover:text-foreground cursor-pointer">FAQ</a></li>
               </ul>
             </div>
 
             <div>
-              <h5 className="text-sm font-bold">Company</h5>
-              <ul className="mt-4 space-y-2.5 text-sm text-muted">
-                <li><Link href="/login" className="transition-colors hover:text-foreground">Log in</Link></li>
-                <li><a href="mailto:support@cliptwo.com" className="transition-colors hover:text-foreground">Contact</a></li>
+              <h5 className="text-[13px] font-bold uppercase tracking-wider text-muted">Company</h5>
+              <ul className="mt-4 space-y-2.5 text-[14px] text-muted">
+                <li><Link href="/login" className="transition-colors hover:text-foreground cursor-pointer">Log in</Link></li>
+                <li><a href="mailto:support@cliptwo.com" className="transition-colors hover:text-foreground cursor-pointer">Contact</a></li>
               </ul>
             </div>
 
             <div>
-              <h5 className="text-sm font-bold">Legal</h5>
-              <ul className="mt-4 space-y-2.5 text-sm text-muted">
-                <li><Link href="/terms" className="transition-colors hover:text-foreground">Terms</Link></li>
-                <li><Link href="/privacy" className="transition-colors hover:text-foreground">Privacy</Link></li>
-                <li><Link href="/payout-policy" className="transition-colors hover:text-foreground">Payout policy</Link></li>
-                <li><Link href="/content-policy" className="transition-colors hover:text-foreground">Content policy</Link></li>
-                <li><Link href="/community-guidelines" className="transition-colors hover:text-foreground">Community guidelines</Link></li>
+              <h5 className="text-[13px] font-bold uppercase tracking-wider text-muted">Legal</h5>
+              <ul className="mt-4 space-y-2.5 text-[14px] text-muted">
+                <li><Link href="/terms" className="transition-colors hover:text-foreground cursor-pointer">Terms</Link></li>
+                <li><Link href="/privacy" className="transition-colors hover:text-foreground cursor-pointer">Privacy</Link></li>
+                <li><Link href="/payout-policy" className="transition-colors hover:text-foreground cursor-pointer">Payout policy</Link></li>
+                <li><Link href="/content-policy" className="transition-colors hover:text-foreground cursor-pointer">Content policy</Link></li>
+                <li><Link href="/community-guidelines" className="transition-colors hover:text-foreground cursor-pointer">Community guidelines</Link></li>
               </ul>
             </div>
           </div>
 
-          <div className="mt-12 flex flex-col items-start justify-between gap-3 border-t pt-8 text-xs text-muted sm:flex-row sm:items-center">
+          <div className="mt-12 flex flex-col items-start justify-between gap-3 border-t border-border/30 pt-8 text-[12px] text-muted sm:flex-row sm:items-center">
             <p>&copy; {new Date().getFullYear()} cliptwo.</p>
             <p>Made for creators &amp; clippers across India.</p>
           </div>
