@@ -85,8 +85,6 @@ function clipperStats(
 ): Stats {
   const own = clips.filter((k) => k.clipper === p.username);
   const earned = own.filter((k) => k.status === "approved" || k.status === "held");
-  // "Approved" = reached an approved/payable state, but a failed payout is not
-  // a clean approval, so it's excluded from the approval rate.
   const approved = own.filter(
     (k) => k.status === "approved" || k.status === "held",
   ).length;
@@ -153,24 +151,27 @@ export default function AdminClippers() {
   const selected = profiles.find((p) => p.id === selectedId) ?? null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* ── Header ──────────────────────────────────────── */}
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Clippers</h1>
-        <p className="mt-1 text-sm text-muted">
-          {rows.length} of {profiles.filter((p) => p.role === "clipper").length} clipper
-          accounts
-          {q || filter !== "all" ? " (filtered)" : ""}.
+        <h1 className="text-[28px] font-bold tracking-tight sm:text-[30px]">
+          Clippers
+        </h1>
+        <p className="mt-2 text-[14px] text-muted">
+          {rows.length} of {profiles.filter((p) => p.role === "clipper").length} accounts
+          {q || filter !== "all" ? " (filtered)" : ""}
         </p>
       </div>
 
+      {/* ── Search + filters ────────────────────────────── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative max-w-sm">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+        <div className="relative w-full max-w-sm">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search name, username or email"
-            className="w-full rounded-lg border bg-background py-2 pl-9 pr-3 text-sm outline-none focus:border-foreground"
+            className="h-11 w-full rounded-[10px] border border-border/60 bg-card pl-10 pr-4 text-[14px] outline-none transition-colors focus:border-foreground/30"
           />
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -178,10 +179,10 @@ export default function AdminClippers() {
             <button
               key={f.key}
               onClick={() => setFilter(f.key)}
-              className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+              className={`cursor-pointer rounded-[8px] px-3.5 py-2.5 text-[13px] font-medium transition-colors duration-150 ${
                 filter === f.key
-                  ? "border-foreground bg-accent-soft text-foreground"
-                  : "text-muted hover:bg-accent-soft/60"
+                  ? "bg-foreground text-background"
+                  : "border border-border/50 bg-card text-muted hover:border-foreground/20 hover:text-foreground"
               }`}
             >
               {f.label}
@@ -190,29 +191,24 @@ export default function AdminClippers() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border bg-card">
+      {/* ── Table ───────────────────────────────────────── */}
+      <div className="overflow-hidden rounded-xl border border-border/40 bg-card">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1100px] text-sm">
+          <table className="w-full min-w-[960px] text-[14px]">
             <thead>
-              <tr className="border-b text-left text-xs text-muted">
-                <th className="px-4 py-3 font-medium">Clipper</th>
-                <th className="px-4 py-3 font-medium">Username</th>
-                <th className="px-4 py-3 font-medium">Email</th>
-                <th className="px-4 py-3 font-medium">Accounts</th>
-                <th className="px-4 py-3 font-medium">Verified</th>
-                <th className="px-4 py-3 text-right font-medium">Clips</th>
-                <th className="px-4 py-3 text-right font-medium">Approved</th>
-                <th className="px-4 py-3 text-right font-medium">Rejected</th>
-                <th className="px-4 py-3 text-right font-medium">Appr. rate</th>
-                <th className="px-4 py-3 text-right font-medium">Verified views</th>
-                <th className="px-4 py-3 text-right font-medium">Earned</th>
-                <th className="px-4 py-3 text-right font-medium">Paid</th>
-                <th className="px-4 py-3 text-center font-medium">Status</th>
-                <th className="px-4 py-3 text-center font-medium">Joined</th>
-                <th className="px-4 py-3"></th>
+              <tr className="border-b border-border/40 text-left text-[13px] text-muted">
+                <th className="px-5 py-3 font-medium">Clipper</th>
+                <th className="px-5 py-3 font-medium">Social accounts</th>
+                <th className="px-5 py-3 text-right font-medium">Clips</th>
+                <th className="px-5 py-3 text-right font-medium">Approval</th>
+                <th className="px-5 py-3 text-right font-medium">Verified views</th>
+                <th className="px-5 py-3 text-right font-medium">Earned</th>
+                <th className="px-5 py-3 text-center font-medium">Status</th>
+                <th className="px-5 py-3 text-center font-medium">Joined</th>
+                <th className="px-5 py-3"></th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="divide-y divide-border/40">
               {rows.map((p) => {
                 const s = clipperStats(p, clips, campaigns, financeRecords);
                 const accs = accountsFor(p, socialAccounts);
@@ -220,27 +216,33 @@ export default function AdminClippers() {
                   <tr
                     key={p.id}
                     onClick={() => setSelectedId(p.id)}
-                    className="cursor-pointer hover:bg-accent-soft/50"
+                    className="cursor-pointer transition-colors hover:bg-accent-soft/50"
                   >
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent-soft text-xs font-semibold">
+                    {/* Clipper */}
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-[13px] font-semibold text-foreground">
                           {(p.name ?? p.username ?? "?").slice(0, 1).toUpperCase()}
                         </div>
-                        <span className="font-medium">{p.name}</span>
-                        {p.riskFlag && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-red/10 px-1.5 py-0.5 text-[10px] font-medium text-red">
-                            <AlertTriangle size={10} /> Risk
-                          </span>
-                        )}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="truncate font-medium">{p.name}</span>
+                            {p.riskFlag && (
+                              <span className="inline-flex shrink-0 items-center gap-0.5 text-red">
+                                <AlertTriangle size={12} />
+                              </span>
+                            )}
+                          </div>
+                          <p className="truncate text-[13px] text-muted">@{p.username}</p>
+                        </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-muted">@{p.username}</td>
-                    <td className="px-4 py-3 text-muted">{p.email}</td>
-                    <td className="px-4 py-3">
+
+                    {/* Social accounts */}
+                    <td className="px-5 py-4">
                       <div className="flex items-center gap-1.5">
                         {accs.length === 0 ? (
-                          <span className="text-xs text-muted">None</span>
+                          <span className="text-[13px] text-muted">None</span>
                         ) : (
                           accs.map((a) => (
                             <span
@@ -249,7 +251,7 @@ export default function AdminClippers() {
                               className={`inline-flex h-6 w-6 items-center justify-center rounded-md border ${
                                 a.verified
                                   ? "border-green/20 bg-green/10 text-green"
-                                  : "border-muted/20 bg-accent-soft text-muted"
+                                  : "border-border/40 bg-accent-soft text-muted"
                               }`}
                             >
                               <PlatformIcon p={a.platform} size={13} />
@@ -258,48 +260,75 @@ export default function AdminClippers() {
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3">
-                      {p.verified ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-green/10 px-2 py-0.5 text-xs font-medium text-green">
-                          <BadgeCheck size={12} /> Verified
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-muted/10 px-2 py-0.5 text-xs font-medium text-muted">
-                          <BadgeX size={12} /> Unverified
-                        </span>
+
+                    {/* Clips */}
+                    <td className="px-5 py-4 text-right">
+                      <span className="font-mono font-medium">{s.total}</span>
+                      {(s.approved > 0 || s.rejected > 0) && (
+                        <p className="text-[12px] text-muted">
+                          <span className="text-green">{s.approved}</span>
+                          {" / "}
+                          <span className="text-red">{s.rejected}</span>
+                        </p>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono">{s.total}</td>
-                    <td className="px-4 py-3 text-right font-mono text-green">
-                      {s.approved}
+
+                    {/* Approval */}
+                    <td className="px-5 py-4 text-right">
+                      <span className="font-mono font-medium">
+                        {s.approvalRate === null ? "—" : `${s.approvalRate}%`}
+                      </span>
+                      {(s.approved > 0 || s.rejected > 0) && (
+                        <p className="text-[12px] text-muted">
+                          {s.approved} / {s.rejected}
+                        </p>
+                      )}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono text-red">
-                      {s.rejected}
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono">
-                      {s.approvalRate === null ? "—" : `${s.approvalRate}%`}
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono">
+
+                    {/* Verified views */}
+                    <td className="px-5 py-4 text-right font-mono">
                       {fmtViews(s.verifiedViews)}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono">{rup(s.earned)}</td>
-                    <td className="px-4 py-3 text-right font-mono">{rup(s.paid)}</td>
-                    <td className="px-4 py-3 text-center">
-                      <AccountBadge suspended={p.status === "suspended"} />
+
+                    {/* Earned */}
+                    <td className="px-5 py-4 text-right font-mono font-medium">
+                      {rup(s.earned)}
                     </td>
-                    <td className="px-4 py-3 text-center text-xs text-muted">
+
+                    {/* Status */}
+                    <td className="px-5 py-4 text-center">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[12px] font-medium ${
+                          p.status === "suspended"
+                            ? "bg-red/10 text-red"
+                            : "bg-green/10 text-green"
+                        }`}
+                      >
+                        {p.status === "suspended" ? "Suspended" : "Active"}
+                      </span>
+                    </td>
+
+                    {/* Joined */}
+                    <td className="px-5 py-4 text-center text-[13px] text-muted">
                       {fmtDate(p.createdAt)}
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <ChevronRight size={15} className="ml-auto text-muted" />
+
+                    {/* Chevron */}
+                    <td className="px-5 py-4 text-right">
+                      <ChevronRight size={16} className="ml-auto text-muted" />
                     </td>
                   </tr>
                 );
               })}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={15} className="px-4 py-10 text-center text-muted">
-                    No clipper accounts{profiles.length ? " match your filters" : " yet"}.
+                  <td colSpan={9} className="px-5 py-12 text-center">
+                    <p className="text-[15px] font-medium">No clippers found</p>
+                    <p className="mt-1 text-[13px] text-muted">
+                      {profiles.length === 0
+                        ? "No clipper accounts exist yet."
+                        : "Try adjusting your search or filters."}
+                    </p>
                   </td>
                 </tr>
               )}
@@ -308,6 +337,7 @@ export default function AdminClippers() {
         </div>
       </div>
 
+      {/* ── Drawer ──────────────────────────────────────── */}
       {selected && (
         <ClipperDrawer
           key={selected.id}
@@ -324,19 +354,9 @@ export default function AdminClippers() {
   );
 }
 
-function AccountBadge({ suspended }: { suspended: boolean }) {
-  return (
-    <span
-      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${
-        suspended
-          ? "bg-red/10 text-red border-red/20"
-          : "bg-green/10 text-green border-green/20"
-      }`}
-    >
-      {suspended ? "Suspended" : "Active"}
-    </span>
-  );
-}
+/* ================================================================
+   DRAWER
+   ================================================================ */
 
 function ClipperDrawer({
   profile,
@@ -394,44 +414,55 @@ function ClipperDrawer({
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 cursor-pointer bg-black/40" onClick={onClose} />
       <div className="relative flex h-full w-full max-w-2xl flex-col overflow-y-auto bg-card shadow-xl">
-        {/* Header */}
-        <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b bg-card px-6 py-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold">{profile.name}</h2>
-              <AccountBadge suspended={suspended} />
+        {/* ── Header ────────────────────────────────────── */}
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-border/40 bg-card px-7 py-5">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="truncate text-[20px] font-bold tracking-tight">
+                {profile.name}
+              </h2>
+              <span
+                className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-[12px] font-medium ${
+                  suspended
+                    ? "bg-red/10 text-red"
+                    : "bg-green/10 text-green"
+                }`}
+              >
+                {suspended ? "Suspended" : "Active"}
+              </span>
               {profile.verified && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-green/10 px-2 py-0.5 text-xs font-medium text-green">
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-green/10 px-2.5 py-0.5 text-[12px] font-medium text-green">
                   <BadgeCheck size={12} /> Verified
                 </span>
               )}
               {profile.riskFlag && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-red/10 px-2 py-0.5 text-xs font-medium text-red">
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red/10 px-2.5 py-0.5 text-[12px] font-medium text-red">
                   <AlertTriangle size={12} /> Risk
                 </span>
               )}
             </div>
-            <p className="mt-0.5 text-sm text-muted">
+            <p className="mt-1 text-[14px] text-muted">
               @{profile.username} · {profile.email}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="rounded-md border p-1.5 hover:bg-accent-soft"
+            className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-[8px] border border-border/40 transition-colors hover:bg-accent-soft"
             title="Close"
           >
             <X size={16} />
           </button>
         </div>
 
-        {/* Actions */}
-        <div className="flex flex-wrap gap-2 border-b px-6 py-3">
+        {/* ── Actions ───────────────────────────────────── */}
+        <div className="flex flex-wrap gap-2 border-b border-border/40 px-7 py-3.5">
           {suspended ? (
             <ActionButton
               icon={<Check size={14} />}
               label="Reactivate"
               disabled={!can("clipper.reactivate")}
               onClick={() => updateProfileStatus(profile.id, "active", actor)}
+              primary
             />
           ) : (
             <ActionButton
@@ -463,23 +494,23 @@ function ClipperDrawer({
           />
         </div>
 
-        {/* Suspend reason inline */}
+        {/* ── Suspend reason inline ─────────────────────── */}
         {!suspended && showSuspend && (
-          <div className="border-b bg-accent-soft/40 px-6 py-3">
-            <label className="text-xs font-medium text-muted">
+          <div className="border-b border-border/40 bg-red/5 px-7 py-4">
+            <label className="text-[13px] font-medium text-muted">
               Suspension reason (required)
             </label>
-            <div className="mt-1 flex gap-2">
+            <div className="mt-2 flex gap-2">
               <input
                 value={suspendReason}
                 onChange={(e) => setSuspendReason(e.target.value)}
                 placeholder="e.g. Confirmed view fraud"
-                className="flex-1 rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
+                className="flex-1 rounded-[8px] border border-border/60 bg-card px-3.5 py-2.5 text-[14px] outline-none transition-colors focus:border-foreground/30"
               />
               <button
                 onClick={onSuspend}
                 disabled={!can("clipper.suspend")}
-                className="rounded-lg bg-red px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                className="cursor-pointer rounded-[8px] bg-red px-4 py-2.5 text-[14px] font-medium text-white disabled:opacity-50"
               >
                 Suspend
               </button>
@@ -487,10 +518,11 @@ function ClipperDrawer({
           </div>
         )}
 
-        <div className="space-y-6 px-6 py-5">
-          {/* Profile info */}
+        {/* ── Body ──────────────────────────────────────── */}
+        <div className="space-y-8 px-7 py-6">
+          {/* Profile information */}
           <Section title="Profile information">
-            <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4 text-[14px] sm:grid-cols-3">
               <Field label="Name" value={profile.name} />
               <Field label="Username" value={"@" + (profile.username ?? "—")} />
               <Field label="Email" value={profile.email} />
@@ -518,27 +550,27 @@ function ClipperDrawer({
           {/* Social accounts */}
           <Section title="Social accounts">
             {accs.length === 0 ? (
-              <p className="text-sm text-muted">No connected accounts.</p>
+              <p className="text-[14px] text-muted">No connected accounts.</p>
             ) : (
               <ul className="space-y-2">
                 {accs.map((a) => (
                   <li
                     key={a.id}
-                    className="flex items-center justify-between rounded-lg border bg-background px-3 py-2 text-sm"
+                    className="flex items-center justify-between rounded-[8px] border border-border/40 bg-background px-4 py-3 text-[14px]"
                   >
-                    <span className="flex items-center gap-2">
+                    <span className="flex items-center gap-2.5">
                       <PlatformIcon p={a.platform} size={15} />
                       <span className="font-medium">{a.handle}</span>
-                      <span className="text-xs text-muted">{a.platform}</span>
+                      <span className="text-[13px] text-muted">{a.platform}</span>
                     </span>
                     <span className="flex items-center gap-2">
                       {a.verified && (
-                        <span className="inline-flex items-center gap-1 text-xs text-green">
+                        <span className="inline-flex items-center gap-1 text-[13px] text-green">
                           <BadgeCheck size={12} /> Verified
                         </span>
                       )}
                       <span
-                        className={`rounded-full border px-2 py-0.5 text-xs font-medium ${
+                        className={`rounded-full border px-2 py-0.5 text-[12px] font-medium ${
                           a.status === "connected" || a.status === "verified"
                             ? "border-green/20 bg-green/10 text-green"
                             : a.status === "connecting"
@@ -559,42 +591,52 @@ function ClipperDrawer({
 
           {/* Performance */}
           <Section title="Performance">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Stat label="Total clips" value={String(stats.total)} />
-              <Stat label="Approved" value={String(stats.approved)} />
-              <Stat label="Rejected" value={String(stats.rejected)} />
-              <Stat
-                label="Approval rate"
-                value={stats.approvalRate === null ? "—" : `${stats.approvalRate}%`}
-              />
-              <Stat label="Verified views" value={fmtViews(stats.verifiedViews)} />
-              <Stat label="Total earned" value={rup(stats.earned)} />
-              <Stat label="Total paid" value={rup(stats.paid)} />
-              <Stat label="Outstanding" value={rup(stats.earned - stats.paid)} />
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <MetricRow label="Total clips" value={String(stats.total)} />
+                <MetricRow label="Approved" value={String(stats.approved)} />
+                <MetricRow label="Rejected" value={String(stats.rejected)} />
+                <MetricRow
+                  label="Approval rate"
+                  value={stats.approvalRate === null ? "—" : `${stats.approvalRate}%`}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <MetricRow label="Verified views" value={fmtViews(stats.verifiedViews)} />
+                <MetricRow label="Total earned" value={rup(stats.earned)} />
+                <MetricRow label="Total paid" value={rup(stats.paid)} />
+                <MetricRow label="Outstanding" value={rup(stats.earned - stats.paid)} />
+              </div>
             </div>
           </Section>
 
           {/* Reputation */}
           <Section title="Reputation">
-            <div className="rounded-lg border bg-background p-4">
+            <div className="rounded-[8px] border border-border/40 bg-background px-5 py-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium">Reputation Score</p>
-                  <p className="text-xs text-muted">Based on approval rate, campaign success, and payouts</p>
+                  <p className="text-[14px] font-medium">Reputation score</p>
+                  <p className="mt-0.5 text-[13px] text-muted">
+                    Based on approval rate, campaign success, and payouts
+                  </p>
                 </div>
-                <div className={`flex h-14 w-14 items-center justify-center rounded-full text-lg font-bold ${
-                  repScore >= 80 ? "bg-green/10 text-green" :
-                  repScore >= 50 ? "bg-amber/10 text-amber" :
-                  "bg-red/10 text-red"
-                }`}>
+                <span
+                  className={`font-mono text-[28px] font-bold ${
+                    repScore >= 80
+                      ? "text-green"
+                      : repScore >= 50
+                        ? "text-amber"
+                        : "text-red"
+                  }`}
+                >
                   {repScore}
-                </div>
+                </span>
               </div>
               <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <Stat label="Approved clips" value={String(repMetrics.totalApproved)} />
-                <Stat label="Rejected clips" value={String(repMetrics.totalRejected)} />
-                <Stat label="Campaigns" value={String(repMetrics.successfulCampaigns)} />
-                <Stat label="Payouts completed" value={String(repMetrics.completedPayouts)} />
+                <MetricRow label="Approved clips" value={String(repMetrics.totalApproved)} />
+                <MetricRow label="Rejected clips" value={String(repMetrics.totalRejected)} />
+                <MetricRow label="Campaigns" value={String(repMetrics.successfulCampaigns)} />
+                <MetricRow label="Payouts completed" value={String(repMetrics.completedPayouts)} />
               </div>
             </div>
           </Section>
@@ -606,45 +648,45 @@ function ClipperDrawer({
               action={
                 <Link
                   href="/admin/clips"
-                  className="inline-flex items-center gap-1 text-xs font-medium text-foreground hover:underline"
+                  className="inline-flex cursor-pointer items-center gap-1 text-[13px] font-medium text-foreground hover:underline"
                 >
                   Open review <ExternalLink size={12} />
                 </Link>
               }
             >
               {stats.own.length === 0 ? (
-                <p className="text-sm text-muted">No submissions yet.</p>
+                <p className="text-[14px] text-muted">No submissions yet.</p>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-[14px]">
                     <thead>
-                      <tr className="border-b text-left text-xs text-muted">
-                        <th className="px-2 py-2 font-medium">Campaign</th>
-                        <th className="px-2 py-2 font-medium">Platform</th>
-                        <th className="px-2 py-2 text-right font-medium">Views</th>
-                        <th className="px-2 py-2 font-medium">Status</th>
-                        <th className="px-2 py-2 text-right font-medium">Earnings</th>
+                      <tr className="border-b border-border/40 text-left text-[13px] text-muted">
+                        <th className="px-3 py-2.5 font-medium">Campaign</th>
+                        <th className="px-3 py-2.5 font-medium">Platform</th>
+                        <th className="px-3 py-2.5 text-right font-medium">Views</th>
+                        <th className="px-3 py-2.5 font-medium">Status</th>
+                        <th className="px-3 py-2.5 text-right font-medium">Earnings</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y">
+                    <tbody className="divide-y divide-border/40">
                       {stats.own.map((k) => {
                         const camp = campaigns.find((c) => c.id === k.campaignId);
                         return (
                           <tr key={k.id}>
-                            <td className="px-2 py-2">
+                            <td className="px-3 py-3">
                               <div className="font-medium">{camp?.title ?? k.campaignId}</div>
-                              <div className="text-xs text-muted">{k.caption}</div>
+                              <div className="text-[13px] text-muted">{k.caption}</div>
                             </td>
-                            <td className="px-2 py-2">
+                            <td className="px-3 py-3">
                               <PlatformIcon p={k.platform ?? "Instagram"} size={14} />
                             </td>
-                            <td className="px-2 py-2 text-right font-mono">
+                            <td className="px-3 py-3 text-right font-mono">
                               {fmtViews(k.verifiedViews ?? 0)}
                             </td>
-                            <td className="px-2 py-2">
+                            <td className="px-3 py-3">
                               <StatusPill status={k.status} />
                             </td>
-                            <td className="px-2 py-2 text-right font-mono">
+                            <td className="px-3 py-3 text-right font-mono">
                               {rup(clipEarnings(k, campaigns))}
                             </td>
                           </tr>
@@ -659,8 +701,8 @@ function ClipperDrawer({
 
           {/* Earnings & payouts */}
           <Section title="Earnings & payouts">
-            <p className="text-sm text-muted">
-              Outstanding balance of {rup(stats.earned - stats.paid)} is pending payout.
+            <p className="text-[14px] text-muted">
+              Outstanding balance of <span className="font-medium text-foreground">{rup(stats.earned - stats.paid)}</span> is pending payout.
             </p>
             <div className="mt-3 space-y-2">
               {stats.own
@@ -670,28 +712,28 @@ function ClipperDrawer({
                   return (
                     <div
                       key={k.id}
-                      className="flex items-center justify-between rounded-lg border bg-background px-3 py-2 text-sm"
+                      className="flex items-center justify-between rounded-[8px] border border-border/40 bg-background px-4 py-3 text-[14px]"
                     >
-                      <span className="flex items-center gap-2">
+                      <span className="flex items-center gap-2.5">
                         <Wallet size={14} className="text-muted" />
                         <span className="font-medium">{camp?.title ?? k.campaignId}</span>
                         <StatusPill status={k.status} />
                       </span>
-                      <span className="font-mono">{rup(clipEarnings(k, campaigns))}</span>
+                      <span className="font-mono font-medium">{rup(clipEarnings(k, campaigns))}</span>
                     </div>
                   );
                 })}
               {stats.own.filter((k) => k.status === "approved" || k.status === "held").length === 0 && (
-                <p className="text-sm text-muted">No payouts yet.</p>
+                <p className="text-[14px] text-muted">No payouts yet.</p>
               )}
             </div>
           </Section>
 
           {/* Fraud / risk flags */}
           <Section title="Fraud / risk flags">
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex items-center gap-2 text-[14px]">
               <span
-                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[12px] font-medium ${
                   profile.riskFlag
                     ? "bg-red/10 text-red"
                     : "bg-green/10 text-green"
@@ -709,15 +751,16 @@ function ClipperDrawer({
               </span>
             </div>
             {profile.riskNote && (
-              <p className="mt-2 text-sm text-muted">{profile.riskNote}</p>
+              <p className="mt-2 text-[14px] text-muted">{profile.riskNote}</p>
             )}
             {riskOpen && can("clipper.review_risk") && (
-              <div className="mt-3 rounded-lg border bg-background p-3">
-                <label className="flex items-center gap-2 text-sm font-medium">
+              <div className="mt-3 rounded-[8px] border border-border/40 bg-background p-4">
+                <label className="flex items-center gap-2 text-[14px] font-medium">
                   <input
                     type="checkbox"
                     checked={riskFlag}
                     onChange={(e) => setRiskFlag(e.target.checked)}
+                    className="cursor-pointer"
                   />
                   Mark as risk flagged
                 </label>
@@ -726,21 +769,21 @@ function ClipperDrawer({
                   onChange={(e) => setRiskNote(e.target.value)}
                   rows={2}
                   placeholder="Risk note (why this account is flagged)"
-                  className="mt-2 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
+                  className="mt-2 w-full rounded-[8px] border border-border/60 bg-card px-3.5 py-2.5 text-[14px] outline-none transition-colors focus:border-foreground/30"
                 />
                 <button
                   onClick={() => {
                     setProfileRisk(profile.id, actor ?? "", riskFlag, riskNote.trim() || undefined);
                     setRiskOpen(false);
                   }}
-                  className="mt-2 rounded-lg bg-foreground px-3 py-1.5 text-sm font-medium text-background"
+                  className="mt-3 cursor-pointer rounded-[8px] bg-foreground px-4 py-2.5 text-[14px] font-medium text-background"
                 >
                   Save risk decision
                 </button>
               </div>
             )}
             {riskOpen && !can("clipper.review_risk") && (
-              <p className="mt-2 text-sm text-muted">
+              <p className="mt-2 text-[14px] text-muted">
                 You don&apos;t have permission to review risk flags.
               </p>
             )}
@@ -749,7 +792,7 @@ function ClipperDrawer({
           {/* Appeals */}
           <Section title="Appeals">
             {!profile.appeals || profile.appeals.length === 0 ? (
-              <p className="text-sm text-muted">No appeals filed.</p>
+              <p className="text-[14px] text-muted">No appeals filed.</p>
             ) : (
               <div className="space-y-3">
                 {profile.appeals.map((a) => (
@@ -773,17 +816,17 @@ function ClipperDrawer({
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
               placeholder="Internal notes about this clipper"
-              className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
+              className="w-full rounded-[8px] border border-border/60 bg-background px-3.5 py-2.5 text-[14px] outline-none transition-colors focus:border-foreground/30"
             />
             <button
               disabled={!can("clipper.notes")}
               onClick={() => saveAdminNotes(profile.id, notes, actor ?? "")}
-              className="mt-2 rounded-lg bg-foreground px-3 py-1.5 text-sm font-medium text-background disabled:opacity-50"
+              className="mt-2 cursor-pointer rounded-[8px] bg-foreground px-4 py-2.5 text-[14px] font-medium text-background disabled:opacity-50"
             >
               Save notes
             </button>
             {!can("clipper.notes") && (
-              <p className="mt-1 text-xs text-muted">
+              <p className="mt-1 text-[13px] text-muted">
                 You don&apos;t have permission to edit admin notes.
               </p>
             )}
@@ -792,18 +835,18 @@ function ClipperDrawer({
           {/* Audit history */}
           <Section title="Audit history">
             {!profile.audit || profile.audit.length === 0 ? (
-              <p className="text-sm text-muted">No audit entries.</p>
+              <p className="text-[14px] text-muted">No audit entries.</p>
             ) : (
-              <ul className="space-y-2">
+              <ul className="space-y-3">
                 {[...profile.audit].reverse().map((e, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm">
+                  <li key={i} className="flex items-start gap-2.5 text-[14px]">
                     <History size={14} className="mt-0.5 shrink-0 text-muted" />
                     <div>
                       <span className="font-medium">{e.action}</span>
                       {e.by && <span className="text-muted"> by {e.by}</span>}
                       <span className="text-muted"> · {fmtDateTime(e.at)}</span>
                       {e.note && (
-                        <p className="text-muted">
+                        <p className="mt-0.5 text-[13px] text-muted">
                           <ArrowUpRight size={11} className="mr-0.5 inline" />
                           {e.note}
                         </p>
@@ -820,6 +863,10 @@ function ClipperDrawer({
   );
 }
 
+/* ================================================================
+   SUB-COMPONENTS
+   ================================================================ */
+
 function AppealRow({
   appeal,
   canRespond,
@@ -834,44 +881,44 @@ function AppealRow({
 }) {
   const [response, setResponse] = useState(appeal.response ?? "");
   return (
-    <div className="rounded-lg border bg-background p-3">
+    <div className="rounded-[8px] border border-border/40 bg-background p-4">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">
+        <span className="text-[14px] font-medium">
           Appeal · {appeal.status}
         </span>
         {appeal.at && (
-          <span className="text-xs text-muted">{fmtDate(appeal.at)}</span>
+          <span className="text-[13px] text-muted">{fmtDate(appeal.at)}</span>
         )}
       </div>
-      <p className="mt-1 text-sm">{appeal.reason}</p>
+      <p className="mt-1.5 text-[14px]">{appeal.reason}</p>
       {appeal.response && (
-        <p className="mt-1 text-sm text-muted">Response: {appeal.response}</p>
+        <p className="mt-1.5 text-[14px] text-muted">Response: {appeal.response}</p>
       )}
       {canRespond && appeal.status !== "approved" && appeal.status !== "rejected" && (
-        <div className="mt-2 space-y-2">
+        <div className="mt-3 space-y-2">
           <textarea
             value={response}
             onChange={(e) => setResponse(e.target.value)}
             rows={2}
             placeholder="Admin response"
-            className="w-full rounded-lg border bg-card px-3 py-2 text-sm outline-none focus:border-foreground"
+            className="w-full rounded-[8px] border border-border/60 bg-card px-3.5 py-2.5 text-[14px] outline-none transition-colors focus:border-foreground/30"
           />
           <div className="flex gap-2">
             <button
               onClick={() => onRespond(response, "approved")}
-              className="rounded-lg bg-green px-3 py-1.5 text-sm font-medium text-white"
+              className="cursor-pointer rounded-[8px] bg-green px-3.5 py-2 text-[14px] font-medium text-white"
             >
               Approve
             </button>
             <button
               onClick={() => onRespond(response, "rejected")}
-              className="rounded-lg bg-red px-3 py-1.5 text-sm font-medium text-white"
+              className="cursor-pointer rounded-[8px] bg-red px-3.5 py-2 text-[14px] font-medium text-white"
             >
               Reject
             </button>
             <button
               onClick={() => onRespond(response, "reviewing")}
-              className="rounded-lg border px-3 py-1.5 text-sm font-medium"
+              className="cursor-pointer rounded-[8px] border border-border/60 px-3.5 py-2 text-[14px] font-medium"
             >
               Mark reviewing
             </button>
@@ -893,8 +940,8 @@ function Section({
 }) {
   return (
     <section>
-      <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-muted">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-[13px] font-semibold uppercase tracking-wide text-muted">
           {title}
         </h3>
         {action}
@@ -907,17 +954,17 @@ function Section({
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-xs text-muted">{label}</p>
+      <p className="text-[13px] text-muted">{label}</p>
       <p className="font-medium">{value}</p>
     </div>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function MetricRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border bg-background px-3 py-2">
-      <p className="text-xs text-muted">{label}</p>
-      <p className="font-mono text-base font-semibold">{value}</p>
+    <div className="rounded-[8px] border border-border/40 bg-background px-4 py-3">
+      <p className="text-[13px] text-muted">{label}</p>
+      <p className="font-mono text-[16px] font-semibold">{value}</p>
     </div>
   );
 }
@@ -928,22 +975,26 @@ function ActionButton({
   onClick,
   disabled,
   danger,
+  primary,
 }: {
   icon: ReactNode;
   label: string;
   onClick: () => void;
   disabled?: boolean;
   danger?: boolean;
+  primary?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
       title={disabled ? "Insufficient permissions" : label}
-      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-        danger
-          ? "border-red/30 text-red hover:bg-red/10"
-          : "hover:bg-accent-soft"
+      className={`inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[8px] border px-3.5 text-[14px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+        primary
+          ? "border-foreground bg-foreground text-background hover:opacity-90"
+          : danger
+            ? "border-red/30 text-red hover:bg-red/10"
+            : "border-border/60 text-foreground hover:bg-accent-soft"
       }`}
     >
       {icon}
