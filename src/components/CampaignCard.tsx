@@ -47,13 +47,13 @@ export function CampaignCard({
           </div>
         )}
         {/* Badges */}
-        <div className="absolute left-2.5 top-2.5 flex items-center gap-1.5">
-          <span className="inline-flex items-center gap-1 rounded-md bg-white/90 px-2 py-[3px] text-[10px] font-medium text-foreground shadow-sm backdrop-blur">
-            <PlatformIcon p={campaign.platform} size={10} />
+        <div className="absolute left-3 top-3 flex items-center gap-2">
+          <span className="inline-flex items-center gap-1 rounded-md bg-white/90 px-2.5 py-1 text-xs font-medium text-foreground shadow-sm backdrop-blur">
+            <PlatformIcon p={campaign.platform} size={12} />
             {campaign.platform}
           </span>
           {(campaign.category || campaign.niche) && (
-            <span className="rounded-md bg-white/90 px-2 py-[3px] text-[10px] font-medium text-foreground shadow-sm backdrop-blur">
+            <span className="rounded-md bg-white/90 px-2.5 py-1 text-xs font-medium text-foreground shadow-sm backdrop-blur">
               {campaign.category || campaign.niche}
             </span>
           )}
@@ -65,25 +65,25 @@ export function CampaignCard({
             e.preventDefault();
             toggleSaveCampaign(campaign.id);
           }}
-          className="absolute right-2.5 top-2.5 flex h-7 w-7 items-center justify-center rounded-full bg-white/80 backdrop-blur transition-colors duration-150 hover:bg-white"
+          className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/80 backdrop-blur transition-colors duration-150 hover:bg-white"
           title={isSaved ? "Unsave" : "Save"}
         >
           <Heart
-            size={14}
+            size={16}
             className={isSaved ? "fill-red text-red" : "text-muted"}
           />
         </button>
       </div>
 
       {/* Content */}
-      <div className="flex flex-1 flex-col p-3.5">
+      <div className="flex flex-1 flex-col p-5">
         {/* Title + creator */}
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <h3 className="text-[13px] font-bold leading-snug group-hover:underline underline-offset-2">
+            <h3 className="text-base font-semibold leading-snug group-hover:underline underline-offset-2">
               {campaign.title}
             </h3>
-            <p className="mt-0.5 text-[11px] text-muted">
+            <p className="mt-1 text-sm text-muted">
               by {campaign.creator}
             </p>
           </div>
@@ -91,15 +91,15 @@ export function CampaignCard({
         </div>
 
         {/* CPM — dominant metric */}
-        <div className="mt-3 flex items-baseline gap-1.5">
-          <span className="font-mono text-lg font-bold tracking-tight">
+        <div className="mt-4 flex items-baseline gap-1.5">
+          <span className="font-mono text-xl font-bold tracking-tight">
             {rup(campaign.payout)}
           </span>
-          <span className="text-[11px] text-muted">/ 1K views</span>
+          <span className="text-sm text-muted">/ 1K views</span>
         </div>
 
         {/* Secondary metrics */}
-        <div className="mt-2 flex items-center gap-3 text-[11px] text-muted">
+        <div className="mt-2.5 flex items-center gap-3 text-sm text-muted">
           <span className={isLowBudget ? "font-medium text-amber" : ""}>
             {b.total > 0 ? `${rup(remaining)} left` : "Flexible budget"}
           </span>
@@ -117,7 +117,7 @@ export function CampaignCard({
 
         {/* Budget bar */}
         {b.total > 0 && (
-          <div className="mt-2.5 h-[3px] w-full overflow-hidden rounded-full bg-accent-soft">
+          <div className="mt-3 h-[4px] w-full overflow-hidden rounded-full bg-accent-soft">
             <div
               className={`h-full rounded-full ${
                 b.status === "budget_reached"
@@ -135,11 +135,11 @@ export function CampaignCard({
         <div className="flex-1" />
 
         {/* CTA row */}
-        <div className="mt-3 flex items-center justify-between border-t border-border/50 pt-3">
-          <span className="text-[11px] text-muted">
+        <div className="mt-4 flex items-center justify-between border-t border-border/50 pt-4">
+          <span className="text-sm text-muted">
             {clippersIn > 0 ? `${clippersIn} clippers` : "Be the first"}
           </span>
-          <span className="inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-1.5 text-[11px] font-medium text-white transition-all duration-200 group-hover:bg-foreground/90">
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-all duration-200 group-hover:bg-foreground/90">
             View campaign
           </span>
         </div>
