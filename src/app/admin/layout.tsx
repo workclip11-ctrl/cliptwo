@@ -88,9 +88,20 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                   </p>
                   <nav className="flex flex-col gap-0.5">
                     {group.items.map((n) => {
-                      const active = n.exact
-                        ? pathname === n.href
-                        : pathname === n.href || pathname.startsWith(n.href + "/");
+                      const active =
+                        n.exact
+                          ? pathname === n.href
+                          : pathname === n.href ||
+                            (pathname.startsWith(n.href + "/") &&
+                              // only if no more-specific child is also active
+                              !NAV.some(
+                                (other) =>
+                                  other.href !== n.href &&
+                                  !other.exact &&
+                                  other.href.startsWith(n.href + "/") &&
+                                  (pathname === other.href ||
+                                    pathname.startsWith(other.href + "/")),
+                              ));
                       return (
                         <Link
                           key={n.href}
