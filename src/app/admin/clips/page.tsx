@@ -5,10 +5,6 @@ import { useSearchParams } from "next/navigation";
 import {
   Check,
   Ban,
-  Wallet,
-  Banknote,
-  AlertTriangle,
-  PlayCircle,
   History,
   Search,
   X,
@@ -20,7 +16,7 @@ import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { rup, fmtViews, clipEarnings } from "@/lib/format";
-import { financeOf, PLATFORM_FEE_RATE, campaignBudget } from "@/lib/finance";
+import { financeOf, campaignBudget } from "@/lib/finance";
 import { clipCPM } from "@/lib/analytics";
 import type { Campaign, Clip, ClipStatus, FinanceRecord } from "@/lib/types";
 
@@ -118,54 +114,63 @@ export default function AdminClips() {
   }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* ── Header ──────────────────────────────────────── */}
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Review &amp; payouts</h1>
-        <p className="mt-1 text-sm text-muted">
+        <h1 className="text-[28px] font-bold tracking-tight sm:text-[30px]">
+          Review &amp; payouts
+        </h1>
+        <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-muted">
           Approve submitted clips, then move them through payable → processing → paid. Every
           action is written to the clip&apos;s audit trail. Nothing is marked paid until the
           payout provider confirms.
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <SummaryCard
-          icon={<Banknote size={18} className="text-amber" />}
-          amount={rup(pendingFin.total / 100)}
-          label="Pending approval"
-        />
-        <SummaryCard
-          icon={<PlayCircle size={18} className="text-amber" />}
-          amount={rup(processingFin.total / 100)}
-          label="In processing"
-        />
-        <SummaryCard
-          icon={<Wallet size={18} className="text-blue-500" />}
-          amount={rup(paidFin.total / 100)}
-          label="Released to clippers"
-        />
-        <SummaryCard
-          icon={<AlertTriangle size={18} className="text-purple-400" />}
-          amount={rup(financeRecords.filter((r) => {
-            const clip = clips.find((c) => c.id === r.clipId);
-            return clip?.status === "held";
-          }).reduce((s, r) => s + r.netAmount, 0) / 100)}
-          label="Held / disputed"
-        />
+      {/* ── Summary metrics ─────────────────────────────── */}
+      <div className="flex flex-wrap items-baseline gap-x-10 gap-y-3">
+        <div>
+          <p className="text-[20px] font-mono font-bold tracking-tight">
+            {rup(pendingFin.total / 100)}
+          </p>
+          <p className="mt-0.5 text-[13px] text-muted">Pending approval</p>
+        </div>
+        <div>
+          <p className="text-[20px] font-mono font-bold tracking-tight">
+            {rup(processingFin.total / 100)}
+          </p>
+          <p className="mt-0.5 text-[13px] text-muted">In processing</p>
+        </div>
+        <div>
+          <p className="text-[20px] font-mono font-bold tracking-tight">
+            {rup(paidFin.total / 100)}
+          </p>
+          <p className="mt-0.5 text-[13px] text-muted">Released to clippers</p>
+        </div>
+        <div>
+          <p className="text-[20px] font-mono font-bold tracking-tight">
+            {rup(financeRecords.filter((r) => {
+              const clip = clips.find((c) => c.id === r.clipId);
+              return clip?.status === "held";
+            }).reduce((s, r) => s + r.netAmount, 0) / 100)}
+          </p>
+          <p className="mt-0.5 text-[13px] text-muted">Held / disputed</p>
+        </div>
       </div>
 
+      {/* ── Budget warning ──────────────────────────────── */}
       {(() => {
         const atBudget = campaigns.filter(
           (c) => c.status === "budget_reached" || c.status === "near_budget",
         );
         if (atBudget.length === 0) return null;
         return (
-          <div className="rounded-xl border border-amber/30 bg-amber/5 p-3">
-            <p className="text-xs font-medium text-amber">
+          <div className="rounded-[10px] border border-amber/30 bg-amber/5 px-5 py-4">
+            <p className="text-[14px] font-medium text-amber">
               {atBudget.length} campaign{atBudget.length === 1 ? " is" : "s are"}{" "}
               {atBudget.length === 1 ? "at" : "near"} budget limit
             </p>
-            <p className="mt-1 text-xs text-muted">
+            <p className="mt-1 text-[13px] text-muted">
               New approvals for these campaigns may be blocked. Review budget
               allocation before proceeding.
             </p>
@@ -173,41 +178,37 @@ export default function AdminClips() {
         );
       })()}
 
+      {/* ── Tabs + search toolbar ───────────────────────── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="-mx-4 flex overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:overflow-visible">
+        <div className="flex flex-wrap gap-1.5">
           {tabsWithCounts.map((t) => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+              className={`cursor-pointer rounded-[8px] px-3.5 py-2.5 text-[13px] font-medium transition-colors duration-150 ${
                 tab === t.key
-                  ? "border-foreground bg-accent-soft text-foreground"
-                  : "text-muted hover:bg-accent-soft/60"
+                  ? "bg-foreground text-background"
+                  : "border border-border/50 bg-card text-muted hover:border-foreground/20 hover:text-foreground"
               }`}
             >
               {t.label}
-              <span
-                className={`rounded-full px-1.5 text-xs ${
-                  tab === t.key ? "bg-background" : "bg-accent-soft"
-                }`}
-              >
-                {t.count}
-              </span>
+              <span className="ml-1.5 text-[12px] opacity-60">{t.count}</span>
             </button>
           ))}
         </div>
-        <div className="relative max-w-xs">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+        <div className="relative w-full max-w-xs">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search clipper, campaign, txn…"
-            className="w-full rounded-lg border bg-background py-2.5 pl-9 pr-3 text-sm outline-none focus:border-foreground"
+            placeholder="Search clipper, campaign, caption…"
+            className="h-11 w-full rounded-[10px] border border-border/60 bg-card pl-10 pr-4 text-[14px] outline-none transition-colors focus:border-foreground/30"
           />
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border bg-card">
+      {/* ── Table ───────────────────────────────────────── */}
+      <div className="overflow-hidden rounded-xl border border-border/40 bg-card">
         <div className="overflow-x-auto">
           {tab === "pending" || tab === "held" || tab === "rejected" ? (
             <ReviewTable
@@ -253,6 +254,7 @@ export default function AdminClips() {
               }}
               auditId={auditId}
               onToggleAudit={(id) => setAuditId(auditId === id ? null : id)}
+              tab={tab}
             />
           ) : (
             <ApprovedClipsTable
@@ -269,47 +271,35 @@ export default function AdminClips() {
   );
 }
 
-function SummaryCard({
-  icon,
-  amount,
-  label,
-}: {
-  icon: ReactNode;
-  amount: string;
-  label: string;
-}) {
-  return (
-    <div className="flex items-center gap-3 rounded-xl border bg-card p-4">
-      {icon}
-      <div>
-        <p className="font-mono text-lg font-semibold">{amount}</p>
-        <p className="text-xs text-muted">{label}</p>
-      </div>
-    </div>
-  );
-}
+/* ================================================================
+   AUDIT TRAIL
+   ================================================================ */
 
 function AuditTrail({ clip }: { clip: Clip }) {
   if (!clip.audit || clip.audit.length === 0)
-    return <p className="text-xs text-muted">No audit entries.</p>;
+    return <p className="text-[13px] text-muted">No audit entries.</p>;
   return (
-    <ol className="space-y-2">
+    <ol className="space-y-3">
       {clip.audit.map((e, i) => (
-        <li key={i} className="flex items-start gap-2 text-xs">
-          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+        <li key={i} className="flex items-start gap-2.5">
+          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/30" />
           <div className="min-w-0">
-            <p className="font-medium capitalize">{e.action.replace(/_/g, " ")}</p>
-            <p className="text-muted">
+            <p className="text-[14px] font-medium capitalize">{e.action.replace(/_/g, " ")}</p>
+            <p className="text-[13px] text-muted">
               {e.by ? `${e.by} · ` : ""}
               {fmtDateTime(e.at)}
             </p>
-            {e.note && <p className="mt-0.5 text-muted">{e.note}</p>}
+            {e.note && <p className="mt-0.5 text-[13px] text-muted">{e.note}</p>}
           </div>
         </li>
       ))}
     </ol>
   );
 }
+
+/* ================================================================
+   REVIEW TABLE (Pending / Held / Rejected)
+   ================================================================ */
 
 function ReviewTable({
   clips,
@@ -331,6 +321,7 @@ function ReviewTable({
   onCancelHold,
   auditId,
   onToggleAudit,
+  tab,
 }: {
   clips: Clip[];
   campaigns: Campaign[];
@@ -351,22 +342,30 @@ function ReviewTable({
   onCancelHold: () => void;
   auditId: string | null;
   onToggleAudit: (id: string) => void;
+  tab: string;
 }) {
+  const emptyMessages: Record<string, { heading: string; sub: string }> = {
+    pending: { heading: "No clips awaiting review", sub: "New submissions will appear here." },
+    held: { heading: "No held clips", sub: "Clips on hold will appear here." },
+    rejected: { heading: "No rejected clips", sub: "Rejected clips will appear here." },
+  };
+  const empty = emptyMessages[tab] ?? { heading: "No clips", sub: "" };
+
   return (
-    <table className="w-full min-w-[900px] text-sm">
+    <table className="w-full min-w-[900px] text-[14px]">
       <thead>
-        <tr className="border-b text-left text-xs text-muted">
-          <th className="px-4 py-3 font-medium">Clip</th>
-          <th className="px-4 py-3 font-medium">Clipper</th>
-          <th className="px-4 py-3 font-medium">Campaign</th>
-          <th className="px-4 py-3 font-medium">Platform</th>
-          <th className="px-4 py-3 font-medium">Submitted</th>
-          <th className="px-4 py-3 text-right font-medium">Views</th>
-          <th className="px-4 py-3 font-medium">Status</th>
-          <th className="px-4 py-3"></th>
+        <tr className="border-b border-border/40 text-left text-[13px] text-muted">
+          <th className="px-5 py-3 font-medium">Clip</th>
+          <th className="px-5 py-3 font-medium">Clipper</th>
+          <th className="px-5 py-3 font-medium">Campaign</th>
+          <th className="px-5 py-3 font-medium">Platform</th>
+          <th className="px-5 py-3 font-medium">Submitted</th>
+          <th className="px-5 py-3 text-right font-medium">Views</th>
+          <th className="px-5 py-3 font-medium">Status</th>
+          <th className="px-5 py-3"></th>
         </tr>
       </thead>
-      <tbody className="divide-y">
+      <tbody className="divide-y divide-border/40">
         {clips.map((k) => {
           const c = campaigns.find((x) => x.id === k.campaignId);
           return (
@@ -374,40 +373,46 @@ function ReviewTable({
               key={k.id}
               colSpan={8}
               extra={
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    onClick={() => onApprove?.(k)}
-                    className="inline-flex items-center gap-1 rounded-md bg-green/10 px-2.5 py-1 text-xs font-medium text-green"
-                  >
-                    <Check size={13} /> Approve
-                  </button>
-                  <button
-                    onClick={() => onReject?.(k)}
-                    className="inline-flex items-center gap-1 rounded-md bg-red/10 px-2.5 py-1 text-xs font-medium text-red"
-                  >
-                    <Ban size={13} /> Reject
-                  </button>
-                  <button
-                    onClick={() => onHold?.(k)}
-                    className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-accent-soft"
-                  >
-                    <ShieldAlert size={13} /> Hold
-                  </button>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {onApprove && (
+                    <button
+                      onClick={() => onApprove(k)}
+                      className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-[8px] bg-green/10 px-3 text-[13px] font-medium text-green transition-colors hover:bg-green/20"
+                    >
+                      <Check size={14} /> Approve
+                    </button>
+                  )}
+                  {onReject && (
+                    <button
+                      onClick={() => onReject(k)}
+                      className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-[8px] bg-red/10 px-3 text-[13px] font-medium text-red transition-colors hover:bg-red/20"
+                    >
+                      <Ban size={14} /> Reject
+                    </button>
+                  )}
+                  {onHold && (
+                    <button
+                      onClick={() => onHold(k)}
+                      className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-[8px] border border-border/60 px-3 text-[13px] font-medium transition-colors hover:bg-accent-soft"
+                    >
+                      <ShieldAlert size={14} /> Hold
+                    </button>
+                  )}
                   <button
                     onClick={() => onToggleAudit(k.id)}
-                    className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-accent-soft ${
+                    className={`inline-flex h-9 cursor-pointer items-center gap-1 rounded-[8px] border border-border/60 px-3 text-[13px] font-medium transition-colors hover:bg-accent-soft ${
                       auditId === k.id ? "bg-accent-soft" : ""
                     }`}
                   >
-                    <History size={13} /> Audit
+                    <History size={14} /> Audit
                     {k.audit?.length ? ` (${k.audit.length})` : ""}
                   </button>
                 </div>
               }
               audit={
                 auditId === k.id ? (
-                  <div className="mt-3 rounded-lg border bg-background/50 p-3">
-                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                  <div className="mt-2 rounded-[8px] border border-border/40 bg-background px-5 py-4">
+                    <p className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-muted">
                       Audit trail
                     </p>
                     <AuditTrail clip={k} />
@@ -415,7 +420,7 @@ function ReviewTable({
                 ) : null
               }
             >
-              <td className="px-4 py-3">
+              <td className="px-5 py-4">
                 <div className="min-w-0">
                   <p className="truncate font-medium">{k.caption}</p>
                   {k.videoUrl && (
@@ -423,21 +428,21 @@ function ReviewTable({
                       href={k.videoUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="mt-0.5 inline-block text-xs text-accent hover:underline"
+                      className="mt-0.5 inline-block text-[13px] text-foreground/60 hover:underline"
                     >
                       View clip ↗
                     </a>
                   )}
                 </div>
               </td>
-              <td className="px-4 py-3">@{k.clipper}</td>
-              <td className="px-4 py-3 text-muted">{c?.title ?? "Campaign"}</td>
-              <td className="px-4 py-3">
+              <td className="px-5 py-4 font-medium">@{k.clipper}</td>
+              <td className="px-5 py-4 text-muted">{c?.title ?? "Campaign"}</td>
+              <td className="px-5 py-4">
                 {k.platform && <PlatformIcon p={k.platform} size={15} />}
               </td>
-              <td className="px-4 py-3 text-muted">{fmtDate(k.submittedAt)}</td>
-              <td className="px-4 py-3 text-right font-mono">{fmtViews(k.verifiedViews ?? 0)}</td>
-              <td className="px-4 py-3">
+              <td className="px-5 py-4 text-[13px] text-muted">{fmtDate(k.submittedAt)}</td>
+              <td className="px-5 py-4 text-right font-mono">{fmtViews(k.verifiedViews ?? 0)}</td>
+              <td className="px-5 py-4">
                 <StatusPill status={k.status} />
               </td>
             </FragmentRow>
@@ -445,8 +450,9 @@ function ReviewTable({
         })}
         {clips.length === 0 && (
           <tr>
-            <td colSpan={8} className="px-4 py-10 text-center text-sm text-muted">
-              No clips in this view.
+            <td colSpan={8} className="px-5 py-12 text-center">
+              <p className="text-[15px] font-medium">{empty.heading}</p>
+              <p className="mt-1 text-[13px] text-muted">{empty.sub}</p>
             </td>
           </tr>
         )}
@@ -485,6 +491,10 @@ function ReviewTable({
   );
 }
 
+/* ================================================================
+   APPROVED CLIPS TABLE
+   ================================================================ */
+
 function ApprovedClipsTable({
   financeRecords,
   clips,
@@ -499,117 +509,125 @@ function ApprovedClipsTable({
   onToggleAudit: (id: string) => void;
 }) {
   return (
-    <table className="w-full min-w-[1200px] text-sm">
+    <table className="w-full min-w-[1000px] text-[14px]">
       <thead>
-        <tr className="border-b text-left text-xs text-muted">
-          <th className="px-4 py-3 font-medium">Record ID</th>
-          <th className="px-4 py-3 font-medium">Clipper</th>
-          <th className="px-4 py-3 font-medium">Campaign</th>
-          <th className="px-4 py-3 font-medium">Clip</th>
-          <th className="px-4 py-3 text-right font-medium">Views</th>
-          <th className="px-4 py-3 text-right font-medium">CPM</th>
-          <th className="px-4 py-3 text-right font-medium">Gross</th>
-          <th className="px-4 py-3 text-right font-medium">Platform fee</th>
-          <th className="px-4 py-3 text-right font-medium">Net clipper</th>
-          <th className="px-4 py-3 font-medium">Status</th>
-          <th className="px-4 py-3 font-medium">Created</th>
-          <th className="px-4 py-3 font-medium">Paid</th>
-          <th className="px-4 py-3"></th>
+        <tr className="border-b border-border/40 text-left text-[13px] text-muted">
+          <th className="px-5 py-3 font-medium">Clip</th>
+          <th className="px-5 py-3 font-medium">Clipper</th>
+          <th className="px-5 py-3 font-medium">Campaign</th>
+          <th className="px-5 py-3 text-right font-medium">Views</th>
+          <th className="px-5 py-3 text-right font-medium">CPM</th>
+          <th className="px-5 py-3 text-right font-medium">Gross</th>
+          <th className="px-5 py-3 text-right font-medium">Platform fee</th>
+          <th className="px-5 py-3 text-right font-medium">Net clipper</th>
+          <th className="px-5 py-3 font-medium">Payment</th>
+          <th className="px-5 py-3 font-medium">Paid</th>
+          <th className="px-5 py-3"></th>
         </tr>
       </thead>
-      <tbody className="divide-y">
+      <tbody className="divide-y divide-border/40">
         {financeRecords.map((r) => {
           const clip = clips.find((c) => c.id === r.clipId);
           const c = campaigns.find((x) => x.id === r.campaignId);
           const cpm = clip ? clipCPM(clip, campaigns) : 0;
+
+          const paymentLabel =
+            r.status === "paid" ? "Paid" :
+            r.status === "processing" ? "Processing" :
+            "Payable";
+          const paymentStyle =
+            r.status === "paid" ? "bg-green/10 text-green" :
+            r.status === "processing" ? "bg-blue-500/10 text-blue-600" :
+            "bg-amber/10 text-amber";
+
           return (
             <FragmentRow
               key={r.id}
-              colSpan={13}
+              colSpan={11}
               extra={
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <button
                     onClick={() => onToggleAudit(r.id)}
-                    className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-accent-soft ${
+                    className={`inline-flex h-9 cursor-pointer items-center gap-1 rounded-[8px] border border-border/60 px-3 text-[13px] font-medium transition-colors hover:bg-accent-soft ${
                       auditId === r.id ? "bg-accent-soft" : ""
                     }`}
                   >
-                    <History size={13} /> Audit
+                    <History size={14} /> Audit
                   </button>
                 </div>
               }
               audit={
                 auditId === r.id ? (
-                  <div className="mt-3 rounded-lg border bg-background/50 p-3">
-                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                  <div className="mt-2 rounded-[8px] border border-border/40 bg-background px-5 py-4">
+                    <p className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-muted">
                       Audit trail
                     </p>
                     {r.audit && r.audit.length > 0 ? (
-                      <ol className="space-y-2">
+                      <ol className="space-y-3">
                         {r.audit.map((e, i) => (
-                          <li key={i} className="flex items-start gap-2 text-xs">
-                            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+                          <li key={i} className="flex items-start gap-2.5">
+                            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/30" />
                             <div className="min-w-0">
-                              <p className="font-medium capitalize">{e.action.replace(/_/g, " ")}</p>
-                              <p className="text-muted">
+                              <p className="text-[14px] font-medium capitalize">{e.action.replace(/_/g, " ")}</p>
+                              <p className="text-[13px] text-muted">
                                 {e.by ? `${e.by} · ` : ""}
                                 {fmtDateTime(e.at)}
                               </p>
-                              {e.note && <p className="mt-0.5 text-muted">{e.note}</p>}
+                              {e.note && <p className="mt-0.5 text-[13px] text-muted">{e.note}</p>}
                             </div>
                           </li>
                         ))}
                       </ol>
                     ) : (
-                      <p className="text-xs text-muted">No audit entries.</p>
+                      <p className="text-[13px] text-muted">No audit entries.</p>
                     )}
                   </div>
                 ) : null
               }
             >
-              <td className="px-4 py-3 font-mono text-xs">{r.id.slice(0, 8)}</td>
-              <td className="px-4 py-3">@{clip?.clipper ?? "—"}</td>
-              <td className="px-4 py-3 text-muted">{c?.title ?? "Campaign"}</td>
-              <td className="px-4 py-3 max-w-[180px]">
+              <td className="px-5 py-4 max-w-[180px]">
                 <p className="truncate font-medium">{clip?.caption ?? "—"}</p>
                 {clip?.videoUrl && (
                   <a
                     href={clip.videoUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-xs text-accent hover:underline"
+                    className="text-[13px] text-foreground/60 hover:underline"
                   >
                     View ↗
                   </a>
                 )}
                 {clip?.status === "held" && clip.heldReason && (
-                  <p className="mt-1 text-xs text-muted">Held: {clip.heldReason}</p>
+                  <p className="mt-0.5 text-[13px] text-muted">Held: {clip.heldReason}</p>
                 )}
               </td>
-              <td className="px-4 py-3 text-right font-mono">{fmtViews(clip?.verifiedViews ?? 0)}</td>
-              <td className="px-4 py-3 text-right font-mono">{rup(cpm)}</td>
-              <td className="px-4 py-3 text-right font-mono">{rup(r.grossAmount / 100)}</td>
-              <td className="px-4 py-3 text-right font-mono text-muted">
+              <td className="px-5 py-4 font-medium">@{clip?.clipper ?? "—"}</td>
+              <td className="px-5 py-4 text-muted">{c?.title ?? "Campaign"}</td>
+              <td className="px-5 py-4 text-right font-mono">{fmtViews(clip?.verifiedViews ?? 0)}</td>
+              <td className="px-5 py-4 text-right font-mono">{rup(cpm)}</td>
+              <td className="px-5 py-4 text-right font-mono">{rup(r.grossAmount / 100)}</td>
+              <td className="px-5 py-4 text-right font-mono text-muted">
                 {rup(r.platformFee / 100)}
-                <span className="ml-1 text-[10px]">
-                  {Math.round(PLATFORM_FEE_RATE * 100)}%
-                </span>
               </td>
-              <td className="px-4 py-3 text-right font-mono font-semibold text-green">
+              <td className="px-5 py-4 text-right font-mono font-semibold text-green">
                 {rup(r.netAmount / 100)}
               </td>
-              <td className="px-4 py-3">
-                <StatusPill status={r.status === "pending" ? "pending" : "approved"} />
+              <td className="px-5 py-4">
+                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[12px] font-medium ${paymentStyle}`}>
+                  {paymentLabel}
+                </span>
               </td>
-              <td className="px-4 py-3 text-muted">{fmtDate(r.createdAt)}</td>
-              <td className="px-4 py-3 text-muted">{r.paidAt ? fmtDate(r.paidAt) : "—"}</td>
+              <td className="px-5 py-4 text-[13px] text-muted">{r.paidAt ? fmtDate(r.paidAt) : "—"}</td>
             </FragmentRow>
           );
         })}
         {financeRecords.length === 0 && (
           <tr>
-            <td colSpan={13} className="px-4 py-10 text-center text-sm text-muted">
-              No financial records in this view.
+            <td colSpan={11} className="px-5 py-12 text-center">
+              <p className="text-[15px] font-medium">No approved clips</p>
+              <p className="mt-1 text-[13px] text-muted">
+                Approved clips will move through the payout workflow here.
+              </p>
             </td>
           </tr>
         )}
@@ -617,6 +635,10 @@ function ApprovedClipsTable({
     </table>
   );
 }
+
+/* ================================================================
+   FRAGMENT ROW (expands with audit trail)
+   ================================================================ */
 
 function FragmentRow({
   colSpan,
@@ -631,15 +653,15 @@ function FragmentRow({
 }) {
   return (
     <>
-      <tr className="align-top">
+      <tr className="align-top transition-colors hover:bg-accent-soft/50">
         {children}
-        <td className="px-4 py-3">
+        <td className="px-5 py-4">
           <div className="flex flex-col items-end gap-2">{extra}</div>
         </td>
       </tr>
       {audit ? (
         <tr>
-          <td colSpan={colSpan} className="px-4 pb-4 pt-0">
+          <td colSpan={colSpan} className="px-5 pb-4 pt-0">
             {audit}
           </td>
         </tr>
@@ -647,6 +669,10 @@ function FragmentRow({
     </>
   );
 }
+
+/* ================================================================
+   REJECT / HOLD FORM ROW
+   ================================================================ */
 
 function RejectFormRow({
   colSpan,
@@ -671,34 +697,36 @@ function RejectFormRow({
 }) {
   return (
     <tr>
-      <td colSpan={colSpan} className="px-4 py-3">
-        <div className="space-y-2 rounded-lg border border-red/30 bg-red/5 p-3">
-          <p className="text-xs font-medium text-red">{title}</p>
+      <td colSpan={colSpan} className="px-5 py-4">
+        <div className="space-y-3 rounded-[10px] border border-red/20 bg-red/5 px-5 py-4">
+          <p className="text-[14px] font-medium text-red">{title}</p>
           <input
             value={reason}
             onChange={(e) => onReason(e.target.value)}
             placeholder={placeholder}
-            className="w-full rounded-md border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-foreground"
+            className="w-full rounded-[8px] border border-border/60 bg-card px-3.5 py-2.5 text-[14px] outline-none transition-colors focus:border-foreground/30"
           />
-          <textarea
-            value={details}
-            onChange={(e) => onDetails(e.target.value)}
-            rows={2}
-            placeholder="Details (optional)"
-            className="w-full resize-none rounded-md border bg-background px-2.5 py-1.5 text-xs outline-none focus:border-foreground"
-          />
+          {details !== undefined && (
+            <textarea
+              value={details}
+              onChange={(e) => onDetails(e.target.value)}
+              rows={2}
+              placeholder="Details (optional)"
+              className="w-full resize-none rounded-[8px] border border-border/60 bg-card px-3.5 py-2.5 text-[14px] outline-none transition-colors focus:border-foreground/30"
+            />
+          )}
           <div className="flex gap-2">
             <button
               onClick={onConfirm}
-              className="inline-flex items-center gap-1 rounded-md bg-red/10 px-2.5 py-1 text-xs font-medium text-red"
+              className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[8px] bg-red px-4 text-[14px] font-medium text-white transition-colors hover:opacity-90"
             >
-              <Ban size={13} /> Confirm
+              <Ban size={14} /> Confirm
             </button>
             <button
               onClick={onCancel}
-              className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium"
+              className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[8px] border border-border/60 px-4 text-[14px] font-medium transition-colors hover:bg-accent-soft"
             >
-              <X size={13} /> Cancel
+              <X size={14} /> Cancel
             </button>
           </div>
         </div>
