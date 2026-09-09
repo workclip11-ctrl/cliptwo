@@ -83,56 +83,93 @@ export default function ClipperSubmissionsPage() {
     .reduce((s, _k) => s + netOf(_k), 0);
   const pendingReview = myClips.filter((k) => k.status === "pending").length;
 
+  const emptyMessages: Record<TabKey, { heading: string; body: string }> = {
+    all: {
+      heading: "No clips yet",
+      body: "You haven't submitted any clips yet.",
+    },
+    pending: {
+      heading: "Nothing waiting for review",
+      body: "No clips are waiting for review.",
+    },
+    rejected: {
+      heading: "No rejected clips",
+      body: "No rejected clips.",
+    },
+    held: {
+      heading: "No held clips",
+      body: "No clips are currently on hold.",
+    },
+  };
+
   return (
-    <div className="space-y-5">
-      {/* Header */}
+    <div className="mx-auto max-w-[1120px] space-y-8 px-5 py-10 sm:px-8">
+      {/* ── Header ──────────────────────────────────────── */}
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">My Submissions</h1>
-        <p className="mt-1 text-sm text-muted">
+        <h1 className="text-[28px] font-semibold leading-tight tracking-tight sm:text-[26px]">
+          My Submissions
+        </h1>
+        <p className="mt-2 text-[14px] text-muted sm:text-[15px]">
           Track your clips, approvals, views, and earnings.
         </p>
       </div>
 
-      {/* Compact summary */}
-      <div className="flex items-center gap-5 text-sm">
+      {/* ── Earnings Summary ────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
         <div>
-          <span className="text-muted">Total earned </span>
-          <span className="font-mono font-medium">{rup(totalEarnedNet)}</span>
+          <p className="text-[12px] leading-none text-muted">Total earned</p>
+          <p className="mt-1.5 font-mono text-[16px] font-bold tracking-tight">
+            {rup(totalEarnedNet)}
+          </p>
         </div>
         <div>
-          <span className="text-muted">Paid out </span>
-          <span className="font-mono font-medium text-green">{rup(totalPaidNet)}</span>
+          <p className="text-[12px] leading-none text-muted">Paid out</p>
+          <p className="mt-1.5 font-mono text-[16px] font-bold tracking-tight text-green">
+            {rup(totalPaidNet)}
+          </p>
         </div>
         <div>
-          <span className="text-muted">Pending </span>
-          <span className="font-mono font-medium text-amber">{pendingReview}</span>
+          <p className="text-[12px] leading-none text-muted">Pending</p>
+          <p className="mt-1.5 font-mono text-[16px] font-bold tracking-tight text-amber">
+            {pendingReview}
+          </p>
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* ── Tabs ────────────────────────────────────────── */}
       <div className="-mx-4 flex overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:overflow-visible">
         {TABS.map((t) => (
           <button
             key={t.key}
             onClick={() => selectTab(t.key)}
-            className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+            className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-4 py-2 text-[13px] font-medium transition-all duration-150 ${
               tab === t.key
                 ? "border-accent bg-accent-soft text-foreground"
-                : "text-muted hover:bg-accent-soft"
+                : "border-transparent text-muted hover:bg-accent-soft/60"
             }`}
           >
             {t.label}
-            <span className="rounded-full bg-background px-1.5 text-xs">
+            <span
+              className={`rounded-full px-1.5 text-[11px] ${
+                tab === t.key ? "bg-background text-muted" : "text-muted/60"
+              }`}
+            >
               {counts[t.key]}
             </span>
           </button>
         ))}
       </div>
 
+      {/* ── Submissions List ─────────────────────────────── */}
       {sorted.length === 0 ? (
-        <p className="rounded-xl border border-dashed p-8 text-center text-sm text-muted">
-          No clips in this view.
-        </p>
+        <div className="rounded-[12px] border border-dashed bg-card py-16 text-center">
+          <p className="text-[16px] font-medium">
+            {emptyMessages[tab].heading}
+          </p>
+          <p className="mt-2 text-[14px] text-muted">
+            {emptyMessages[tab].body}
+          </p>
+        </div>
       ) : (
         <div className="space-y-3">
           {visible.map((k) => {
@@ -145,7 +182,6 @@ export default function ClipperSubmissionsPage() {
             const thumb = campaign?.thumbnails?.[0];
             const isOpen = expanded[k.id];
 
-            /* Status microcopy */
             let statusNote = "";
             if (k.status === "pending") statusNote = "Waiting for review";
             else if (k.status === "approved") statusNote = "Earning";
@@ -153,12 +189,15 @@ export default function ClipperSubmissionsPage() {
             else if (k.status === "rejected") statusNote = "Rejected";
 
             return (
-              <div key={k.id} className="rounded-xl border bg-card p-3 sm:p-4">
-                <div className="flex gap-3">
-                  {/* Thumbnail */}
+              <div
+                key={k.id}
+                className="rounded-[12px] border bg-card p-4 transition-colors duration-150 hover:border-foreground/8 sm:p-5"
+              >
+                <div className="flex gap-4">
+                  {/* ── Thumbnail ──────────────────────────── */}
                   <Link
                     href={`/clip/${k.id}`}
-                    className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-accent-soft sm:h-28 sm:w-32"
+                    className="relative h-[88px] w-[112px] shrink-0 overflow-hidden rounded-lg bg-accent-soft sm:h-[96px] sm:w-[144px]"
                   >
                     {thumb ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
@@ -177,77 +216,79 @@ export default function ClipperSubmissionsPage() {
                     )}
                   </Link>
 
-                  {/* Main content */}
+                  {/* ── Main Content ───────────────────────── */}
                   <div className="min-w-0 flex-1">
-                    {/* Row 1: title + status */}
+                    {/* Row 1: Title + Status */}
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div className="min-w-0">
                         <Link
                           href={`/campaigns/${k.campaignId}`}
-                          className="text-sm font-semibold hover:underline underline-offset-2"
+                          className="text-[15px] font-semibold leading-snug hover:underline underline-offset-2 sm:text-[16px]"
                         >
                           {campaign?.title ?? "Campaign"}
                         </Link>
-                        <p className="line-clamp-1 text-xs text-muted">
+                        <p className="mt-0.5 line-clamp-1 text-[13px] text-muted">
                           {k.caption}
                         </p>
                       </div>
-                      <div className="flex items-center gap-1.5">
+                      <div className="shrink-0">
                         <StatusPill status={k.status} />
                       </div>
                     </div>
 
-                    {/* Row 2: meta */}
-                    <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11px] text-muted">
-                      <span className="inline-flex items-center gap-1">
-                        <PlatformIcon
-                          p={k.platform ?? "Instagram"}
-                          size={11}
-                        />
-                        {k.platform ?? "Instagram"}
-                      </span>
-                      <span>·</span>
-                      <span>Submitted {fmtDate(k.submittedAt)}</span>
-                      {statusNote && (
-                        <>
-                          <span>·</span>
-                          <span>{statusNote}</span>
-                        </>
-                      )}
-                    </div>
-
-                    {/* Row 3: views + earnings — dominant */}
-                    <div className="mt-2.5 flex items-baseline gap-4">
+                    {/* Row 2: Performance — dominant */}
+                    <div className="mt-3 flex items-baseline gap-5">
                       <div>
-                        <span className="font-mono text-lg font-bold tracking-tight">
-                          {k.verifiedViews ? fmtViews(k.verifiedViews) : "—"}
+                        <span className="font-mono text-[18px] font-bold tracking-tight sm:text-[20px]">
+                          {k.verifiedViews
+                            ? fmtViews(k.verifiedViews)
+                            : "—"}
                         </span>
-                        <span className="ml-1 text-[11px] text-muted">
+                        <span className="ml-1.5 text-[12px] text-muted">
                           verified views
                         </span>
                       </div>
                       {earned > 0 && (
                         <div>
-                          <span className="font-mono text-lg font-bold tracking-tight">
+                          <span className="font-mono text-[18px] font-bold tracking-tight sm:text-[20px]">
                             {rup(earned)}
                           </span>
-                          <span className="ml-1 text-[11px] text-muted">
+                          <span className="ml-1.5 text-[12px] text-muted">
                             earned
                           </span>
                         </div>
                       )}
                     </div>
+
+                    {/* Row 3: Metadata */}
+                    <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[12px] text-muted sm:text-[13px]">
+                      <span className="inline-flex items-center gap-1">
+                        <PlatformIcon
+                          p={k.platform ?? "Instagram"}
+                          size={12}
+                        />
+                        {k.platform ?? "Instagram"}
+                      </span>
+                      <span className="text-border">·</span>
+                      <span>{fmtDate(k.submittedAt)}</span>
+                      {statusNote && (
+                        <>
+                          <span className="text-border">·</span>
+                          <span>{statusNote}</span>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {/* Rejection block */}
+                {/* ── Rejection Block ──────────────────────── */}
                 {k.status === "rejected" && (
-                  <div className="mt-3 rounded-lg border border-red/20 bg-red/5 p-3 text-sm">
-                    <p className="flex items-center gap-1.5 font-medium text-red">
+                  <div className="mt-4 rounded-lg border border-red/20 bg-red/[0.04] p-3.5">
+                    <p className="flex items-center gap-1.5 text-[13px] font-medium text-red">
                       <MessageSquareWarning size={14} /> Rejected
                     </p>
                     {k.rejectionReason && (
-                      <p className="mt-1 text-muted">
+                      <p className="mt-1.5 text-[13px] text-muted">
                         <span className="font-medium text-foreground">
                           Reason:{" "}
                         </span>
@@ -255,7 +296,7 @@ export default function ClipperSubmissionsPage() {
                       </p>
                     )}
                     {k.rejectionDetails && (
-                      <p className="mt-0.5 text-muted">
+                      <p className="mt-0.5 text-[13px] text-muted">
                         <span className="font-medium text-foreground">
                           Details:{" "}
                         </span>
@@ -265,9 +306,9 @@ export default function ClipperSubmissionsPage() {
                   </div>
                 )}
 
-                {/* Held note */}
+                {/* ── Held Block ──────────────────────────── */}
                 {k.status === "held" && k.heldReason && (
-                  <div className="mt-3 rounded-lg border border-amber/20 bg-amber/5 p-3 text-sm text-muted">
+                  <div className="mt-4 rounded-lg border border-amber/20 bg-amber/[0.04] p-3.5 text-[13px] text-muted">
                     <span className="font-medium text-foreground">
                       Hold reason:{" "}
                     </span>
@@ -275,21 +316,21 @@ export default function ClipperSubmissionsPage() {
                   </div>
                 )}
 
-                {/* Details toggle */}
+                {/* ── View Details Toggle ──────────────────── */}
                 <button
                   onClick={() => toggleDetails(k.id)}
-                  className="mt-2 inline-flex items-center gap-1 text-xs text-muted hover:text-foreground"
+                  className="mt-3 inline-flex items-center gap-1 text-[13px] text-muted transition-colors duration-150 hover:text-foreground"
                 >
                   <ChevronDown
-                    size={13}
-                    className={`transition-transform ${isOpen ? "rotate-180" : ""}`}
+                    size={14}
+                    className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
                   />
                   {isOpen ? "Hide details" : "View details"}
                 </button>
 
-                {/* Expanded details */}
+                {/* ── Expanded Details ─────────────────────── */}
                 {isOpen && (
-                  <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1.5 border-t border-border/50 pt-3 text-xs sm:grid-cols-3">
+                  <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 border-t border-border/50 pt-3 text-[13px] sm:grid-cols-3">
                     <div>
                       <span className="text-muted">CPM </span>
                       <span className="font-medium">
@@ -330,17 +371,17 @@ export default function ClipperSubmissionsPage() {
                   </div>
                 )}
 
-                {/* Actions */}
-                <div className="mt-3 flex flex-wrap items-center gap-2">
+                {/* ── Actions ─────────────────────────────── */}
+                <div className="mt-4 flex flex-wrap items-center gap-2">
                   <Link
                     href={`/clip/${k.id}`}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
+                    className="inline-flex items-center gap-1.5 rounded-[10px] bg-accent px-4 py-2.5 text-[13px] font-medium text-white transition-all duration-150 hover:bg-foreground/90"
                   >
                     <Film size={13} /> View clip
                   </Link>
                   <Link
                     href={`/campaigns/${k.campaignId}`}
-                    className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium text-muted hover:bg-accent-soft"
+                    className="inline-flex items-center gap-1.5 rounded-[10px] border px-4 py-2.5 text-[13px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft"
                   >
                     <ExternalLink size={13} /> View campaign
                   </Link>
@@ -349,14 +390,14 @@ export default function ClipperSubmissionsPage() {
                       onClick={() =>
                         setAppealed((a) => ({ ...a, [k.id]: true }))
                       }
-                      className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium text-muted hover:bg-accent-soft"
+                      className="inline-flex items-center gap-1.5 rounded-[10px] border px-4 py-2.5 text-[13px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft"
                     >
                       <MessageSquareWarning size={13} /> Appeal rejection
                     </button>
                   )}
                 </div>
                 {appealed[k.id] && (
-                  <p className="mt-2 text-xs text-green">
+                  <p className="mt-2.5 text-[13px] text-green">
                     Appeal submitted — our team will review and respond within 7
                     days.
                   </p>
@@ -365,10 +406,11 @@ export default function ClipperSubmissionsPage() {
             );
           })}
 
+          {/* ── Load More ─────────────────────────────────── */}
           {hasMore && (
             <button
               onClick={() => setPage((p) => p + 1)}
-              className="flex w-full items-center justify-center gap-1.5 rounded-xl border bg-card py-3 text-sm font-medium hover:bg-accent-soft"
+              className="flex w-full items-center justify-center gap-1.5 rounded-[12px] border bg-card py-3.5 text-[14px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft"
             >
               <ChevronDown size={15} /> Load more
             </button>
