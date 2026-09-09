@@ -14,7 +14,6 @@ import {
   ExternalLink,
   Film,
   Target,
-  History,
   RotateCcw,
   Loader2,
   Send,
@@ -189,7 +188,7 @@ export default function CreatorCampaignDetailPage() {
   };
 
   return (
-    <div className="mx-auto max-w-[1120px] space-y-12 px-5 py-10 sm:px-8">
+    <div className="mx-auto max-w-[1120px] space-y-16 px-5 py-10 sm:px-8">
       {/* ── Back navigation ─────────────────────────────── */}
       <Link
         href="/creator/campaigns"
@@ -382,9 +381,12 @@ export default function CreatorCampaignDetailPage() {
 
       {/* ── Budget & Spend ───────────────────────────────── */}
       <section>
-        <h2 className="mb-5 text-[20px] font-bold tracking-tight">
+        <h2 className="mb-1.5 text-[20px] font-bold tracking-tight">
           Budget &amp; spend
         </h2>
+        <p className="mb-5 text-[14px] text-muted">
+          Campaign funding and remaining capacity.
+        </p>
         <div className="rounded-[12px] border bg-card px-6 py-6 sm:px-8">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -445,9 +447,12 @@ export default function CreatorCampaignDetailPage() {
 
       {/* ── Performance ──────────────────────────────────── */}
       <section>
-        <h2 className="mb-5 text-[20px] font-bold tracking-tight">
+        <h2 className="mb-1.5 text-[20px] font-bold tracking-tight">
           Performance
         </h2>
+        <p className="mb-5 text-[14px] text-muted">
+          Aggregated campaign metrics.
+        </p>
         {/* Primary metrics */}
         <div className="mb-6 flex flex-wrap gap-x-12 gap-y-6">
           <div>
@@ -490,9 +495,12 @@ export default function CreatorCampaignDetailPage() {
 
       {/* ── Campaign Brief ──────────────────────────────── */}
       <section>
-        <h2 className="mb-5 text-[20px] font-bold tracking-tight">
+        <h2 className="mb-1.5 text-[20px] font-bold tracking-tight">
           Campaign brief
         </h2>
+        <p className="mb-5 text-[14px] text-muted">
+          What clippers need to know before creating content.
+        </p>
         <div className="space-y-6">
           {camp.brief && (
             <div>
@@ -563,9 +571,12 @@ export default function CreatorCampaignDetailPage() {
 
       {/* ── Source Assets ────────────────────────────────── */}
       <section>
-        <h2 className="mb-5 text-[20px] font-bold tracking-tight">
+        <h2 className="mb-1.5 text-[20px] font-bold tracking-tight">
           Source assets
         </h2>
+        <p className="mb-5 text-[14px] text-muted">
+          Reference materials for clippers.
+        </p>
         {(() => {
           const hasAssets =
             camp.sourceLink ||
@@ -575,19 +586,23 @@ export default function CreatorCampaignDetailPage() {
             camp.exampleClips?.length;
           if (!hasAssets) {
             return (
-              <div className="rounded-[12px] border border-dashed bg-card py-10 text-center">
-                <p className="text-[14px] text-muted">No source assets added.</p>
-              </div>
+              <p className="py-6 text-[14px] text-muted">
+                No source assets added.
+              </p>
             );
           }
           return (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {camp.sourceLink && (
                 <AssetRow label="Source video" value={camp.sourceLink} />
               )}
-              {camp.thumbnails?.map((t, i) => (
-                <AssetRow key={`thumb-${i}`} label={`Thumbnail ${i + 1}`} value={t} />
-              ))}
+              {camp.thumbnails?.length ? (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {camp.thumbnails.map((t, i) => (
+                    <AssetThumb key={`thumb-${i}`} label={`Thumbnail ${i + 1}`} value={t} />
+                  ))}
+                </div>
+              ) : null}
               {camp.brandAssets?.map((a, i) => (
                 <AssetRow
                   key={`brand-${i}`}
@@ -616,75 +631,112 @@ export default function CreatorCampaignDetailPage() {
 
       {/* ── Rules ────────────────────────────────────────── */}
       <section>
-        <h2 className="mb-5 text-[20px] font-bold tracking-tight">Rules</h2>
-        <div className="rounded-[12px] border bg-card px-6 py-5">
-          <dl className="space-y-2">
-            {camp.rules && <DefRow label="Campaign rules" value={camp.rules} />}
-            {camp.viewRules?.minViews != null && (
-              <DefRow
-                label="Min views"
-                value={String(camp.viewRules.minViews)}
-              />
-            )}
-            {camp.maxPayoutPerClip != null && (
-              <DefRow
-                label="Max payout / clip"
-                value={rup(camp.maxPayoutPerClip)}
-              />
-            )}
-            {camp.spendCap != null && (
-              <DefRow label="Spend cap" value={rup(camp.spendCap)} />
-            )}
-            <DefRow
-              label="Auto-approve"
-              value={camp.approval?.autoReview ? "Yes" : "No"}
-            />
-            {camp.approval?.reviewTime && (
-              <DefRow label="Review time" value={camp.approval.reviewTime} />
-            )}
-          </dl>
-          {camp.doList?.length ? (
-            <div className="mt-4 border-t border-border/50 pt-4">
-              <p className="mb-1.5 text-[13px] font-medium text-muted">Do</p>
-              <ul className="list-inside list-disc text-[14px] text-muted">
-                {camp.doList.map((d, i) => (
-                  <li key={i}>{d}</li>
-                ))}
-              </ul>
+        <h2 className="mb-1.5 text-[20px] font-bold tracking-tight">Rules</h2>
+        <p className="mb-5 text-[14px] text-muted">
+          Constraints and guidelines for this campaign.
+        </p>
+
+        {/* Campaign rules — general */}
+        {camp.rules && (
+          <div className="mb-5">
+            <p className="mb-1.5 text-[13px] font-medium text-muted">Campaign rules</p>
+            <p className="text-[14px] leading-relaxed text-foreground/80">
+              {camp.rules}
+            </p>
+          </div>
+        )}
+
+        {/* Requirements — numeric constraints */}
+        {(camp.viewRules?.minViews != null ||
+          camp.maxPayoutPerClip != null ||
+          camp.spendCap != null ||
+          camp.approval?.autoReview != null ||
+          camp.approval?.reviewTime) && (
+          <div className="mb-5">
+            <p className="mb-2.5 text-[13px] font-medium text-muted">Requirements</p>
+            <div className="flex flex-wrap gap-x-8 gap-y-2.5 text-[14px]">
+              {camp.viewRules?.minViews != null && (
+                <div>
+                  <span className="text-muted">Min views </span>
+                  <span className="font-medium">{fmtViews(camp.viewRules.minViews)}</span>
+                </div>
+              )}
+              {camp.maxPayoutPerClip != null && (
+                <div>
+                  <span className="text-muted">Max payout / clip </span>
+                  <span className="font-medium">{rup(camp.maxPayoutPerClip)}</span>
+                </div>
+              )}
+              {camp.spendCap != null && (
+                <div>
+                  <span className="text-muted">Spend cap </span>
+                  <span className="font-medium">{rup(camp.spendCap)}</span>
+                </div>
+              )}
+              <div>
+                <span className="text-muted">Auto-approve </span>
+                <span className="font-medium">{camp.approval?.autoReview ? "Yes" : "No"}</span>
+              </div>
+              {camp.approval?.reviewTime && (
+                <div>
+                  <span className="text-muted">Review time </span>
+                  <span className="font-medium">{camp.approval.reviewTime}</span>
+                </div>
+              )}
             </div>
-          ) : null}
-          {camp.dontList?.length ? (
-            <div className="mt-4 border-t border-border/50 pt-4">
-              <p className="mb-1.5 text-[13px] font-medium text-muted">
-                Don&apos;t
-              </p>
-              <ul className="list-inside list-disc text-[14px] text-muted">
-                {camp.dontList.map((d, i) => (
-                  <li key={i}>{d}</li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-        </div>
+          </div>
+        )}
+
+        {/* Do */}
+        {camp.doList?.length ? (
+          <div className="mb-5">
+            <p className="mb-2.5 text-[13px] font-medium text-green">Do</p>
+            <ul className="space-y-1 text-[14px] text-foreground/80">
+              {camp.doList.map((d, i) => (
+                <li key={i} className="flex items-start gap-2">
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-green" />
+                  {d}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {/* Don't */}
+        {camp.dontList?.length ? (
+          <div>
+            <p className="mb-2.5 text-[13px] font-medium text-red">Don&apos;t</p>
+            <ul className="space-y-1 text-[14px] text-foreground/80">
+              {camp.dontList.map((d, i) => (
+                <li key={i} className="flex items-start gap-2">
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-red" />
+                  {d}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </section>
 
       {/* ── Submissions ──────────────────────────────────── */}
       <section>
-        <h2 className="mb-5 text-[20px] font-bold tracking-tight">
-          Submissions ({campClips.length})
+        <h2 className="mb-1.5 text-[20px] font-bold tracking-tight">
+          Submissions
         </h2>
+        <p className="mb-5 text-[14px] text-muted">
+          Clips submitted to this campaign.
+        </p>
         <ClipList clips={campClips} earned={false} />
       </section>
 
       {/* ── Approved Clips ───────────────────────────────── */}
       <section>
-        <h2 className="mb-5 text-[20px] font-bold tracking-tight">
-          Approved clips (
-          {campClips.filter(
-            (k) => k.status === "approved" || k.status === "held",
-          ).length}
-          )
+        <h2 className="mb-1.5 text-[20px] font-bold tracking-tight">
+          Approved clips
         </h2>
+        <p className="mb-5 text-[14px] text-muted">
+          Clips contributing to campaign spend and performance.
+        </p>
         <ClipList clips={campClips} earned />
       </section>
 
@@ -696,7 +748,7 @@ export default function CreatorCampaignDetailPage() {
           </h2>
           <Link
             href={`/creator/analytics/${camp.id}`}
-            className="group inline-flex items-center gap-1.5 text-[13px] font-medium text-muted transition-colors duration-150 hover:text-foreground"
+            className="group inline-flex items-center gap-1.5 text-[13px] font-medium text-muted cursor-pointer transition-colors duration-150 hover:text-foreground"
           >
             Full analytics
             <span className="transition-transform duration-200 group-hover:translate-x-0.5">
@@ -704,52 +756,57 @@ export default function CreatorCampaignDetailPage() {
             </span>
           </Link>
         </div>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="rounded-[12px] border bg-card p-5">
-            <p className="mb-3 text-[14px] font-medium">Views over time</p>
-            <TimeSeriesChart data={viewsSeries} format={fmtViews} />
-          </div>
-          <div className="rounded-[12px] border bg-card p-5">
-            <p className="mb-3 text-[14px] font-medium">Spend over time</p>
-            <TimeSeriesChart data={spendSeries} format={rup} />
+        <div className="rounded-[12px] border border-border/40 bg-card p-6">
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div>
+              <p className="mb-3 text-[13px] font-medium text-muted">
+                Views over time
+              </p>
+              <TimeSeriesChart data={viewsSeries} format={fmtViews} />
+            </div>
+            <div className="lg:border-l lg:border-border/40 lg:pl-6">
+              <p className="mb-3 text-[13px] font-medium text-muted">
+                Spend over time
+              </p>
+              <TimeSeriesChart data={spendSeries} format={rup} />
+            </div>
           </div>
         </div>
       </section>
 
       {/* ── Top Performing Clips ─────────────────────────── */}
       <section>
-        <h2 className="mb-5 text-[20px] font-bold tracking-tight">
+        <h2 className="mb-1.5 text-[20px] font-bold tracking-tight">
           Top performing clips
         </h2>
-        <div className="rounded-[12px] border bg-card overflow-hidden">
-          <TopClipsTable clips={campClips} campaigns={campaigns} />
-        </div>
+        <p className="mb-5 text-[14px] text-muted">
+          Highest-performing submissions by views.
+        </p>
+        <TopClipsTable clips={campClips} campaigns={campaigns} />
       </section>
 
       {/* ── Budget & Transactions ────────────────────────── */}
       <section>
-        <h2 className="mb-5 text-[20px] font-bold tracking-tight">
+        <h2 className="mb-1.5 text-[20px] font-bold tracking-tight">
           Budget &amp; transactions
         </h2>
-        <p className="mb-4 text-[14px] text-muted">
-          Transactions are derived from the clip ledger — a campaign can never
-          spend beyond its configured budget ({rup(budget)}). A{" "}
-          {Math.round(PLATFORM_FEE_RATE * 100)}% platform fee applies to all
-          payouts.
+        <p className="mb-5 text-[14px] text-muted">
+          Payout ledger for approved clips. A{" "}
+          {Math.round(PLATFORM_FEE_RATE * 100)}% platform fee applies.
         </p>
-        <div className="overflow-hidden rounded-[12px] border bg-card">
+        <div className="overflow-x-auto">
           <table className="w-full text-[14px]">
             <thead>
-              <tr className="border-b text-left text-[13px] text-muted">
-                <th className="px-4 py-3 font-medium">Date</th>
-                <th className="px-4 py-3 font-medium">Clipper</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 text-right font-medium">Gross</th>
-                <th className="px-4 py-3 text-right font-medium">Fee</th>
-                <th className="px-4 py-3 text-right font-medium">Net</th>
+              <tr className="border-b border-border/50 text-left text-[13px] text-muted">
+                <th className="pb-2.5 pr-4 font-medium">Date</th>
+                <th className="pb-2.5 pr-4 font-medium">Clipper</th>
+                <th className="pb-2.5 pr-4 font-medium">Status</th>
+                <th className="pb-2.5 pl-4 text-right font-medium">Gross</th>
+                <th className="pb-2.5 pl-4 text-right font-medium">Fee</th>
+                <th className="pb-2.5 text-right font-medium">Net</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="divide-y divide-border/30">
               {campClips
                 .filter(
                   (k) => k.status === "approved" || k.status === "held",
@@ -759,21 +816,21 @@ export default function CreatorCampaignDetailPage() {
                   const gross = clipEarnings(k, campaigns);
                   const fee = creatorFee(gross);
                   return (
-                    <tr key={k.id} className="hover:bg-accent-soft/30">
-                      <td className="px-4 py-3 text-muted">
+                    <tr key={k.id} className="transition-colors duration-100 hover:bg-accent-soft/30">
+                      <td className="py-3 pr-4 text-muted">
                         {fmtDateTime(k.submittedAt)}
                       </td>
-                      <td className="px-4 py-3 font-medium">@{k.clipper}</td>
-                      <td className="px-4 py-3">
+                      <td className="py-3 pr-4 font-medium">@{k.clipper}</td>
+                      <td className="py-3 pr-4">
                         <StatusPill status={k.status} />
                       </td>
-                      <td className="px-4 py-3 text-right font-mono">
+                      <td className="py-3 pl-4 text-right font-mono tabular-nums">
                         {rup(gross)}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono text-muted">
+                      <td className="py-3 pl-4 text-right font-mono tabular-nums text-muted">
                         {rup(fee)}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono font-semibold">
+                      <td className="py-3 text-right font-mono tabular-nums font-semibold">
                         {rup(gross - fee)}
                       </td>
                     </tr>
@@ -785,7 +842,7 @@ export default function CreatorCampaignDetailPage() {
                 <tr>
                   <td
                     colSpan={6}
-                    className="px-4 py-8 text-center text-muted"
+                    className="py-8 text-center text-muted"
                   >
                     No payouts yet.
                   </td>
@@ -798,11 +855,14 @@ export default function CreatorCampaignDetailPage() {
 
       {/* ── Content Rights ───────────────────────────────── */}
       <section>
-        <h2 className="mb-5 text-[20px] font-bold tracking-tight">
+        <h2 className="mb-1.5 text-[20px] font-bold tracking-tight">
           Content rights
         </h2>
+        <p className="mb-5 text-[14px] text-muted">
+          Where clippers may use approved content.
+        </p>
         {camp.rights ? (
-          <div className="flex flex-wrap gap-2">
+          <div className="space-y-1.5">
             {(
               [
                 ["Ads", camp.rights.ads],
@@ -811,38 +871,42 @@ export default function CreatorCampaignDetailPage() {
                 ["Other", camp.rights.other],
               ] as Array<[string, boolean]>
             ).map(([label, on]) => (
-              <span
-                key={label}
-                className={`inline-flex items-center rounded-full border px-3 py-1 text-[13px] font-medium ${
-                  on
-                    ? "border-green/20 bg-green/10 text-green"
-                    : "border-muted/20 bg-accent-soft text-muted"
-                }`}
-              >
-                {label}
-              </span>
+              <div key={label} className="flex items-center gap-3 text-[14px]">
+                <span
+                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${on ? "bg-green" : "bg-border"}`}
+                />
+                <span className="text-muted">{label}</span>
+                <span className={on ? "font-medium text-foreground" : "text-muted"}>
+                  {on ? "Enabled" : "Disabled"}
+                </span>
+              </div>
             ))}
           </div>
         ) : (
           <p className="text-[14px] text-muted">No rights specified.</p>
         )}
         {camp.rights?.otherText && (
-          <p className="mt-2 text-[14px] text-muted">
-            Other: {camp.rights.otherText}
+          <p className="mt-3 text-[13px] text-muted">
+            {camp.rights.otherText}
           </p>
         )}
       </section>
 
-      {/* ── Audit Log ────────────────────────────────────── */}
+      {/* ── Activity ────────────────────────────────────── */}
       {camp.audit && camp.audit.length > 0 && (
         <section>
-          <h2 className="mb-5 flex items-center gap-2 text-[20px] font-bold tracking-tight">
-            <History size={18} className="text-muted" /> Activity
+          <h2 className="mb-1.5 text-[20px] font-bold tracking-tight">
+            Activity
           </h2>
-          <ol className="space-y-0 divide-y divide-border/50 rounded-[12px] border bg-card">
+          <p className="mb-5 text-[14px] text-muted">
+            Campaign change history.
+          </p>
+          <div className="relative ml-2 space-y-0">
+            {/* Vertical line */}
+            <div className="absolute left-[3px] top-2 bottom-2 w-px bg-border/50" />
             {camp.audit.map((e, i) => (
-              <li key={i} className="flex items-start gap-3 px-5 py-3.5">
-                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+              <div key={i} className="relative flex gap-4 py-3.5">
+                <span className="relative z-10 mt-1.5 h-[7px] w-[7px] shrink-0 rounded-full border-2 border-foreground/20 bg-background" />
                 <div className="min-w-0 flex-1">
                   <p className="text-[14px] font-medium capitalize">
                     {e.action}
@@ -855,9 +919,9 @@ export default function CreatorCampaignDetailPage() {
                     <p className="mt-0.5 text-[13px] text-muted">{e.note}</p>
                   )}
                 </div>
-              </li>
+              </div>
             ))}
-          </ol>
+          </div>
         </section>
       )}
 
@@ -903,37 +967,49 @@ function DefRow({ label, value }: { label: string; value: string }) {
 }
 
 function AssetRow({ label, value }: { label: string; value: string }) {
-  const isImage = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(value);
   const isVideo = /\.(mp4|webm|mov|avi)$/i.test(value);
   const fileName = value.split("/").pop()?.split("?")[0] ?? value;
   const displayName =
     fileName.length > 40 ? fileName.slice(0, 37) + "..." : fileName;
 
   return (
-    <div className="flex items-center gap-3 rounded-[10px] border bg-card px-4 py-3 transition-colors duration-150 hover:border-foreground/10">
-      <span className="w-32 shrink-0 text-[13px] text-muted">{label}</span>
-      {isImage ? (
-        <a href={value} target="_blank" rel="noreferrer" className="group shrink-0">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={value}
-            alt={label}
-            className="h-14 w-24 rounded-lg border object-cover transition-opacity group-hover:opacity-80"
-          />
-        </a>
-      ) : isVideo ? (
+    <a
+      href={value}
+      target="_blank"
+      rel="noreferrer"
+      className="flex items-center gap-3 rounded-[10px] border border-border/40 bg-card px-4 py-3 cursor-pointer transition-colors duration-150 hover:border-foreground/10"
+    >
+      {isVideo ? (
         <Film size={14} className="shrink-0 text-muted" />
-      ) : null}
-      <a
-        href={value}
-        target="_blank"
-        rel="noreferrer"
-        className="inline-flex min-w-0 items-center gap-1 truncate text-[14px] font-medium text-accent hover:underline underline-offset-2"
-      >
-        <span className="truncate">{displayName}</span>
-        <ExternalLink size={12} className="shrink-0" />
-      </a>
-    </div>
+      ) : (
+        <ExternalLink size={13} className="shrink-0 text-muted" />
+      )}
+      <span className="w-28 shrink-0 text-[13px] text-muted">{label}</span>
+      <span className="min-w-0 truncate text-[14px] font-medium text-accent">
+        {displayName}
+      </span>
+    </a>
+  );
+}
+
+function AssetThumb({ label, value }: { label: string; value: string }) {
+  return (
+    <a
+      href={value}
+      target="_blank"
+      rel="noreferrer"
+      className="group block overflow-hidden rounded-[10px] border border-border/40 bg-card cursor-pointer transition-colors duration-150 hover:border-foreground/10"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={value}
+        alt={label}
+        className="aspect-video w-full object-cover transition-opacity duration-150 group-hover:opacity-80"
+      />
+      <div className="px-3.5 py-2.5">
+        <p className="text-[13px] font-medium text-muted">{label}</p>
+      </div>
+    </a>
   );
 }
 
@@ -949,9 +1025,7 @@ function ClipList({
     : clips;
   if (list.length === 0)
     return (
-      <div className="rounded-[12px] border border-dashed bg-card py-10 text-center">
-        <p className="text-[14px] text-muted">Nothing here yet.</p>
-      </div>
+      <p className="py-6 text-[14px] text-muted">Nothing here yet.</p>
     );
   return (
     <div className="space-y-2">
@@ -959,7 +1033,7 @@ function ClipList({
         <Link
           key={k.id}
           href={`/clip/${k.id}`}
-          className="flex items-center justify-between gap-3 rounded-[12px] border bg-card p-3.5 transition-all duration-150 hover:border-foreground/10 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
+          className="flex items-center justify-between gap-3 rounded-[12px] border bg-card p-3.5 cursor-pointer transition-all duration-150 hover:border-foreground/10 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
         >
           <div className="min-w-0">
             <p className="truncate text-[14px] font-medium">{k.caption}</p>
