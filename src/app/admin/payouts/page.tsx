@@ -8,6 +8,7 @@ import {
   Search,
   AlertTriangle,
   Loader2,
+  X,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
@@ -16,21 +17,21 @@ import { rup } from "@/lib/format";
 import type { PayoutRequest, PayoutRequestStatus } from "@/lib/types";
 
 const STATUS_STYLES: Record<PayoutRequestStatus, string> = {
-  pending: "bg-yellow-100 text-yellow-800 border-yellow-200",
-  processing: "bg-blue-100 text-blue-800 border-blue-200",
-  paid: "bg-green-100 text-green-800 border-green-200",
+  pending: "bg-amber/10 text-amber",
+  processing: "bg-blue-500/10 text-blue-600",
+  paid: "bg-green/10 text-green",
 };
 
 function PayoutStatusBadge({ status }: { status: PayoutRequestStatus }) {
   return (
-    <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[status]}`}>
+    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[12px] font-medium ${STATUS_STYLES[status]}`}>
       {status.charAt(0).toUpperCase() + status.slice(1)}
     </span>
   );
 }
 
 function fmtDate(t?: number) {
-  if (!t) return "\u2014";
+  if (!t) return "—";
   return new Date(t).toLocaleDateString("en-IN", {
     day: "numeric",
     month: "short",
@@ -109,173 +110,238 @@ export default function AdminPayoutsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      {/* ── Header ──────────────────────────────────────── */}
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Payouts</h1>
-        <p className="mt-1 text-sm text-muted">
-          Manage clipper payout requests. Send UPI payments manually, then record the transaction reference.
+        <h1 className="text-[28px] font-bold tracking-tight sm:text-[30px]">
+          Payouts
+        </h1>
+        <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-muted">
+          Manage clipper payout requests and record completed UPI transfers.
         </p>
       </div>
 
+      {/* ── Summary metrics ─────────────────────────────── */}
+      <div className="flex flex-wrap items-baseline gap-x-10 gap-y-3">
+        <div>
+          <p className="text-[20px] font-mono font-bold tracking-tight">
+            {counts.all}
+          </p>
+          <p className="mt-0.5 text-[13px] text-muted">Total requests</p>
+        </div>
+        <div>
+          <p className="text-[20px] font-mono font-bold tracking-tight">
+            {counts.pending}
+          </p>
+          <p className="mt-0.5 text-[13px] text-muted">Pending</p>
+        </div>
+        <div>
+          <p className="text-[20px] font-mono font-bold tracking-tight">
+            {counts.processing}
+          </p>
+          <p className="mt-0.5 text-[13px] text-muted">Processing</p>
+        </div>
+        <div>
+          <p className="text-[20px] font-mono font-bold tracking-tight">
+            {counts.paid}
+          </p>
+          <p className="mt-0.5 text-[13px] text-muted">Paid</p>
+        </div>
+      </div>
+
+      {/* ── Error banner ────────────────────────────────── */}
       {error && (
-        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          <AlertTriangle size={16} />
-          {error}
-          <button onClick={() => setError(null)} className="ml-auto text-red-500 hover:text-red-700">&times;</button>
+        <div className="flex items-center gap-2.5 rounded-[10px] border border-red/20 bg-red/5 px-5 py-3.5">
+          <AlertTriangle size={16} className="shrink-0 text-red" />
+          <p className="flex-1 text-[14px] text-red">{error}</p>
+          <button
+            onClick={() => setError(null)}
+            className="shrink-0 cursor-pointer text-red/60 transition-colors hover:text-red"
+          >
+            <X size={16} />
+          </button>
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2 text-sm font-medium">
-        {(["all", "pending", "processing", "paid"] as const).map((tab) => {
-          const count = tab === "all" ? counts.all : counts[tab];
-          return (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`rounded-lg px-3 py-1.5 transition-colors ${
-                activeTab === tab
-                  ? "bg-accent text-white"
-                  : "bg-muted/50 text-muted hover:bg-muted"
-              }`}
-            >
-              {tab === "all" ? "All" : tab.charAt(0).toUpperCase() + tab.slice(1)}
-              <span className="ml-1.5 text-xs opacity-70">({count})</span>
-            </button>
-          );
-        })}
+      {/* ── Tabs + search toolbar ───────────────────────── */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-1.5">
+          {(["all", "pending", "processing", "paid"] as const).map((tab) => {
+            const count = tab === "all" ? counts.all : counts[tab];
+            return (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`cursor-pointer rounded-[8px] px-3.5 py-2.5 text-[13px] font-medium transition-colors duration-150 ${
+                  activeTab === tab
+                    ? "bg-foreground text-background"
+                    : "border border-border/50 bg-card text-muted hover:border-foreground/20 hover:text-foreground"
+                }`}
+              >
+                {tab === "all" ? "All" : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                <span className="ml-1.5 text-[12px] opacity-60">{count}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="relative w-full max-w-xs">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search by UPI ID, username, or UTR…"
+            className="h-11 w-full rounded-[10px] border border-border/60 bg-card pl-10 pr-4 text-[14px] outline-none transition-colors focus:border-foreground/30"
+          />
+        </div>
       </div>
 
-      <div className="relative">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search by UPI ID, username, or UTR..."
-          className="w-full rounded-lg border border-border bg-card py-2 pl-9 pr-4 text-sm text-foreground placeholder:text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-        />
-      </div>
-
-      <div className="overflow-x-auto rounded-xl border border-border bg-card">
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-border bg-muted/30 text-xs font-semibold uppercase tracking-wider text-muted">
-              <th className="px-4 py-3">Clipper</th>
-              <th className="px-4 py-3">UPI ID</th>
-              <th className="px-4 py-3 text-right">Amount</th>
-              <th className="px-4 py-3 text-right">Net (after fees)</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Requested</th>
-              <th className="px-4 py-3">UTR / Reference</th>
-              <th className="px-4 py-3 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan={8} className="px-4 py-12 text-center text-muted">
-                  No payout requests found.
-                </td>
+      {/* ── Table ───────────────────────────────────────── */}
+      <div className="overflow-hidden rounded-xl border border-border/40 bg-card">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[960px] text-[14px]">
+            <thead>
+              <tr className="border-b border-border/40 text-left text-[13px] text-muted">
+                <th className="px-5 py-3 font-medium">Clipper</th>
+                <th className="px-5 py-3 font-medium">UPI ID</th>
+                <th className="px-5 py-3 text-right font-medium">Amount</th>
+                <th className="px-5 py-3 text-right font-medium">Net</th>
+                <th className="px-5 py-3 font-medium">Status</th>
+                <th className="px-5 py-3 font-medium">Requested</th>
+                <th className="px-5 py-3 font-medium">UTR / Reference</th>
+                <th className="px-5 py-3 text-right font-medium">Actions</th>
               </tr>
-            )}
-            {filtered.map((payout) => {
-              const profile = profiles.find((p) => p.id === payout.userId);
-              const isProcessing = processingId === payout.id;
-              const isCompleting = completingId === payout.id;
-
-              return (
-                <tr key={payout.id} className="hover:bg-muted/20">
-                  <td className="px-4 py-3">
-                    <div>
-                      <p className="font-medium text-foreground">{profile?.name ?? profile?.username ?? "Unknown"}</p>
-                      <p className="text-xs text-muted">@{profile?.username ?? "unknown"}</p>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 font-mono text-xs text-foreground">{payout.upiId}</td>
-                  <td className="px-4 py-3 text-right font-medium text-foreground">{rup(payout.amount / 100)}</td>
-                  <td className="px-4 py-3 text-right text-muted">{rup(payout.netAmount / 100)}</td>
-                  <td className="px-4 py-3">
-                    <PayoutStatusBadge status={payout.status} />
-                  </td>
-                  <td className="px-4 py-3 text-xs text-muted">{fmtDate(payout.createdAt)}</td>
-                  <td className="px-4 py-3">
-                    {payout.paymentReference ? (
-                      <span className="font-mono text-xs text-foreground">{payout.paymentReference}</span>
-                    ) : (
-                      <span className="text-xs text-muted">{"\u2014"}</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {payout.status === "pending" && (
-                      <button
-                        onClick={() => handleProcess(payout)}
-                        disabled={isProcessing}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
-                      >
-                        {isProcessing ? (
-                          <Loader2 size={14} className="animate-spin" />
-                        ) : (
-                          <ArrowRight size={14} />
-                        )}
-                        Start Processing
-                      </button>
-                    )}
-                    {payout.status === "processing" && (
-                      <div className="flex flex-col items-end gap-2">
-                        <div className="flex items-center gap-1.5">
-                          <input
-                            value={completingId === payout.id ? utrInput : ""}
-                            onChange={(e) => {
-                              setCompletingId(payout.id);
-                              setUtrInput(e.target.value);
-                            }}
-                            onFocus={() => setCompletingId(payout.id)}
-                            placeholder="Enter UPI UTR"
-                            className="w-36 rounded border border-border bg-background px-2 py-1 text-xs font-mono text-foreground placeholder:text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-                          />
-                          <button
-                            onClick={() => handleComplete(payout)}
-                            disabled={isCompleting || !utrInput.trim()}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-50"
-                          >
-                            {isCompleting ? (
-                              <Loader2 size={14} className="animate-spin" />
-                            ) : (
-                              <CheckCircle2 size={14} />
-                            )}
-                            Mark Paid
-                          </button>
-                        </div>
-                        <p className="text-[10px] text-muted">
-                          Send UPI payment to {payout.upiId} first, then record the UTR here.
-                        </p>
-                      </div>
-                    )}
-                    {payout.status === "paid" && (
-                      <div className="text-right">
-                        <p className="text-xs text-muted">Paid {fmtDate(payout.paidAt)}</p>
-                        {payout.paidBy && (
-                          <p className="text-[10px] text-muted">by {payout.paidBy}</p>
-                        )}
-                      </div>
-                    )}
+            </thead>
+            <tbody className="divide-y divide-border/40">
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-5 py-12 text-center">
+                    <p className="text-[15px] font-medium">No payout requests found.</p>
+                    <p className="mt-1 text-[13px] text-muted">
+                      Payout requests will appear here when clippers submit withdrawal requests.
+                    </p>
                   </td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              )}
+              {filtered.map((payout) => {
+                const profile = profiles.find((p) => p.id === payout.userId);
+                const isProcessing = processingId === payout.id;
+                const isCompleting = completingId === payout.id;
+
+                return (
+                  <tr key={payout.id} className="transition-colors hover:bg-accent-soft/50">
+                    {/* Clipper */}
+                    <td className="px-5 py-4">
+                      <p className="font-medium">{profile?.name ?? profile?.username ?? "Unknown"}</p>
+                      <p className="text-[13px] text-muted">@{profile?.username ?? "unknown"}</p>
+                    </td>
+
+                    {/* UPI ID */}
+                    <td className="px-5 py-4 font-mono text-[13px]">{payout.upiId}</td>
+
+                    {/* Amount */}
+                    <td className="px-5 py-4 text-right font-mono text-[16px] font-semibold">
+                      {rup(payout.amount / 100)}
+                    </td>
+
+                    {/* Net */}
+                    <td className="px-5 py-4 text-right font-mono text-[16px] font-semibold">
+                      {rup(payout.netAmount / 100)}
+                    </td>
+
+                    {/* Status */}
+                    <td className="px-5 py-4">
+                      <PayoutStatusBadge status={payout.status} />
+                    </td>
+
+                    {/* Requested */}
+                    <td className="px-5 py-4 text-[13px] text-muted">
+                      {fmtDate(payout.createdAt)}
+                    </td>
+
+                    {/* UTR / Reference */}
+                    <td className="px-5 py-4">
+                      {payout.paymentReference ? (
+                        <span className="font-mono text-[13px]">{payout.paymentReference}</span>
+                      ) : (
+                        <span className="text-[13px] text-muted">—</span>
+                      )}
+                    </td>
+
+                    {/* Actions */}
+                    <td className="px-5 py-4 text-right">
+                      {payout.status === "pending" && (
+                        <button
+                          onClick={() => handleProcess(payout)}
+                          disabled={isProcessing}
+                          className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[8px] bg-foreground px-4 text-[14px] font-medium text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {isProcessing ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : (
+                            <ArrowRight size={14} />
+                          )}
+                          Start Processing
+                        </button>
+                      )}
+                      {payout.status === "processing" && (
+                        <div className="flex flex-col items-end gap-2">
+                          <div className="flex items-center gap-2">
+                            <input
+                              value={completingId === payout.id ? utrInput : ""}
+                              onChange={(e) => {
+                                setCompletingId(payout.id);
+                                setUtrInput(e.target.value);
+                              }}
+                              onFocus={() => setCompletingId(payout.id)}
+                              placeholder="Enter UPI UTR"
+                              className="h-10 w-[180px] rounded-[8px] border border-border/60 bg-background px-3.5 font-mono text-[14px] outline-none transition-colors focus:border-foreground/30"
+                            />
+                            <button
+                              onClick={() => handleComplete(payout)}
+                              disabled={isCompleting || !utrInput.trim()}
+                              className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[8px] bg-green px-4 text-[14px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {isCompleting ? (
+                                <Loader2 size={14} className="animate-spin" />
+                              ) : (
+                                <CheckCircle2 size={14} />
+                              )}
+                              Mark Paid
+                            </button>
+                          </div>
+                          <p className="text-[12px] text-muted">
+                            Send UPI payment to {payout.upiId} first, then record the UTR here.
+                          </p>
+                        </div>
+                      )}
+                      {payout.status === "paid" && (
+                        <div className="text-right">
+                          <p className="text-[13px] text-muted">Paid {fmtDate(payout.paidAt)}</p>
+                          {payout.paidBy && (
+                            <p className="text-[12px] text-muted">by {payout.paidBy}</p>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <div className="rounded-lg border border-border bg-card p-4">
+      {/* ── Manual UPI payout process ───────────────────── */}
+      <div className="border-t border-border/40 pt-6">
         <div className="flex items-start gap-3">
-          <Banknote size={20} className="mt-0.5 text-accent" />
+          <Banknote size={18} className="mt-0.5 shrink-0 text-muted" />
           <div>
-            <h3 className="text-sm font-semibold text-foreground">Manual UPI Payout Process</h3>
-            <ol className="mt-2 space-y-1 text-xs text-muted list-decimal list-inside">
+            <h3 className="text-[15px] font-semibold">Manual UPI Payout Process</h3>
+            <ol className="mt-3 space-y-2 text-[13px] leading-relaxed text-muted list-decimal list-inside">
               <li>Clipper requests payout when balance reaches minimum threshold.</li>
-              <li>Admin reviews the request and clicks <strong>&quot;Start Processing&quot;</strong>.</li>
+              <li>Admin reviews the request and clicks <span className="font-medium text-foreground">&quot;Start Processing&quot;</span>.</li>
               <li>Admin manually sends UPI payment to the clipper&apos;s UPI ID.</li>
-              <li>Admin records the UPI Transaction Reference (UTR) and clicks <strong>&quot;Mark Paid&quot;</strong>.</li>
+              <li>Admin records the UPI Transaction Reference (UTR) and clicks <span className="font-medium text-foreground">&quot;Mark Paid&quot;</span>.</li>
               <li>Payout is marked as paid. No automated payment gateway is used.</li>
             </ol>
           </div>
