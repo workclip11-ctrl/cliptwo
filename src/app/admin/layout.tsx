@@ -97,7 +97,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                           href={n.href}
                           className={`flex cursor-pointer items-center gap-2.5 rounded-[8px] px-3 py-2 text-[14px] font-medium transition-colors duration-150 ${
                             active
-                              ? "bg-accent text-foreground"
+                              ? "bg-foreground text-background"
                               : "text-muted hover:bg-accent-soft/60 hover:text-foreground"
                           }`}
                         >

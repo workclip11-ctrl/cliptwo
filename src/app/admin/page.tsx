@@ -64,6 +64,7 @@ export default function AdminDashboard() {
 
   const clippers = profiles.filter((p) => p.role === "clipper");
   const creators = profiles.filter((p) => p.role === "creator");
+  const admins = profiles.filter((p) => p.role === "admin");
 
   const fin = financeOf(financeRecords);
   const pendingCount = fin.pendingCount;
@@ -262,7 +263,7 @@ export default function AdminDashboard() {
               <span className="font-mono font-semibold">{pendingCount}</span>
             </span>
             <span>
-              <span className="text-muted">Earned </span>
+              <span className="text-muted">Total clips </span>
               <span className="font-mono font-semibold">{approvedCount}</span>
             </span>
             <span>
@@ -295,6 +296,10 @@ export default function AdminDashboard() {
               <span className="font-mono font-medium">
                 {rup(totalSpent)} / {rup(totalBudget)}
               </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted">Staff (admin)</span>
+              <span className="font-mono font-medium">{admins.length}</span>
             </div>
           </div>
         </div>
