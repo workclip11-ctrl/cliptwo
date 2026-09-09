@@ -137,7 +137,7 @@ export default function ClipperSubmissionsPage() {
       </div>
 
       {/* ── Tabs ────────────────────────────────────────── */}
-      <div className="-mx-4 flex overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:overflow-visible">
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:overflow-visible">
         {TABS.map((t) => (
           <button
             key={t.key}
