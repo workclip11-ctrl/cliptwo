@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Server, Check, RefreshCw } from "lucide-react";
+import { RefreshCw, Server } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase/client";
 
@@ -45,39 +45,77 @@ export default function AdminBackend() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="mx-auto max-w-[1120px] space-y-12">
+      {/* ── Header ──────────────────────────────────────── */}
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Backend</h1>
-        <p className="mt-1 text-sm text-muted">
-          Connection status and payout configuration.
+        <h1 className="text-[28px] font-bold tracking-tight sm:text-[30px]">
+          Backend
+        </h1>
+        <p className="mt-2 text-[14px] text-muted">
+          Monitor ClipTwo backend services, integrations, and system configuration.
         </p>
       </div>
 
-      <section className="rounded-2xl border bg-card p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-widest text-muted">
-          Supabase
-        </h2>
-        <div className="mt-4 space-y-3 text-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-muted">Status</span>
-            <span className="inline-flex items-center gap-1.5 font-medium">
-              {isSupabaseConfigured ? (
-                <>
-                  <Check size={14} className="text-green" /> Connected
-                </>
-              ) : (
-                <span className="text-amber">Not configured</span>
-              )}
+      {/* ── Section 1: Supabase connection ───────────────── */}
+      <section>
+        <h2 className="text-[18px] font-bold tracking-tight">Supabase</h2>
+        <p className="mt-1 text-[13px] text-muted">
+          Database connection status and live connectivity check.
+        </p>
+
+        <div className="mt-6 space-y-4">
+          {/* Status row */}
+          <div className="flex items-center justify-between rounded-[10px] border border-border/40 bg-card px-5 py-4">
+            <div>
+              <p className="text-[15px] font-medium">Connection status</p>
+              <p className="mt-0.5 text-[13px] text-muted">
+                Primary database and authentication provider
+              </p>
+            </div>
+            <span
+              className={`inline-flex items-center gap-1.5 text-[14px] font-medium ${
+                isSupabaseConfigured ? "text-green" : "text-amber"
+              }`}
+            >
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  isSupabaseConfigured ? "bg-green" : "bg-amber"
+                }`}
+              />
+              {isSupabaseConfigured ? "Connected" : "Not configured"}
             </span>
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-muted">Live ping</span>
+
+          {/* Host row */}
+          <div className="flex items-center justify-between rounded-[10px] border border-border/40 bg-card px-5 py-4">
+            <div>
+              <p className="text-[15px] font-medium">Host</p>
+              <p className="mt-0.5 text-[13px] text-muted">
+                Supabase project endpoint
+              </p>
+            </div>
+            <span className="font-mono text-[14px] text-muted">
+              {host || "—"}
+            </span>
+          </div>
+
+          {/* Test connection row */}
+          <div className="flex items-center justify-between rounded-[10px] border border-border/40 bg-card px-5 py-4">
+            <div>
+              <p className="text-[15px] font-medium">Live ping</p>
+              <p className="mt-0.5 text-[13px] text-muted">
+                Verify the connection is reachable right now
+              </p>
+            </div>
             <button
               onClick={testConnection}
               disabled={!isSupabaseConfigured || ping === "testing"}
-              className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-accent-soft disabled:opacity-60"
+              className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[8px] border border-border/60 px-4 text-[13px] font-medium transition-colors hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <RefreshCw size={12} className={ping === "testing" ? "animate-spin" : ""} />
+              <RefreshCw
+                size={14}
+                className={ping === "testing" ? "animate-spin" : ""}
+              />
               {ping === "ok"
                 ? "Reachable"
                 : ping === "fail"
@@ -87,47 +125,53 @@ export default function AdminBackend() {
                     : "Test connection"}
             </button>
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-muted">Host</span>
-            <span className="font-mono text-xs">{host || "—"}</span>
-          </div>
-        </div>
-        {!isSupabaseConfigured && (
-          <p className="mt-3 rounded-lg bg-amber/10 px-3 py-2 text-xs text-amber">
-            Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to
-            enable live data. The app currently runs on seed data.
-          </p>
-        )}
-      </section>
 
-      <section className="rounded-2xl border bg-card p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-widest text-muted">
-          Data counts
-        </h2>
-        <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <div className="rounded-xl bg-background p-4">
-            <p className="font-mono text-xl font-semibold">{campaigns.length}</p>
-            <p className="text-xs text-muted">campaigns</p>
-          </div>
-          <div className="rounded-xl bg-background p-4">
-            <p className="font-mono text-xl font-semibold">{clips.length}</p>
-            <p className="text-xs text-muted">clips</p>
-          </div>
-          <div className="rounded-xl bg-background p-4">
-            <p className="font-mono text-xl font-semibold">{profiles.length}</p>
-            <p className="text-xs text-muted">profiles</p>
-          </div>
-          <div className="rounded-xl bg-background p-4">
-            <p className="font-mono text-xl font-semibold">{profiles.filter((p) => p.role === "admin").length}</p>
-            <p className="text-xs text-muted">admins</p>
-          </div>
+          {/* Config warning */}
+          {!isSupabaseConfigured && (
+            <div className="rounded-[10px] border border-amber/20 bg-amber/5 px-5 py-4 text-[13px] text-amber">
+              Set <code className="font-mono">NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
+              <code className="font-mono">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> to enable
+              live data. The app currently runs on seed data.
+            </div>
+          )}
         </div>
       </section>
 
-      <p className="flex items-start gap-2 text-xs text-muted">
+      {/* ── Section 2: Data counts ──────────────────────── */}
+      <section>
+        <h2 className="text-[18px] font-bold tracking-tight">Data counts</h2>
+        <p className="mt-1 text-[13px] text-muted">
+          Current totals across the platform database.
+        </p>
+
+        <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {[
+            { label: "Campaigns", value: campaigns.length },
+            { label: "Clips", value: clips.length },
+            { label: "Profiles", value: profiles.length },
+            {
+              label: "Admins",
+              value: profiles.filter((p) => p.role === "admin").length,
+            },
+          ].map((item) => (
+            <div
+              key={item.label}
+              className="rounded-[10px] border border-border/40 bg-card px-5 py-4"
+            >
+              <p className="text-[22px] font-bold tracking-tight">{item.value}</p>
+              <p className="mt-0.5 text-[13px] text-muted">{item.label}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Footer note ─────────────────────────────────── */}
+      <p className="flex items-start gap-2 text-[13px] text-muted">
         <Server size={14} className="mt-0.5 shrink-0" />
-        Admin tables (profiles, site_settings) are created by running
-        <code className="mx-1 rounded bg-accent-soft px-1.5 py-0.5">supabase/admin-schema.sql</code>
+        Admin tables (profiles, site_settings) are created by running{" "}
+        <code className="mx-1 rounded-[4px] bg-accent-soft px-1.5 py-0.5 font-mono text-[12px]">
+          supabase/admin-schema.sql
+        </code>{" "}
         in the Supabase SQL editor.
       </p>
     </div>

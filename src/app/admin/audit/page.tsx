@@ -3,7 +3,6 @@
 import { startTransition, useEffect, useState } from "react";
 import {
   Search,
-  History,
   Download,
   User,
   Megaphone,
@@ -64,8 +63,8 @@ const ACTION_COLORS: Record<string, string> = {
   clip_approved: "bg-green/10 text-green",
   clip_reject: "bg-red/10 text-red",
   clip_rejected: "bg-red/10 text-red",
-  clip_hold: "bg-purple-400/10 text-purple-400",
-  clip_held: "bg-purple-400/10 text-purple-400",
+  clip_hold: "bg-amber/10 text-amber",
+  clip_held: "bg-amber/10 text-amber",
   clip_processing: "bg-blue-500/10 text-blue-500",
   clip_paid: "bg-green/10 text-green",
   clip_failed: "bg-red/10 text-red",
@@ -84,15 +83,15 @@ const ACTION_COLORS: Record<string, string> = {
   user_clear_risk: "bg-green/10 text-green",
   user_save_notes: "bg-muted/10 text-muted",
   user_delete: "bg-red/10 text-red",
-  user_deactivate: "bg-amber-500/10 text-amber-600",
-  user_self_deactivate: "bg-amber-500/10 text-amber-600",
+  user_deactivate: "bg-amber/10 text-amber",
+  user_self_deactivate: "bg-amber/10 text-amber",
   campaign_pause: "bg-amber/10 text-amber",
   campaign_paused: "bg-amber/10 text-amber",
   campaign_resume: "bg-green/10 text-green",
   campaign_close: "bg-red/10 text-red",
   campaign_closed: "bg-red/10 text-red",
   campaign_reopen: "bg-green/10 text-green",
-  campaign_archive: "bg-amber-500/10 text-amber-600",
+  campaign_archive: "bg-amber/10 text-amber",
   campaign_created: "bg-green/10 text-green",
   campaign_edited: "bg-blue-500/10 text-blue-500",
 };
@@ -121,7 +120,6 @@ export default function AdminAuditPage() {
   const [entityType, setEntityType] = useState("");
   const [actor, setActor] = useState("");
 
-  // Fetch audit logs from database whenever filters change
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -162,39 +160,40 @@ export default function AdminAuditPage() {
   const activeFilters = [action, entityType, actor, q].filter(Boolean).length;
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-[1120px] space-y-12">
+      {/* ── Header ──────────────────────────────────────── */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-            <History size={22} />
+          <h1 className="text-[28px] font-bold tracking-tight sm:text-[30px]">
             Audit Log
           </h1>
-          <p className="mt-1 text-sm text-muted">
-            Append-only record of all admin actions. {logs.length} events
+          <p className="mt-2 text-[14px] text-muted">
+            Review administrative actions and important platform events.{" "}
+            {logs.length} event{logs.length !== 1 ? "s" : ""}
             {activeFilters > 0 ? " (filtered)" : ""}.
           </p>
         </div>
         <button
           onClick={exportCsv}
           disabled={logs.length === 0}
-          className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-accent-soft disabled:opacity-40"
+          className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[8px] border border-border/60 px-4 text-[13px] font-medium transition-colors hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Download size={14} /> Export CSV
         </button>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:flex-wrap">
+      {/* ── Filters ─────────────────────────────────────── */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative min-w-0 flex-1 sm:max-w-xs">
           <Search
             size={15}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted"
           />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search logs..."
-            className="w-full rounded-lg border bg-background py-2.5 pl-9 pr-3 text-sm outline-none focus:border-foreground"
+            placeholder="Search logs…"
+            className="h-11 w-full rounded-[10px] border border-border/60 bg-card pl-10 pr-4 text-[14px] outline-none transition-colors focus:border-foreground/30"
           />
         </div>
 
@@ -202,7 +201,7 @@ export default function AdminAuditPage() {
           <select
             value={action}
             onChange={(e) => setAction(e.target.value)}
-            className="flex-1 rounded-lg border bg-background px-3 py-2.5 text-sm outline-none focus:border-foreground sm:flex-initial"
+            className="h-11 cursor-pointer rounded-[10px] border border-border/60 bg-card px-4 text-[14px] outline-none transition-colors focus:border-foreground/30 sm:flex-initial"
           >
             {ACTION_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -214,7 +213,7 @@ export default function AdminAuditPage() {
           <select
             value={entityType}
             onChange={(e) => setEntityType(e.target.value)}
-            className="flex-1 rounded-lg border bg-background px-3 py-2.5 text-sm outline-none focus:border-foreground sm:flex-initial"
+            className="h-11 cursor-pointer rounded-[10px] border border-border/60 bg-card px-4 text-[14px] outline-none transition-colors focus:border-foreground/30 sm:flex-initial"
           >
             <option value="">All entities</option>
             {AUDIT_ENTITY_TYPES.map((t) => (
@@ -228,22 +227,21 @@ export default function AdminAuditPage() {
             value={actor}
             onChange={(e) => setActor(e.target.value)}
             placeholder="Filter by actor"
-            className="w-full rounded-lg border bg-background px-3 py-2.5 text-sm outline-none focus:border-foreground sm:w-40"
+            className="h-11 w-full rounded-[10px] border border-border/60 bg-card px-4 text-[14px] outline-none transition-colors focus:border-foreground/30 sm:w-40"
           />
         </div>
       </div>
 
-      {/* Log entries */}
-      <div className="overflow-hidden rounded-2xl border bg-card">
+      {/* ── Log entries ─────────────────────────────────── */}
+      <div className="overflow-hidden rounded-xl border border-border/40 bg-card">
         {loading ? (
-          <div className="flex flex-col items-center gap-2 p-12 text-center text-muted">
-            <Loader2 size={28} className="animate-spin" />
-            <p className="text-sm">Loading audit logs...</p>
+          <div className="flex flex-col items-center gap-3 p-12 text-center text-muted">
+            <Loader2 size={24} className="animate-spin" />
+            <p className="text-[14px]">Loading audit logs…</p>
           </div>
         ) : logs.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 p-12 text-center text-muted">
-            <History size={28} />
-            <p className="text-sm">No audit logs found.</p>
+          <div className="flex flex-col items-center gap-3 p-12 text-center text-muted">
+            <p className="text-[15px] font-medium">No audit logs found.</p>
             {(q || action || entityType || actor) && (
               <button
                 onClick={() => {
@@ -252,14 +250,14 @@ export default function AdminAuditPage() {
                   setEntityType("");
                   setActor("");
                 }}
-                className="text-xs text-accent hover:underline"
+                className="cursor-pointer text-[13px] text-muted underline transition-colors hover:text-foreground"
               >
                 Clear filters
               </button>
             )}
           </div>
         ) : (
-          <div className="divide-y">
+          <div className="divide-y divide-border/30">
             {logs.map((log) => {
               const Icon = ENTITY_ICONS[log.entity_type] ?? Settings;
               const colorClass = ACTION_COLORS[log.action] ?? "bg-muted/10 text-muted";
@@ -269,11 +267,11 @@ export default function AdminAuditPage() {
               return (
                 <div
                   key={log.id}
-                  className="flex gap-3 px-4 py-3 sm:gap-4"
+                  className="flex gap-4 px-5 py-4"
                 >
                   <div className="mt-0.5 shrink-0">
                     <span
-                      className={`flex h-8 w-8 items-center justify-center rounded-lg ${colorClass}`}
+                      className={`flex h-8 w-8 items-center justify-center rounded-[8px] ${colorClass}`}
                     >
                       <Icon size={15} />
                     </span>
@@ -281,28 +279,28 @@ export default function AdminAuditPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${colorClass}`}
+                        className={`inline-flex items-center rounded-[4px] px-2 py-0.5 text-[12px] font-medium ${colorClass}`}
                       >
                         {AUDIT_ACTION_LABELS[log.action] ?? log.action}
                       </span>
-                      <span className="text-xs text-muted">
+                      <span className="text-[13px] text-muted">
                         {log.entity_type}
                         {log.entity_label ? ` · ${log.entity_label}` : ""}
                       </span>
                     </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted">
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[13px] text-muted">
                       <span>by {log.actor}</span>
                       <span>{fmtDateTime(log.timestamp)}</span>
                       {log.entity_id && (
-                        <span className="font-mono text-[10px] text-muted/70">
+                        <span className="font-mono text-[11px] text-muted/60">
                           {log.entity_id}
                         </span>
                       )}
                     </div>
                     {(before || after) && (
-                      <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-[12px]">
                         {before && (
-                          <span className="rounded bg-muted/10 px-1.5 py-0.5 font-mono text-muted">
+                          <span className="rounded-[4px] bg-muted/10 px-1.5 py-0.5 font-mono text-muted">
                             {JSON.stringify(before)}
                           </span>
                         )}
@@ -310,19 +308,20 @@ export default function AdminAuditPage() {
                           <span className="text-muted">→</span>
                         )}
                         {after && (
-                          <span className="rounded bg-accent-soft px-1.5 py-0.5 font-mono">
+                          <span className="rounded-[4px] bg-accent-soft px-1.5 py-0.5 font-mono">
                             {JSON.stringify(after)}
                           </span>
                         )}
                       </div>
                     )}
                     {typeof meta?.reason === "string" && meta.reason.length > 0 && (
-                      <p className="mt-1 text-xs text-muted">
-                        <span className="font-medium">Reason:</span> {String(meta.reason)}
+                      <p className="mt-1.5 text-[13px] text-muted">
+                        <span className="font-medium">Reason:</span>{" "}
+                        {String(meta.reason)}
                       </p>
                     )}
                     {log.idempotency_key && (
-                      <p className="mt-0.5 font-mono text-[10px] text-muted/50">
+                      <p className="mt-1 font-mono text-[11px] text-muted/40">
                         idempotency: {log.idempotency_key}
                       </p>
                     )}
@@ -334,9 +333,10 @@ export default function AdminAuditPage() {
         )}
       </div>
 
-      <p className="text-xs text-muted">
-        Audit logs are append-only and cannot be edited or deleted. Actor is
-        always derived from auth.uid() server-side.
+      {/* ── Footer note ─────────────────────────────────── */}
+      <p className="text-[13px] text-muted">
+        Audit logs are append-only and cannot be edited or deleted. Actor is always
+        derived from auth.uid() server-side.
       </p>
     </div>
   );
