@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  Wallet,
   ArrowDownToLine,
   CheckCircle2,
   AlertTriangle,
@@ -122,64 +121,150 @@ export default function ClipperWalletPage() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-[1120px] space-y-14 px-5 py-10 sm:px-8">
+      {/* ── Header ──────────────────────────────────────── */}
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Wallet</h1>
-        <p className="mt-1 text-sm text-muted">
+        <h1 className="text-[28px] font-bold tracking-tight sm:text-[32px]">
+          Wallet
+        </h1>
+        <p className="mt-2 text-[15px] text-muted">
           Your earnings, payouts, and payment details.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-2xl border bg-card p-4">
-          <p className="text-xs text-muted">Available balance</p>
-          <p className="mt-1 font-mono text-xl font-semibold text-green">
-            {rup(available / 100)}
-          </p>
-          <p className="mt-1 text-[11px] text-muted">Ready to withdraw</p>
-        </div>
-        <div className="rounded-2xl border bg-card p-4">
-          <p className="text-xs text-muted">Pending earnings</p>
-          <p className="mt-1 font-mono text-xl font-semibold text-amber">
-            {rup(pendingEarnings / 100)}
-          </p>
-          <p className="mt-1 text-[11px] text-muted">Awaiting verified metrics</p>
-        </div>
-        <div className="rounded-2xl border bg-card p-4">
-          <p className="text-xs text-muted">Paid out</p>
-          <p className="mt-1 font-mono text-xl font-semibold text-blue-500">
-            {rup(paidOut / 100)}
-          </p>
-          <p className="mt-1 text-[11px] text-muted">Claimed by payouts</p>
-        </div>
-        <div className="rounded-2xl border bg-card p-4">
-          <p className="text-xs text-muted">Total earned</p>
-          <p className="mt-1 font-mono text-xl font-semibold">{rup(totalEarned / 100)}</p>
-          <p className="mt-1 text-[11px] text-muted">All time</p>
-        </div>
-      </div>
-
+      {/* ── Earnings overview ───────────────────────────── */}
       <section>
-        <h2 className="text-sm font-semibold uppercase tracking-widest text-muted">
+        <p className="mb-2 text-[13px] font-medium text-muted">
+          Available balance
+        </p>
+        <p className="font-mono text-[36px] font-bold tracking-tight leading-none text-green">
+          {rup(available / 100)}
+        </p>
+        <p className="mt-2 text-[14px] text-muted">Ready to withdraw</p>
+
+        <div className="mt-6 flex flex-wrap items-baseline gap-x-8 gap-y-2 text-[14px]">
+          <span>
+            <span className="text-muted">Pending </span>
+            <span className="font-medium text-amber">
+              {rup(pendingEarnings / 100)}
+            </span>
+          </span>
+          <span>
+            <span className="text-muted">Paid out </span>
+            <span className="font-medium">{rup(paidOut / 100)}</span>
+          </span>
+          <span>
+            <span className="text-muted">Total earned </span>
+            <span className="font-medium">{rup(totalEarned / 100)}</span>
+          </span>
+        </div>
+      </section>
+
+      {/* ── Request payout ──────────────────────────────── */}
+      <section>
+        <div className="rounded-[12px] border border-border/40 bg-card p-5 sm:p-6">
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+            {/* Left: info */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-[14px]">
+                <span className="text-muted">Payment method</span>
+                <span className="font-mono font-medium">{upi || "Not set"}</span>
+                {verified ? (
+                  <span className="inline-flex items-center gap-1 text-[12px] font-medium text-green">
+                    <ShieldCheck size={13} /> Verified
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[12px] font-medium text-amber">
+                    <AlertTriangle size={13} /> Unverified
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-x-6 gap-y-1 text-[13px] text-muted">
+                <span>
+                  Min withdrawal <span className="font-medium text-foreground">{rup(MIN_WITHDRAWAL)}</span>
+                </span>
+                <span className="flex items-center gap-1">
+                  <CalendarClock size={13} /> Weekly · Next: {nextPayoutDate()}
+                </span>
+              </div>
+            </div>
+
+            {/* Right: CTA */}
+            <div className="shrink-0">
+              {!requestSuccess && (
+                <button
+                  type="button"
+                  disabled={!canWithdraw || requesting || hasInProgress}
+                  onClick={handleRequestPayout}
+                  className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-[10px] bg-accent px-6 text-[14px] font-medium text-white transition-colors duration-150 hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {requesting ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" /> Processing...
+                    </>
+                  ) : hasInProgress ? (
+                    "Payout in progress"
+                  ) : (
+                    <>
+                      <ArrowDownToLine size={16} />
+                      {available >= MIN_WITHDRAWAL * 100
+                        ? `Request payout · ${rup(available / 100)}`
+                        : `Needs ${rup(MIN_WITHDRAWAL)} to withdraw`}
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Status messages */}
+          {requestSuccess && (
+            <div className="mt-4 flex items-start gap-2 rounded-[10px] border border-green/30 bg-green/5 px-4 py-3 text-[14px] text-green">
+              <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
+              <p>{requestSuccess}</p>
+            </div>
+          )}
+          {requestError && (
+            <div className="mt-4 flex items-start gap-2 rounded-[10px] border border-red/30 bg-red/5 px-4 py-3 text-[14px] text-red">
+              <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+              <p>{requestError}</p>
+            </div>
+          )}
+          {!canWithdraw && !hasInProgress && !requestSuccess && (
+            <p className="mt-3 flex items-center gap-1.5 text-[13px] text-muted">
+              <Info size={13} />
+              {!profile?.upi ? (
+                <span>Add your UPI ID in payment details below to enable payouts.</span>
+              ) : (
+                "Only finalized (processing) balance can be withdrawn."
+              )}
+            </p>
+          )}
+        </div>
+      </section>
+
+      {/* ── Transaction history ─────────────────────────── */}
+      <section>
+        <h2 className="mb-5 text-[18px] font-bold tracking-tight">
           Transaction history
         </h2>
-        <div className="mt-3 overflow-hidden rounded-2xl border bg-card">
+        <div className="overflow-hidden rounded-[12px] border border-border/40 bg-card">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm">
+            <table className="w-full min-w-[720px] text-[14px]">
               <thead>
-                <tr className="border-b text-left text-xs uppercase tracking-wider text-muted">
-                  <th className="px-4 py-3 font-medium">Date</th>
-                  <th className="px-4 py-3 font-medium">Campaign</th>
-                  <th className="px-4 py-3 font-medium">Clip</th>
-                  <th className="px-4 py-3 text-right font-medium">Views</th>
-                  <th className="px-4 py-3 text-right font-medium">Amount</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
+                <tr className="border-b border-border/40 text-left text-[13px] text-muted">
+                  <th className="px-5 py-3 font-medium">Date</th>
+                  <th className="px-5 py-3 font-medium">Campaign</th>
+                  <th className="px-5 py-3 font-medium">Clip</th>
+                  <th className="px-5 py-3 text-right font-medium">Views</th>
+                  <th className="px-5 py-3 text-right font-medium">Amount</th>
+                  <th className="px-5 py-3 font-medium">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className="divide-y divide-border/30">
                 {visible.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-6 text-center text-muted">
+                    <td colSpan={6} className="px-5 py-8 text-center text-muted">
                       No transactions yet.
                     </td>
                   </tr>
@@ -188,38 +273,38 @@ export default function ClipperWalletPage() {
                     const camp = campaigns.find((c) => c.id === k.campaignId);
                     const record = myFinanceRecords.find((r) => r.clipId === k.id);
                     return (
-                      <tr key={k.id} className="align-top">
-                        <td className="whitespace-nowrap px-4 py-3 text-muted">
+                      <tr key={k.id} className="align-top transition-colors hover:bg-accent-soft/30">
+                        <td className="whitespace-nowrap px-5 py-3.5 text-muted">
                           {fmtDate(k.submittedAt)}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-5 py-3.5">
                           <Link
                             href={`/campaigns/${k.campaignId}`}
-                            className="font-medium hover:text-accent"
+                            className="cursor-pointer font-medium hover:underline underline-offset-2"
                           >
                             {camp?.title ?? k.campaignId}
                           </Link>
                         </td>
-                        <td className="max-w-[220px] px-4 py-3">
+                        <td className="max-w-[220px] px-5 py-3.5">
                           <Link
                             href={`/clip/${k.id}`}
-                            className="inline-flex items-center gap-1.5 hover:text-accent"
+                            className="cursor-pointer inline-flex items-center gap-1.5 hover:underline underline-offset-2"
                           >
                             <PlatformIcon p={k.platform || camp?.platform || "Instagram"} size={14} />
                             <span className="line-clamp-1">{k.caption}</span>
                           </Link>
                         </td>
-                        <td className="px-4 py-3 text-right font-mono">
+                        <td className="px-5 py-3.5 text-right font-mono tabular-nums">
                           {fmtViews(k.verifiedViews ?? k.views)}
                         </td>
-                        <td className="px-4 py-3 text-right font-mono">
+                        <td className="px-5 py-3.5 text-right font-mono tabular-nums font-semibold">
                           {record ? (
                             <span className="text-green">{rup(record.netAmount / 100)}</span>
                           ) : (
                             <span className="text-muted">—</span>
                           )}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-5 py-3.5">
                           <StatusPill status={k.status} />
                         </td>
                       </tr>
@@ -230,10 +315,10 @@ export default function ClipperWalletPage() {
             </table>
           </div>
           {txns.length > visible.length && (
-            <div className="border-t px-4 py-3 text-center">
+            <div className="border-t border-border/40 px-5 py-3 text-center">
               <button
                 onClick={() => setPage((p) => p + 1)}
-                className="text-xs font-medium text-accent hover:underline"
+                className="cursor-pointer text-[13px] font-medium text-accent hover:underline"
               >
                 Load more
               </button>
@@ -242,19 +327,19 @@ export default function ClipperWalletPage() {
         </div>
       </section>
 
-      {/* UPI details */}
-      <section className="rounded-2xl border bg-card p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-widest text-muted">
+      {/* ── Payment details ─────────────────────────────── */}
+      <section>
+        <h2 className="mb-1.5 text-[18px] font-bold tracking-tight">
           Payment details
         </h2>
-        <p className="mt-1 text-sm text-muted">
-          Enter your UPI ID to receive payouts directly to your bank account.
+        <p className="mb-5 text-[14px] text-muted">
+          Your UPI ID for receiving payouts.
         </p>
 
-        <div className="mt-4 rounded-xl border border-dashed p-4">
-          <label className="block text-sm">
-            <span className="text-muted">UPI ID</span>
-            <div className="mt-1.5 flex items-center gap-2">
+        <div className="rounded-[12px] border border-border/40 bg-card p-5 sm:p-6">
+          <label className="block text-[14px]">
+            <span className="mb-1.5 block text-muted">UPI ID</span>
+            <div className="flex items-center gap-2.5">
               {editingUpi ? (
                 <>
                   <input
@@ -262,7 +347,7 @@ export default function ClipperWalletPage() {
                     onChange={(e) => setUpiInput(e.target.value)}
                     placeholder="yourname@upi"
                     autoFocus
-                    className="flex-1 rounded-lg border bg-background px-3 py-2.5 font-mono text-sm outline-none focus:border-foreground sm:max-w-xs"
+                    className="h-11 flex-1 rounded-[10px] border border-border/60 bg-background px-3.5 font-mono text-[14px] outline-none transition-colors focus:border-foreground/30 sm:max-w-xs"
                   />
                   <button
                     onClick={() => {
@@ -271,25 +356,25 @@ export default function ClipperWalletPage() {
                         setEditingUpi(false);
                       }
                     }}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 text-sm font-medium text-white hover:opacity-90"
+                    className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[10px] bg-accent px-4 text-[14px] font-medium text-white transition-colors duration-150 hover:bg-foreground/90"
                   >
                     <Save size={14} /> Save
                   </button>
                   <button
                     onClick={() => { setEditingUpi(false); setUpiInput(profile?.upi ?? ""); }}
-                    className="rounded-lg border px-3 py-2.5 text-sm font-medium hover:bg-accent-soft"
+                    className="inline-flex h-10 cursor-pointer items-center rounded-[10px] border border-border/60 px-4 text-[14px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground"
                   >
                     Cancel
                   </button>
                 </>
               ) : (
                 <>
-                  <span className="flex-1 font-mono text-sm">
+                  <span className="flex-1 font-mono text-[14px]">
                     {profile?.upi ? profile.upi : <span className="text-muted italic">Not set</span>}
                   </span>
                   <button
                     onClick={() => setEditingUpi(true)}
-                    className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium hover:bg-accent-soft"
+                    className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[10px] border border-border/60 px-4 text-[14px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground"
                   >
                     <Pencil size={13} /> {profile?.upi ? "Change" : "Add UPI"}
                   </button>
@@ -297,178 +382,78 @@ export default function ClipperWalletPage() {
               )}
             </div>
           </label>
-          <p className="mt-2 flex items-center gap-1.5 text-xs text-muted">
-            <ShieldCheck size={12} className="text-green" />
+          <p className="mt-3 flex items-center gap-1.5 text-[13px] text-muted">
+            <ShieldCheck size={13} className="text-green" />
             Your UPI ID is verified by our team before payouts are enabled.
           </p>
         </div>
       </section>
 
-      <section>
-        <h2 className="text-sm font-semibold uppercase tracking-widest text-muted">
-          Payouts
-        </h2>
-        <div className="mt-3 grid gap-3 lg:grid-cols-2">
-          <div className="rounded-2xl border bg-card p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted">Current payment method</p>
-                <p className="mt-1 flex items-center gap-2 font-mono text-sm font-medium">
-                  <Wallet size={14} className="text-muted" /> {upi}
-                </p>
-              </div>
-              <span
-                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium ${
-                  verified
-                    ? "border-green/30 bg-accent-soft text-green"
-                    : "border-amber/30 bg-amber/10 text-amber"
-                }`}
+      {/* ── Payout history ──────────────────────────────── */}
+      {myPayouts.length > 0 && (
+        <section>
+          <h2 className="mb-5 text-[18px] font-bold tracking-tight">
+            Payout history
+          </h2>
+          <div className="divide-y divide-border/40 rounded-[12px] border border-border/40 bg-card">
+            {myPayouts.map((p) => (
+              <div
+                key={p.id}
+                className="flex items-center justify-between px-5 py-4"
               >
-                {verified ? (
-                  <>
-                    <ShieldCheck size={13} /> Verified
-                  </>
-                ) : (
-                  <>
-                    <AlertTriangle size={13} /> Unverified
-                  </>
-                )}
-              </span>
-            </div>
-
-            <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-              <div className="rounded-xl bg-background p-3">
-                <p className="text-xs text-muted">Minimum withdrawal</p>
-                <p className="mt-1 font-mono font-medium">{rup(MIN_WITHDRAWAL)}</p>
+                <div>
+                  <p className="font-mono text-[15px] font-semibold">
+                    {rup(p.netAmount / 100)}
+                  </p>
+                  <p className="mt-0.5 text-[13px] text-muted">
+                    {fmtDate(p.createdAt)}
+                    {p.paidAt && " · Paid"}
+                    {p.status === "processing" && " · Processing"}
+                  </p>
+                  {p.paymentReference && (
+                    <p className="mt-0.5 font-mono text-[12px] text-muted">
+                      Ref: {p.paymentReference}
+                    </p>
+                  )}
+                </div>
+                <span
+                  className={`inline-flex items-center rounded-full px-2.5 py-1 text-[12px] font-medium ${
+                    p.status === "paid"
+                      ? "bg-green/10 text-green"
+                      : p.status === "processing"
+                        ? "bg-blue-500/10 text-blue-500"
+                        : "bg-accent-soft text-muted"
+                  }`}
+                >
+                  {p.status}
+                </span>
               </div>
-              <div className="rounded-xl bg-background p-3">
-                <p className="text-xs text-muted">Payout schedule</p>
-                <p className="mt-1 flex items-center gap-1.5 font-medium">
-                  <CalendarClock size={13} className="text-muted" /> Weekly
-                </p>
-                <p className="mt-0.5 text-xs text-muted">
-                  Next: {nextPayoutDate()}
-                </p>
-              </div>
-            </div>
-
-            {requestSuccess && (
-              <div className="mt-4 flex items-start gap-2 rounded-xl border border-green/30 bg-accent-soft p-3 text-sm text-green">
-                <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
-                <p>{requestSuccess}</p>
-              </div>
-            )}
-            {requestError && (
-              <div className="mt-4 flex items-start gap-2 rounded-xl border border-red/30 bg-red/5 p-3 text-sm text-red">
-                <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-                <p>{requestError}</p>
-              </div>
-            )}
-
-            {!requestSuccess && (
-              <button
-                type="button"
-                disabled={!canWithdraw || requesting || hasInProgress}
-                onClick={handleRequestPayout}
-                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {requesting ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" /> Processing...
-                  </>
-                ) : hasInProgress ? (
-                  "Payout in progress"
-                ) : (
-                  <>
-                    <ArrowDownToLine size={16} />
-                    {available >= MIN_WITHDRAWAL * 100
-                      ? `Request payout · ${rup(available / 100)}`
-                      : `Needs ${rup(MIN_WITHDRAWAL)} to withdraw`}
-                  </>
-                )}
-              </button>
-            )}
-            {!canWithdraw && !hasInProgress && (
-              <p className="mt-2 flex items-center gap-1.5 text-xs text-muted">
-                <Info size={12} />
-                {!profile?.upi ? (
-                  <span className="text-accent">
-                    Add your UPI ID above to enable payouts
-                  </span>
-                ) : (
-                  "Only finalized (processing) balance can be withdrawn — pending earnings are not yet finalized."
-                )}
-              </p>
-            )}
+            ))}
           </div>
+        </section>
+      )}
 
-          <div className="rounded-2xl border bg-card p-5">
-            <h3 className="text-sm font-semibold">Payout history</h3>
-            <div className="mt-3 divide-y">
-              {myPayouts.length === 0 ? (
-                <p className="py-4 text-sm text-muted">No payouts yet.</p>
-              ) : (
-                myPayouts.map((p) => (
-                  <div
-                    key={p.id}
-                    className="flex items-center justify-between py-3 text-sm"
-                  >
-                    <div>
-                      <p className="font-medium">
-                        {rup(p.netAmount / 100)}
-                      </p>
-                      <p className="text-xs text-muted">
-                        {fmtDate(p.createdAt)}
-                        {p.paidAt && " · Paid"}
-                        {p.status === "processing" && " · Processing"}
-                      </p>
-                      {p.paymentReference && (
-                        <p className="mt-0.5 text-[11px] text-muted font-mono">
-                          Ref: {p.paymentReference}
-                        </p>
-                      )}
-                    </div>
-                    <span
-                      className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                        p.status === "paid"
-                          ? "bg-green/10 text-green"
-                          : p.status === "processing"
-                            ? "bg-blue-500/10 text-blue-500"
-                            : "bg-muted/10 text-muted"
-                      }`}
-                    >
-                      {p.status}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
-
+      {/* ── Earnings by campaign ────────────────────────── */}
       {byCampaign.size > 0 && (
         <section>
-          <h2 className="text-sm font-semibold uppercase tracking-widest text-muted">
+          <h2 className="mb-5 text-[18px] font-bold tracking-tight">
             Earnings by campaign
           </h2>
-          <div className="mt-3 overflow-hidden rounded-2xl border bg-card">
-            <ul className="divide-y">
-              {[...byCampaign.entries()].map(([id, amount]) => (
-                <li
-                  key={id}
-                  className="flex items-center justify-between px-4 py-3 text-sm"
+          <div className="divide-y divide-border/40 rounded-[12px] border border-border/40 bg-card">
+            {[...byCampaign.entries()].map(([id, amount]) => (
+              <div
+                key={id}
+                className="flex items-center justify-between px-5 py-3.5"
+              >
+                <Link
+                  href={`/campaigns/${id}`}
+                  className="cursor-pointer font-medium hover:underline underline-offset-2"
                 >
-                  <Link
-                    href={`/campaigns/${id}`}
-                    className="font-medium hover:text-accent"
-                  >
-                    {campaigns.find((c) => c.id === id)?.title ?? id}
-                  </Link>
-                  <span className="font-mono">{rup(amount / 100)}</span>
-                </li>
-              ))}
-            </ul>
+                  {campaigns.find((c) => c.id === id)?.title ?? id}
+                </Link>
+                <span className="font-mono tabular-nums">{rup(amount / 100)}</span>
+              </div>
+            ))}
           </div>
         </section>
       )}
