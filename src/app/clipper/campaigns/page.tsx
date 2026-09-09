@@ -138,27 +138,29 @@ export default function ClipperCampaignsPage() {
   const endingSoon = allActive.filter((c) => (c.daysLeft ?? 99) <= 7).length;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Campaigns</h1>
-        <p className="mt-1 text-sm text-muted">
+    <div className="mx-auto max-w-[1120px] space-y-7 px-5 py-10 sm:px-8">
+      {/* ── Header ──────────────────────────────────────── */}
+      <div className="mb-2">
+        <h1 className="text-[28px] font-bold leading-tight tracking-tight sm:text-[32px]">
+          Campaigns
+        </h1>
+        <p className="mt-2 text-[15px] text-muted">
           Find campaigns worth clipping.
         </p>
       </div>
 
-      {/* Toolbar */}
+      {/* ── Toolbar ─────────────────────────────────────── */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="relative min-w-0 flex-1 sm:max-w-md">
+        <div className="relative min-w-0 flex-1 sm:max-w-[400px]">
           <Search
-            size={15}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+            size={16}
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted"
           />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search campaigns..."
-            className="w-full rounded-lg border bg-background py-2.5 pl-9 pr-3 text-sm outline-none focus:border-foreground"
+            className="h-11 w-full rounded-[10px] border bg-background pl-10 pr-4 text-[14px] outline-none transition-colors placeholder:text-muted/50 focus:border-foreground"
           />
         </div>
 
@@ -166,7 +168,7 @@ export default function ClipperCampaignsPage() {
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value)}
-            className="rounded-lg border bg-background px-3 py-2.5 text-sm outline-none focus:border-foreground"
+            className="h-11 rounded-[10px] border bg-background px-3.5 text-[14px] outline-none transition-colors focus:border-foreground"
           >
             {SORT_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -177,7 +179,7 @@ export default function ClipperCampaignsPage() {
 
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors ${
+            className={`inline-flex h-11 items-center gap-2 rounded-[10px] border px-3.5 text-[14px] font-medium transition-colors ${
               showFilters || activeFilterCount > 0
                 ? "border-foreground bg-accent-soft text-foreground"
                 : "text-muted hover:bg-accent-soft/60"
@@ -194,13 +196,16 @@ export default function ClipperCampaignsPage() {
 
           <button
             onClick={() => setShowSaved(!showSaved)}
-            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors ${
+            className={`inline-flex h-11 items-center gap-2 rounded-[10px] border px-3.5 text-[14px] font-medium transition-colors ${
               showSaved
                 ? "border-foreground bg-accent-soft text-foreground"
                 : "text-muted hover:bg-accent-soft/60"
             }`}
           >
-            <Heart size={15} className={showSaved ? "fill-red text-red" : ""} />
+            <Heart
+              size={15}
+              className={showSaved ? "fill-red text-red" : ""}
+            />
             Saved
             {savedCampaigns.length > 0 && (
               <span className="rounded-full bg-accent px-1.5 text-[10px] text-white">
@@ -211,27 +216,26 @@ export default function ClipperCampaignsPage() {
         </div>
       </div>
 
-      {/* Filters */}
+      {/* ── Filter Panel ────────────────────────────────── */}
       {showFilters && (
-        <div className="rounded-xl border bg-card p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <p className="text-sm font-medium">Filters</p>
+        <div className="rounded-[12px] border bg-card p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <p className="text-[14px] font-medium">Filters</p>
             {activeFilterCount > 0 && (
               <button
                 onClick={clearFilters}
-                className="text-xs text-accent hover:underline"
+                className="text-[13px] font-medium text-accent hover:underline"
               >
                 Clear all
               </button>
             )}
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div>
-              <label className="mb-1 block text-xs text-muted">Platform</label>
+            <FilterField label="Platform">
               <select
                 value={platform}
                 onChange={(e) => setPlatform(e.target.value as Platform | "")}
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
+                className="h-11 w-full rounded-[10px] border bg-background px-3.5 text-[14px] outline-none transition-colors focus:border-foreground"
               >
                 <option value="">All platforms</option>
                 {PLATFORMS.map((p) => (
@@ -240,13 +244,12 @@ export default function ClipperCampaignsPage() {
                   </option>
                 ))}
               </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-muted">Category</label>
+            </FilterField>
+            <FilterField label="Category">
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
+                className="h-11 w-full rounded-[10px] border bg-background px-3.5 text-[14px] outline-none transition-colors focus:border-foreground"
               >
                 <option value="">All categories</option>
                 {categories.map((c) => (
@@ -255,123 +258,94 @@ export default function ClipperCampaignsPage() {
                   </option>
                 ))}
               </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-muted">
-                Min CPM (₹)
-              </label>
+            </FilterField>
+            <FilterField label="Min CPM (₹)">
               <input
                 type="number"
                 value={minCpm}
                 onChange={(e) => setMinCpm(e.target.value)}
                 placeholder="0"
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
+                className="h-11 w-full rounded-[10px] border bg-background px-3.5 text-[14px] outline-none transition-colors focus:border-foreground"
               />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-muted">
-                Max CPM (₹)
-              </label>
+            </FilterField>
+            <FilterField label="Max CPM (₹)">
               <input
                 type="number"
                 value={maxCpm}
                 onChange={(e) => setMaxCpm(e.target.value)}
                 placeholder="∞"
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
+                className="h-11 w-full rounded-[10px] border bg-background px-3.5 text-[14px] outline-none transition-colors focus:border-foreground"
               />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-muted">
-                Min budget remaining (₹)
-              </label>
+            </FilterField>
+            <FilterField label="Min budget remaining (₹)">
               <input
                 type="number"
                 value={minBudget}
                 onChange={(e) => setMinBudget(e.target.value)}
                 placeholder="0"
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
+                className="h-11 w-full rounded-[10px] border bg-background px-3.5 text-[14px] outline-none transition-colors focus:border-foreground"
               />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-muted">
-                Min views required
-              </label>
+            </FilterField>
+            <FilterField label="Min views required">
               <input
                 type="number"
                 value={minViews}
                 onChange={(e) => setMinViews(e.target.value)}
                 placeholder="0"
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
+                className="h-11 w-full rounded-[10px] border bg-background px-3.5 text-[14px] outline-none transition-colors focus:border-foreground"
               />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-muted">
-                Max days remaining
-              </label>
+            </FilterField>
+            <FilterField label="Max days remaining">
               <input
                 type="number"
                 value={maxDays}
                 onChange={(e) => setMaxDays(e.target.value)}
                 placeholder="∞"
-                className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
+                className="h-11 w-full rounded-[10px] border bg-background px-3.5 text-[14px] outline-none transition-colors focus:border-foreground"
               />
-            </div>
+            </FilterField>
           </div>
         </div>
       )}
 
-      {/* Active filter chips */}
+      {/* ── Active Filter Chips ─────────────────────────── */}
       {(activeFilterCount > 0 || showSaved || q) && (
-        <div className="flex flex-wrap items-center gap-2 text-sm text-muted">
-          <span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[14px] text-muted">
             {list.length} campaign{list.length === 1 ? "" : "s"}
           </span>
           {q && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-xs">
-              &quot;{q}&quot;
-              <button onClick={() => setQ("")}>
-                <X size={12} />
-              </button>
-            </span>
+            <Chip onRemove={() => setQ("")}>&quot;{q}&quot;</Chip>
           )}
           {platform && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-xs">
-              {platform}
-              <button onClick={() => setPlatform("")}>
-                <X size={12} />
-              </button>
-            </span>
+            <Chip onRemove={() => setPlatform("")}>{platform}</Chip>
           )}
           {category && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-xs">
-              {category}
-              <button onClick={() => setCategory("")}>
-                <X size={12} />
-              </button>
-            </span>
+            <Chip onRemove={() => setCategory("")}>{category}</Chip>
           )}
           {showSaved && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-xs">
-              Saved only
-              <button onClick={() => setShowSaved(false)}>
-                <X size={12} />
-              </button>
-            </span>
+            <Chip onRemove={() => setShowSaved(false)}>Saved only</Chip>
           )}
         </div>
       )}
 
-      {/* Opportunity summary */}
+      {/* ── Opportunity Summary ─────────────────────────── */}
       {allActive.length > 0 && !showSaved && !q && activeFilterCount === 0 && (
-        <div className="flex items-center gap-4 text-xs text-muted">
+        <div className="flex items-center gap-4 text-[13px] text-muted">
           <span>
-            <span className="font-medium text-foreground">{allActive.length}</span> campaigns
+            <span className="font-medium text-foreground">
+              {allActive.length}
+            </span>{" "}
+            campaigns
           </span>
           {highestCpm > 0 && (
             <>
               <span className="text-border">·</span>
               <span>
-                Highest CPM <span className="font-medium text-foreground">{rup(highestCpm)}</span>
+                Highest CPM{" "}
+                <span className="font-semibold text-foreground">
+                  {rup(highestCpm)}
+                </span>
               </span>
             </>
           )}
@@ -379,20 +353,21 @@ export default function ClipperCampaignsPage() {
             <>
               <span className="text-border">·</span>
               <span>
-                <span className="font-medium text-amber">{endingSoon}</span> ending soon
+                <span className="font-medium text-amber">{endingSoon}</span>{" "}
+                ending soon
               </span>
             </>
           )}
         </div>
       )}
 
-      {/* Grid or empty */}
+      {/* ── Campaign Grid ───────────────────────────────── */}
       {list.length === 0 ? (
-        <div className="rounded-xl border border-dashed bg-card py-12 text-center">
-          <p className="text-sm font-medium">
+        <div className="rounded-[12px] border border-dashed bg-card py-16 text-center">
+          <p className="text-[16px] font-medium">
             {showSaved ? "No saved campaigns" : "No campaigns found"}
           </p>
-          <p className="mt-1 text-xs text-muted">
+          <p className="mt-2 text-[14px] text-muted">
             {showSaved
               ? "Save campaigns to find them here later."
               : activeFilterCount > 0
@@ -402,19 +377,55 @@ export default function ClipperCampaignsPage() {
           {activeFilterCount > 0 && (
             <button
               onClick={clearFilters}
-              className="mt-3 inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium hover:bg-accent-soft"
+              className="mt-5 inline-flex h-11 items-center gap-2 rounded-[10px] border px-5 text-[14px] font-medium transition-colors hover:bg-accent-soft"
             >
               Clear filters
             </button>
           )}
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {list.map((c, i) => (
             <CampaignCard key={c.id} campaign={c} index={i} />
           ))}
         </div>
       )}
     </div>
+  );
+}
+
+function FilterField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-[13px] text-muted">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function Chip({
+  children,
+  onRemove,
+}: {
+  children: React.ReactNode;
+  onRemove: () => void;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1.5 text-[13px] text-muted">
+      {children}
+      <button
+        onClick={onRemove}
+        className="flex h-4 w-4 items-center justify-center rounded-full transition-colors hover:bg-border/50"
+        aria-label="Remove filter"
+      >
+        <X size={11} />
+      </button>
+    </span>
   );
 }

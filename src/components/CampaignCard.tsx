@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Heart } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { PlatformIcon } from "@/components/PlatformIcon";
-import { StatusPill } from "@/components/StatusPill";
 import { useStore } from "@/lib/store";
 import { campaignBudget } from "@/lib/finance";
 import { rup } from "@/lib/format";
@@ -18,7 +17,8 @@ export function CampaignCard({
   index: number;
   onView?: (c: Campaign) => void;
 }) {
-  const { clips, savedCampaigns, toggleSaveCampaign, financeRecords } = useStore();
+  const { clips, savedCampaigns, toggleSaveCampaign, financeRecords } =
+    useStore();
   const clippersIn = new Set(
     clips.filter((k) => k.campaignId === campaign.id).map((k) => k.clipper),
   ).size;
@@ -32,74 +32,70 @@ export function CampaignCard({
 
   const inner = (
     <>
-      {/* Thumbnail */}
+      {/* ── Thumbnail ──────────────────────────────────── */}
       <div className="relative aspect-video w-full overflow-hidden bg-accent-soft">
         {thumb ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
             src={thumb}
             alt={campaign.title}
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+            className="h-full w-full object-cover transition-transform duration-[220ms] ease-out group-hover:scale-[1.03]"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             <PlatformIcon p={campaign.platform} size={28} />
           </div>
         )}
-        {/* Badges */}
-        <div className="absolute left-3 top-3 flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 rounded-md bg-white/90 px-2.5 py-1 text-xs font-medium text-foreground shadow-sm backdrop-blur">
+
+        {/* Single badge — platform/category combined */}
+        <div className="absolute left-3 top-3">
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/90 px-2.5 py-1.5 text-[12px] font-medium text-foreground shadow-sm backdrop-blur">
             <PlatformIcon p={campaign.platform} size={12} />
             {campaign.platform}
+            {(campaign.category || campaign.niche) && (
+              <>
+                <span className="text-border">·</span>
+                {campaign.category || campaign.niche}
+              </>
+            )}
           </span>
-          {(campaign.category || campaign.niche) && (
-            <span className="rounded-md bg-white/90 px-2.5 py-1 text-xs font-medium text-foreground shadow-sm backdrop-blur">
-              {campaign.category || campaign.niche}
-            </span>
-          )}
         </div>
-        {/* Save */}
+
+        {/* Save button */}
         <button
           onClick={(e) => {
             e.stopPropagation();
             e.preventDefault();
             toggleSaveCampaign(campaign.id);
           }}
-          className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/80 backdrop-blur transition-colors duration-150 hover:bg-white"
+          className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/80 backdrop-blur transition-colors duration-150 hover:bg-white"
           title={isSaved ? "Unsave" : "Save"}
+          aria-label={isSaved ? "Unsave campaign" : "Save campaign"}
         >
-          <Heart
-            size={16}
-            className={isSaved ? "fill-red text-red" : "text-muted"}
-          />
+          <HeartIcon saved={isSaved} />
         </button>
       </div>
 
-      {/* Content */}
+      {/* ── Content ─────────────────────────────────────── */}
       <div className="flex flex-1 flex-col p-5">
-        {/* Title + creator */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h3 className="text-base font-semibold leading-snug group-hover:underline underline-offset-2">
-              {campaign.title}
-            </h3>
-            <p className="mt-1 text-sm text-muted">
-              by {campaign.creator}
-            </p>
-          </div>
-          <StatusPill status={campaign.status} />
-        </div>
+        {/* Title + Creator */}
+        <h3 className="line-clamp-2 text-[17px] font-semibold leading-[1.3] group-hover:underline underline-offset-2">
+          {campaign.title}
+        </h3>
+        <p className="mt-1.5 text-[14px] text-muted">
+          by {campaign.creator}
+        </p>
 
-        {/* CPM — dominant metric */}
+        {/* Payout — dominant */}
         <div className="mt-4 flex items-baseline gap-1.5">
-          <span className="font-mono text-xl font-bold tracking-tight">
+          <span className="font-mono text-[22px] font-bold tracking-tight">
             {rup(campaign.payout)}
           </span>
-          <span className="text-sm text-muted">/ 1K views</span>
+          <span className="text-[13px] text-muted">/ 1K views</span>
         </div>
 
-        {/* Secondary metrics */}
-        <div className="mt-2.5 flex items-center gap-3 text-sm text-muted">
+        {/* Secondary metadata */}
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted">
           <span className={isLowBudget ? "font-medium text-amber" : ""}>
             {b.total > 0 ? `${rup(remaining)} left` : "Flexible budget"}
           </span>
@@ -107,12 +103,15 @@ export function CampaignCard({
           <span className={isUrgent ? "font-medium text-amber" : ""}>
             {campaign.daysLeft}d left
           </span>
-          {campaign.viewRules?.minViews != null && campaign.viewRules.minViews > 0 && (
-            <>
-              <span className="text-border">·</span>
-              <span>Min {campaign.viewRules.minViews.toLocaleString()} views</span>
-            </>
-          )}
+          {campaign.viewRules?.minViews != null &&
+            campaign.viewRules.minViews > 0 && (
+              <>
+                <span className="text-border">·</span>
+                <span>
+                  Min {campaign.viewRules.minViews.toLocaleString()} views
+                </span>
+              </>
+            )}
         </div>
 
         {/* Budget bar */}
@@ -134,13 +133,14 @@ export function CampaignCard({
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* CTA row */}
-        <div className="mt-4 flex items-center justify-between border-t border-border/50 pt-4">
-          <span className="text-sm text-muted">
+        {/* Footer: clippers + CTA */}
+        <div className="mt-5 flex items-center justify-between border-t border-border/50 pt-4">
+          <span className="text-[13px] text-muted">
             {clippersIn > 0 ? `${clippersIn} clippers` : "Be the first"}
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-all duration-200 group-hover:bg-foreground/90">
+          <span className="inline-flex items-center gap-2 rounded-[10px] bg-accent px-4 py-2.5 text-[14px] font-medium text-white transition-all duration-200 group-hover:bg-foreground/90">
             View campaign
+            <ArrowRight size={14} />
           </span>
         </div>
       </div>
@@ -156,7 +156,7 @@ export function CampaignCard({
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") onView(campaign);
         }}
-        className="group flex flex-col cursor-pointer overflow-hidden rounded-xl border bg-card transition-all duration-200 hover:border-foreground/12 hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)]"
+        className="group flex flex-col cursor-pointer overflow-hidden rounded-[12px] border bg-card transition-all duration-200 hover:border-foreground/12 hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)]"
       >
         {inner}
       </div>
@@ -166,9 +166,27 @@ export function CampaignCard({
   return (
     <Link
       href={`/campaigns/${campaign.id}`}
-      className="group flex flex-col overflow-hidden rounded-xl border bg-card transition-all duration-200 hover:border-foreground/12 hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)]"
+      className="group flex flex-col overflow-hidden rounded-[12px] border bg-card transition-all duration-200 hover:border-foreground/12 hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)]"
     >
       {inner}
     </Link>
+  );
+}
+
+function HeartIcon({ saved }: { saved: boolean }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill={saved ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={saved ? "text-red" : "text-muted"}
+    >
+      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+    </svg>
   );
 }
