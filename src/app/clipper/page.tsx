@@ -41,14 +41,11 @@ export default function ClipperPage() {
   const displayedCampaigns = openCampaigns.slice(0, 4);
 
   return (
-    <div className="space-y-8">
-      {/* ─── Welcome + Primary Action ─── */}
+    <div className="space-y-6">
+      {/* ─── A. Welcome Header ─── */}
       <section className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-wider text-muted">
-            Dashboard
-          </p>
-          <h1 className="mt-1 text-[22px] font-bold leading-tight tracking-tight">
+          <h1 className="text-[22px] font-bold leading-tight tracking-tight">
             Welcome back, @{user?.name ?? user?.email ?? "clipper"}
           </h1>
           <p className="mt-1 max-w-md text-sm leading-relaxed text-muted">
@@ -64,165 +61,154 @@ export default function ClipperPage() {
         </Link>
       </section>
 
-      {/* ─── Earnings + Activity Summary ─── */}
-      <section className="flex flex-col gap-5 rounded-2xl border bg-card p-5 sm:flex-row sm:items-center sm:justify-between sm:gap-8">
-        {/* Primary: Earnings */}
-        <div className="flex items-center gap-3.5">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent text-white">
-            <Wallet size={16} />
+      {/* ─── B. Live Campaigns (Main Focus) ─── */}
+      <section>
+        <div className="mb-4 flex items-baseline justify-between">
+          <div>
+            <h2 className="text-lg font-bold tracking-tight">Live campaigns</h2>
+            <p className="mt-0.5 text-xs text-muted">
+              {openCampaigns.length} available
+              {openCampaigns.length === 1 ? "" : ""}
+            </p>
+          </div>
+          {openCampaigns.length > 0 && (
+            <Link
+              href="/clipper/campaigns"
+              className="group inline-flex items-center gap-1 text-xs font-medium text-muted transition-colors duration-150 hover:text-foreground"
+            >
+              View all
+              <ArrowRight
+                size={11}
+                className="transition-transform duration-200 group-hover:translate-x-0.5"
+              />
+            </Link>
+          )}
+        </div>
+
+        {displayedCampaigns.length === 0 ? (
+          <EmptyCampaigns onBrowse={() => router.push("/clipper/campaigns")} />
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {displayedCampaigns.map((c, i) => {
+              const spent = campaignSpent(c, financeRecords);
+              const remaining = (c.budget ?? 0) - spent;
+              const thumb = c.thumbnails?.[0];
+              return (
+                <Link
+                  key={c.id}
+                  href={`/campaigns/${c.id}`}
+                  className={`group overflow-hidden rounded-xl border bg-card transition-all duration-200 hover:border-foreground/12 hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)] ${
+                    i === 0 ? "ring-1 ring-foreground/8" : ""
+                  }`}
+                >
+                  {/* Thumbnail */}
+                  <div className="relative aspect-[16/9] w-full overflow-hidden bg-accent-soft">
+                    {thumb ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={thumb}
+                        alt={c.title}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <ImageIcon size={22} className="text-muted/25" />
+                      </div>
+                    )}
+                    <div className="absolute left-2.5 top-2.5 flex items-center gap-1.5">
+                      <span className="inline-flex items-center gap-1 rounded-md bg-white/90 px-2 py-[3px] text-[10px] font-medium text-foreground shadow-sm backdrop-blur">
+                        <PlatformIcon p={c.platform} size={10} />
+                        {c.platform}
+                      </span>
+                      {c.niche && (
+                        <span className="rounded-md bg-white/90 px-2 py-[3px] text-[10px] font-medium text-foreground shadow-sm backdrop-blur">
+                          {c.niche}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Content */}
+                  <div className="p-3.5">
+                    <h3 className="text-[13px] font-bold leading-snug group-hover:underline underline-offset-2">
+                      {c.title}
+                    </h3>
+                    <p className="mt-0.5 text-[11px] text-muted">
+                      by {c.creator}
+                    </p>
+
+                    {/* Payout — dominant */}
+                    <div className="mt-2.5 flex items-baseline gap-1.5">
+                      <span className="font-mono text-[15px] font-bold tracking-tight">
+                        {rup(c.payout)}
+                      </span>
+                      <span className="text-[10px] text-muted">/ 1K views</span>
+                    </div>
+
+                    {/* Secondary metrics */}
+                    <div className="mt-1.5 flex items-center gap-3 text-[11px] text-muted">
+                      <span>
+                        {remaining > 0 ? `${rup(remaining)} left` : "Flexible"}
+                      </span>
+                      <span className="text-border">·</span>
+                      <span>{c.daysLeft}d left</span>
+                    </div>
+
+                    {/* CTA */}
+                    <div className="mt-3 flex items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-[11px] font-medium text-white transition-all duration-200 group-hover:bg-foreground/90">
+                      View Campaign
+                      <ArrowRight size={10} />
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* ─── C. Compact Activity Strip ─── */}
+      <section className="flex flex-col gap-3 rounded-xl border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+        {/* Total earnings — strongest number */}
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent text-white">
+            <Wallet size={14} />
           </div>
           <div>
-            <p className="text-[11px] font-medium uppercase tracking-wider text-muted">
-              Total earnings
-            </p>
-            <p className="mt-0.5 text-[26px] font-bold leading-none tracking-tight">
+            <p className="text-[11px] text-muted">Total earnings</p>
+            <p className="font-mono text-lg font-bold leading-tight tracking-tight">
               {rup(earnings)}
-            </p>
-            <p className="mt-1 text-[11px] text-muted">
-              {earnings > 0
-                ? "from approved clips"
-                : "earnings will appear here"}
             </p>
           </div>
         </div>
 
-        {/* Supporting: inline metrics */}
-        <div className="flex items-center gap-5 sm:gap-6">
-          <MetricBlock
-            value={String(myClips.length)}
-            label="Submitted"
-          />
-          <div className="h-7 w-px bg-border" />
-          <MetricBlock
-            value={String(approvedCount)}
-            label="Approved"
-            hint={
-              pendingCount > 0 ? `${pendingCount} pending` : undefined
-            }
-          />
-          <div className="h-7 w-px bg-border" />
-          <MetricBlock
-            value={String(openCampaigns.length)}
-            label="Open"
-          />
+        {/* Supporting metrics */}
+        <div className="flex items-center gap-4 text-center sm:gap-6">
+          <div>
+            <p className="font-mono text-sm font-bold">{myClips.length}</p>
+            <p className="text-[10px] text-muted">Submitted</p>
+          </div>
+          <div className="h-5 w-px bg-border" />
+          <div>
+            <p className="font-mono text-sm font-bold">{approvedCount}</p>
+            <p className="text-[10px] text-muted">
+              Approved{pendingCount > 0 ? ` · ${pendingCount} pending` : ""}
+            </p>
+          </div>
+          <div className="h-5 w-px bg-border" />
+          <div>
+            <p className="font-mono text-sm font-bold">
+              {openCampaigns.length}
+            </p>
+            <p className="text-[10px] text-muted">Open</p>
+          </div>
         </div>
       </section>
 
-      {/* ─── Main: Campaigns + Sidebar ─── */}
+      {/* ─── Main: Submissions + Performance + Sidebar ─── */}
       <div className="grid gap-8 lg:grid-cols-[1fr_260px]">
-        {/* ── Left: Campaign Discovery (Hero) ── */}
         <div className="space-y-8">
-          <section>
-            <div className="mb-5 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <h2 className="text-base font-bold tracking-tight">
-                  Live campaigns
-                </h2>
-                <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-semibold text-muted">
-                  {openCampaigns.length}
-                </span>
-              </div>
-              {openCampaigns.length > 0 && (
-                <Link
-                  href="/clipper/campaigns"
-                  className="group inline-flex items-center gap-1 text-xs font-medium text-muted transition-colors duration-150 hover:text-foreground"
-                >
-                  View all
-                  <ArrowRight
-                    size={11}
-                    className="transition-transform duration-200 group-hover:translate-x-0.5"
-                  />
-                </Link>
-              )}
-            </div>
-
-            {displayedCampaigns.length === 0 ? (
-              <EmptyCampaigns onBrowse={() => router.push("/clipper/campaigns")} />
-            ) : (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {displayedCampaigns.map((c) => {
-                  const spent = campaignSpent(c, financeRecords);
-                  const remaining = (c.budget ?? 0) - spent;
-                  const thumb = c.thumbnails?.[0];
-                  return (
-                    <Link
-                      key={c.id}
-                      href={`/campaigns/${c.id}`}
-                      className="group overflow-hidden rounded-xl border bg-card transition-all duration-200 hover:border-foreground/12 hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)]"
-                    >
-                      {/* Thumbnail — media-first, ~50% of card */}
-                      <div className="relative aspect-[16/9] w-full overflow-hidden bg-accent-soft">
-                        {thumb ? (
-                          /* eslint-disable-next-line @next/next/no-img-element */
-                          <img
-                            src={thumb}
-                            alt={c.title}
-                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center">
-                            <ImageIcon size={22} className="text-muted/25" />
-                          </div>
-                        )}
-                        {/* Badges overlay */}
-                        <div className="absolute left-2.5 top-2.5 flex items-center gap-1.5">
-                          <span className="inline-flex items-center gap-1 rounded-md bg-white/90 px-2 py-[3px] text-[10px] font-medium text-foreground shadow-sm backdrop-blur">
-                            <PlatformIcon p={c.platform} size={10} />
-                            {c.platform}
-                          </span>
-                          {c.niche && (
-                            <span className="rounded-md bg-white/90 px-2 py-[3px] text-[10px] font-medium text-foreground shadow-sm backdrop-blur">
-                              {c.niche}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Content */}
-                      <div className="p-3.5">
-                        <h3 className="text-[13px] font-bold leading-snug group-hover:underline underline-offset-2">
-                          {c.title}
-                        </h3>
-                        <p className="mt-0.5 text-[11px] text-muted">
-                          by {c.creator}
-                        </p>
-
-                        <div className="mt-2.5 flex items-center gap-0 rounded-lg border bg-background">
-                          <div className="flex-1 py-1.5 text-center">
-                            <p className="font-mono text-[12px] font-bold">
-                              {rup(c.payout)}
-                            </p>
-                            <p className="text-[9px] text-muted">CPM</p>
-                          </div>
-                          <div className="h-5 w-px bg-border" />
-                          <div className="flex-1 py-1.5 text-center">
-                            <p className="font-mono text-[12px] font-bold">
-                              {rup(remaining > 0 ? remaining : 0)}
-                            </p>
-                            <p className="text-[9px] text-muted">Left</p>
-                          </div>
-                          <div className="h-5 w-px bg-border" />
-                          <div className="flex-1 py-1.5 text-center">
-                            <p className="font-mono text-[12px] font-bold">
-                              {c.daysLeft}d
-                            </p>
-                            <p className="text-[9px] text-muted">Days</p>
-                          </div>
-                        </div>
-
-                        <div className="mt-2.5 flex items-center justify-center gap-1.5 rounded-lg bg-accent py-1.5 text-[11px] font-medium text-white transition-all duration-200 group-hover:bg-foreground/90">
-                          View Campaign
-                          <ArrowRight size={10} />
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
-          {/* ── Recent Submissions ── */}
+          {/* ── D. Recent Submissions ── */}
           <section>
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-base font-bold tracking-tight">
@@ -261,7 +247,6 @@ export default function ClipperPage() {
                       href={`/clip/${k.id}`}
                       className="group flex items-center gap-3.5 py-3 transition-colors duration-150"
                     >
-                      {/* Thumbnail */}
                       <div className="h-9 w-14 shrink-0 overflow-hidden rounded-lg bg-accent-soft">
                         {thumb ? (
                           /* eslint-disable-next-line @next/next/no-img-element */
@@ -280,7 +265,6 @@ export default function ClipperPage() {
                         )}
                       </div>
 
-                      {/* Info */}
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[13px] font-medium group-hover:underline underline-offset-2">
                           {camp?.title ?? "Campaign"}
@@ -295,7 +279,6 @@ export default function ClipperPage() {
                         </p>
                       </div>
 
-                      {/* Right side: views, earnings, status */}
                       <div className="hidden shrink-0 items-center gap-4 text-right sm:flex">
                         <div>
                           <p className="font-mono text-[11px] font-medium">
@@ -314,7 +297,6 @@ export default function ClipperPage() {
                         <StatusPill status={k.status} />
                       </div>
 
-                      {/* Mobile: compact right */}
                       <div className="flex shrink-0 items-center gap-2 sm:hidden">
                         <span className="font-mono text-[11px] font-medium text-muted">
                           {k.verifiedViews
@@ -330,9 +312,9 @@ export default function ClipperPage() {
             )}
           </section>
 
-          {/* ── Performance ── */}
+          {/* ── E. Performance ── */}
           <section>
-            <h2 className="mb-4 text-base font-bold tracking-tight">
+            <h2 className="mb-3 text-base font-bold tracking-tight">
               Performance
             </h2>
             {myClips.length === 0 ? (
@@ -351,8 +333,8 @@ export default function ClipperPage() {
                   const pct = ((k.verifiedViews ?? 0) / maxViews) * 100;
                   const thumb = camp?.thumbnails?.[0];
                   return (
-                    <div key={k.id} className="flex items-center gap-3 py-3">
-                      <div className="h-8 w-12 shrink-0 overflow-hidden rounded bg-accent-soft">
+                    <div key={k.id} className="flex items-center gap-3 py-2.5">
+                      <div className="h-7 w-10 shrink-0 overflow-hidden rounded bg-accent-soft">
                         {thumb ? (
                           /* eslint-disable-next-line @next/next/no-img-element */
                           <img
@@ -363,7 +345,7 @@ export default function ClipperPage() {
                         ) : (
                           <div className="flex h-full w-full items-center justify-center">
                             <ImageIcon
-                              size={12}
+                              size={10}
                               className="text-muted/30"
                             />
                           </div>
@@ -371,16 +353,16 @@ export default function ClipperPage() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between">
-                          <span className="truncate text-[13px] font-medium">
+                          <span className="truncate text-[12px] font-medium text-muted">
                             {camp?.title ?? "Clip"}
                           </span>
-                          <span className="shrink-0 pl-2 font-mono text-[11px] font-medium text-muted">
+                          <span className="shrink-0 pl-2 font-mono text-[10px] font-medium text-muted">
                             {k.verifiedViews
                               ? fmtViews(k.verifiedViews)
                               : "0"}
                           </span>
                         </div>
-                        <div className="mt-1.5 h-[4px] w-full overflow-hidden rounded-full bg-accent-soft">
+                        <div className="mt-1 h-[3px] w-full overflow-hidden rounded-full bg-accent-soft">
                           <div
                             className={`h-full rounded-full transition-all duration-700 ease-out ${
                               k.status === "approved"
@@ -542,27 +524,6 @@ export default function ClipperPage() {
 }
 
 /* ─── Local helpers ─── */
-
-function MetricBlock({
-  value,
-  label,
-  hint,
-}: {
-  icon?: React.ReactNode;
-  value: string;
-  label: string;
-  hint?: string;
-}) {
-  return (
-    <div className="text-center">
-      <p className="text-xl font-bold tracking-tight">{value}</p>
-      <p className="mt-0.5 text-[11px] text-muted">{label}</p>
-      {hint && (
-        <p className="mt-0.5 text-[10px] text-muted">{hint}</p>
-      )}
-    </div>
-  );
-}
 
 function EmptyCampaigns({ onBrowse }: { onBrowse: () => void }) {
   return (
