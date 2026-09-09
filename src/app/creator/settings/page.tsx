@@ -48,11 +48,14 @@ export default function CreatorSettingsPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="mx-auto max-w-[1120px] space-y-14 px-5 py-10 sm:px-8">
+      {/* ── Header ──────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-          <p className="mt-1 text-sm text-muted">
+          <h1 className="text-[28px] font-bold tracking-tight sm:text-[32px]">
+            Settings
+          </h1>
+          <p className="mt-2 text-[15px] text-muted">
             Manage your profile, notifications, and account.
           </p>
         </div>
@@ -61,84 +64,126 @@ export default function CreatorSettingsPage() {
             signOut();
             router.push("/login");
           }}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-600"
+          className="inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-[10px] border border-border/60 bg-card px-4 text-[14px] font-medium text-muted transition-colors duration-150 hover:border-foreground/20 hover:text-foreground"
         >
           <LogOut size={14} /> Log out
         </button>
       </div>
 
-      {/* Profile */}
-      <section className="rounded-2xl border bg-card p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-widest text-muted">
-          Profile details
-        </h2>
-        <div className="mt-4 flex items-start gap-5">
-          <div className="shrink-0">
-            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-accent text-xl font-semibold text-white">
+      {/* ── Profile ─────────────────────────────────────── */}
+      <section>
+        <h2 className="mb-1.5 text-[18px] font-bold tracking-tight">Profile</h2>
+        <p className="mb-5 text-[14px] text-muted">
+          Update the information shown to people working with you.
+        </p>
+
+        <div className="rounded-[12px] border border-border/40 bg-card p-5 sm:p-6">
+          <div className="flex items-start gap-5">
+            {/* Avatar */}
+            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-accent text-[20px] font-semibold text-white">
               {(user?.name?.[0] ?? "C").toUpperCase()}
             </span>
+
+            {/* Fields */}
+            <div className="min-w-0 flex-1">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="block text-[14px]">
+                  <span className="mb-1.5 block text-muted">Display name</span>
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="h-11 w-full rounded-[10px] border border-border/60 bg-background px-3.5 text-[14px] outline-none transition-colors focus:border-foreground/30"
+                  />
+                </label>
+                <label className="block text-[14px]">
+                  <span className="mb-1.5 block text-muted">Email</span>
+                  <input
+                    value={user?.email ?? ""}
+                    readOnly
+                    className="h-11 w-full rounded-[10px] border border-border/60 bg-background px-3.5 text-[14px] text-muted outline-none"
+                  />
+                </label>
+              </div>
+              <label className="mt-4 block text-[14px]">
+                <span className="mb-1.5 block text-muted">Bio</span>
+                <textarea
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  placeholder="Tell clippers about your brand…"
+                  rows={3}
+                  className="w-full resize-none rounded-[10px] border border-border/60 bg-background px-3.5 py-2.5 text-[14px] outline-none transition-colors focus:border-foreground/30"
+                />
+              </label>
+            </div>
           </div>
-          <div className="grid flex-1 gap-4 sm:grid-cols-2">
-            <label className="block text-sm">
-              <span className="text-muted">Display name</span>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="text-muted">Email</span>
-              <input
-                value={user?.email ?? ""}
-                readOnly
-                className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm text-muted outline-none"
-              />
-            </label>
-            <label className="block sm:col-span-2 text-sm">
-              <span className="text-muted">Bio</span>
-              <textarea
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                placeholder="Tell clippers about your brand…"
-                rows={3}
-                className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground resize-none"
-              />
-            </label>
-          </div>
+        </div>
+
+        {/* Save — directly under Profile */}
+        <div className="mt-4">
+          <button
+            onClick={save}
+            className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[10px] bg-accent px-5 text-[14px] font-medium text-white transition-colors duration-150 hover:bg-foreground/90"
+          >
+            <Save size={14} /> {saved ? "Saved" : "Save changes"}
+          </button>
         </div>
       </section>
 
-      {/* Notifications */}
-      <section className="rounded-2xl border bg-card p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-widest text-muted">
+      {/* ── Notifications ───────────────────────────────── */}
+      <section>
+        <h2 className="mb-1.5 text-[18px] font-bold tracking-tight">
           Notifications
         </h2>
-        <p className="mt-1 text-sm text-muted">
-          Choose what updates you receive.
+        <p className="mb-5 text-[14px] text-muted">
+          Choose which updates you receive.
         </p>
-        <div className="mt-4 space-y-3">
+
+        <div className="divide-y divide-border/40 rounded-[12px] border border-border/40 bg-card">
           {[
-            { label: "Email notifications", desc: "Receive updates via email", val: emailNotifs, set: setEmailNotifs, icon: Bell },
-            { label: "Push notifications", desc: "Browser push alerts", val: pushNotifs, set: setPushNotifs, icon: Bell },
-            { label: "Campaign updates", desc: "New submissions on your campaigns", val: campaignAlerts, set: setCampaignAlerts, icon: Eye },
-            { label: "Submission alerts", desc: "When a clip is submitted or reviewed", val: submissionAlerts, set: setSubmissionAlerts, icon: Bell },
+            {
+              label: "Email notifications",
+              desc: "Receive updates via email",
+              val: emailNotifs,
+              set: setEmailNotifs,
+              icon: Bell,
+            },
+            {
+              label: "Push notifications",
+              desc: "Browser push alerts",
+              val: pushNotifs,
+              set: setPushNotifs,
+              icon: Bell,
+            },
+            {
+              label: "Campaign updates",
+              desc: "New submissions on your campaigns",
+              val: campaignAlerts,
+              set: setCampaignAlerts,
+              icon: Eye,
+            },
+            {
+              label: "Submission alerts",
+              desc: "When a clip is submitted or reviewed",
+              val: submissionAlerts,
+              set: setSubmissionAlerts,
+              icon: Bell,
+            },
           ].map((item) => (
             <div
               key={item.label}
-              className="flex items-center justify-between rounded-xl bg-background px-4 py-3"
+              className="flex items-center justify-between px-5 py-4"
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3.5">
                 <item.icon size={16} className="text-muted" />
                 <div>
-                  <p className="text-sm font-medium">{item.label}</p>
-                  <p className="text-xs text-muted">{item.desc}</p>
+                  <p className="text-[15px] font-medium">{item.label}</p>
+                  <p className="text-[13px] text-muted">{item.desc}</p>
                 </div>
               </div>
               <button
                 onClick={() => item.set(!item.val)}
                 aria-label={`Toggle ${item.label}`}
-                className="text-muted hover:text-foreground"
+                className="cursor-pointer text-muted transition-colors hover:text-foreground"
               >
                 {item.val ? (
                   <ToggleRight size={28} className="text-green" />
@@ -151,32 +196,39 @@ export default function CreatorSettingsPage() {
         </div>
       </section>
 
-      {/* Danger zone */}
-      <section className="rounded-2xl border border-amber-500/20 bg-card p-6">
-        <h2 className="text-sm font-semibold text-amber-600">Deactivate account</h2>
-        <p className="mt-1 text-sm text-muted">
-          Deactivating your account will anonymize your profile data and block future logins.
-          Your financial and audit records will be preserved for compliance purposes.
+      {/* ── Deactivate account ──────────────────────────── */}
+      <section>
+        <h2 className="mb-1.5 text-[18px] font-bold tracking-tight">
+          Deactivate account
+        </h2>
+        <p className="mb-5 text-[14px] text-muted">
+          Permanently deactivate your account and remove access.
         </p>
-        <button
-          onClick={async () => {
-            if (!confirm("Deactivate your account?\n\nThis will:\n- Anonymize your profile (name, email, etc.)\n- Block future logins\n- Preserve financial records for compliance\n\nThis action cannot be undone.")) return;
-            await deactivateOwnAccount();
-            await signOut();
-            router.push("/");
-          }}
-          className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-amber-500/30 px-4 py-2 text-sm font-medium text-amber-600 hover:bg-amber-500/5"
-        >
-          <Archive size={14} /> Deactivate account
-        </button>
-      </section>
 
-      <button
-        onClick={save}
-        className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-      >
-        <Save size={14} /> {saved ? "Saved" : "Save changes"}
-      </button>
+        <div className="rounded-[12px] border border-amber/30 bg-amber/5 p-5 sm:p-6">
+          <p className="text-[14px] leading-relaxed text-foreground/80">
+            Deactivating your account will anonymize your profile data and block
+            future logins. Your financial and audit records will be preserved for
+            compliance purposes.
+          </p>
+          <button
+            onClick={async () => {
+              if (
+                !confirm(
+                  "Deactivate your account?\n\nThis will:\n- Anonymize your profile (name, email, etc.)\n- Block future logins\n- Preserve financial records for compliance\n\nThis action cannot be undone.",
+                )
+              )
+                return;
+              await deactivateOwnAccount();
+              await signOut();
+              router.push("/");
+            }}
+            className="mt-4 inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[10px] border border-red/30 px-5 text-[14px] font-medium text-red transition-colors duration-150 hover:bg-red/5"
+          >
+            <Archive size={14} /> Deactivate account
+          </button>
+        </div>
+      </section>
     </div>
   );
 }
