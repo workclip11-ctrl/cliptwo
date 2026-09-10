@@ -34,6 +34,7 @@ interface AuthValue {
     name: string;
     role: Role;
   }) => Promise<void>;
+  signInWithGoogle: (desiredRole?: "clipper" | "creator") => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -90,7 +91,8 @@ async function enrichProfileFromDb(u: UserProfile): Promise<UserProfile> {
 // Backfill a public `profiles` row for any signed-in user.
 // SECURITY: Never trust u.role from client. New profiles always get "clipper".
 // Role promotion is exclusively via adminProfilePatch (admin-controlled).
-async function ensureProfile(u: UserProfile) {
+// For OAuth signups, initialRole is the user's selected role from metadata.
+async function ensureProfile(u: UserProfile, initialRole?: Role) {
   if (!isSupabaseConfigured) return;
   try {
     const { data } = await supabase
@@ -103,7 +105,7 @@ async function ensureProfile(u: UserProfile) {
         id: u.id,
         name: u.name,
         email: u.email,
-        role: "clipper",
+        role: initialRole ?? "clipper",
         status: "active",
       });
     }
@@ -263,6 +265,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (base) ensureProfile(base);
   };
 
+  const signInWithGoogle: AuthValue["signInWithGoogle"] = async (
+    desiredRole,
+  ) => {
+    setError(null);
+    if (!isSupabaseConfigured) {
+      const msg =
+        "Authentication requires Supabase. Please configure your environment.";
+      setError(msg);
+      throw new Error(msg);
+    }
+    const redirectUrl = `${window.location.origin}/auth/callback`;
+    if (desiredRole) {
+      window.sessionStorage.setItem("cliptwo_oauth_role", desiredRole);
+    }
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: redirectUrl,
+        queryParams: desiredRole ? { role: desiredRole } : undefined,
+      },
+    });
+    if (oauthError) {
+      const msg =
+        oauthError.message.includes("cancelled") ||
+        oauthError.message.includes("closed")
+          ? "Sign-in was cancelled."
+          : "Google sign-in failed. Please try again.";
+      setError(msg);
+      throw new Error(msg);
+    }
+  };
+
   const signOut: AuthValue["signOut"] = async () => {
     setError(null);
     if (isSupabaseConfigured) {
@@ -277,7 +311,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ isSignedIn, role, user, loading, error, signIn, signUp, signOut }}
+      value={{ isSignedIn, role, user, loading, error, signIn, signUp, signInWithGoogle, signOut }}
     >
       {children}
     </AuthContext.Provider>
