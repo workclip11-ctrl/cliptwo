@@ -41,6 +41,27 @@ export async function POST(request: Request) {
     );
   }
 
+  // Ownership check: verify the campaign belongs to this creator (defense-in-depth)
+  const { data: campaign, error: campaignError } = await supabase
+    .from("campaigns")
+    .select("created_by")
+    .eq("id", campaignId)
+    .single();
+
+  if (campaignError || !campaign) {
+    return NextResponse.json(
+      { error: "Campaign not found" },
+      { status: 404 },
+    );
+  }
+
+  if (campaign.created_by !== user.id) {
+    return NextResponse.json(
+      { error: "Access denied" },
+      { status: 403 },
+    );
+  }
+
   const { data, error } = await supabase.rpc(
     "submit_campaign_launch_payment",
     {

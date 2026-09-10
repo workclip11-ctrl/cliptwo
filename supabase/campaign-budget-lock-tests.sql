@@ -418,7 +418,7 @@ ROLLBACK;
 -- Expected: After rejection, budget is unlocked. After resubmission, locked again.
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 
 DO $$
 DECLARE
@@ -431,7 +431,7 @@ BEGIN
     budget, status, launch_payment_status
   ) VALUES (
     'Budget Lock Test 11', 'Test brief', 'YouTube', 0, 'Test Creator',
-    'REPLACE_WITH_CREATOR_UUID'::uuid,
+    'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid,
     400::numeric, 'draft', 'pending'
   ) RETURNING id INTO v_id;
 
@@ -442,14 +442,14 @@ BEGIN
   WHERE campaign_id = v_id;
 
   -- Switch to admin
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}', true);
+  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
 
   -- Admin rejects
   PERFORM public.reject_campaign_launch_payment(v_payment_id, 'Changing budget');
 
   -- Switch back to creator
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}', true);
+  PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
 
   -- After rejection: budget change ALLOWED

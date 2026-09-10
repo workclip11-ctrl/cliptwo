@@ -106,7 +106,7 @@ ROLLBACK;
 -- ===========================================================================
 -- TEST 4: Creator attempts direct UPDATE to set launch_payment_status='verified' → BLOCKED
 -- ===========================================================================
--- Expected: Either RLS blocks it or the trigger blocks the subsequent status change
+-- Expected: The new integrity trigger blocks non-admin from setting 'verified'
 BEGIN;
 SET LOCAL role = 'authenticated';
 SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
@@ -121,21 +121,23 @@ SELECT public.create_campaign(
 );
 
 -- Try to directly set launch_payment_status='verified'
-UPDATE public.campaigns
-SET launch_payment_status = 'verified'
-WHERE title = 'Test Campaign 4'
-  AND created_by = 'REPLACE_WITH_CREATOR_UUID'::uuid;
+BEGIN
+  UPDATE public.campaigns
+  SET launch_payment_status = 'verified'
+  WHERE title = 'Test Campaign 4'
+    AND created_by = 'REPLACE_WITH_CREATOR_UUID'::uuid;
+  ASSERT false, 'Should have raised exception';
+EXCEPTION WHEN OTHERS THEN
+  ASSERT SQLERRM LIKE '%Only admin can verify%',
+    'Wrong error: ' || SQLERRM;
+END;
 
--- This UPDATE itself may succeed (RLS allows owner updates),
--- but the important thing is that status remains 'draft'
--- and the trigger would block setting status='open' separately.
-
--- Verify status is still draft
+-- Verify status is still draft and payment status is still pending
 SELECT status, launch_payment_status
 FROM public.campaigns
 WHERE title = 'Test Campaign 4';
 
--- Expected: status='draft' (status was not changed by this UPDATE)
+-- Expected: status='draft', launch_payment_status='pending' (unchanged)
 ROLLBACK;
 
 -- ===========================================================================
@@ -177,15 +179,11 @@ ROLLBACK;
 -- TEST 6: Admin verifies payment → campaign becomes open
 -- ===========================================================================
 -- Expected: After verify_campaign_launch_payment, status='open'
--- NOTE: This test requires a payment record to exist. In practice,
--- the creator would call submit_campaign_launch_payment first.
--- For testing, we simulate by creating the payment record manually as admin.
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}';
-
--- Create a campaign as creator first
 SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
+
+-- Create a campaign as creator
 SELECT public.create_campaign(
   'Test Campaign 6',
   'Test brief',
@@ -194,7 +192,7 @@ SELECT public.create_campaign(
   'Test Creator'
 );
 
--- Get campaign ID
+-- Get campaign ID and submit payment as creator
 DO $$
 DECLARE
   v_campaign_id uuid;
@@ -205,26 +203,17 @@ BEGIN
   WHERE title = 'Test Campaign 6'
     AND created_by = 'REPLACE_WITH_CREATOR_UUID'::uuid;
 
-  -- Simulate: creator submits payment (as admin for test convenience)
-  -- In production, this would go through submit_campaign_launch_payment
-  INSERT INTO public.campaign_launch_payments (
-    campaign_id, creator_id, campaign_budget_rupees,
-    platform_fee_paise, total_payable_paise, payment_status
-  ) VALUES (
-    v_campaign_id,
-    'REPLACE_WITH_CREATOR_UUID'::uuid,
-    50,
-    500,
-    5500,
-    'submitted'
-  ) RETURNING id INTO v_payment_id;
+  -- Creator submits payment via RPC
+  PERFORM public.submit_campaign_launch_payment(v_campaign_id, 'UTR-TEST-6');
 
-  -- Update campaign to reflect submitted status
-  UPDATE public.campaigns
-  SET launch_payment_status = 'submitted'
-  WHERE id = v_campaign_id;
+  -- Get payment ID
+  SELECT id INTO v_payment_id
+  FROM public.campaign_launch_payments
+  WHERE campaign_id = v_campaign_id;
 
-  -- Admin verifies payment
+  -- Switch to admin and verify
+  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}', true);
+  PERFORM set_config('role', 'authenticated', true);
   PERFORM public.verify_campaign_launch_payment(v_payment_id);
 END $$;
 
@@ -317,10 +306,9 @@ ROLLBACK;
 -- Expected: Admin campaign_action still works for non-publish transitions
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
 
 -- Create a campaign as creator
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
 SELECT public.create_campaign(
   'Test Campaign 9',
   'Test brief',
@@ -329,20 +317,32 @@ SELECT public.create_campaign(
   'Test Creator'
 );
 
--- Get campaign ID and simulate verified payment
+-- Get campaign ID and submit payment as creator
 DO $$
 DECLARE
   v_campaign_id uuid;
+  v_payment_id uuid;
 BEGIN
   SELECT id INTO v_campaign_id
   FROM public.campaigns
   WHERE title = 'Test Campaign 9'
     AND created_by = 'REPLACE_WITH_CREATOR_UUID'::uuid;
 
-  -- Simulate verified payment
-  UPDATE public.campaigns
-  SET launch_payment_status = 'verified'
-  WHERE id = v_campaign_id;
+  -- Creator submits payment
+  PERFORM public.submit_campaign_launch_payment(v_campaign_id, 'UTR-TEST-9');
+
+  SELECT id INTO v_payment_id
+  FROM public.campaign_launch_payments
+  WHERE campaign_id = v_campaign_id;
+
+  -- Switch to admin and verify payment
+  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}', true);
+  PERFORM set_config('role', 'authenticated', true);
+  PERFORM public.verify_campaign_launch_payment(v_payment_id);
+
+  -- Switch back to creator for lifecycle actions
+  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}', true);
+  PERFORM set_config('role', 'authenticated', true);
 
   -- Creator publishes (now allowed since payment is verified)
   PERFORM public.campaign_action(v_campaign_id, 'publish');

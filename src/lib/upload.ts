@@ -50,9 +50,14 @@ export async function uploadCampaignFile(
   }
 
   const safeName = sanitizeFilename(file.name);
-  // Path must match: {user_id}/{campaign_id}/{filename}
+  // Path convention:
+  //   Public (thumbnails): {user_id}/{campaign_id}/{filename}
+  //   Private (source/brand): {user_id}/{campaign_id}/private/{filename}
   // The storage policy checks (storage.foldername(name))[1] = auth.uid()::text
-  const filePath = `${user.id}/${campaignId}/${safeName}`;
+  const isPrivate = category === "source" || category === "brand";
+  const filePath = isPrivate
+    ? `${user.id}/${campaignId}/private/${safeName}`
+    : `${user.id}/${campaignId}/${safeName}`;
 
   const { error } = await supabase.storage
     .from(BUCKET)

@@ -352,8 +352,9 @@ SELECT 'TEST 10 PASSED' AS result;
 ROLLBACK;
 
 -- ===========================================================================
--- TEST 11: Creator can directly set launch_payment_status (demonstrates need for RPC workflow)
+-- TEST 11: Creator cannot directly set launch_payment_status (trigger blocks)
 -- ===========================================================================
+-- With the integrity trigger, only admin can set launch_payment_status='verified'
 BEGIN;
 SET LOCAL role = 'authenticated';
 SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
@@ -371,10 +372,13 @@ BEGIN
     0, 'draft', 'pending'
   ) RETURNING id INTO v_id;
 
-  UPDATE public.campaigns SET launch_payment_status = 'verified' WHERE id = v_id;
-
-  ASSERT (SELECT launch_payment_status FROM public.campaigns WHERE id = v_id) = 'verified',
-    'Direct UPDATE bypasses payment workflow';
+  BEGIN
+    UPDATE public.campaigns SET launch_payment_status = 'verified' WHERE id = v_id;
+    ASSERT false, 'Should have raised exception';
+  EXCEPTION WHEN OTHERS THEN
+    ASSERT SQLERRM LIKE '%Only admin can verify%',
+      'Wrong error: ' || SQLERRM;
+  END;
 
   DELETE FROM public.campaigns WHERE id = v_id;
 END $$;
