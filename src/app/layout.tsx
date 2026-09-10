@@ -19,6 +19,9 @@ export const metadata: Metadata = {
   title: "cliptwo — clip long videos into shorts",
   description:
     "A two-sided marketplace connecting creators with clippers who turn long videos into shorts.",
+  icons: {
+    icon: "/cliptwo-logo.png",
+  },
 };
 
 export default function RootLayout(props: LayoutProps<"/">) {

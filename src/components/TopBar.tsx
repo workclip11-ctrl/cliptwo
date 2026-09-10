@@ -142,9 +142,7 @@ export function TopBar() {
           href={logoHref}
           className="flex items-center gap-2 font-semibold tracking-tight"
         >
-          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-accent text-xs text-white">
-            C
-          </span>
+          <img src="/cliptwo-logo.png" alt="ClipTwo" className="h-6 w-6 rounded-md object-contain" />
           cliptwo
         </Link>
 

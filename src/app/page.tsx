@@ -453,9 +453,7 @@ export default function Home() {
       <header className="sticky top-0 z-40 border-b border-border/40 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-[1120px] items-center justify-between px-6 py-4">
           <Link href="/" className="flex items-center gap-2.5 font-bold tracking-tight cursor-pointer">
-            <span className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-foreground text-[13px] text-background">
-              <Scissors size={14} />
-            </span>
+            <img src="/cliptwo-logo.png" alt="ClipTwo" className="h-8 w-8 rounded-[8px] object-contain" />
             <span className="text-[17px]">cliptwo</span>
           </Link>
           <nav className="hidden items-center gap-7 text-[14px] text-muted md:flex">
@@ -700,9 +698,7 @@ export default function Home() {
           <div className="grid gap-12 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
             <div>
               <div className="flex items-center gap-2.5 font-bold tracking-tight">
-                <span className="flex h-8 w-8 items-center justify-center rounded-[8px] bg-foreground text-[14px] text-background">
-                  <Scissors size={15} />
-                </span>
+                <img src="/cliptwo-logo.png" alt="ClipTwo" className="h-8 w-8 rounded-[8px] object-contain" />
                 <span className="text-[17px]">cliptwo</span>
               </div>
               <p className="mt-4 max-w-xs text-[14px] leading-relaxed text-muted">

@@ -3,7 +3,7 @@
 import { Suspense, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Scissors, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
 
@@ -88,9 +88,7 @@ function AuthForm() {
           href="/"
           className="mb-8 flex items-center justify-center gap-2 font-semibold tracking-tight"
         >
-          <span className="flex h-7 w-7 items-center justify-center rounded-md bg-accent text-white">
-            <Scissors size={15} />
-          </span>
+          <img src="/cliptwo-logo.png" alt="ClipTwo" className="h-7 w-7 rounded-md object-contain" />
           cliptwo
         </Link>
 
