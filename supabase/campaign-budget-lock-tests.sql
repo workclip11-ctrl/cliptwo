@@ -20,6 +20,20 @@
 -- \set admin_uuid   '00000000-0000-0000-0000-000000000002'
 
 -- ===========================================================================
+-- CLEANUP: Remove old overloaded create_campaign with p_status parameter
+-- ===========================================================================
+-- The admin-schema.sql created a version with 'p_status text default open'.
+-- The campaign-state-machine-phase1.sql replaced it without p_status.
+-- Both coexist as separate overloads, causing ambiguity.
+-- Run this ONCE before the tests to clean up:
+DROP FUNCTION IF EXISTS public.create_campaign(
+  text, text, text, numeric, text, uuid, text, numeric, integer,
+  text, text, text, jsonb, text, date, date, numeric, text, text,
+  text, text, text, text, jsonb, jsonb, jsonb, jsonb, jsonb, jsonb,
+  jsonb, jsonb, numeric, text, text, text, jsonb, text
+);
+
+-- ===========================================================================
 -- TEST 1: Budget can be changed before payment workflow begins
 -- ===========================================================================
 -- Expected: Creator adjusts budget from ₹400 to ₹500 — SUCCEEDS
