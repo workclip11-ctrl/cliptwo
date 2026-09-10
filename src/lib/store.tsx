@@ -1500,21 +1500,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       clearError: () => {
         setState((s) => ({ ...s, lastError: undefined }));
       },
-      addCampaign: async (c, status = "open", campaignId) => {
+      addCampaign: async (c, _status = "open", campaignId) => {
         // SECURITY: Every campaign must have a creator (created_by).
         // The caller must provide created_by. If missing, the campaign is
         // rejected in production (Supabase enforces NOT NULL via RPC).
         // If campaignId is provided, use it (allows pre-specifying for storage path consistency).
         const campaignIdValue = campaignId ?? `c${Date.now()}`;
-        // If publishing (status=open), RPC will set status to draft and launch_payment_status to pending
-        const effectiveStatus = status === "open" ? "draft" : status;
+        // SECURITY: Status is always forced to 'draft' by the RPC.
+        // The campaign becomes 'open' only after Admin verifies launch payment.
         const optimistic: Campaign = {
           ...c,
           id: campaignIdValue,
           createdAt: Date.now(),
-          status: effectiveStatus,
+          status: "draft",
           created_by: c.created_by,
-          launchPaymentStatus: status === "open" ? "pending" : "pending",
+          launchPaymentStatus: "pending",
         };
         setState((s) => ({ ...s, campaigns: [optimistic, ...s.campaigns] }));
 
@@ -1558,7 +1558,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           p_what_to_make: c.whatToMake ?? null,
           p_style: c.style ?? null,
           p_rights: c.rights ?? null,
-          p_status: status,
         });
         if (error) {
           // Remove optimistic campaign from state on failure
