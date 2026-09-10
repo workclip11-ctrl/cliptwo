@@ -16,14 +16,13 @@ import {
   Eye,
   TrendingUp,
   AlertTriangle,
-  Zap,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { CampaignCard } from "@/components/CampaignCard";
 import { CampaignModal } from "@/components/CampaignModal";
 import { rup } from "@/lib/format";
-import { financeOf } from "@/lib/finance";
+
 import type { Campaign } from "@/lib/types";
 
 const NICHES = ["Podcast", "Gaming", "Finance", "Comedy", "Fitness", "Tech"];
@@ -428,7 +427,7 @@ function FAQ() {
 
 export default function Home() {
   const router = useRouter();
-  const { campaigns, clips, siteSettings, financeRecords } = useStore();
+  const { campaigns, siteSettings } = useStore();
   const [active, setActive] = useState<Campaign | null>(null);
 
   const heroTitle =
@@ -436,15 +435,6 @@ export default function Home() {
   const heroSubtitle =
     siteSettings.heroSubtitle ||
     "cliptwo connects creators who have long-form content with clippers who cut it into clips — paid per verified view, settled straight to UPI.";
-
-  const stats = useMemo(() => {
-    const openCampaigns = campaigns.filter((c) => c.status === "open" || c.status === "near_budget").length;
-    const totalViews = clips.reduce((s, k) => s + (k.verifiedViews ?? 0), 0);
-    const clippers = new Set(clips.map((k) => k.clipper)).size;
-    const fin = financeOf(financeRecords);
-    const paidOut = fin.paid;
-    return { openCampaigns, totalViews, clippers, paidOut };
-  }, [clips, campaigns, financeRecords]);
 
   const featuredIds = siteSettings.featuredIds;
   const featured = useMemo(() => {
@@ -510,155 +500,68 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Phone mockup — real ClipTwo product screen */}
+        {/* Phone mockup — Reel playing inside phone */}
         <div className="relative mx-auto w-full max-w-md lg:max-w-lg">
-          <div className="group relative mx-auto w-[280px] sm:w-[300px] transition-transform duration-300 ease-out hover:-translate-y-1">
+          <div className="group relative mx-auto w-[260px] sm:w-[280px]">
             {/* Phone body */}
-            <div className="relative overflow-hidden rounded-[2.5rem] border border-border/30 bg-card shadow-2xl shadow-black/8 transition-shadow duration-300 group-hover:shadow-2xl group-hover:shadow-black/12">
+            <div className="relative overflow-hidden rounded-[2.5rem] border border-border/30 bg-black shadow-2xl shadow-black/10">
               {/* Notch */}
-              <div className="absolute left-1/2 top-0 z-10 h-6 w-28 -translate-x-1/2 rounded-b-2xl bg-card" />
+              <div className="absolute left-1/2 top-0 z-20 h-6 w-28 -translate-x-1/2 rounded-b-2xl bg-black" />
 
-              {/* Screen */}
-              <div className="relative aspect-[9/19] overflow-hidden bg-background">
-                {/* Status bar */}
-                <div className="flex items-center justify-between px-6 pt-8 pb-2">
-                  <span className="text-[10px] font-medium text-muted">9:41</span>
-                  <div className="flex gap-1">
-                    <div className="h-1 w-1 rounded-full bg-muted" />
-                    <div className="h-1 w-1 rounded-full bg-muted" />
-                    <div className="h-1 w-1 rounded-full bg-muted" />
+              {/* Screen — 9:16 Reel */}
+              <div className="relative aspect-[9/19] overflow-hidden bg-gradient-to-b from-slate-900 to-slate-800">
+                {/* Reel image — fills entire screen */}
+                <img
+                  src="/hero-reel.jpg"
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = featured[0]?.thumbnails?.[0] ?? "";
+                    (e.target as HTMLImageElement).onerror = null;
+                  }}
+                />
+
+                {/* Subtle gradient overlay for depth */}
+                <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/40" />
+
+                {/* Tiny progress bar near bottom */}
+                <div className="absolute inset-x-3 bottom-16 z-10">
+                  <div className="h-[2px] w-full overflow-hidden rounded-full bg-white/20">
+                    <div className="h-full w-[35%] rounded-full bg-white/80" />
                   </div>
                 </div>
 
-                {/* App header */}
-                <div className="px-4 pt-2 pb-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[13px] font-bold tracking-tight">cliptwo</span>
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent-soft text-[10px] font-bold">R</span>
-                  </div>
-                  <p className="mt-2 text-[10px] text-muted">Discover</p>
-                </div>
-
-                {/* Campaign thumbnail — dominant visual */}
-                <div className="mx-3 overflow-hidden rounded-[12px]">
-                  <div className="relative aspect-[16/10] bg-gradient-to-br from-slate-800 via-slate-700 to-slate-600 transition-transform duration-300 ease-out group-hover:scale-[1.02]">
-                    {/* Real thumbnail if available */}
-                    {featured[0]?.thumbnails?.[0] ? (
-                      <img src={featured[0].thumbnails[0]} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="flex h-full items-center justify-center">
-                        <Scissors size={28} className="text-white/20" />
-                      </div>
-                    )}
-                    {/* Play button overlay */}
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-lg">
-                        <svg className="ml-0.5 h-4 w-4 text-foreground" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M8 5v14l11-7z" />
-                        </svg>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Campaign info */}
-                <div className="px-4 pt-3">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-green/15 px-2 py-0.5 text-[9px] font-semibold text-green">
-                      <Zap size={7} /> Live
-                    </span>
-                    <span className="font-mono text-[10px] text-muted">
-                      CPM {rup(featured[0]?.payout ?? 220)}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-[12px] font-semibold leading-tight">
-                    {featured[0]?.title || "Podcast clips — Ep. 143"}
-                  </p>
-                  <p className="mt-0.5 text-[10px] text-muted">
-                    {featured[0]?.creator || "Rohan Malhotra"}
-                  </p>
-                </div>
-
-                {/* Platform + remaining budget or days left */}
-                <div className="px-4 pt-3">
-                  <div className="flex items-center justify-between text-[10px]">
-                    <span className="flex items-center gap-1 text-muted">
-                      <PlatformIcon p={featured[0]?.platform ?? "Instagram"} size={10} />
-                      {featured[0]?.platform ?? "Instagram"}
-                      {featured[0]?.niche ? ` · ${featured[0].niche}` : ""}
-                    </span>
-                    {featured[0]?.remainingBudget != null ? (
-                      <span className="font-mono text-muted">{rup(featured[0].remainingBudget!)} left</span>
-                    ) : featured[0]?.daysLeft != null ? (
-                      <span className="font-mono text-muted">{featured[0].daysLeft}d left</span>
-                    ) : null}
-                  </div>
-                  {featured[0]?.budget != null && featured[0]?.spent != null && (
-                    <div className="mt-1.5">
-                      <div className="h-1 w-full overflow-hidden rounded-full bg-muted/20">
-                        <div
-                          className="h-full rounded-full bg-foreground transition-all duration-500"
-                          style={{ width: `${Math.min(100, ((featured[0].spent ?? 0) / (featured[0].budget ?? 1)) * 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Action button */}
-                <div className="px-4 pt-4">
-                  <button className="flex h-9 w-full items-center justify-center rounded-[8px] bg-foreground text-[11px] font-semibold text-background transition-opacity duration-200 hover:opacity-90">
-                    Start clipping
-                  </button>
-                </div>
-
-                {/* Bottom nav hint */}
-                <div className="absolute inset-x-0 bottom-0 border-t border-border/30 bg-card px-6 py-3">
-                  <div className="flex items-center justify-between text-[9px] text-muted">
-                    <span className="flex flex-col items-center gap-0.5 font-medium text-foreground">
-                      <Zap size={12} /> Discover
-                    </span>
-                    <span className="flex flex-col items-center gap-0.5">
-                      <Film size={12} /> My clips
-                    </span>
-                    <span className="flex flex-col items-center gap-0.5">
-                      <IndianRupee size={12} /> Wallet
-                    </span>
+                {/* Play/pause indicator — subtle */}
+                <div className="absolute inset-0 z-10 flex items-center justify-center opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm">
+                    <svg className="ml-1 h-6 w-6 text-white" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Floating card — earned */}
-            <div className="absolute -left-12 top-16 w-32 rotate-[-4deg] rounded-[10px] border border-border/30 bg-card p-3 shadow-lg shadow-black/5 transition-all duration-300 group-hover:shadow-xl sm:-left-16 sm:w-36">
+            {/* Floating card — Views */}
+            <div className="absolute -right-10 top-20 z-30 w-[120px] rounded-[12px] border border-border/20 bg-white p-3 shadow-lg shadow-black/8 sm:-right-14 sm:w-[130px]">
               <div className="flex items-center gap-1.5">
-                <span className="flex h-5 w-5 items-center justify-center rounded-[6px] bg-amber/10">
-                  <IndianRupee size={10} className="text-amber" />
-                </span>
-                <span className="text-[10px] font-medium text-muted">Earned</span>
-              </div>
-              <p className="mt-1.5 font-mono text-[14px] font-bold">{rup(stats.paidOut / 100 || 12400)}</p>
-            </div>
-
-            {/* Floating card — views */}
-            <div className="absolute -right-12 top-32 w-32 rotate-[4deg] rounded-[10px] border border-border/30 bg-card p-3 shadow-lg shadow-black/5 transition-all duration-300 group-hover:shadow-xl sm:-right-16 sm:w-36">
-              <div className="flex items-center gap-1.5">
-                <span className="flex h-5 w-5 items-center justify-center rounded-[6px] bg-green/10">
-                  <TrendingUp size={10} className="text-green" />
+                <span className="flex h-5 w-5 items-center justify-center rounded-[6px] bg-foreground/5">
+                  <Eye size={11} className="text-foreground/60" />
                 </span>
                 <span className="text-[10px] font-medium text-muted">Views</span>
               </div>
-              <p className="mt-1.5 font-mono text-[14px] font-bold">
-                {stats.totalViews >= 1000 ? (stats.totalViews / 1000).toFixed(1) + "K" : "1.8K"}
-              </p>
+              <p className="mt-1.5 font-mono text-[18px] font-bold tracking-tight">24.8K</p>
             </div>
 
-            {/* Verified badge */}
-            <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-border/30 bg-card px-4 py-1.5 shadow-md transition-all duration-300 group-hover:shadow-lg">
+            {/* Floating card — Earned */}
+            <div className="absolute -left-10 bottom-28 z-30 w-[120px] rounded-[12px] border border-border/20 bg-white p-3 shadow-lg shadow-black/8 sm:-left-14 sm:w-[130px]">
               <div className="flex items-center gap-1.5">
-                <BadgeCheck size={13} className="text-green" />
-                <span className="text-[11px] font-medium">Verified &amp; Paid</span>
+                <span className="flex h-5 w-5 items-center justify-center rounded-[6px] bg-foreground/5">
+                  <IndianRupee size={11} className="text-foreground/60" />
+                </span>
+                <span className="text-[10px] font-medium text-muted">Earned</span>
               </div>
+              <p className="mt-1.5 font-mono text-[18px] font-bold tracking-tight">₹4,960</p>
             </div>
           </div>
         </div>
