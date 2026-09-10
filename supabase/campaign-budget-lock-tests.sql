@@ -352,6 +352,7 @@ BEGIN
 END $$;
 
 -- Try direct SQL UPDATE (bypassing RPCs) — should be BLOCKED by trigger
+DO $$
 BEGIN
   UPDATE public.campaigns SET budget = 9999
   WHERE title = 'Budget Lock Test 10';
@@ -359,7 +360,7 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
   ASSERT SQLERRM LIKE '%Cannot change campaign budget%',
     'Wrong error: ' || SQLERRM;
-END;
+END $$;
 
 SELECT 'TEST 10 PASSED' AS result;
 ROLLBACK;
