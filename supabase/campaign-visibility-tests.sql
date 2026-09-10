@@ -18,10 +18,10 @@
 -- Admin is simulated via JWT claims only (is_admin() checks auth.uid()).
 -- ===========================================================================
 
--- Replace with real UUIDs from Supabase Dashboard > Auth > Users:
--- \set creator_uuid '00000000-0000-0000-0000-000000000001'
--- \set clipper_uuid '00000000-0000-0000-0000-000000000002'
--- \set admin_uuid   '00000000-0000-0000-0000-000000000003'
+-- UUIDs:
+-- Creator: e92427b0-254e-44cc-b2df-be83792c8a94
+-- Clipper: fe542ad2-8b40-40ea-8aba-ad8dc63140ce
+-- Admin:   f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd
 
 -- Helper: insert campaign bypassing RLS (SECURITY DEFINER runs as owner)
 CREATE OR REPLACE FUNCTION public._test_insert_campaign(
@@ -54,7 +54,7 @@ $$;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 
 DO $$
 DECLARE
@@ -62,7 +62,7 @@ DECLARE
 BEGIN
   v_id := public._test_insert_campaign(
     'Visibility Test 1',
-    'REPLACE_WITH_CREATOR_UUID'::uuid
+    'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid
   );
 
   ASSERT (SELECT count(*) FROM public.campaigns WHERE id = v_id) = 1,
@@ -79,7 +79,7 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 
 DO $$
 DECLARE
@@ -105,7 +105,7 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 
 DO $$
 DECLARE
@@ -133,7 +133,7 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CLIPPER_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "fe542ad2-8b40-40ea-8aba-ad8dc63140ce", "role": "authenticated"}';
 
 DO $$
 DECLARE
@@ -141,7 +141,7 @@ DECLARE
 BEGIN
   v_id := public._test_insert_campaign(
     'Visibility Test 4',
-    'REPLACE_WITH_CREATOR_UUID'::uuid,
+    'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid,
     'draft', 'pending'
   );
 
@@ -159,7 +159,7 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CLIPPER_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "fe542ad2-8b40-40ea-8aba-ad8dc63140ce", "role": "authenticated"}';
 
 DO $$
 DECLARE
@@ -167,7 +167,7 @@ DECLARE
 BEGIN
   v_id := public._test_insert_campaign(
     'Visibility Test 5',
-    'REPLACE_WITH_CREATOR_UUID'::uuid,
+    'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid,
     'draft', 'submitted'
   );
 
@@ -185,7 +185,7 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CLIPPER_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "fe542ad2-8b40-40ea-8aba-ad8dc63140ce", "role": "authenticated"}';
 
 DO $$
 DECLARE
@@ -193,7 +193,7 @@ DECLARE
 BEGIN
   v_id := public._test_insert_campaign(
     'Visibility Test 6',
-    'REPLACE_WITH_CREATOR_UUID'::uuid,
+    'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid,
     'draft', 'rejected'
   );
 
@@ -211,7 +211,7 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CLIPPER_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "fe542ad2-8b40-40ea-8aba-ad8dc63140ce", "role": "authenticated"}';
 
 DO $$
 DECLARE
@@ -219,7 +219,7 @@ DECLARE
 BEGIN
   v_id := public._test_insert_campaign(
     'Visibility Test 7',
-    'REPLACE_WITH_CREATOR_UUID'::uuid,
+    'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid,
     'open', 'verified'
   );
 
@@ -237,7 +237,7 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CLIPPER_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "fe542ad2-8b40-40ea-8aba-ad8dc63140ce", "role": "authenticated"}';
 
 DO $$
 DECLARE
@@ -245,7 +245,7 @@ DECLARE
 BEGIN
   v_id := public._test_insert_campaign(
     'Visibility Test 8',
-    'REPLACE_WITH_CREATOR_UUID'::uuid,
+    'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid,
     'closed', 'verified'
   );
 
@@ -263,7 +263,7 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CLIPPER_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "fe542ad2-8b40-40ea-8aba-ad8dc63140ce", "role": "authenticated"}';
 
 DO $$
 DECLARE
@@ -271,7 +271,7 @@ DECLARE
 BEGIN
   v_id := public._test_insert_campaign(
     'Visibility Test 9',
-    'REPLACE_WITH_CREATOR_UUID'::uuid,
+    'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid,
     'paused', 'verified'
   );
 
@@ -289,7 +289,7 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CLIPPER_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "fe542ad2-8b40-40ea-8aba-ad8dc63140ce", "role": "authenticated"}';
 
 DO $$
 DECLARE
@@ -297,7 +297,7 @@ DECLARE
 BEGIN
   v_id := public._test_insert_campaign(
     'Visibility Test 10',
-    'REPLACE_WITH_CREATOR_UUID'::uuid,
+    'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid,
     'budget_reached', 'verified'
   );
 
@@ -315,7 +315,7 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CLIPPER_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "fe542ad2-8b40-40ea-8aba-ad8dc63140ce", "role": "authenticated"}';
 
 DO $$
 DECLARE
@@ -324,7 +324,7 @@ DECLARE
 BEGIN
   v_id := public._test_insert_campaign(
     'Visibility Test 11',
-    'REPLACE_WITH_CREATOR_UUID'::uuid,
+    'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid,
     'draft', 'pending'
   );
 
@@ -343,7 +343,7 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 
 DO $$
 DECLARE
@@ -351,7 +351,7 @@ DECLARE
 BEGIN
   v_id := public._test_insert_campaign(
     'Visibility Test 12',
-    'REPLACE_WITH_CREATOR_UUID'::uuid
+    'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid
   );
 
   UPDATE public.campaigns SET launch_payment_status = 'verified' WHERE id = v_id;
@@ -370,7 +370,7 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 
 DO $$
 DECLARE
@@ -378,7 +378,7 @@ DECLARE
 BEGIN
   v_id := public._test_insert_campaign(
     'Visibility Test 13',
-    'REPLACE_WITH_CREATOR_UUID'::uuid
+    'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid
   );
 
   BEGIN
@@ -400,7 +400,7 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}';
 
 DO $$
 DECLARE
@@ -412,7 +412,7 @@ BEGIN
   )
   SELECT
     'Admin Test ' || s, 'Brief', 'YouTube', 0, 'Creator',
-    'REPLACE_WITH_CREATOR_UUID'::uuid,
+    'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid,
     0, s, 'verified'
   FROM unnest(ARRAY['draft','open','closed','paused','archived','budget_reached','near_budget']) AS s;
 
@@ -438,7 +438,7 @@ DECLARE
 BEGIN
   v_id := public._test_insert_campaign(
     'Visibility Test 15',
-    'REPLACE_WITH_CREATOR_UUID'::uuid,
+    'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid,
     'open', 'verified'
   );
 
@@ -446,7 +446,7 @@ BEGIN
     'Anonymous should NOT see campaign rows';
 
   -- Cleanup (switch to authenticated to delete)
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}', true);
+  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
   DELETE FROM public.campaigns WHERE id = v_id;
 END $$;
@@ -459,7 +459,7 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 
 DO $$
 DECLARE
