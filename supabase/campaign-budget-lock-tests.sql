@@ -54,13 +54,13 @@ $$;
 -- Expected: Creator adjusts budget from 400 to 500 — SUCCEEDS
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  v_id := public._test_create_campaign('Budget Lock Test 1', 400, 'REPLACE_WITH_CREATOR_UUID'::uuid);
+  v_id := public._test_create_campaign('Budget Lock Test 1', 400::numeric, 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid);
 
   PERFORM public.adjust_campaign_budget(v_id, 500, 'Pre-payment adjustment');
 
@@ -77,13 +77,13 @@ ROLLBACK;
 -- Expected: ERROR "Cannot change campaign budget: launch payment is submitted"
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  v_id := public._test_create_campaign('Budget Lock Test 2', 400, 'REPLACE_WITH_CREATOR_UUID'::uuid);
+  v_id := public._test_create_campaign('Budget Lock Test 2', 400::numeric, 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid);
 
   -- Creator submits payment
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-002');
@@ -107,14 +107,14 @@ ROLLBACK;
 -- Expected: ERROR "Cannot change campaign budget: launch payment is verified"
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
   v_payment_id uuid;
 BEGIN
-  v_id := public._test_create_campaign('Budget Lock Test 3', 400, 'REPLACE_WITH_CREATOR_UUID'::uuid);
+  v_id := public._test_create_campaign('Budget Lock Test 3', 400::numeric, 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid);
 
   -- Creator submits payment
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-003');
@@ -123,14 +123,14 @@ BEGIN
   WHERE campaign_id = v_id;
 
   -- Switch to admin for verification
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}', true);
+  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
 
   -- Admin verifies payment
   PERFORM public.verify_campaign_launch_payment(v_payment_id);
 
   -- Switch back to creator
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}', true);
+  PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
 
   -- Creator attempts budget change — should be BLOCKED
@@ -152,13 +152,13 @@ ROLLBACK;
 -- Expected: ERROR "Cannot change campaign budget: launch payment is submitted"
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  v_id := public._test_create_campaign('Budget Lock Test 4', 400, 'REPLACE_WITH_CREATOR_UUID'::uuid);
+  v_id := public._test_create_campaign('Budget Lock Test 4', 400::numeric, 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid);
 
   -- Creator submits payment
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-004');
@@ -182,14 +182,14 @@ ROLLBACK;
 -- Expected: ERROR "Cannot change campaign budget: launch payment is verified"
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
   v_payment_id uuid;
 BEGIN
-  v_id := public._test_create_campaign('Budget Lock Test 5', 400, 'REPLACE_WITH_CREATOR_UUID'::uuid);
+  v_id := public._test_create_campaign('Budget Lock Test 5', 400::numeric, 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid);
 
   -- Creator submits payment
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-005');
@@ -198,7 +198,7 @@ BEGIN
   WHERE campaign_id = v_id;
 
   -- Switch to admin
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}', true);
+  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
 
   -- Admin verifies payment
@@ -223,14 +223,14 @@ ROLLBACK;
 -- Expected: Budget adjustment SUCCEEDS after payment rejection
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
   v_payment_id uuid;
 BEGIN
-  v_id := public._test_create_campaign('Budget Lock Test 6', 400, 'REPLACE_WITH_CREATOR_UUID'::uuid);
+  v_id := public._test_create_campaign('Budget Lock Test 6', 400::numeric, 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid);
 
   -- Creator submits payment
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-006');
@@ -239,14 +239,14 @@ BEGIN
   WHERE campaign_id = v_id;
 
   -- Switch to admin
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}', true);
+  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
 
   -- Admin rejects payment
   PERFORM public.reject_campaign_launch_payment(v_payment_id, 'Need to change budget');
 
   -- Switch back to creator
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}', true);
+  PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
 
   -- Creator adjusts budget — should SUCCEED
@@ -265,14 +265,14 @@ ROLLBACK;
 -- Expected: campaign_budget_rupees = 400 (budget at time of submission)
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
   v_payment_id uuid;
 BEGIN
-  v_id := public._test_create_campaign('Budget Lock Test 7', 400, 'REPLACE_WITH_CREATOR_UUID'::uuid);
+  v_id := public._test_create_campaign('Budget Lock Test 7', 400::numeric, 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid);
 
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-007');
 
@@ -301,13 +301,13 @@ ROLLBACK;
 -- Expected: Changing title after submission SUCCEEDS
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  v_id := public._test_create_campaign('Budget Lock Test 8', 400, 'REPLACE_WITH_CREATOR_UUID'::uuid);
+  v_id := public._test_create_campaign('Budget Lock Test 8', 400::numeric, 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid);
 
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-008');
 
@@ -327,13 +327,13 @@ ROLLBACK;
 -- Expected: Direct patch with budget key is BLOCKED after submission
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  v_id := public._test_create_campaign('Budget Lock Test 9', 400, 'REPLACE_WITH_CREATOR_UUID'::uuid);
+  v_id := public._test_create_campaign('Budget Lock Test 9', 400::numeric, 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid);
 
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-009');
 
@@ -356,13 +356,13 @@ ROLLBACK;
 -- Expected: Even raw SQL UPDATE is blocked by the trigger
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  v_id := public._test_create_campaign('Budget Lock Test 10', 400, 'REPLACE_WITH_CREATOR_UUID'::uuid);
+  v_id := public._test_create_campaign('Budget Lock Test 10', 400::numeric, 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid);
 
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-010');
 END $$;
@@ -387,14 +387,14 @@ ROLLBACK;
 -- Expected: After resubmission, budget change is blocked again
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
   v_payment_id uuid;
 BEGIN
-  v_id := public._test_create_campaign('Budget Lock Test 11', 400, 'REPLACE_WITH_CREATOR_UUID'::uuid);
+  v_id := public._test_create_campaign('Budget Lock Test 11', 400::numeric, 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid);
 
   -- Creator submits
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-011-A');
@@ -403,14 +403,14 @@ BEGIN
   WHERE campaign_id = v_id;
 
   -- Switch to admin
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}', true);
+  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
 
   -- Admin rejects
   PERFORM public.reject_campaign_launch_payment(v_payment_id, 'Changing budget');
 
   -- Switch back to creator
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}', true);
+  PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
 
   -- Creator adjusts budget (allowed after rejection)
@@ -438,14 +438,14 @@ ROLLBACK;
 -- Expected: Status transitions work normally while budget is locked
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
   v_payment_id uuid;
 BEGIN
-  v_id := public._test_create_campaign('Budget Lock Test 12', 400, 'REPLACE_WITH_CREATOR_UUID'::uuid);
+  v_id := public._test_create_campaign('Budget Lock Test 12', 400::numeric, 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid);
 
   -- Creator submits payment
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-012');
@@ -453,14 +453,14 @@ BEGIN
   SELECT id INTO v_payment_id FROM public.campaign_launch_payments WHERE campaign_id = v_id;
 
   -- Switch to admin
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}', true);
+  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
 
   -- Admin verifies (sets status='open')
   PERFORM public.verify_campaign_launch_payment(v_payment_id);
 
   -- Switch back to creator
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}', true);
+  PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
 
   -- Creator pauses campaign — should work (status change, not budget change)
@@ -485,13 +485,13 @@ ROLLBACK;
 -- Expected: UPDATE succeeds (launch_payment_status = 'pending')
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  v_id := public._test_create_campaign('Budget Lock Test A', 400, 'REPLACE_WITH_CREATOR_UUID'::uuid);
+  v_id := public._test_create_campaign('Budget Lock Test A', 400::numeric, 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid);
 
   -- Direct UPDATE — should succeed (status = pending)
   UPDATE public.campaigns SET budget = 500 WHERE id = v_id;
@@ -509,13 +509,13 @@ ROLLBACK;
 -- Expected: UPDATE fails with "Cannot change campaign budget"
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  v_id := public._test_create_campaign('Budget Lock Test B', 400, 'REPLACE_WITH_CREATOR_UUID'::uuid);
+  v_id := public._test_create_campaign('Budget Lock Test B', 400::numeric, 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid);
 
   -- Creator submits payment
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-TRIGGER-B');
@@ -541,14 +541,14 @@ ROLLBACK;
 -- Expected: UPDATE fails with "Cannot change campaign budget"
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
   v_payment_id uuid;
 BEGIN
-  v_id := public._test_create_campaign('Budget Lock Test C', 400, 'REPLACE_WITH_CREATOR_UUID'::uuid);
+  v_id := public._test_create_campaign('Budget Lock Test C', 400::numeric, 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid);
 
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-TRIGGER-C');
 
@@ -556,7 +556,7 @@ BEGIN
   WHERE campaign_id = v_id;
 
   -- Switch to admin
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}', true);
+  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
 
   -- Admin verifies
@@ -583,14 +583,14 @@ ROLLBACK;
 -- Expected: UPDATE succeeds (launch_payment_status = 'rejected')
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
   v_payment_id uuid;
 BEGIN
-  v_id := public._test_create_campaign('Budget Lock Test D', 400, 'REPLACE_WITH_CREATOR_UUID'::uuid);
+  v_id := public._test_create_campaign('Budget Lock Test D', 400::numeric, 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid);
 
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-TRIGGER-D');
 
@@ -598,7 +598,7 @@ BEGIN
   WHERE campaign_id = v_id;
 
   -- Switch to admin
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}', true);
+  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
 
   -- Admin rejects
