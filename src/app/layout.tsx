@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   description:
     "A two-sided marketplace connecting creators with clippers who turn long videos into shorts.",
   icons: {
-    icon: "/cliptwo-logo.png",
+    icon: "/favicon.png",
   },
 };
 
