@@ -141,13 +141,23 @@ BEGIN
     RAISE EXCEPTION 'UTR reference is required';
   END IF;
 
-  -- Validate campaign exists and belongs to this creator
+  -- Validate campaign exists, belongs to this creator, and is in a submittable state
   SELECT budget INTO v_campaign_budget
   FROM public.campaigns
   WHERE id = p_campaign_id AND created_by = v_creator_id;
 
   IF v_campaign_budget IS NULL THEN
     RAISE EXCEPTION 'Campaign not found or access denied';
+  END IF;
+
+  -- Only allow payment submission for campaigns in draft or open status
+  -- (open allows resubmission if payment was previously rejected)
+  -- Prevents paying for closed, paused, or archived campaigns
+  IF NOT EXISTS (
+    SELECT 1 FROM public.campaigns
+    WHERE id = p_campaign_id AND status IN ('draft', 'open')
+  ) THEN
+    RAISE EXCEPTION 'Cannot submit payment for a campaign with status other than draft or open';
   END IF;
 
   -- Calculate platform fee: 10% of budget (budget is in rupees)
@@ -165,6 +175,14 @@ BEGIN
     -- Allow resubmission only if rejected or pending
     IF v_existing.payment_status NOT IN ('rejected', 'pending') THEN
       RAISE EXCEPTION 'A verified/submitted payment already exists for this campaign';
+    END IF;
+
+    -- Safety: campaign must still be in draft or open status for resubmission
+    IF NOT EXISTS (
+      SELECT 1 FROM public.campaigns
+      WHERE id = p_campaign_id AND status IN ('draft', 'open')
+    ) THEN
+      RAISE EXCEPTION 'Cannot resubmit payment for a campaign with status other than draft or open';
     END IF;
 
     -- Update existing record (resubmission after rejection)
@@ -275,6 +293,15 @@ BEGIN
 
   v_campaign_id := v_payment.campaign_id;
 
+  -- Verify the campaign is in draft status before opening
+  -- Prevents reopening closed/paused/archived campaigns
+  IF NOT EXISTS (
+    SELECT 1 FROM public.campaigns
+    WHERE id = v_campaign_id AND status = 'draft'
+  ) THEN
+    RAISE EXCEPTION 'Cannot verify payment: campaign is not in draft status';
+  END IF;
+
   -- Update payment to verified
   UPDATE public.campaign_launch_payments
   SET
@@ -358,6 +385,15 @@ BEGIN
   END IF;
 
   v_campaign_id := v_payment.campaign_id;
+
+  -- Validate campaign is in draft status (prevents rejecting payment for an
+  -- already-open campaign, which would be an inconsistent state)
+  IF NOT EXISTS (
+    SELECT 1 FROM public.campaigns
+    WHERE id = v_campaign_id AND status = 'draft'
+  ) THEN
+    RAISE EXCEPTION 'Cannot reject payment: campaign is not in draft status';
+  END IF;
 
   -- Update payment to rejected
   UPDATE public.campaign_launch_payments

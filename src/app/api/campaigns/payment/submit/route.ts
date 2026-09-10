@@ -8,6 +8,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Verify caller is a creator (defense-in-depth; RPC also checks)
+  const authHeader = request.headers.get("authorization");
+  const token = authHeader?.replace("Bearer ", "");
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { global: { headers: { Authorization: `Bearer ${token}` } } },
+  );
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role, status")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile || profile.role !== "creator" || profile.status !== "active") {
+    return NextResponse.json(
+      { error: "Only active creators can submit campaign payments" },
+      { status: 403 },
+    );
+  }
+
   const body = await request.json();
   const { campaignId, utrReference } = body;
 
@@ -17,15 +40,6 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-
-  const authHeader = request.headers.get("authorization");
-  const token = authHeader?.replace("Bearer ", "");
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { global: { headers: { Authorization: `Bearer ${token}` } } },
-  );
 
   const { data, error } = await supabase.rpc(
     "submit_campaign_launch_payment",

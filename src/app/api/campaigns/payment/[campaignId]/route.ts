@@ -25,6 +25,34 @@ export async function GET(
     { global: { headers: { Authorization: `Bearer ${token}` } } },
   );
 
+  // Verify caller is the campaign owner or an admin (defense-in-depth;
+  // the RPC also enforces this, but we fail fast at the HTTP layer)
+  const { data: campaign } = await supabase
+    .from("campaigns")
+    .select("created_by")
+    .eq("id", campaignId)
+    .single();
+
+  if (!campaign) {
+    return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
+  }
+
+  const isOwner = campaign.created_by === user.id;
+
+  let isAdmin = false;
+  if (!isOwner) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    isAdmin = profile?.role === "admin";
+  }
+
+  if (!isOwner && !isAdmin) {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  }
+
   const { data, error } = await supabase.rpc("get_campaign_launch_payment", {
     p_campaign_id: campaignId,
   });
