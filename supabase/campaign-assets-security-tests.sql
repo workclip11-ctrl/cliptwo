@@ -17,13 +17,9 @@
 --   Admin:     f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd
 --   Creator B: 11111111-1111-1111-1111-111111111111
 --
--- Path convention:
---   Public:  {user_id}/{campaign_id}/{filename}        (thumbnails)
---   Private: {user_id}/{campaign_id}/private/{filename} (source, brand)
---
--- HOW TO RUN: Execute each test block individually in Supabase SQL Editor.
--- Each test uses BEGIN/ROLLBACK — no data is persisted.
--- All role/jwt switching is done inside DO blocks via set_config().
+-- IMPORTANT: set_config('role', ...) does NOT change the PostgreSQL role.
+-- We must use EXECUTE 'SET LOCAL role = ...' to actually switch roles,
+-- otherwise the session user (postgres) bypasses RLS entirely.
 -- ===========================================================================
 
 -- ===========================================================================
@@ -34,29 +30,20 @@ DO $$
 DECLARE
   v_campaign_id uuid := 'a0000000-0000-0000-0000-000000000001';
   v_count int;
-  v_thumb_path text;
+  v_file_path text;
 BEGIN
-  -- Setup: Act as Creator A
-  PERFORM set_config('role', 'authenticated', true);
+  EXECUTE 'SET LOCAL role = ''authenticated''';
   PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
 
-  -- Create campaign
-  INSERT INTO public.campaigns (
-    title, brief, platform, payout, creator, created_by,
-    budget, status, launch_payment_status
-  ) VALUES (
-    'Asset Test A', 'Brief', 'YouTube', 50, 'Creator A',
-    'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid,
-    1000::numeric, 'draft', 'pending'
-  ) RETURNING id INTO v_campaign_id;
+  INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
+  VALUES ('Asset Test A', 'Brief', 'YouTube', 50, 'Creator A', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, 1000::numeric, 'draft', 'pending')
+  RETURNING id INTO v_campaign_id;
 
-  -- Insert private file
-  v_thumb_path := 'e92427b0-254e-44cc-b2df-be83792c8a94/' || v_campaign_id::text || '/private/source_video.mp4';
+  v_file_path := 'e92427b0-254e-44cc-b2df-be83792c8a94/' || v_campaign_id::text || '/private/source_video.mp4';
   INSERT INTO storage.objects (bucket_id, name, owner, metadata)
-  VALUES ('campaign-assets', v_thumb_path, 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '{"mimetype": "video/mp4"}');
+  VALUES ('campaign-assets', v_file_path, 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '{"mimetype": "video/mp4"}');
 
-  -- Creator A reads their own file
-  SELECT count(*) INTO v_count FROM storage.objects WHERE bucket_id = 'campaign-assets' AND name = v_thumb_path;
+  SELECT count(*) INTO v_count FROM storage.objects WHERE bucket_id = 'campaign-assets' AND name = v_file_path;
   ASSERT v_count = 1, 'TEST A FAILED: Creator cannot read own private asset, got ' || v_count;
 END $$;
 SELECT 'TEST A PASSED' AS result;
@@ -72,30 +59,22 @@ DECLARE
   v_count int;
   v_file_path text;
 BEGIN
-  -- Setup: Act as Creator A
-  PERFORM set_config('role', 'authenticated', true);
+  -- Act as Creator A to insert
+  EXECUTE 'SET LOCAL role = ''authenticated''';
   PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
 
-  -- Create campaign as Creator A
-  INSERT INTO public.campaigns (
-    title, brief, platform, payout, creator, created_by,
-    budget, status, launch_payment_status
-  ) VALUES (
-    'Asset Test B', 'Brief', 'YouTube', 50, 'Creator A',
-    'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid,
-    1000::numeric, 'draft', 'pending'
-  ) RETURNING id INTO v_campaign_id;
+  INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
+  VALUES ('Asset Test B', 'Brief', 'YouTube', 50, 'Creator A', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, 1000::numeric, 'draft', 'pending')
+  RETURNING id INTO v_campaign_id;
 
-  -- Insert private file owned by Creator A
   v_file_path := 'e92427b0-254e-44cc-b2df-be83792c8a94/' || v_campaign_id::text || '/private/brand_guide.pdf';
   INSERT INTO storage.objects (bucket_id, name, owner, metadata)
   VALUES ('campaign-assets', v_file_path, 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '{"mimetype": "application/pdf"}');
 
   -- Switch to Creator B
-  PERFORM set_config('role', 'authenticated', true);
+  EXECUTE 'SET LOCAL role = ''authenticated''';
   PERFORM set_config('request.jwt.claims', '{"sub": "11111111-1111-1111-1111-111111111111", "role": "authenticated"}', true);
 
-  -- Creator B should NOT see Creator A's private file
   SELECT count(*) INTO v_count FROM storage.objects WHERE bucket_id = 'campaign-assets' AND name = v_file_path;
   ASSERT v_count = 0, 'TEST B FAILED: Creator B can see Creator A private asset, got ' || v_count;
 END $$;
@@ -112,25 +91,19 @@ DECLARE
   v_count int;
   v_file_path text;
 BEGIN
-  -- Setup: Act as Creator A
-  PERFORM set_config('role', 'authenticated', true);
+  EXECUTE 'SET LOCAL role = ''authenticated''';
   PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
 
-  INSERT INTO public.campaigns (
-    title, brief, platform, payout, creator, created_by,
-    budget, status, launch_payment_status
-  ) VALUES (
-    'Asset Test C', 'Brief', 'YouTube', 50, 'Creator A',
-    'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid,
-    1000::numeric, 'draft', 'pending'
-  ) RETURNING id INTO v_campaign_id;
+  INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
+  VALUES ('Asset Test C', 'Brief', 'YouTube', 50, 'Creator A', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, 1000::numeric, 'draft', 'pending')
+  RETURNING id INTO v_campaign_id;
 
   v_file_path := 'e92427b0-254e-44cc-b2df-be83792c8a94/' || v_campaign_id::text || '/private/source_footage.mp4';
   INSERT INTO storage.objects (bucket_id, name, owner, metadata)
   VALUES ('campaign-assets', v_file_path, 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '{"mimetype": "video/mp4"}');
 
   -- Switch to Admin
-  PERFORM set_config('role', 'authenticated', true);
+  EXECUTE 'SET LOCAL role = ''authenticated''';
   PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
 
   SELECT count(*) INTO v_count FROM storage.objects WHERE bucket_id = 'campaign-assets' AND name = v_file_path;
@@ -149,25 +122,19 @@ DECLARE
   v_count int;
   v_file_path text;
 BEGIN
-  -- Setup: Act as Creator A
-  PERFORM set_config('role', 'authenticated', true);
+  EXECUTE 'SET LOCAL role = ''authenticated''';
   PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
 
-  INSERT INTO public.campaigns (
-    title, brief, platform, payout, creator, created_by,
-    budget, status, launch_payment_status
-  ) VALUES (
-    'Asset Test D', 'Brief', 'YouTube', 50, 'Creator A',
-    'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid,
-    1000::numeric, 'open', 'verified'
-  ) RETURNING id INTO v_campaign_id;
+  INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
+  VALUES ('Asset Test D', 'Brief', 'YouTube', 50, 'Creator A', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, 1000::numeric, 'open', 'verified')
+  RETURNING id INTO v_campaign_id;
 
   v_file_path := 'e92427b0-254e-44cc-b2df-be83792c8a94/' || v_campaign_id::text || '/private/source_video.mp4';
   INSERT INTO storage.objects (bucket_id, name, owner, metadata)
   VALUES ('campaign-assets', v_file_path, 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '{"mimetype": "video/mp4"}');
 
   -- Switch to Clipper
-  PERFORM set_config('role', 'authenticated', true);
+  EXECUTE 'SET LOCAL role = ''authenticated''';
   PERFORM set_config('request.jwt.claims', '{"sub": "fe542ad2-8b40-40ea-8aba-ad8dc63140ce", "role": "authenticated"}', true);
 
   SELECT count(*) INTO v_count FROM storage.objects WHERE bucket_id = 'campaign-assets' AND name = v_file_path;
@@ -177,7 +144,7 @@ SELECT 'TEST D PASSED' AS result;
 ROLLBACK;
 
 -- ===========================================================================
--- TEST E: Clipper cannot read private asset for draft/unverified/closed campaign
+-- TEST E: Clipper cannot read private asset for draft/unverified/closed
 -- ===========================================================================
 BEGIN;
 DO $$
@@ -187,7 +154,7 @@ DECLARE
   v_closed_id uuid;
   v_count int;
 BEGIN
-  PERFORM set_config('role', 'authenticated', true);
+  EXECUTE 'SET LOCAL role = ''authenticated''';
   PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
 
   INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
@@ -208,7 +175,7 @@ BEGIN
     ('campaign-assets', 'e92427b0-254e-44cc-b2df-be83792c8a94/' || v_closed_id::text || '/private/file.mp4', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '{}');
 
   -- Switch to Clipper
-  PERFORM set_config('role', 'authenticated', true);
+  EXECUTE 'SET LOCAL role = ''authenticated''';
   PERFORM set_config('request.jwt.claims', '{"sub": "fe542ad2-8b40-40ea-8aba-ad8dc63140ce", "role": "authenticated"}', true);
 
   SELECT count(*) INTO v_count FROM storage.objects WHERE bucket_id = 'campaign-assets' AND name = 'e92427b0-254e-44cc-b2df-be83792c8a94/' || v_draft_id::text || '/private/file.mp4';
@@ -224,7 +191,7 @@ SELECT 'TEST E PASSED' AS result;
 ROLLBACK;
 
 -- ===========================================================================
--- TEST F: Another authenticated non-clipper user cannot read private asset
+-- TEST F: Non-clipper user cannot read private asset
 -- ===========================================================================
 BEGIN;
 DO $$
@@ -233,7 +200,7 @@ DECLARE
   v_count int;
   v_file_path text;
 BEGIN
-  PERFORM set_config('role', 'authenticated', true);
+  EXECUTE 'SET LOCAL role = ''authenticated''';
   PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
 
   INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
@@ -245,7 +212,7 @@ BEGIN
   VALUES ('campaign-assets', v_file_path, 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '{"mimetype": "video/mp4"}');
 
   -- Switch to Creator B (role=creator, not clipper)
-  PERFORM set_config('role', 'authenticated', true);
+  EXECUTE 'SET LOCAL role = ''authenticated''';
   PERFORM set_config('request.jwt.claims', '{"sub": "11111111-1111-1111-1111-111111111111", "role": "authenticated"}', true);
 
   SELECT count(*) INTO v_count FROM storage.objects WHERE bucket_id = 'campaign-assets' AND name = v_file_path;
@@ -265,7 +232,7 @@ DECLARE
   v_file_path text;
 BEGIN
   -- Create as Creator A
-  PERFORM set_config('role', 'authenticated', true);
+  EXECUTE 'SET LOCAL role = ''authenticated''';
   PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
 
   INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
@@ -277,7 +244,7 @@ BEGIN
   VALUES ('campaign-assets', v_file_path, 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '{"mimetype": "video/mp4"}');
 
   -- Switch to anonymous
-  PERFORM set_config('role', 'anon', true);
+  EXECUTE 'SET LOCAL role = ''anon''';
   PERFORM set_config('request.jwt.claims', '{"role": "anon"}', true);
 
   SELECT count(*) INTO v_count FROM storage.objects WHERE bucket_id = 'campaign-assets' AND name = v_file_path;
@@ -296,14 +263,13 @@ DECLARE
   v_count int;
   v_thumb_path text;
 BEGIN
-  PERFORM set_config('role', 'authenticated', true);
+  EXECUTE 'SET LOCAL role = ''authenticated''';
   PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
 
   INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
   VALUES ('Asset Test H', 'Brief', 'YouTube', 50, 'Creator A', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, 1000::numeric, 'draft', 'pending')
   RETURNING id INTO v_campaign_id;
 
-  -- Public thumbnail (3-part path)
   v_thumb_path := 'e92427b0-254e-44cc-b2df-be83792c8a94/' || v_campaign_id::text || '/thumbnail.jpg';
   INSERT INTO storage.objects (bucket_id, name, owner, metadata)
   VALUES ('campaign-assets', v_thumb_path, 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '{"mimetype": "image/jpeg"}');
@@ -313,13 +279,13 @@ BEGIN
   ASSERT v_count = 1, 'TEST H FAILED: Creator cannot see public thumbnail, got ' || v_count;
 
   -- Clipper sees it
-  PERFORM set_config('role', 'authenticated', true);
+  EXECUTE 'SET LOCAL role = ''authenticated''';
   PERFORM set_config('request.jwt.claims', '{"sub": "fe542ad2-8b40-40ea-8aba-ad8dc63140ce", "role": "authenticated"}', true);
   SELECT count(*) INTO v_count FROM storage.objects WHERE bucket_id = 'campaign-assets' AND name = v_thumb_path;
   ASSERT v_count = 1, 'TEST H FAILED: Clipper cannot see public thumbnail, got ' || v_count;
 
   -- Anonymous sees it
-  PERFORM set_config('role', 'anon', true);
+  EXECUTE 'SET LOCAL role = ''anon''';
   PERFORM set_config('request.jwt.claims', '{"role": "anon"}', true);
   SELECT count(*) INTO v_count FROM storage.objects WHERE bucket_id = 'campaign-assets' AND name = v_thumb_path;
   ASSERT v_count = 1, 'TEST H FAILED: Anonymous cannot see public thumbnail, got ' || v_count;
