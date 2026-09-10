@@ -12,8 +12,21 @@
 -- This migration is idempotent — safe to run multiple times.
 -- ============================================================================
 
--- 1. Drop the old world-readable SELECT policy
-DROP POLICY IF EXISTS "campaigns_select" ON public.campaigns;
+-- 1. Drop ALL existing SELECT policies on campaigns (defense-in-depth)
+--    This ensures no stale USING (true) policy remains.
+DO $$
+DECLARE
+  pol record;
+BEGIN
+  FOR pol IN
+    SELECT policyname FROM pg_policies
+    WHERE tablename = 'campaigns'
+      AND schemaname = 'public'
+      AND cmd = 'SELECT'
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.campaigns', pol.policyname);
+  END LOOP;
+END $$;
 
 -- 2. Creator sees own campaigns (any status)
 CREATE POLICY "campaigns_select_creator"
