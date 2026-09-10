@@ -23,6 +23,32 @@
 -- \set clipper_uuid '00000000-0000-0000-0000-000000000002'
 -- \set admin_uuid   '00000000-0000-0000-0000-000000000003'
 
+-- Helper: insert campaign bypassing RLS (SECURITY DEFINER runs as owner)
+CREATE OR REPLACE FUNCTION public._test_insert_campaign(
+  p_title text,
+  p_created_by uuid,
+  p_status text DEFAULT 'draft',
+  p_launch_payment_status text DEFAULT 'pending'
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_id uuid;
+BEGIN
+  INSERT INTO public.campaigns (
+    title, brief, platform, payout, creator, created_by,
+    budget, status, launch_payment_status
+  ) VALUES (
+    p_title, 'Test brief', 'YouTube', 0, 'Test Creator', p_created_by,
+    0, p_status, p_launch_payment_status
+  ) RETURNING id INTO v_id;
+  RETURN v_id;
+END;
+$$;
+
 -- ===========================================================================
 -- TEST 1: Creator sees own campaign
 -- ===========================================================================
@@ -33,19 +59,14 @@ SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "au
 DO $$
 DECLARE
   v_id uuid;
-  v_count integer;
 BEGIN
-  INSERT INTO public.campaigns (
-    title, brief, platform, payout, creator, created_by,
-    budget, status, launch_payment_status
-  ) VALUES (
-    'Visibility Test 1', 'Brief', 'YouTube', 0, 'Creator',
-    'REPLACE_WITH_CREATOR_UUID'::uuid,
-    0, 'draft', 'pending'
-  ) RETURNING id INTO v_id;
+  v_id := public._test_insert_campaign(
+    'Visibility Test 1',
+    'REPLACE_WITH_CREATOR_UUID'::uuid
+  );
 
-  SELECT count(*) INTO v_count FROM public.campaigns WHERE id = v_id;
-  ASSERT v_count = 1, 'Creator should see own campaign';
+  ASSERT (SELECT count(*) FROM public.campaigns WHERE id = v_id) = 1,
+    'Creator should see own campaign';
 
   DELETE FROM public.campaigns WHERE id = v_id;
 END $$;
@@ -56,37 +77,23 @@ ROLLBACK;
 -- ===========================================================================
 -- TEST 2: Creator cannot see another creator's campaign
 -- ===========================================================================
--- Uses admin context to insert, then creator context to query.
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
-  v_count integer;
 BEGIN
-  -- Admin inserts campaign owned by a different user
-  INSERT INTO public.campaigns (
-    title, brief, platform, payout, creator, created_by,
-    budget, status, launch_payment_status
-  ) VALUES (
-    'Visibility Test 2', 'Brief', 'YouTube', 0, 'Other Creator',
+  v_id := public._test_insert_campaign(
+    'Visibility Test 2',
     '00000000-0000-0000-0000-999999999999'::uuid,
-    0, 'open', 'verified'
-  ) RETURNING id INTO v_id;
+    'open', 'verified'
+  );
 
-  -- Switch to creator
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
+  ASSERT (SELECT count(*) FROM public.campaigns WHERE id = v_id) = 0,
+    'Creator should NOT see other creator campaign';
 
-  -- Creator A queries — should see 0 rows
-  SELECT count(*) INTO v_count FROM public.campaigns WHERE id = v_id;
-  ASSERT v_count = 0, 'Creator should NOT see other creator campaign';
-
-  -- Cleanup
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
   DELETE FROM public.campaigns WHERE id = v_id;
 END $$;
 
@@ -98,31 +105,23 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
   v_rows integer;
 BEGIN
-  INSERT INTO public.campaigns (
-    title, brief, platform, payout, creator, created_by,
-    budget, status, launch_payment_status
-  ) VALUES (
-    'Visibility Test 3', 'Brief', 'YouTube', 0, 'Other Creator',
+  v_id := public._test_insert_campaign(
+    'Visibility Test 3',
     '00000000-0000-0000-0000-999999999999'::uuid,
-    0, 'open', 'verified'
-  ) RETURNING id INTO v_id;
-
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
+    'open', 'verified'
+  );
 
   UPDATE public.campaigns SET title = 'HACKED' WHERE id = v_id;
   GET DIAGNOSTICS v_rows = ROW_COUNT;
   ASSERT v_rows = 0, 'Creator should NOT update other creator campaign';
 
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
   DELETE FROM public.campaigns WHERE id = v_id;
 END $$;
 
@@ -134,29 +133,21 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CLIPPER_UUID", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  INSERT INTO public.campaigns (
-    title, brief, platform, payout, creator, created_by,
-    budget, status, launch_payment_status
-  ) VALUES (
-    'Visibility Test 4', 'Brief', 'YouTube', 0, 'Creator',
+  v_id := public._test_insert_campaign(
+    'Visibility Test 4',
     'REPLACE_WITH_CREATOR_UUID'::uuid,
-    0, 'draft', 'pending'
-  ) RETURNING id INTO v_id;
-
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_CLIPPER_UUID", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
+    'draft', 'pending'
+  );
 
   ASSERT (SELECT count(*) FROM public.campaigns WHERE id = v_id) = 0,
     'Clipper should NOT see draft campaign';
 
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
   DELETE FROM public.campaigns WHERE id = v_id;
 END $$;
 
@@ -168,29 +159,21 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CLIPPER_UUID", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  INSERT INTO public.campaigns (
-    title, brief, platform, payout, creator, created_by,
-    budget, status, launch_payment_status
-  ) VALUES (
-    'Visibility Test 5', 'Brief', 'YouTube', 0, 'Creator',
+  v_id := public._test_insert_campaign(
+    'Visibility Test 5',
     'REPLACE_WITH_CREATOR_UUID'::uuid,
-    0, 'draft', 'submitted'
-  ) RETURNING id INTO v_id;
-
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_CLIPPER_UUID", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
+    'draft', 'submitted'
+  );
 
   ASSERT (SELECT count(*) FROM public.campaigns WHERE id = v_id) = 0,
     'Clipper should NOT see submitted campaign';
 
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
   DELETE FROM public.campaigns WHERE id = v_id;
 END $$;
 
@@ -202,29 +185,21 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CLIPPER_UUID", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  INSERT INTO public.campaigns (
-    title, brief, platform, payout, creator, created_by,
-    budget, status, launch_payment_status
-  ) VALUES (
-    'Visibility Test 6', 'Brief', 'YouTube', 0, 'Creator',
+  v_id := public._test_insert_campaign(
+    'Visibility Test 6',
     'REPLACE_WITH_CREATOR_UUID'::uuid,
-    0, 'draft', 'rejected'
-  ) RETURNING id INTO v_id;
-
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_CLIPPER_UUID", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
+    'draft', 'rejected'
+  );
 
   ASSERT (SELECT count(*) FROM public.campaigns WHERE id = v_id) = 0,
     'Clipper should NOT see rejected campaign';
 
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
   DELETE FROM public.campaigns WHERE id = v_id;
 END $$;
 
@@ -236,29 +211,21 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CLIPPER_UUID", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  INSERT INTO public.campaigns (
-    title, brief, platform, payout, creator, created_by,
-    budget, status, launch_payment_status
-  ) VALUES (
-    'Visibility Test 7', 'Brief', 'YouTube', 0, 'Creator',
+  v_id := public._test_insert_campaign(
+    'Visibility Test 7',
     'REPLACE_WITH_CREATOR_UUID'::uuid,
-    0, 'open', 'verified'
-  ) RETURNING id INTO v_id;
-
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_CLIPPER_UUID", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
+    'open', 'verified'
+  );
 
   ASSERT (SELECT count(*) FROM public.campaigns WHERE id = v_id) = 1,
     'Clipper SHOULD see open+verified campaign';
 
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
   DELETE FROM public.campaigns WHERE id = v_id;
 END $$;
 
@@ -270,29 +237,21 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CLIPPER_UUID", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  INSERT INTO public.campaigns (
-    title, brief, platform, payout, creator, created_by,
-    budget, status, launch_payment_status
-  ) VALUES (
-    'Visibility Test 8', 'Brief', 'YouTube', 0, 'Creator',
+  v_id := public._test_insert_campaign(
+    'Visibility Test 8',
     'REPLACE_WITH_CREATOR_UUID'::uuid,
-    0, 'closed', 'verified'
-  ) RETURNING id INTO v_id;
-
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_CLIPPER_UUID", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
+    'closed', 'verified'
+  );
 
   ASSERT (SELECT count(*) FROM public.campaigns WHERE id = v_id) = 0,
     'Clipper should NOT see closed campaign';
 
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
   DELETE FROM public.campaigns WHERE id = v_id;
 END $$;
 
@@ -304,29 +263,21 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CLIPPER_UUID", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  INSERT INTO public.campaigns (
-    title, brief, platform, payout, creator, created_by,
-    budget, status, launch_payment_status
-  ) VALUES (
-    'Visibility Test 9', 'Brief', 'YouTube', 0, 'Creator',
+  v_id := public._test_insert_campaign(
+    'Visibility Test 9',
     'REPLACE_WITH_CREATOR_UUID'::uuid,
-    0, 'paused', 'verified'
-  ) RETURNING id INTO v_id;
-
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_CLIPPER_UUID", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
+    'paused', 'verified'
+  );
 
   ASSERT (SELECT count(*) FROM public.campaigns WHERE id = v_id) = 0,
     'Clipper should NOT see paused campaign';
 
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
   DELETE FROM public.campaigns WHERE id = v_id;
 END $$;
 
@@ -338,29 +289,21 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CLIPPER_UUID", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  INSERT INTO public.campaigns (
-    title, brief, platform, payout, creator, created_by,
-    budget, status, launch_payment_status
-  ) VALUES (
-    'Visibility Test 10', 'Brief', 'YouTube', 0, 'Creator',
+  v_id := public._test_insert_campaign(
+    'Visibility Test 10',
     'REPLACE_WITH_CREATOR_UUID'::uuid,
-    0, 'budget_reached', 'verified'
-  ) RETURNING id INTO v_id;
-
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_CLIPPER_UUID", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
+    'budget_reached', 'verified'
+  );
 
   ASSERT (SELECT count(*) FROM public.campaigns WHERE id = v_id) = 0,
     'Clipper should NOT see budget_reached campaign';
 
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
   DELETE FROM public.campaigns WHERE id = v_id;
 END $$;
 
@@ -372,32 +315,23 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CLIPPER_UUID", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
   v_rows integer;
 BEGIN
-  INSERT INTO public.campaigns (
-    title, brief, platform, payout, creator, created_by,
-    budget, status, launch_payment_status
-  ) VALUES (
-    'Visibility Test 11', 'Brief', 'YouTube', 0, 'Creator',
+  v_id := public._test_insert_campaign(
+    'Visibility Test 11',
     'REPLACE_WITH_CREATOR_UUID'::uuid,
-    0, 'draft', 'pending'
-  ) RETURNING id INTO v_id;
+    'draft', 'pending'
+  );
 
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_CLIPPER_UUID", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
-
-  -- Clipper cannot see draft campaign, so UPDATE affects 0 rows
   UPDATE public.campaigns SET launch_payment_status = 'verified' WHERE id = v_id;
   GET DIAGNOSTICS v_rows = ROW_COUNT;
   ASSERT v_rows = 0, 'Clipper should NOT update launch_payment_status';
 
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
   DELETE FROM public.campaigns WHERE id = v_id;
 END $$;
 
@@ -405,10 +339,8 @@ SELECT 'TEST 11 PASSED' AS result;
 ROLLBACK;
 
 -- ===========================================================================
--- TEST 12: Creator cannot directly set launch_payment_status = verified
+-- TEST 12: Creator can directly set launch_payment_status (demonstrates need for RPC workflow)
 -- ===========================================================================
--- Creator CAN update own campaigns (RLS allows), but this demonstrates
--- why the payment verification RPC workflow is necessary.
 BEGIN;
 SET LOCAL role = 'authenticated';
 SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
@@ -417,16 +349,11 @@ DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  INSERT INTO public.campaigns (
-    title, brief, platform, payout, creator, created_by,
-    budget, status, launch_payment_status
-  ) VALUES (
-    'Visibility Test 12', 'Brief', 'YouTube', 0, 'Creator',
-    'REPLACE_WITH_CREATOR_UUID'::uuid,
-    0, 'draft', 'pending'
-  ) RETURNING id INTO v_id;
+  v_id := public._test_insert_campaign(
+    'Visibility Test 12',
+    'REPLACE_WITH_CREATOR_UUID'::uuid
+  );
 
-  -- Creator CAN update own campaigns directly (RLS allows owner)
   UPDATE public.campaigns SET launch_payment_status = 'verified' WHERE id = v_id;
 
   ASSERT (SELECT launch_payment_status FROM public.campaigns WHERE id = v_id) = 'verified',
@@ -439,9 +366,8 @@ SELECT 'TEST 12 PASSED' AS result;
 ROLLBACK;
 
 -- ===========================================================================
--- TEST 13: Creator cannot force unpaid campaign to open
+-- TEST 13: Creator cannot force unpaid campaign to open (trigger blocks)
 -- ===========================================================================
--- Trigger blocks status='open' without verified payment
 BEGIN;
 SET LOCAL role = 'authenticated';
 SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
@@ -450,14 +376,10 @@ DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  INSERT INTO public.campaigns (
-    title, brief, platform, payout, creator, created_by,
-    budget, status, launch_payment_status
-  ) VALUES (
-    'Visibility Test 13', 'Brief', 'YouTube', 0, 'Creator',
-    'REPLACE_WITH_CREATOR_UUID'::uuid,
-    0, 'draft', 'pending'
-  ) RETURNING id INTO v_id;
+  v_id := public._test_insert_campaign(
+    'Visibility Test 13',
+    'REPLACE_WITH_CREATOR_UUID'::uuid
+  );
 
   BEGIN
     UPDATE public.campaigns SET status = 'open' WHERE id = v_id;
@@ -513,29 +435,17 @@ SET LOCAL request.jwt.claims = '{"role": "anon"}';
 DO $$
 DECLARE
   v_id uuid;
-  v_count integer;
 BEGIN
-  -- Insert as admin first
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
-
-  INSERT INTO public.campaigns (
-    title, brief, platform, payout, creator, created_by,
-    budget, status, launch_payment_status
-  ) VALUES (
-    'Visibility Test 15', 'Brief', 'YouTube', 0, 'Creator',
+  v_id := public._test_insert_campaign(
+    'Visibility Test 15',
     'REPLACE_WITH_CREATOR_UUID'::uuid,
-    0, 'open', 'verified'
-  ) RETURNING id INTO v_id;
+    'open', 'verified'
+  );
 
-  -- Switch to anon
-  PERFORM set_config('request.jwt.claims', '{"role": "anon"}', true);
-  PERFORM set_config('role', 'anon', true);
+  ASSERT (SELECT count(*) FROM public.campaigns WHERE id = v_id) = 0,
+    'Anonymous should NOT see campaign rows';
 
-  SELECT count(*) INTO v_count FROM public.campaigns WHERE id = v_id;
-  ASSERT v_count = 0, 'Anonymous should NOT see campaign rows';
-
-  -- Cleanup
+  -- Cleanup (switch to authenticated to delete)
   PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
   DELETE FROM public.campaigns WHERE id = v_id;
@@ -549,26 +459,18 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
   v_rows integer;
 BEGIN
-  -- Admin inserts campaign owned by a different user
-  INSERT INTO public.campaigns (
-    title, brief, platform, payout, creator, created_by,
-    budget, status, launch_payment_status
-  ) VALUES (
-    'Visibility Test 16', 'Brief', 'YouTube', 0, 'Other Creator',
+  v_id := public._test_insert_campaign(
+    'Visibility Test 16',
     '00000000-0000-0000-0000-999999999999'::uuid,
-    0, 'open', 'verified'
-  ) RETURNING id INTO v_id;
-
-  -- Switch to Creator A
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
+    'open', 'verified'
+  );
 
   -- SELECT: should see 0 rows
   ASSERT (SELECT count(*) FROM public.campaigns WHERE id = v_id) = 0,
@@ -584,14 +486,16 @@ BEGIN
   GET DIAGNOSTICS v_rows = ROW_COUNT;
   ASSERT v_rows = 0, 'Creator A should NOT delete Creator B campaign';
 
-  -- Cleanup
-  PERFORM set_config('request.jwt.claims', '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
   DELETE FROM public.campaigns WHERE id = v_id;
 END $$;
 
 SELECT 'TEST 16 PASSED' AS result;
 ROLLBACK;
+
+-- ===========================================================================
+-- Cleanup helper function
+-- ===========================================================================
+DROP FUNCTION IF EXISTS public._test_insert_campaign(text, uuid, text, text);
 
 -- ===========================================================================
 -- SUMMARY
