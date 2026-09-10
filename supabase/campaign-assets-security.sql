@@ -34,7 +34,7 @@ CREATE POLICY "campaign_assets_select_public" ON storage.objects
 -- 3. Authenticated users can read private files (4-part path with 'private' prefix)
 --    Creator: own files only
 --    Admin: all files
---    Clipper: open+verified campaign files only
+--    Clipper: open+verified campaign files ONLY when profile role = 'clipper'
 CREATE POLICY "campaign_assets_select_private" ON storage.objects
   FOR SELECT TO authenticated
   USING (
@@ -46,9 +46,14 @@ CREATE POLICY "campaign_assets_select_private" ON storage.objects
       (storage.foldername(name))[1] = auth.uid()::text
       -- Admin: all files
       OR public.is_admin()
-      -- Clipper: open+verified campaign files
+      -- Clipper: open+verified campaign files, only if profile role = 'clipper'
       OR (
         (storage.foldername(name))[2] ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+        AND EXISTS (
+          SELECT 1 FROM public.profiles
+          WHERE id = auth.uid()
+            AND role = 'clipper'
+        )
         AND EXISTS (
           SELECT 1 FROM public.campaigns
           WHERE id = (storage.foldername(name))[2]::uuid
