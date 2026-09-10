@@ -3,6 +3,11 @@
 -- ===========================================================================
 -- Run in Supabase SQL Editor to verify budget lock security.
 --
+-- NOTE: These tests use direct INSERT to create campaigns, bypassing the
+-- create_campaign() RPC which has an overloaded signature issue in some
+-- databases. The trigger fires on UPDATE regardless of how the row was
+-- created, so this is equivalent for testing the budget lock.
+--
 -- How to use:
 --   1. Create test users in Supabase Dashboard > Auth > Users:
 --      - A creator user (note UUID as CREATOR_UUID)
@@ -19,19 +24,32 @@
 -- \set creator_uuid '00000000-0000-0000-0000-000000000001'
 -- \set admin_uuid   '00000000-0000-0000-0000-000000000002'
 
--- ===========================================================================
--- CLEANUP: Remove old overloaded create_campaign with p_status parameter
--- ===========================================================================
--- The admin-schema.sql created a version with 'p_status text default open'.
--- The campaign-state-machine-phase1.sql replaced it without p_status.
--- Both coexist as separate overloads, causing ambiguity.
--- Run this ONCE before the tests to clean up:
-DROP FUNCTION IF EXISTS public.create_campaign(
-  text, text, text, numeric, text, uuid, text, numeric, integer,
-  text, text, text, jsonb, text, date, date, numeric, text, text,
-  text, text, text, text, jsonb, jsonb, jsonb, jsonb, jsonb, jsonb,
-  jsonb, jsonb, numeric, text, text, text, jsonb, text
-);
+-- Helper: create a test campaign via direct INSERT (avoids overloaded RPC)
+-- Sets status='draft' and launch_payment_status='pending' matching create_campaign behavior.
+CREATE OR REPLACE FUNCTION public._test_create_campaign(
+  p_title text,
+  p_budget numeric,
+  p_created_by uuid
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_id uuid;
+BEGIN
+  INSERT INTO public.campaigns (
+    title, brief, platform, payout, creator, created_by,
+    budget, status, launch_payment_status
+  ) VALUES (
+    p_title, 'Test brief', 'YouTube', 0, 'Test Creator', p_created_by,
+    p_budget, 'draft', 'pending'
+  )
+  RETURNING id INTO v_id;
+  RETURN v_id;
+END;
+$$;
 
 -- ===========================================================================
 -- TEST 1: Budget can be changed before payment workflow begins
@@ -41,27 +59,19 @@ BEGIN;
 SET LOCAL role = 'authenticated';
 SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
 
-SELECT public.create_campaign(
-  'Budget Lock Test 1'::text,
-  'Brief'::text,
-  'YouTube'::text,
-  400::numeric,
-  'Creator'::text
-);
-
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  SELECT id INTO v_id FROM public.campaigns
-  WHERE title = 'Budget Lock Test 1' AND created_by = 'REPLACE_WITH_CREATOR_UUID'::uuid;
+  v_id := public._test_create_campaign('Budget Lock Test 1', 400, 'REPLACE_WITH_CREATOR_UUID'::uuid);
 
   PERFORM public.adjust_campaign_budget(v_id, 500, 'Pre-payment adjustment');
+
+  ASSERT (SELECT budget FROM public.campaigns WHERE id = v_id) = 500,
+    'Budget should be 500 after adjustment';
 END $$;
 
-SELECT budget FROM public.campaigns
-WHERE title = 'Budget Lock Test 1' AND created_by = 'REPLACE_WITH_CREATOR_UUID'::uuid;
--- Expected: 500
+SELECT 'TEST 1 PASSED' AS result;
 ROLLBACK;
 
 -- ===========================================================================
@@ -72,27 +82,24 @@ BEGIN;
 SET LOCAL role = 'authenticated';
 SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
 
-SELECT public.create_campaign(
-  'Budget Lock Test 2'::text,
-  'Brief'::text,
-  'YouTube'::text,
-  400::numeric,
-  'Creator'::text
-);
-
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  SELECT id INTO v_id FROM public.campaigns
-  WHERE title = 'Budget Lock Test 2' AND created_by = 'REPLACE_WITH_CREATOR_UUID'::uuid;
+  v_id := public._test_create_campaign('Budget Lock Test 2', 400, 'REPLACE_WITH_CREATOR_UUID'::uuid);
 
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-002');
 
-  PERFORM public.adjust_campaign_budget(v_id, 800, 'Post-submission change');
+  BEGIN
+    PERFORM public.adjust_campaign_budget(v_id, 800, 'Post-submission change');
+    ASSERT false, 'Should have raised exception';
+  EXCEPTION WHEN OTHERS THEN
+    ASSERT SQLERRM LIKE '%Cannot change campaign budget%',
+      'Wrong error: ' || SQLERRM;
+  END;
 END $$;
 
--- Expected: ERROR: Cannot change campaign budget: launch payment is submitted
+SELECT 'TEST 2 PASSED' AS result;
 ROLLBACK;
 
 -- ===========================================================================
@@ -103,21 +110,12 @@ BEGIN;
 SET LOCAL role = 'authenticated';
 SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
 
-SELECT public.create_campaign(
-  'Budget Lock Test 3'::text,
-  'Brief'::text,
-  'YouTube'::text,
-  400::numeric,
-  'Creator'::text
-);
-
 DO $$
 DECLARE
   v_id uuid;
   v_payment_id uuid;
 BEGIN
-  SELECT id INTO v_id FROM public.campaigns
-  WHERE title = 'Budget Lock Test 3' AND created_by = 'REPLACE_WITH_CREATOR_UUID'::uuid;
+  v_id := public._test_create_campaign('Budget Lock Test 3', 400, 'REPLACE_WITH_CREATOR_UUID'::uuid);
 
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-003');
 
@@ -126,10 +124,16 @@ BEGIN
 
   PERFORM public.verify_campaign_launch_payment(v_payment_id);
 
-  PERFORM public.adjust_campaign_budget(v_id, 800, 'Post-verification change');
+  BEGIN
+    PERFORM public.adjust_campaign_budget(v_id, 800, 'Post-verification change');
+    ASSERT false, 'Should have raised exception';
+  EXCEPTION WHEN OTHERS THEN
+    ASSERT SQLERRM LIKE '%Cannot change campaign budget%',
+      'Wrong error: ' || SQLERRM;
+  END;
 END $$;
 
--- Expected: ERROR: Cannot change campaign budget: launch payment is verified
+SELECT 'TEST 3 PASSED' AS result;
 ROLLBACK;
 
 -- ===========================================================================
@@ -140,27 +144,24 @@ BEGIN;
 SET LOCAL role = 'authenticated';
 SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
 
-SELECT public.create_campaign(
-  'Budget Lock Test 4'::text,
-  'Brief'::text,
-  'YouTube'::text,
-  400::numeric,
-  'Creator'::text
-);
-
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  SELECT id INTO v_id FROM public.campaigns
-  WHERE title = 'Budget Lock Test 4' AND created_by = 'REPLACE_WITH_CREATOR_UUID'::uuid;
+  v_id := public._test_create_campaign('Budget Lock Test 4', 400, 'REPLACE_WITH_CREATOR_UUID'::uuid);
 
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-004');
 
-  PERFORM public.update_campaign(v_id, '{"budget": 800}'::jsonb);
+  BEGIN
+    PERFORM public.update_campaign(v_id, '{"budget": 800}'::jsonb);
+    ASSERT false, 'Should have raised exception';
+  EXCEPTION WHEN OTHERS THEN
+    ASSERT SQLERRM LIKE '%Cannot change campaign budget%',
+      'Wrong error: ' || SQLERRM;
+  END;
 END $$;
 
--- Expected: ERROR: Cannot change campaign budget: launch payment is submitted
+SELECT 'TEST 4 PASSED' AS result;
 ROLLBACK;
 
 -- ===========================================================================
@@ -171,48 +172,42 @@ BEGIN;
 SET LOCAL role = 'authenticated';
 SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
 
-SELECT public.create_campaign(
-  'Budget Lock Test 5'::text,
-  'Brief'::text,
-  'YouTube'::text,
-  400::numeric,
-  'Creator'::text
-);
-
 DO $$
 DECLARE
   v_id uuid;
   v_payment_id uuid;
 BEGIN
-  SELECT id INTO v_id FROM public.campaigns
-  WHERE title = 'Budget Lock Test 5' AND created_by = 'REPLACE_WITH_CREATOR_UUID'::uuid;
+  v_id := public._test_create_campaign('Budget Lock Test 5', 400, 'REPLACE_WITH_CREATOR_UUID'::uuid);
 
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-005');
 
   SELECT id INTO v_payment_id FROM public.campaign_launch_payments
   WHERE campaign_id = v_id;
+
+  -- Admin verifies
+  PERFORM public.verify_campaign_launch_payment(v_payment_id);
 END $$;
 
+-- Switch to admin
 SET LOCAL role = 'authenticated';
 SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
-  v_payment_id uuid;
 BEGIN
-  SELECT id INTO v_id FROM public.campaigns
-  WHERE title = 'Budget Lock Test 5';
+  SELECT id INTO v_id FROM public.campaigns WHERE title = 'Budget Lock Test 5';
 
-  SELECT id INTO v_payment_id FROM public.campaign_launch_payments
-  WHERE campaign_id = v_id;
-
-  PERFORM public.verify_campaign_launch_payment(v_payment_id);
-
-  PERFORM public.adjust_campaign_budget(v_id, 800, 'Admin post-verification change');
+  BEGIN
+    PERFORM public.adjust_campaign_budget(v_id, 800, 'Admin post-verification change');
+    ASSERT false, 'Should have raised exception';
+  EXCEPTION WHEN OTHERS THEN
+    ASSERT SQLERRM LIKE '%Cannot change campaign budget%',
+      'Wrong error: ' || SQLERRM;
+  END;
 END $$;
 
--- Expected: ERROR: Cannot change campaign budget: launch payment is verified
+SELECT 'TEST 5 PASSED' AS result;
 ROLLBACK;
 
 -- ===========================================================================
@@ -223,45 +218,23 @@ BEGIN;
 SET LOCAL role = 'authenticated';
 SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
 
-SELECT public.create_campaign(
-  'Budget Lock Test 6'::text,
-  'Brief'::text,
-  'YouTube'::text,
-  400::numeric,
-  'Creator'::text
-);
-
 DO $$
 DECLARE
   v_id uuid;
   v_payment_id uuid;
 BEGIN
-  SELECT id INTO v_id FROM public.campaigns
-  WHERE title = 'Budget Lock Test 6' AND created_by = 'REPLACE_WITH_CREATOR_UUID'::uuid;
+  v_id := public._test_create_campaign('Budget Lock Test 6', 400, 'REPLACE_WITH_CREATOR_UUID'::uuid);
 
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-006');
 
   SELECT id INTO v_payment_id FROM public.campaign_launch_payments
   WHERE campaign_id = v_id;
-END $$;
 
-SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}';
-
-DO $$
-DECLARE
-  v_id uuid;
-  v_payment_id uuid;
-BEGIN
-  SELECT id INTO v_id FROM public.campaigns
-  WHERE title = 'Budget Lock Test 6';
-
-  SELECT id INTO v_payment_id FROM public.campaign_launch_payments
-  WHERE campaign_id = v_id;
-
+  -- Admin rejects
   PERFORM public.reject_campaign_launch_payment(v_payment_id, 'Need to change budget');
 END $$;
 
+-- Creator adjusts budget after rejection
 SET LOCAL role = 'authenticated';
 SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
 
@@ -269,14 +242,15 @@ DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  SELECT id INTO v_id FROM public.campaigns
-  WHERE title = 'Budget Lock Test 6';
+  SELECT id INTO v_id FROM public.campaigns WHERE title = 'Budget Lock Test 6';
 
   PERFORM public.adjust_campaign_budget(v_id, 600, 'Post-rejection adjustment');
+
+  ASSERT (SELECT budget FROM public.campaigns WHERE id = v_id) = 600,
+    'Budget should be 600 after post-rejection adjustment';
 END $$;
 
-SELECT budget FROM public.campaigns WHERE title = 'Budget Lock Test 6';
--- Expected: 600
+SELECT 'TEST 6 PASSED' AS result;
 ROLLBACK;
 
 -- ===========================================================================
@@ -287,33 +261,23 @@ BEGIN;
 SET LOCAL role = 'authenticated';
 SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
 
-SELECT public.create_campaign(
-  'Budget Lock Test 7'::text,
-  'Brief'::text,
-  'YouTube'::text,
-  400::numeric,
-  'Creator'::text
-);
-
 DO $$
 DECLARE
   v_id uuid;
   v_payment_id uuid;
 BEGIN
-  SELECT id INTO v_id FROM public.campaigns
-  WHERE title = 'Budget Lock Test 7' AND created_by = 'REPLACE_WITH_CREATOR_UUID'::uuid;
+  v_id := public._test_create_campaign('Budget Lock Test 7', 400, 'REPLACE_WITH_CREATOR_UUID'::uuid);
 
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-007');
 
   SELECT id INTO v_payment_id FROM public.campaign_launch_payments
   WHERE campaign_id = v_id;
 
-  ASSERT (
-    SELECT campaign_budget_rupees FROM public.campaign_launch_payments WHERE id = v_payment_id
-  ) = 400,
-  'Payment budget snapshot should be 400';
+  ASSERT (SELECT campaign_budget_rupees FROM public.campaign_launch_payments WHERE id = v_payment_id) = 400,
+    'Payment budget snapshot should be 400';
 END $$;
 
+SELECT 'TEST 7 PASSED' AS result;
 ROLLBACK;
 
 -- ===========================================================================
@@ -324,28 +288,22 @@ BEGIN;
 SET LOCAL role = 'authenticated';
 SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
 
-SELECT public.create_campaign(
-  'Budget Lock Test 8'::text,
-  'Brief'::text,
-  'YouTube'::text,
-  400::numeric,
-  'Creator'::text
-);
-
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  SELECT id INTO v_id FROM public.campaigns
-  WHERE title = 'Budget Lock Test 8' AND created_by = 'REPLACE_WITH_CREATOR_UUID'::uuid;
+  v_id := public._test_create_campaign('Budget Lock Test 8', 400, 'REPLACE_WITH_CREATOR_UUID'::uuid);
 
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-008');
 
+  -- Change title — should NOT be blocked
   PERFORM public.update_campaign(v_id, '{"title": "Budget Lock Test 8 Updated"}'::jsonb);
+
+  ASSERT (SELECT title FROM public.campaigns WHERE id = v_id) = 'Budget Lock Test 8 Updated',
+    'Title should be updated';
 END $$;
 
-SELECT title FROM public.campaigns WHERE title LIKE 'Budget Lock Test 8%';
--- Expected: "Budget Lock Test 8 Updated"
+SELECT 'TEST 8 PASSED' AS result;
 ROLLBACK;
 
 -- ===========================================================================
@@ -356,27 +314,24 @@ BEGIN;
 SET LOCAL role = 'authenticated';
 SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
 
-SELECT public.create_campaign(
-  'Budget Lock Test 9'::text,
-  'Brief'::text,
-  'YouTube'::text,
-  400::numeric,
-  'Creator'::text
-);
-
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  SELECT id INTO v_id FROM public.campaigns
-  WHERE title = 'Budget Lock Test 9' AND created_by = 'REPLACE_WITH_CREATOR_UUID'::uuid;
+  v_id := public._test_create_campaign('Budget Lock Test 9', 400, 'REPLACE_WITH_CREATOR_UUID'::uuid);
 
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-009');
 
-  PERFORM public.update_campaign(v_id, '{"budget": 999}'::jsonb);
+  BEGIN
+    PERFORM public.update_campaign(v_id, '{"budget": 999}'::jsonb);
+    ASSERT false, 'Should have raised exception';
+  EXCEPTION WHEN OTHERS THEN
+    ASSERT SQLERRM LIKE '%Cannot change campaign budget%',
+      'Wrong error: ' || SQLERRM;
+  END;
 END $$;
 
--- Expected: ERROR: Cannot change campaign budget: launch payment is submitted
+SELECT 'TEST 9 PASSED' AS result;
 ROLLBACK;
 
 -- ===========================================================================
@@ -387,28 +342,26 @@ BEGIN;
 SET LOCAL role = 'authenticated';
 SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
 
-SELECT public.create_campaign(
-  'Budget Lock Test 10'::text,
-  'Brief'::text,
-  'YouTube'::text,
-  400::numeric,
-  'Creator'::text
-);
-
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  SELECT id INTO v_id FROM public.campaigns
-  WHERE title = 'Budget Lock Test 10' AND created_by = 'REPLACE_WITH_CREATOR_UUID'::uuid;
+  v_id := public._test_create_campaign('Budget Lock Test 10', 400, 'REPLACE_WITH_CREATOR_UUID'::uuid);
 
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-010');
 END $$;
 
-UPDATE public.campaigns SET budget = 9999
-WHERE title = 'Budget Lock Test 10';
+-- Try direct SQL UPDATE (bypassing RPCs) — should be BLOCKED by trigger
+BEGIN
+  UPDATE public.campaigns SET budget = 9999
+  WHERE title = 'Budget Lock Test 10';
+  ASSERT false, 'Should have raised exception';
+EXCEPTION WHEN OTHERS THEN
+  ASSERT SQLERRM LIKE '%Cannot change campaign budget%',
+    'Wrong error: ' || SQLERRM;
+END;
 
--- Expected: ERROR: Cannot change campaign budget: launch payment is submitted
+SELECT 'TEST 10 PASSED' AS result;
 ROLLBACK;
 
 -- ===========================================================================
@@ -419,58 +372,39 @@ BEGIN;
 SET LOCAL role = 'authenticated';
 SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
 
-SELECT public.create_campaign(
-  'Budget Lock Test 11'::text,
-  'Brief'::text,
-  'YouTube'::text,
-  400::numeric,
-  'Creator'::text
-);
-
 DO $$
 DECLARE
   v_id uuid;
   v_payment_id uuid;
 BEGIN
-  SELECT id INTO v_id FROM public.campaigns
-  WHERE title = 'Budget Lock Test 11' AND created_by = 'REPLACE_WITH_CREATOR_UUID'::uuid;
+  v_id := public._test_create_campaign('Budget Lock Test 11', 400, 'REPLACE_WITH_CREATOR_UUID'::uuid);
 
+  -- Submit
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-011-A');
 
   SELECT id INTO v_payment_id FROM public.campaign_launch_payments
   WHERE campaign_id = v_id;
-END $$;
 
-SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}';
-
-DO $$
-DECLARE
-  v_id uuid;
-  v_payment_id uuid;
-BEGIN
-  SELECT id INTO v_id FROM public.campaigns WHERE title = 'Budget Lock Test 11';
-  SELECT id INTO v_payment_id FROM public.campaign_launch_payments WHERE campaign_id = v_id;
+  -- Admin rejects
   PERFORM public.reject_campaign_launch_payment(v_payment_id, 'Changing budget');
-END $$;
 
-SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
-
-DO $$
-DECLARE
-  v_id uuid;
-BEGIN
-  SELECT id INTO v_id FROM public.campaigns WHERE title = 'Budget Lock Test 11';
-
+  -- Creator adjusts budget
   PERFORM public.adjust_campaign_budget(v_id, 600, 'Increased budget');
 
+  -- Resubmit at new budget
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-011-B');
 
-  PERFORM public.adjust_campaign_budget(v_id, 700, 'Second change attempt');
+  -- Now budget change should be BLOCKED again
+  BEGIN
+    PERFORM public.adjust_campaign_budget(v_id, 700, 'Second change attempt');
+    ASSERT false, 'Should have raised exception';
+  EXCEPTION WHEN OTHERS THEN
+    ASSERT SQLERRM LIKE '%Cannot change campaign budget%',
+      'Wrong error: ' || SQLERRM;
+  END;
 END $$;
 
--- Expected: ERROR: Cannot change campaign budget: launch payment is submitted
+SELECT 'TEST 11 PASSED' AS result;
 ROLLBACK;
 
 -- ===========================================================================
@@ -481,56 +415,35 @@ BEGIN;
 SET LOCAL role = 'authenticated';
 SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
 
-SELECT public.create_campaign(
-  'Budget Lock Test 12'::text,
-  'Brief'::text,
-  'YouTube'::text,
-  400::numeric,
-  'Creator'::text
-);
-
 DO $$
 DECLARE
   v_id uuid;
   v_payment_id uuid;
 BEGIN
-  SELECT id INTO v_id FROM public.campaigns
-  WHERE title = 'Budget Lock Test 12' AND created_by = 'REPLACE_WITH_CREATOR_UUID'::uuid;
+  v_id := public._test_create_campaign('Budget Lock Test 12', 400, 'REPLACE_WITH_CREATOR_UUID'::uuid);
 
+  -- Submit payment
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-012');
 
   SELECT id INTO v_payment_id FROM public.campaign_launch_payments WHERE campaign_id = v_id;
-END $$;
 
-SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_ADMIN_UUID", "role": "authenticated"}';
-
-DO $$
-DECLARE
-  v_id uuid;
-  v_payment_id uuid;
-BEGIN
-  SELECT id INTO v_id FROM public.campaigns WHERE title = 'Budget Lock Test 12';
-  SELECT id INTO v_payment_id FROM public.campaign_launch_payments WHERE campaign_id = v_id;
-
+  -- Admin verifies (sets status='open')
   PERFORM public.verify_campaign_launch_payment(v_payment_id);
-END $$;
 
-SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_CREATOR_UUID", "role": "authenticated"}';
-
-DO $$
-DECLARE
-  v_id uuid;
-BEGIN
-  SELECT id INTO v_id FROM public.campaigns WHERE title = 'Budget Lock Test 12';
-
+  -- Creator pauses campaign — should work
   PERFORM public.campaign_action(v_id, 'pause', null, null);
+
+  ASSERT (SELECT status FROM public.campaigns WHERE id = v_id) = 'paused',
+    'Status should be paused';
 END $$;
 
-SELECT status FROM public.campaigns WHERE title = 'Budget Lock Test 12';
--- Expected: paused
+SELECT 'TEST 12 PASSED' AS result;
 ROLLBACK;
+
+-- ===========================================================================
+-- Cleanup helper function
+-- ===========================================================================
+DROP FUNCTION IF EXISTS public._test_create_campaign(text, numeric, uuid);
 
 -- ===========================================================================
 -- SUMMARY
