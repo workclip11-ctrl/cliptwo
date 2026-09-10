@@ -224,7 +224,7 @@ SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", 
 
 DO $$
 DECLARE
-  v_campaign_id uuid := 'g0000000-0000-0000-0000-000000000007';
+  v_campaign_id uuid := 'c0000007-0000-0000-0000-000000000007';
 BEGIN
   INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
   VALUES ('Asset Test G', 'Brief', 'YouTube', 50, 'Creator A', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, 1000::numeric, 'open', 'verified')
@@ -242,7 +242,7 @@ SET LOCAL request.jwt.claims = '{"role": "anon"}';
 
 SELECT count(*) AS anon_blocked
 FROM storage.objects
-WHERE bucket_id = 'campaign-assets' AND name LIKE '%/g0000000-0000-0000-0000-000000000007/private/source.mp4';
+WHERE bucket_id = 'campaign-assets' AND name LIKE '%/c0000007-0000-0000-0000-000000000007/private/source.mp4';
 -- Expected: 0 rows
 ROLLBACK;
 
@@ -256,7 +256,7 @@ SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", 
 
 DO $$
 DECLARE
-  v_campaign_id uuid := 'h0000000-0000-0000-0000-000000000008';
+  v_campaign_id uuid := 'd0000008-0000-0000-0000-000000000008';
 BEGIN
   INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
   VALUES ('Asset Test H', 'Brief', 'YouTube', 50, 'Creator A', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, 1000::numeric, 'draft', 'pending')
@@ -273,7 +273,7 @@ SET LOCAL role = 'authenticated';
 SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 
 SELECT count(*) AS creator_sees_thumb
-FROM storage.objects WHERE bucket_id = 'campaign-assets' AND name LIKE '%/h0000000-0000-0000-0000-000000000008/thumbnail.jpg';
+FROM storage.objects WHERE bucket_id = 'campaign-assets' AND name LIKE '%/d0000008-0000-0000-0000-000000000008/thumbnail.jpg';
 -- Expected: 1
 ROLLBACK;
 
@@ -283,7 +283,7 @@ SET LOCAL role = 'authenticated';
 SET LOCAL request.jwt.claims = '{"sub": "fe542ad2-8b40-40ea-8aba-ad8dc63140ce", "role": "authenticated"}';
 
 SELECT count(*) AS clipper_sees_thumb
-FROM storage.objects WHERE bucket_id = 'campaign-assets' AND name LIKE '%/h0000000-0000-0000-0000-000000000008/thumbnail.jpg';
+FROM storage.objects WHERE bucket_id = 'campaign-assets' AND name LIKE '%/d0000008-0000-0000-0000-000000000008/thumbnail.jpg';
 -- Expected: 1
 ROLLBACK;
 
@@ -293,7 +293,7 @@ SET LOCAL role = 'anon';
 SET LOCAL request.jwt.claims = '{"role": "anon"}';
 
 SELECT count(*) AS anon_sees_thumb
-FROM storage.objects WHERE bucket_id = 'campaign-assets' AND name LIKE '%/h0000000-0000-0000-0000-000000000008/thumbnail.jpg';
+FROM storage.objects WHERE bucket_id = 'campaign-assets' AND name LIKE '%/d0000008-0000-0000-0000-000000000008/thumbnail.jpg';
 -- Expected: 1
 ROLLBACK;
 
