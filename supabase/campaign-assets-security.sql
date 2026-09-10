@@ -4,9 +4,9 @@
 -- Problem: The campaign-assets bucket is fully public. Source footage (videos,
 -- source assets) is publicly readable by anyone with the URL.
 --
--- Solution: Path-based access control using a 'private/' prefix.
+-- Solution: Set bucket to private, then path-based access control via policies.
 --
--- Path convention (updated):
+-- Path convention:
 --   Public:  {user_id}/{campaign_id}/{filename}        (thumbnails, logos)
 --   Private: {user_id}/{campaign_id}/private/{filename} (source footage, brand assets)
 --
@@ -15,18 +15,21 @@
 --   Private files (4-part path with 'private' prefix):
 --     - Creator: can read own files
 --     - Admin: can read all
---     - Clipper: can read files for open+verified campaigns
+--     - Clipper: can read files for open+verified campaigns (role='clipper' required)
+--     - Others: DENIED
 --
 -- This migration is idempotent — safe to run multiple times.
 -- ============================================================================
 
--- 1. Drop ALL existing SELECT policies on storage.objects
---    (Supabase creates internal policies for public buckets that OR with ours)
+-- 0. Make bucket private (removes implicit public read access)
+UPDATE storage.buckets SET public = false WHERE id = 'campaign-assets';
+
+-- 1. Drop ALL existing policies on storage.objects to start clean
 DO $$ DECLARE
   r RECORD;
 BEGIN
   FOR r IN SELECT policyname FROM pg_policies
-    WHERE schemaname = 'storage' AND tablename = 'objects' AND cmd = 'SELECT'
+    WHERE schemaname = 'storage' AND tablename = 'objects'
   LOOP
     EXECUTE 'DROP POLICY IF EXISTS "' || r.policyname || '" ON storage.objects';
   END LOOP;
@@ -74,7 +77,6 @@ CREATE POLICY "campaign_assets_select_private" ON storage.objects
   );
 
 -- 4. Update INSERT policy to support both public and private paths
-DROP POLICY IF EXISTS "campaign_assets_insert" ON storage.objects;
 CREATE POLICY "campaign_assets_insert" ON storage.objects
   FOR INSERT TO authenticated
   WITH CHECK (
@@ -107,7 +109,6 @@ CREATE POLICY "campaign_assets_insert" ON storage.objects
   );
 
 -- 5. Update DELETE policy to support both public and private paths
-DROP POLICY IF EXISTS "campaign_assets_delete" ON storage.objects;
 CREATE POLICY "campaign_assets_delete" ON storage.objects
   FOR DELETE TO authenticated
   USING (
