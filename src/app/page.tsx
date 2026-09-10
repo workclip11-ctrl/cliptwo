@@ -515,10 +515,6 @@ export default function Home() {
                   src="/hero-reel.jpg"
                   alt=""
                   className="absolute inset-0 h-full w-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = featured[0]?.thumbnails?.[0] ?? "";
-                    (e.target as HTMLImageElement).onerror = null;
-                  }}
                 />
 
                 {/* Subtle gradient overlay for depth */}
@@ -545,8 +541,8 @@ export default function Home() {
             {/* Floating card — Views */}
             <div className="absolute -right-10 top-20 z-30 w-[120px] rounded-[12px] border border-border/20 bg-white p-3 shadow-lg shadow-black/8 sm:-right-14 sm:w-[130px]">
               <div className="flex items-center gap-1.5">
-                <span className="flex h-5 w-5 items-center justify-center rounded-[6px] bg-foreground/5">
-                  <Eye size={11} className="text-foreground/60" />
+                <span className="flex h-5 w-5 items-center justify-center rounded-[6px] bg-blue-500/10">
+                  <Eye size={11} className="text-blue-500" />
                 </span>
                 <span className="text-[10px] font-medium text-muted">Views</span>
               </div>
@@ -556,8 +552,8 @@ export default function Home() {
             {/* Floating card — Earned */}
             <div className="absolute -left-10 bottom-28 z-30 w-[120px] rounded-[12px] border border-border/20 bg-white p-3 shadow-lg shadow-black/8 sm:-left-14 sm:w-[130px]">
               <div className="flex items-center gap-1.5">
-                <span className="flex h-5 w-5 items-center justify-center rounded-[6px] bg-foreground/5">
-                  <IndianRupee size={11} className="text-foreground/60" />
+                <span className="flex h-5 w-5 items-center justify-center rounded-[6px] bg-green/10">
+                  <IndianRupee size={11} className="text-green" />
                 </span>
                 <span className="text-[10px] font-medium text-muted">Earned</span>
               </div>
