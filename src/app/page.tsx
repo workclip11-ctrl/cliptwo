@@ -512,9 +512,9 @@ export default function Home() {
 
         {/* Phone mockup — real ClipTwo product screen */}
         <div className="relative mx-auto w-full max-w-md lg:max-w-lg">
-          <div className="relative mx-auto w-[280px] sm:w-[300px]">
+          <div className="group relative mx-auto w-[280px] sm:w-[300px] transition-transform duration-300 ease-out hover:-translate-y-1">
             {/* Phone body */}
-            <div className="relative overflow-hidden rounded-[2.5rem] border border-border/30 bg-card shadow-2xl shadow-black/8">
+            <div className="relative overflow-hidden rounded-[2.5rem] border border-border/30 bg-card shadow-2xl shadow-black/8 transition-shadow duration-300 group-hover:shadow-2xl group-hover:shadow-black/12">
               {/* Notch */}
               <div className="absolute left-1/2 top-0 z-10 h-6 w-28 -translate-x-1/2 rounded-b-2xl bg-card" />
 
@@ -536,12 +536,12 @@ export default function Home() {
                     <span className="text-[13px] font-bold tracking-tight">cliptwo</span>
                     <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent-soft text-[10px] font-bold">R</span>
                   </div>
-                  <p className="mt-2 text-[10px] text-muted">Browse campaigns</p>
+                  <p className="mt-2 text-[10px] text-muted">Discover</p>
                 </div>
 
                 {/* Campaign thumbnail — dominant visual */}
                 <div className="mx-3 overflow-hidden rounded-[12px]">
-                  <div className="relative aspect-[16/10] bg-gradient-to-br from-slate-800 via-slate-700 to-slate-600">
+                  <div className="relative aspect-[16/10] bg-gradient-to-br from-slate-800 via-slate-700 to-slate-600 transition-transform duration-300 ease-out group-hover:scale-[1.02]">
                     {/* Real thumbnail if available */}
                     {featured[0]?.thumbnails?.[0] ? (
                       <img src={featured[0].thumbnails[0]} alt="" className="h-full w-full object-cover" />
@@ -550,9 +550,13 @@ export default function Home() {
                         <Scissors size={28} className="text-white/20" />
                       </div>
                     )}
-                    {/* Duration badge */}
-                    <div className="absolute right-2 bottom-2 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-mono text-white/90">
-                      0:42
+                    {/* Play button overlay */}
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-lg">
+                        <svg className="ml-0.5 h-4 w-4 text-foreground" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -563,33 +567,48 @@ export default function Home() {
                     <span className="inline-flex items-center gap-1 rounded-full bg-green/15 px-2 py-0.5 text-[9px] font-semibold text-green">
                       <Zap size={7} /> Live
                     </span>
-                    <span className="font-mono text-[10px] text-muted">CPM ₹220</span>
+                    <span className="font-mono text-[10px] text-muted">
+                      CPM {rup(featured[0]?.payout ?? 220)}
+                    </span>
                   </div>
                   <p className="mt-2 text-[12px] font-semibold leading-tight">
                     {featured[0]?.title || "Podcast clips — Ep. 143"}
                   </p>
                   <p className="mt-0.5 text-[10px] text-muted">
-                    by {featured[0]?.creator || "Rohan Malhotra"}
+                    {featured[0]?.creator || "Rohan Malhotra"}
                   </p>
                 </div>
 
-                {/* Platform + budget */}
+                {/* Platform + remaining budget or days left */}
                 <div className="px-4 pt-3">
                   <div className="flex items-center justify-between text-[10px]">
                     <span className="flex items-center gap-1 text-muted">
-                      <PlatformIcon p="Instagram" size={10} /> Instagram
+                      <PlatformIcon p={featured[0]?.platform ?? "Instagram"} size={10} />
+                      {featured[0]?.platform ?? "Instagram"}
+                      {featured[0]?.niche ? ` · ${featured[0].niche}` : ""}
                     </span>
-                    <span className="font-mono text-muted">₹18,400 / ₹40,000</span>
+                    {featured[0]?.remainingBudget != null ? (
+                      <span className="font-mono text-muted">{rup(featured[0].remainingBudget!)} left</span>
+                    ) : featured[0]?.daysLeft != null ? (
+                      <span className="font-mono text-muted">{featured[0].daysLeft}d left</span>
+                    ) : null}
                   </div>
-                  <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-muted/20">
-                    <div className="h-full w-[46%] rounded-full bg-foreground" />
-                  </div>
+                  {featured[0]?.budget != null && featured[0]?.spent != null && (
+                    <div className="mt-1.5">
+                      <div className="h-1 w-full overflow-hidden rounded-full bg-muted/20">
+                        <div
+                          className="h-full rounded-full bg-foreground transition-all duration-500"
+                          style={{ width: `${Math.min(100, ((featured[0].spent ?? 0) / (featured[0].budget ?? 1)) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Action button */}
                 <div className="px-4 pt-4">
-                  <button className="flex h-9 w-full items-center justify-center rounded-[8px] bg-foreground text-[11px] font-semibold text-background">
-                    View campaign
+                  <button className="flex h-9 w-full items-center justify-center rounded-[8px] bg-foreground text-[11px] font-semibold text-background transition-opacity duration-200 hover:opacity-90">
+                    Start clipping
                   </button>
                 </div>
 
@@ -611,7 +630,7 @@ export default function Home() {
             </div>
 
             {/* Floating card — earned */}
-            <div className="absolute -left-12 top-16 w-32 rotate-[-4deg] rounded-[10px] border border-border/30 bg-card p-3 shadow-lg shadow-black/5 sm:-left-16 sm:w-36">
+            <div className="absolute -left-12 top-16 w-32 rotate-[-4deg] rounded-[10px] border border-border/30 bg-card p-3 shadow-lg shadow-black/5 transition-all duration-300 group-hover:shadow-xl sm:-left-16 sm:w-36">
               <div className="flex items-center gap-1.5">
                 <span className="flex h-5 w-5 items-center justify-center rounded-[6px] bg-amber/10">
                   <IndianRupee size={10} className="text-amber" />
@@ -622,7 +641,7 @@ export default function Home() {
             </div>
 
             {/* Floating card — views */}
-            <div className="absolute -right-12 top-32 w-32 rotate-[4deg] rounded-[10px] border border-border/30 bg-card p-3 shadow-lg shadow-black/5 sm:-right-16 sm:w-36">
+            <div className="absolute -right-12 top-32 w-32 rotate-[4deg] rounded-[10px] border border-border/30 bg-card p-3 shadow-lg shadow-black/5 transition-all duration-300 group-hover:shadow-xl sm:-right-16 sm:w-36">
               <div className="flex items-center gap-1.5">
                 <span className="flex h-5 w-5 items-center justify-center rounded-[6px] bg-green/10">
                   <TrendingUp size={10} className="text-green" />
@@ -635,7 +654,7 @@ export default function Home() {
             </div>
 
             {/* Verified badge */}
-            <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-border/30 bg-card px-4 py-1.5 shadow-md">
+            <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-border/30 bg-card px-4 py-1.5 shadow-md transition-all duration-300 group-hover:shadow-lg">
               <div className="flex items-center gap-1.5">
                 <BadgeCheck size={13} className="text-green" />
                 <span className="text-[11px] font-medium">Verified &amp; Paid</span>
