@@ -10,8 +10,9 @@
 --      - Clipper: fe542ad2-8b40-40ea-8aba-ad8dc63140ce
 --      - Admin:   f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd
 --
--- Auth pattern: SET LOCAL role = 'authenticated' + SET LOCAL request.jwt.claims.
--- All cross-user inserts use admin context via set_config() then switch back.
+-- Auth pattern: SET LOCAL role = 'authenticated' + SET LOCAL request.jwt.clays.
+-- INSERT policy requires auth.uid() = created_by, so admin inserts use admin's
+-- own UUID as created_by for cross-user test data.
 -- Each test is wrapped in BEGIN/ROLLBACK so no data persists.
 -- ===========================================================================
 
@@ -47,35 +48,33 @@ ROLLBACK;
 -- ===========================================================================
 -- TEST 2: Creator cannot see another creator's campaign
 -- ===========================================================================
+-- Admin inserts campaign with created_by = admin UUID (satisfies INSERT policy)
+-- then creator queries — should see 0 rows.
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  -- Admin-context insert via set_config
-  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
-
   INSERT INTO public.campaigns (
     title, brief, platform, payout, creator, created_by,
     budget, status, launch_payment_status
   ) VALUES (
     'Visibility Test 2', 'Test brief', 'YouTube', 0, 'Other Creator',
-    '00000000-0000-0000-0000-999999999999'::uuid,
+    'f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd'::uuid,
     0, 'open', 'verified'
   ) RETURNING id INTO v_id;
 
-  -- Switch back to creator
+  -- Switch to creator
   PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
 
   ASSERT (SELECT count(*) FROM public.campaigns WHERE id = v_id) = 0,
-    'Creator should NOT see other creator campaign';
+    'Creator should NOT see admin-owned campaign';
 
-  -- Cleanup as admin
+  -- Cleanup
   PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
   DELETE FROM public.campaigns WHERE id = v_id;
@@ -89,22 +88,19 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
   v_rows integer;
 BEGIN
-  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
-
   INSERT INTO public.campaigns (
     title, brief, platform, payout, creator, created_by,
     budget, status, launch_payment_status
   ) VALUES (
     'Visibility Test 3', 'Test brief', 'YouTube', 0, 'Other Creator',
-    '00000000-0000-0000-0000-999999999999'::uuid,
+    'f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd'::uuid,
     0, 'open', 'verified'
   ) RETURNING id INTO v_id;
 
@@ -113,7 +109,7 @@ BEGIN
 
   UPDATE public.campaigns SET title = 'HACKED' WHERE id = v_id;
   GET DIAGNOSTICS v_rows = ROW_COUNT;
-  ASSERT v_rows = 0, 'Creator should NOT update other creator campaign';
+  ASSERT v_rows = 0, 'Creator should NOT update other campaign';
 
   PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
@@ -128,15 +124,12 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "fe542ad2-8b40-40ea-8aba-ad8dc63140ce", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
-
   INSERT INTO public.campaigns (
     title, brief, platform, payout, creator, created_by,
     budget, status, launch_payment_status
@@ -165,15 +158,12 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "fe542ad2-8b40-40ea-8aba-ad8dc63140ce", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
-
   INSERT INTO public.campaigns (
     title, brief, platform, payout, creator, created_by,
     budget, status, launch_payment_status
@@ -202,15 +192,12 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "fe542ad2-8b40-40ea-8aba-ad8dc63140ce", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
-
   INSERT INTO public.campaigns (
     title, brief, platform, payout, creator, created_by,
     budget, status, launch_payment_status
@@ -239,15 +226,12 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "fe542ad2-8b40-40ea-8aba-ad8dc63140ce", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
-
   INSERT INTO public.campaigns (
     title, brief, platform, payout, creator, created_by,
     budget, status, launch_payment_status
@@ -276,15 +260,12 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "fe542ad2-8b40-40ea-8aba-ad8dc63140ce", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
-
   INSERT INTO public.campaigns (
     title, brief, platform, payout, creator, created_by,
     budget, status, launch_payment_status
@@ -313,15 +294,12 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "fe542ad2-8b40-40ea-8aba-ad8dc63140ce", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
-
   INSERT INTO public.campaigns (
     title, brief, platform, payout, creator, created_by,
     budget, status, launch_payment_status
@@ -350,15 +328,12 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "fe542ad2-8b40-40ea-8aba-ad8dc63140ce", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
-
   INSERT INTO public.campaigns (
     title, brief, platform, payout, creator, created_by,
     budget, status, launch_payment_status
@@ -387,16 +362,13 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "fe542ad2-8b40-40ea-8aba-ad8dc63140ce", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
   v_rows integer;
 BEGIN
-  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
-
   INSERT INTO public.campaigns (
     title, brief, platform, payout, creator, created_by,
     budget, status, launch_payment_status
@@ -503,7 +475,7 @@ BEGIN
   )
   SELECT
     'Admin Test ' || s, 'Brief', 'YouTube', 0, 'Creator',
-    'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid,
+    'f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd'::uuid,
     0, s, 'verified'
   FROM unnest(ARRAY['draft','open','closed','paused','archived','budget_reached','near_budget']) AS s;
 
@@ -520,17 +492,13 @@ ROLLBACK;
 -- TEST 15: Anonymous user cannot access campaign rows
 -- ===========================================================================
 BEGIN;
-SET LOCAL role = 'anon';
-SET LOCAL request.jwt.claims = '{"role": "anon"}';
+SET LOCAL role = 'authenticated';
+SET LOCAL request.jwt.claims = '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  -- Insert as admin first (anon can't insert)
-  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
-
   INSERT INTO public.campaigns (
     title, brief, platform, payout, creator, created_by,
     budget, status, launch_payment_status
@@ -547,7 +515,7 @@ BEGIN
   ASSERT (SELECT count(*) FROM public.campaigns WHERE id = v_id) = 0,
     'Anonymous should NOT see campaign rows';
 
-  -- Cleanup as admin
+  -- Cleanup
   PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
   DELETE FROM public.campaigns WHERE id = v_id;
@@ -561,22 +529,19 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}';
 
 DO $$
 DECLARE
   v_id uuid;
   v_rows integer;
 BEGIN
-  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
-
   INSERT INTO public.campaigns (
     title, brief, platform, payout, creator, created_by,
     budget, status, launch_payment_status
   ) VALUES (
     'Visibility Test 16', 'Test brief', 'YouTube', 0, 'Other Creator',
-    '00000000-0000-0000-0000-999999999999'::uuid,
+    'f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd'::uuid,
     0, 'open', 'verified'
   ) RETURNING id INTO v_id;
 
@@ -585,19 +550,19 @@ BEGIN
 
   -- SELECT: should see 0 rows
   ASSERT (SELECT count(*) FROM public.campaigns WHERE id = v_id) = 0,
-    'Creator A should NOT see Creator B campaign via SELECT';
+    'Creator should NOT see admin-owned campaign via SELECT';
 
   -- UPDATE: should affect 0 rows
   UPDATE public.campaigns SET title = 'HACKED' WHERE id = v_id;
   GET DIAGNOSTICS v_rows = ROW_COUNT;
-  ASSERT v_rows = 0, 'Creator A should NOT update Creator B campaign';
+  ASSERT v_rows = 0, 'Creator should NOT update admin-owned campaign';
 
   -- DELETE: should affect 0 rows
   DELETE FROM public.campaigns WHERE id = v_id;
   GET DIAGNOSTICS v_rows = ROW_COUNT;
-  ASSERT v_rows = 0, 'Creator A should NOT delete Creator B campaign';
+  ASSERT v_rows = 0, 'Creator should NOT delete admin-owned campaign';
 
-  -- Cleanup as admin
+  -- Cleanup
   PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
   DELETE FROM public.campaigns WHERE id = v_id;
@@ -610,8 +575,8 @@ ROLLBACK;
 -- SUMMARY
 -- ===========================================================================
 -- TEST  1: Creator sees own campaign
--- TEST  2: Creator cannot see another creator's campaign
--- TEST  3: Creator cannot update another creator's campaign
+-- TEST  2: Creator cannot see another user's campaign
+-- TEST  3: Creator cannot update another user's campaign
 -- TEST  4: Clipper cannot see draft campaign
 -- TEST  5: Clipper cannot see submitted campaign
 -- TEST  6: Clipper cannot see rejected campaign
@@ -624,4 +589,4 @@ ROLLBACK;
 -- TEST 13: Creator cannot force unpaid campaign to open (trigger blocks)
 -- TEST 14: Admin can see all campaign states
 -- TEST 15: Anonymous user cannot access campaign rows
--- TEST 16: Campaign IDOR — Creator A blocked on Creator B's campaign
+-- TEST 16: Campaign IDOR — Creator blocked on other user's campaign
