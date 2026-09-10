@@ -20,8 +20,17 @@
 -- This migration is idempotent — safe to run multiple times.
 -- ============================================================================
 
--- 1. Drop existing SELECT policy (replaces world-readable with path-based)
-DROP POLICY IF EXISTS "campaign_assets_select" ON storage.objects;
+-- 1. Drop ALL existing SELECT policies on storage.objects
+--    (Supabase creates internal policies for public buckets that OR with ours)
+DO $$ DECLARE
+  r RECORD;
+BEGIN
+  FOR r IN SELECT policyname FROM pg_policies
+    WHERE schemaname = 'storage' AND tablename = 'objects' AND cmd = 'SELECT'
+  LOOP
+    EXECUTE 'DROP POLICY IF EXISTS "' || r.policyname || '" ON storage.objects';
+  END LOOP;
+END $$;
 
 -- 2. Public can read non-private files (3-part path: user/campaign/file)
 CREATE POLICY "campaign_assets_select_public" ON storage.objects
