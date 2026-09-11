@@ -2,7 +2,7 @@
 -- Campaign Assets Security Regression Tests
 -- ===========================================================================
 -- Tests the private file access security model via SELECT policies.
--- INSERT uses DO blocks (postgres superuser bypasses INSERT RLS).
+-- INSERT uses DO blocks with JWT claims (trigger needs auth.uid()).
 -- SELECT uses transaction-level SET LOCAL role (RLS enforced for non-owners).
 --
 -- UUIDs:
@@ -15,15 +15,17 @@
 -- ===========================================================================
 -- TEST A: Creator can read own private campaign asset
 -- ===========================================================================
--- Insert as postgres (bypasses RLS)
 DO $$
 DECLARE v_id uuid;
 BEGIN
-  INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
-  VALUES ('TA-Private', 'Brief', 'YouTube', 50, 'Creator A', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, 1000::numeric, 'draft', 'pending')
+  PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', false);
+  PERFORM set_config('role', 'authenticated', false);
+  INSERT INTO public.campaigns (title, brief, platform, payout, creator, budget, status, launch_payment_status)
+  VALUES ('TA-Private', 'Brief', 'YouTube', 50, 'Creator A', 1000::numeric, 'draft', 'pending')
   RETURNING id INTO v_id;
   INSERT INTO storage.objects (bucket_id, name, owner, metadata)
   VALUES ('campaign-assets', 'e92427b0-254e-44cc-b2df-be83792c8a94/' || v_id::text || '/private/secret.mp4', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '{}');
+  RAISE NOTICE 'TEST_A campaign_id=%', v_id;
 END $$;
 
 -- Read as Creator A (should see 1)
@@ -39,11 +41,14 @@ ROLLBACK;
 DO $$
 DECLARE v_id uuid;
 BEGIN
-  INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
-  VALUES ('TB-Private', 'Brief', 'YouTube', 50, 'Creator A', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, 1000::numeric, 'draft', 'pending')
+  PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', false);
+  PERFORM set_config('role', 'authenticated', false);
+  INSERT INTO public.campaigns (title, brief, platform, payout, creator, budget, status, launch_payment_status)
+  VALUES ('TB-Private', 'Brief', 'YouTube', 50, 'Creator A', 1000::numeric, 'draft', 'pending')
   RETURNING id INTO v_id;
   INSERT INTO storage.objects (bucket_id, name, owner, metadata)
   VALUES ('campaign-assets', 'e92427b0-254e-44cc-b2df-be83792c8a94/' || v_id::text || '/private/secret.mp4', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '{}');
+  RAISE NOTICE 'TEST_B campaign_id=%', v_id;
 END $$;
 
 -- Read as Creator B (should see 0)
@@ -59,11 +64,14 @@ ROLLBACK;
 DO $$
 DECLARE v_id uuid;
 BEGIN
-  INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
-  VALUES ('TC-Private', 'Brief', 'YouTube', 50, 'Creator A', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, 1000::numeric, 'draft', 'pending')
+  PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', false);
+  PERFORM set_config('role', 'authenticated', false);
+  INSERT INTO public.campaigns (title, brief, platform, payout, creator, budget, status, launch_payment_status)
+  VALUES ('TC-Private', 'Brief', 'YouTube', 50, 'Creator A', 1000::numeric, 'draft', 'pending')
   RETURNING id INTO v_id;
   INSERT INTO storage.objects (bucket_id, name, owner, metadata)
   VALUES ('campaign-assets', 'e92427b0-254e-44cc-b2df-be83792c8a94/' || v_id::text || '/private/secret.mp4', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '{}');
+  RAISE NOTICE 'TEST_C campaign_id=%', v_id;
 END $$;
 
 -- Read as Admin (should see 1)
@@ -79,11 +87,14 @@ ROLLBACK;
 DO $$
 DECLARE v_id uuid;
 BEGIN
-  INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
-  VALUES ('TD-Private', 'Brief', 'YouTube', 50, 'Creator A', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, 1000::numeric, 'open', 'verified')
+  PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', false);
+  PERFORM set_config('role', 'authenticated', false);
+  INSERT INTO public.campaigns (title, brief, platform, payout, creator, budget, status, launch_payment_status)
+  VALUES ('TD-Private', 'Brief', 'YouTube', 50, 'Creator A', 1000::numeric, 'open', 'verified')
   RETURNING id INTO v_id;
   INSERT INTO storage.objects (bucket_id, name, owner, metadata)
   VALUES ('campaign-assets', 'e92427b0-254e-44cc-b2df-be83792c8a94/' || v_id::text || '/private/footage.mp4', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '{}');
+  RAISE NOTICE 'TEST_D campaign_id=%', v_id;
 END $$;
 
 -- Read as Clipper (should see 1)
@@ -99,16 +110,19 @@ ROLLBACK;
 DO $$
 DECLARE v1 uuid; v2 uuid; v3 uuid;
 BEGIN
-  INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
-  VALUES ('TE-Draft', 'B', 'YouTube', 50, 'A', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, 100, 'draft', 'pending') RETURNING id INTO v1;
-  INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
-  VALUES ('TE-Unverified', 'B', 'YouTube', 50, 'A', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, 100, 'open', 'pending') RETURNING id INTO v2;
-  INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
-  VALUES ('TE-Closed', 'B', 'YouTube', 50, 'A', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, 100, 'closed', 'verified') RETURNING id INTO v3;
+  PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', false);
+  PERFORM set_config('role', 'authenticated', false);
+  INSERT INTO public.campaigns (title, brief, platform, payout, creator, budget, status, launch_payment_status)
+  VALUES ('TE-Draft', 'B', 'YouTube', 50, 'A', 100, 'draft', 'pending') RETURNING id INTO v1;
+  INSERT INTO public.campaigns (title, brief, platform, payout, creator, budget, status, launch_payment_status)
+  VALUES ('TE-Unverified', 'B', 'YouTube', 50, 'A', 100, 'open', 'pending') RETURNING id INTO v2;
+  INSERT INTO public.campaigns (title, brief, platform, payout, creator, budget, status, launch_payment_status)
+  VALUES ('TE-Closed', 'B', 'YouTube', 50, 'A', 100, 'closed', 'verified') RETURNING id INTO v3;
   INSERT INTO storage.objects (bucket_id, name, owner, metadata) VALUES
     ('campaign-assets', 'e92427b0-254e-44cc-b2df-be83792c8a94/' || v1::text || '/private/f.mp4', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '{}'),
     ('campaign-assets', 'e92427b0-254e-44cc-b2df-be83792c8a94/' || v2::text || '/private/f.mp4', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '{}'),
     ('campaign-assets', 'e92427b0-254e-44cc-b2df-be83792c8a94/' || v3::text || '/private/f.mp4', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '{}');
+  RAISE NOTICE 'TEST_E v1=% v2=% v3=%', v1, v2, v3;
 END $$;
 
 -- Read as Clipper (should see 0)
@@ -124,11 +138,14 @@ ROLLBACK;
 DO $$
 DECLARE v_id uuid;
 BEGIN
-  INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
-  VALUES ('TF-Private', 'B', 'YouTube', 50, 'A', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, 100, 'open', 'verified')
+  PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', false);
+  PERFORM set_config('role', 'authenticated', false);
+  INSERT INTO public.campaigns (title, brief, platform, payout, creator, budget, status, launch_payment_status)
+  VALUES ('TF-Private', 'B', 'YouTube', 50, 'A', 100, 'open', 'verified')
   RETURNING id INTO v_id;
   INSERT INTO storage.objects (bucket_id, name, owner, metadata)
   VALUES ('campaign-assets', 'e92427b0-254e-44cc-b2df-be83792c8a94/' || v_id::text || '/private/src.mp4', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '{}');
+  RAISE NOTICE 'TEST_F campaign_id=%', v_id;
 END $$;
 
 -- Read as Creator B (role=creator, not clipper)
@@ -144,11 +161,14 @@ ROLLBACK;
 DO $$
 DECLARE v_id uuid;
 BEGIN
-  INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
-  VALUES ('TG-Private', 'B', 'YouTube', 50, 'A', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, 100, 'open', 'verified')
+  PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', false);
+  PERFORM set_config('role', 'authenticated', false);
+  INSERT INTO public.campaigns (title, brief, platform, payout, creator, budget, status, launch_payment_status)
+  VALUES ('TG-Private', 'B', 'YouTube', 50, 'A', 100, 'open', 'verified')
   RETURNING id INTO v_id;
   INSERT INTO storage.objects (bucket_id, name, owner, metadata)
   VALUES ('campaign-assets', 'e92427b0-254e-44cc-b2df-be83792c8a94/' || v_id::text || '/private/src.mp4', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '{}');
+  RAISE NOTICE 'TEST_G campaign_id=%', v_id;
 END $$;
 
 -- Read as Anonymous
@@ -164,11 +184,14 @@ ROLLBACK;
 DO $$
 DECLARE v_id uuid;
 BEGIN
-  INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
-  VALUES ('TH-Public', 'B', 'YouTube', 50, 'A', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, 100, 'draft', 'pending')
+  PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', false);
+  PERFORM set_config('role', 'authenticated', false);
+  INSERT INTO public.campaigns (title, brief, platform, payout, creator, budget, status, launch_payment_status)
+  VALUES ('TH-Public', 'B', 'YouTube', 50, 'A', 100, 'draft', 'pending')
   RETURNING id INTO v_id;
   INSERT INTO storage.objects (bucket_id, name, owner, metadata)
   VALUES ('campaign-assets', 'e92427b0-254e-44cc-b2df-be83792c8a94/' || v_id::text || '/thumb.jpg', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '{}');
+  RAISE NOTICE 'TEST_H campaign_id=%', v_id;
 END $$;
 
 -- Creator sees thumbnail
