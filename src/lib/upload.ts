@@ -54,7 +54,7 @@ export async function uploadCampaignFile(
   //   Public (thumbnails): {user_id}/{campaign_id}/{filename}
   //   Private (source/brand): {user_id}/{campaign_id}/private/{filename}
   // The storage policy checks (storage.foldername(name))[1] = auth.uid()::text
-  const isPrivate = category === "source" || category === "brand";
+  const isPrivate = category === "source" || category === "brand" || category === "brand-asset";
   const filePath = isPrivate
     ? `${user.id}/${campaignId}/private/${safeName}`
     : `${user.id}/${campaignId}/${safeName}`;
@@ -66,6 +66,14 @@ export async function uploadCampaignFile(
   if (error) {
     console.error(`Upload failed (${category}):`, error.message);
     return null;
+  }
+
+  // Public files: return a direct public URL (bucket is private, but public
+  // SELECT policy allows anon reads for 2-segment paths).
+  // Private files: return the storage path only. Callers must resolve to a
+  // signed URL before use — never expose a fake "public" URL for private assets.
+  if (isPrivate) {
+    return filePath;
   }
 
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);

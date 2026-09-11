@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -28,7 +28,8 @@ import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup, fmtViews, clipEarnings } from "@/lib/format";
 import { campaignSpent } from "@/lib/finance";
-import type { Clip, Platform } from "@/lib/types";
+import { isStoragePath, resolveAssetUrls, resolveThumbnailUrls } from "@/lib/private-assets";
+import type { Clip, Platform, CampaignSourceAsset } from "@/lib/types";
 
 function Section({
   title,
@@ -67,11 +68,32 @@ export default function CampaignDetailPage() {
   const router = useRouter();
   const [active, setActive] = useState(false);
   const [reported, setReported] = useState(false);
+  const [resolvedSourceAssets, setResolvedSourceAssets] = useState<CampaignSourceAsset[]>([]);
+  const [resolvedThumbnails, setResolvedThumbnails] = useState<string[]>([]);
 
   const saved = savedCampaigns.includes(id);
 
   const campaign = campaigns.find((c) => c.id === id);
   const campClips = clips.filter((k) => k.campaignId === id);
+
+  // Resolve private storage paths to signed URLs for authenticated access
+  useEffect(() => {
+    if (!campaign) return;
+    let cancelled = false;
+    (async () => {
+      const src = campaign.sourceAssets ?? [];
+      const thumbs = campaign.thumbnails ?? [];
+      const [resolvedSrc, resolvedThumbs] = await Promise.all([
+        resolveAssetUrls(src),
+        resolveThumbnailUrls(thumbs),
+      ]);
+      if (!cancelled) {
+        setResolvedSourceAssets(resolvedSrc);
+        setResolvedThumbnails(resolvedThumbs);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [campaign?.id, campaign?.sourceAssets, campaign?.thumbnails]);
 
   function join() {
     if (!isSignedIn) {
@@ -113,7 +135,7 @@ export default function CampaignDetailPage() {
   const category = campaign.category ?? campaign.niche ?? "—";
   const vr = campaign.viewRules;
   const ap = campaign.approval;
-  const thumb = campaign.thumbnails?.[0];
+  const thumb = resolvedThumbnails[0] ?? campaign.thumbnails?.[0];
   const isUrgent = (campaign.daysLeft ?? 99) <= 7;
 
   return (
@@ -287,9 +309,9 @@ export default function CampaignDetailPage() {
                 <Film size={14} /> Open source video
               </a>
             )}
-            {campaign.sourceAssets?.length ? (
+            {resolvedSourceAssets.length ? (
               <div className="mt-2 space-y-2">
-                {campaign.sourceAssets.map((a) => (
+                {resolvedSourceAssets.map((a) => (
                   <a
                     key={a.url}
                     href={a.url}

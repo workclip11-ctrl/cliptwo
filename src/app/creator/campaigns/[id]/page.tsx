@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Pencil,
   Pause,
@@ -31,6 +31,8 @@ import { TopClipsTable } from "@/components/TopClipsTable";
 import { TimeSeriesChart } from "@/components/charts";
 import { EditCampaignModal } from "@/components/EditCampaignModal";
 import { AdjustBudgetModal } from "@/components/AdjustBudgetModal";
+import { isStoragePath, resolveAssetUrls, resolveThumbnailUrls } from "@/lib/private-assets";
+import type { CampaignSourceAsset } from "@/lib/types";
 
 function fmtDateTime(t: number) {
   return new Date(t).toLocaleString("en-IN", {
@@ -79,8 +81,33 @@ export default function CreatorCampaignDetailPage() {
   const [ending, setEnding] = useState(false);
   const [reopening, setReopening] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [resolvedSourceAssets, setResolvedSourceAssets] = useState<CampaignSourceAsset[]>([]);
+  const [resolvedBrandAssets, setResolvedBrandAssets] = useState<CampaignSourceAsset[]>([]);
+  const [resolvedThumbnails, setResolvedThumbnails] = useState<string[]>([]);
 
   const camp = campaigns.find((c) => c.id === id);
+
+  // Resolve private storage paths to signed URLs for authenticated access
+  useEffect(() => {
+    if (!camp) return;
+    let cancelled = false;
+    (async () => {
+      const src = camp.sourceAssets ?? [];
+      const brand = camp.brandAssets ?? [];
+      const thumbs = camp.thumbnails ?? [];
+      const [resolvedSrc, resolvedBrand, resolvedThumbs] = await Promise.all([
+        resolveAssetUrls(src),
+        resolveAssetUrls(brand),
+        resolveThumbnailUrls(thumbs),
+      ]);
+      if (!cancelled) {
+        setResolvedSourceAssets(resolvedSrc);
+        setResolvedBrandAssets(resolvedBrand);
+        setResolvedThumbnails(resolvedThumbs);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [camp?.id, camp?.sourceAssets, camp?.brandAssets, camp?.thumbnails]);
 
   if (!camp) {
     return (
@@ -580,9 +607,9 @@ export default function CreatorCampaignDetailPage() {
         {(() => {
           const hasAssets =
             camp.sourceLink ||
-            camp.thumbnails?.length ||
-            camp.brandAssets?.length ||
-            camp.sourceAssets?.length ||
+            resolvedThumbnails.length ||
+            resolvedBrandAssets.length ||
+            resolvedSourceAssets.length ||
             camp.exampleClips?.length;
           if (!hasAssets) {
             return (
@@ -596,21 +623,21 @@ export default function CreatorCampaignDetailPage() {
               {camp.sourceLink && (
                 <AssetRow label="Source video" value={camp.sourceLink} />
               )}
-              {camp.thumbnails?.length ? (
+              {resolvedThumbnails.length ? (
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {camp.thumbnails.map((t, i) => (
+                  {resolvedThumbnails.map((t, i) => (
                     <AssetThumb key={`thumb-${i}`} label={`Thumbnail ${i + 1}`} value={t} />
                   ))}
                 </div>
               ) : null}
-              {camp.brandAssets?.map((a, i) => (
+              {resolvedBrandAssets.map((a, i) => (
                 <AssetRow
                   key={`brand-${i}`}
                   label={a.label || `Brand asset ${i + 1}`}
                   value={a.url}
                 />
               ))}
-              {camp.sourceAssets?.map((a, i) => (
+              {resolvedSourceAssets.map((a, i) => (
                 <AssetRow
                   key={`src-${i}`}
                   label={a.label || `Asset ${i + 1}`}

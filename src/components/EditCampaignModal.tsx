@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useRef, type ReactNode } from "react";
+import { useState, useRef, useEffect, type ReactNode } from "react";
 import { X, Upload, Loader2, ImageIcon, FileText, XCircle } from "lucide-react";
 import { rup } from "@/lib/format";
 import { uploadCampaignFile } from "@/lib/upload";
+import { isStoragePath, resolveAssetUrl } from "@/lib/private-assets";
 import type { Campaign, CampaignRights, Platform } from "@/lib/types";
 
 const PLATFORM_OPTIONS: Platform[] = ["Instagram", "YouTube", "Kick"];
@@ -98,6 +99,17 @@ export function EditCampaignModal({
   const brandInputRef = useRef<HTMLInputElement>(null);
   const [confirmRules, setConfirmRules] = useState(false);
   const [budgetError, setBudgetError] = useState("");
+
+  // Resolve initial brand asset storage path to signed URL for display
+  useEffect(() => {
+    if (!brandAsset || !isStoragePath(brandAsset)) return;
+    let cancelled = false;
+    (async () => {
+      const signed = await resolveAssetUrl(brandAsset);
+      if (!cancelled && signed) setBrandAsset(signed);
+    })();
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const togglePlatform = (p: Platform) =>
     setPlatforms((prev) =>
