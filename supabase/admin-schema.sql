@@ -3544,7 +3544,7 @@ EXCEPTION WHEN undefined_function THEN NULL; END $$;
 -- Drop legacy functions
 DROP FUNCTION IF EXISTS public.create_earning(uuid, text);
 DROP FUNCTION IF EXISTS public.update_earning_status(uuid, text, text);
-DROP FUNCTION IF EXISTS public.get_clipper_earnings(uuid);
+-- get_clipper_earnings(uuid) is defined above (line ~2176), not legacy.
 DROP FUNCTION IF EXISTS public.process_payout(uuid, text);
 DROP FUNCTION IF EXISTS public.complete_payout(uuid, text);
 DROP FUNCTION IF EXISTS public.fail_payout(uuid, text);
