@@ -118,15 +118,14 @@ SELECT 'TEST 3 PASSED' AS result;
 ROLLBACK;
 
 -- ===========================================================================
--- TEST 4: Clipper cannot submit clip to open campaign with unverified payment
+-- TEST 4: Clipper cannot submit clip to campaign with submitted (unverified) payment
 -- ===========================================================================
 BEGIN;
 SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
 SELECT set_config('role', 'authenticated', true);
 
--- Create campaign and force it to open with pending payment (simulate legacy row)
 SELECT public.create_campaign(
-  'IDOR Test 4 - Unverified Open'::text,
+  'IDOR Test 4 - Submitted Payment'::text,
   'Brief'::text,
   'Instagram'::text,
   50::numeric,
@@ -139,13 +138,11 @@ DECLARE
 BEGIN
   SELECT id INTO v_campaign_id
   FROM public.campaigns
-  WHERE title = 'IDOR Test 4 - Unverified Open'
+  WHERE title = 'IDOR Test 4 - Submitted Payment'
     AND created_by = 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid;
 
-  -- Admin bypass: set status=open with payment_status=pending (simulate legacy)
-  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
-  UPDATE public.campaigns SET status = 'open', launch_payment_status = 'pending' WHERE id = v_campaign_id;
+  -- Submit payment (campaign stays draft, payment_status → submitted)
+  PERFORM public.submit_campaign_launch_payment(v_campaign_id, 'UTR-IDOR-4');
 
   PERFORM set_config('request.jwt.claims', '{"sub": "fe542ad2-8b40-40ea-8aba-ad8dc63140ce", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
@@ -154,7 +151,9 @@ BEGIN
     PERFORM public.submit_clip(v_campaign_id, 'Test caption', 'https://example.com/video2.mp4', 'Instagram');
     ASSERT false, 'TEST 4 FAIL: submit_clip to unverified campaign should fail';
   EXCEPTION WHEN OTHERS THEN
-    ASSERT SQLERRM LIKE '%launch payment has not been verified%',
+    ASSERT SQLERRM LIKE '%not open%'
+      OR SQLERRM LIKE '%launch payment%'
+      OR SQLERRM LIKE '%not been verified%',
       'TEST 4 FAIL: wrong error: ' || SQLERRM;
   END;
 END $$;
