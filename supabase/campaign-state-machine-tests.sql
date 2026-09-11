@@ -18,11 +18,11 @@ SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be8379
 SELECT set_config('role', 'authenticated', true);
 
 SELECT public.create_campaign(
-  'Test Campaign 1',
-  'Test brief for phase 1',
-  'YouTube',
-  50,
-  'Test Creator'
+  'Test Campaign 1'::text,
+  'Test brief for phase 1'::text,
+  'YouTube'::text,
+  50::numeric,
+  'Test Creator'::text
 );
 
 DO $$
@@ -85,11 +85,11 @@ SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be8379
 SELECT set_config('role', 'authenticated', true);
 
 SELECT public.create_campaign(
-  'Test Campaign 3',
-  'Test brief',
-  'YouTube',
-  50,
-  'Test Creator'
+  'Test Campaign 3'::text,
+  'Test brief'::text,
+  'YouTube'::text,
+  50::numeric,
+  'Test Creator'::text
 );
 
 DO $$
@@ -121,11 +121,11 @@ SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be8379
 SELECT set_config('role', 'authenticated', true);
 
 SELECT public.create_campaign(
-  'Test Campaign 4',
-  'Test brief',
-  'YouTube',
-  50,
-  'Test Creator'
+  'Test Campaign 4'::text,
+  'Test brief'::text,
+  'YouTube'::text,
+  50::numeric,
+  'Test Creator'::text
 );
 
 DO $$
@@ -157,11 +157,11 @@ SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be8379
 SELECT set_config('role', 'authenticated', true);
 
 SELECT public.create_campaign(
-  'Test Campaign 5',
-  'Test brief',
-  'YouTube',
-  50,
-  'Test Creator'
+  'Test Campaign 5'::text,
+  'Test brief'::text,
+  'YouTube'::text,
+  50::numeric,
+  'Test Creator'::text
 );
 
 DO $$
@@ -193,11 +193,11 @@ SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be8379
 SELECT set_config('role', 'authenticated', true);
 
 SELECT public.create_campaign(
-  'Test Campaign 6',
-  'Test brief',
-  'YouTube',
-  50,
-  'Test Creator'
+  'Test Campaign 6'::text,
+  'Test brief'::text,
+  'YouTube'::text,
+  50::numeric,
+  'Test Creator'::text
 );
 
 DO $$
@@ -240,11 +240,11 @@ SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be8379
 SELECT set_config('role', 'authenticated', true);
 
 SELECT public.create_campaign(
-  'Test Campaign 7',
-  'Test brief',
-  'YouTube',
-  50,
-  'Test Creator'
+  'Test Campaign 7'::text,
+  'Test brief'::text,
+  'YouTube'::text,
+  50::numeric,
+  'Test Creator'::text
 );
 
 DO $$
@@ -309,11 +309,11 @@ SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be8379
 SELECT set_config('role', 'authenticated', true);
 
 SELECT public.create_campaign(
-  'Test Campaign 9',
-  'Test brief',
-  'YouTube',
-  50,
-  'Test Creator'
+  'Test Campaign 9'::text,
+  'Test brief'::text,
+  'YouTube'::text,
+  50::numeric,
+  'Test Creator'::text
 );
 
 DO $$
@@ -361,11 +361,11 @@ SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be8379
 SELECT set_config('role', 'authenticated', true);
 
 SELECT public.create_campaign(
-  'Test Campaign 10',
-  'Test brief',
-  'YouTube',
-  50,
-  'Test Creator'
+  'Test Campaign 10'::text,
+  'Test brief'::text,
+  'YouTube'::text,
+  50::numeric,
+  'Test Creator'::text
 );
 
 DO $$
@@ -400,11 +400,11 @@ SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be8379
 SELECT set_config('role', 'authenticated', true);
 
 SELECT public.create_campaign(
-  'Test Campaign 11',
-  'Test brief',
-  'YouTube',
-  50,
-  'Test Creator'
+  'Test Campaign 11'::text,
+  'Test brief'::text,
+  'YouTube'::text,
+  50::numeric,
+  'Test Creator'::text
 );
 
 DO $$
@@ -439,11 +439,11 @@ SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be8379
 SELECT set_config('role', 'authenticated', true);
 
 SELECT public.create_campaign(
-  'Test Campaign 12',
-  'Test brief',
-  'YouTube',
-  50,
-  'Test Creator'
+  'Test Campaign 12'::text,
+  'Test brief'::text,
+  'YouTube'::text,
+  50::numeric,
+  'Test Creator'::text
 );
 
 DO $$
@@ -477,11 +477,11 @@ SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be8379
 SELECT set_config('role', 'authenticated', true);
 
 SELECT public.create_campaign(
-  'Test Campaign 13 - Creator B',
-  'Test brief',
-  'YouTube',
-  50,
-  'Test Creator B'
+  'Test Campaign 13 - Creator B'::text,
+  'Test brief'::text,
+  'YouTube'::text,
+  50::numeric,
+  'Test Creator B'::text
 );
 
 DO $$
@@ -513,11 +513,11 @@ SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be8379
 SELECT set_config('role', 'authenticated', true);
 
 SELECT public.create_campaign(
-  'Test Campaign 14 - Creator B',
-  'Test brief',
-  'YouTube',
-  50,
-  'Test Creator B'
+  'Test Campaign 14 - Creator B'::text,
+  'Test brief'::text,
+  'YouTube'::text,
+  50::numeric,
+  'Test Creator B'::text
 );
 
 DO $$
@@ -549,11 +549,11 @@ SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be8379
 SELECT set_config('role', 'authenticated', true);
 
 SELECT public.create_campaign(
-  'Test Campaign 15 - Own Delete',
-  'Test brief',
-  'YouTube',
-  50,
-  'Test Creator'
+  'Test Campaign 15 - Own Delete'::text,
+  'Test brief'::text,
+  'YouTube'::text,
+  50::numeric,
+  'Test Creator'::text
 );
 
 DO $$

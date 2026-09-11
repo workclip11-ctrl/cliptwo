@@ -21,11 +21,11 @@ SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be8379
 SELECT set_config('role', 'authenticated', true);
 
 SELECT public.create_campaign(
-  'IDOR Test 1 - Creator A Campaign',
-  'Brief',
-  'YouTube',
-  50,
-  'Creator A'
+  'IDOR Test 1 - Creator A Campaign'::text,
+  'Brief'::text,
+  'YouTube'::text,
+  50::numeric,
+  'Creator A'::text
 );
 
 DO $$
@@ -56,11 +56,11 @@ SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be8379
 SELECT set_config('role', 'authenticated', true);
 
 SELECT public.create_campaign(
-  'IDOR Test 2 - Creator A Campaign',
-  'Brief',
-  'YouTube',
-  50,
-  'Creator A'
+  'IDOR Test 2 - Creator A Campaign'::text,
+  'Brief'::text,
+  'YouTube'::text,
+  50::numeric,
+  'Creator A'::text
 );
 
 DO $$
@@ -86,11 +86,11 @@ SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be8379
 SELECT set_config('role', 'authenticated', true);
 
 SELECT public.create_campaign(
-  'IDOR Test 3 - Draft Campaign',
-  'Brief',
-  'Instagram',
-  50,
-  'Creator A'
+  'IDOR Test 3 - Draft Campaign'::text,
+  'Brief'::text,
+  'Instagram'::text,
+  50::numeric,
+  'Creator A'::text
 );
 
 DO $$
@@ -126,11 +126,11 @@ SELECT set_config('role', 'authenticated', true);
 
 -- Create campaign and force it to open with pending payment (simulate legacy row)
 SELECT public.create_campaign(
-  'IDOR Test 4 - Unverified Open',
-  'Brief',
-  'Instagram',
-  50,
-  'Creator A'
+  'IDOR Test 4 - Unverified Open'::text,
+  'Brief'::text,
+  'Instagram'::text,
+  50::numeric,
+  'Creator A'::text
 );
 
 DO $$
@@ -170,11 +170,11 @@ SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be8379
 SELECT set_config('role', 'authenticated', true);
 
 SELECT public.create_campaign(
-  'IDOR Test 5 - Closed Campaign',
-  'Brief',
-  'Instagram',
-  50,
-  'Creator A'
+  'IDOR Test 5 - Closed Campaign'::text,
+  'Brief'::text,
+  'Instagram'::text,
+  50::numeric,
+  'Creator A'::text
 );
 
 DO $$
@@ -213,11 +213,11 @@ SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be8379
 SELECT set_config('role', 'authenticated', true);
 
 SELECT public.create_campaign(
-  'IDOR Test 6 - Rejected Payment',
-  'Brief',
-  'YouTube',
-  50,
-  'Creator A'
+  'IDOR Test 6 - Rejected Payment'::text,
+  'Brief'::text,
+  'YouTube'::text,
+  50::numeric,
+  'Creator A'::text
 );
 
 DO $$
@@ -249,11 +249,11 @@ SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be8379
 SELECT set_config('role', 'authenticated', true);
 
 SELECT public.create_campaign(
-  'IDOR Test 7 - Clipper UPDATE',
-  'Brief',
-  'YouTube',
-  50,
-  'Creator A'
+  'IDOR Test 7 - Clipper UPDATE'::text,
+  'Brief'::text,
+  'YouTube'::text,
+  50::numeric,
+  'Creator A'::text
 );
 
 DO $$
@@ -285,11 +285,11 @@ SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be8379
 SELECT set_config('role', 'authenticated', true);
 
 SELECT public.create_campaign(
-  'IDOR Test 8 - Clipper DELETE',
-  'Brief',
-  'YouTube',
-  50,
-  'Creator A'
+  'IDOR Test 8 - Clipper DELETE'::text,
+  'Brief'::text,
+  'YouTube'::text,
+  50::numeric,
+  'Creator A'::text
 );
 
 DO $$
@@ -321,11 +321,11 @@ SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be8379
 SELECT set_config('role', 'authenticated', true);
 
 SELECT public.create_campaign(
-  'IDOR Test 9 - Creator Admin Action',
-  'Brief',
-  'YouTube',
-  50,
-  'Creator A'
+  'IDOR Test 9 - Creator Admin Action'::text,
+  'Brief'::text,
+  'YouTube'::text,
+  50::numeric,
+  'Creator A'::text
 );
 
 DO $$
@@ -357,11 +357,11 @@ SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be8379
 SELECT set_config('role', 'authenticated', true);
 
 SELECT public.create_campaign(
-  'IDOR Test 10 - Double Verify',
-  'Brief',
-  'YouTube',
-  50,
-  'Creator A'
+  'IDOR Test 10 - Double Verify'::text,
+  'Brief'::text,
+  'YouTube'::text,
+  50::numeric,
+  'Creator A'::text
 );
 
 DO $$
