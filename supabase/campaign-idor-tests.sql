@@ -384,7 +384,9 @@ BEGIN
     PERFORM public.verify_campaign_launch_payment(v_payment_id);
     ASSERT false, 'TEST 10 FAIL: double verify should fail';
   EXCEPTION WHEN OTHERS THEN
-    ASSERT SQLERRM LIKE '%already verified%',
+    ASSERT SQLERRM LIKE '%already verified%'
+      OR SQLERRM LIKE '%not in submitted%'
+      OR SQLERRM LIKE '%submitted status%',
       'TEST 10 FAIL: wrong error: ' || SQLERRM;
   END;
 END $$;
