@@ -260,7 +260,7 @@ BEGIN
     PERFORM public.campaign_action(v_campaign_id, 'resume');
     ASSERT false, 'TEST 7 FAIL: campaign_action(resume) should have raised exception';
   EXCEPTION WHEN OTHERS THEN
-    ASSERT SQLERRM LIKE '%must be paused%',
+    ASSERT SQLERRM LIKE '%resume a paused%',
       'TEST 7 FAIL: wrong error: ' || SQLERRM;
   END;
 END $$;
@@ -269,40 +269,55 @@ SELECT 'TEST 7 PASSED' AS result;
 ROLLBACK;
 
 -- ===========================================================================
--- TEST 8: Existing campaigns are NOT affected by default change
+-- TEST 8: Full workflow: create -> submit payment -> verify -> opens
 -- ===========================================================================
 BEGIN;
-INSERT INTO public.campaigns (
-  title, brief, platform, payout, creator, status, launch_payment_status,
-  created_by
-) VALUES (
-  'Legacy Campaign',
-  'Pre-migration campaign',
-  'YouTube',
-  100,
-  'Legacy Creator',
-  'open',
-  'verified',
-  'f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd'::uuid
+SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+SELECT set_config('role', 'authenticated', true);
+
+SELECT public.create_campaign(
+  'Test Campaign 8'::text,
+  'Test brief'::text,
+  'YouTube'::text,
+  50::numeric,
+  'Test Creator'::text
 );
 
 DO $$
 DECLARE
+  v_campaign_id uuid;
+  v_payment_id uuid;
   v_status text;
   v_payment text;
 BEGIN
-  SELECT status, launch_payment_status INTO v_status, v_payment
-  FROM public.campaigns WHERE title = 'Legacy Campaign';
+  SELECT id INTO v_campaign_id
+  FROM public.campaigns
+  WHERE title = 'Test Campaign 8'
+    AND created_by = 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid;
 
-  ASSERT v_status = 'open', 'TEST 8 FAIL: expected status=open, got ' || v_status;
-  ASSERT v_payment = 'verified', 'TEST 8 FAIL: expected launch_payment_status=verified, got ' || v_payment;
+  SELECT status, launch_payment_status INTO v_status, v_payment
+  FROM public.campaigns WHERE id = v_campaign_id;
+  ASSERT v_status = 'draft', 'TEST 8 FAIL: expected draft, got ' || v_status;
+  ASSERT v_payment = 'pending', 'TEST 8 FAIL: expected pending, got ' || v_payment;
+
+  PERFORM public.submit_campaign_launch_payment(v_campaign_id, 'UTR-TEST-8');
+  SELECT id INTO v_payment_id FROM public.campaign_launch_payments WHERE campaign_id = v_campaign_id;
+
+  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
+  PERFORM set_config('role', 'authenticated', true);
+  PERFORM public.verify_campaign_launch_payment(v_payment_id);
+
+  SELECT status, launch_payment_status INTO v_status, v_payment
+  FROM public.campaigns WHERE id = v_campaign_id;
+  ASSERT v_status = 'open', 'TEST 8 FAIL: expected open after verify, got ' || v_status;
+  ASSERT v_payment = 'verified', 'TEST 8 FAIL: expected verified, got ' || v_payment;
 END $$;
 
 SELECT 'TEST 8 PASSED' AS result;
 ROLLBACK;
 
 -- ===========================================================================
--- TEST 9: Full lifecycle: publish -> pause -> resume with verified payment
+-- TEST 9: Full lifecycle: verify -> open -> pause -> resume
 -- ===========================================================================
 BEGIN;
 SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
@@ -334,12 +349,11 @@ BEGIN
   PERFORM set_config('role', 'authenticated', true);
   PERFORM public.verify_campaign_launch_payment(v_payment_id);
 
+  SELECT status INTO v_status FROM public.campaigns WHERE id = v_campaign_id;
+  ASSERT v_status = 'open', 'TEST 9 FAIL: expected open after verify, got ' || v_status;
+
   PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
-
-  PERFORM public.campaign_action(v_campaign_id, 'publish');
-  SELECT status INTO v_status FROM public.campaigns WHERE id = v_campaign_id;
-  ASSERT v_status = 'open', 'TEST 9 FAIL: expected open after publish, got ' || v_status;
 
   PERFORM public.campaign_action(v_campaign_id, 'pause');
   SELECT status INTO v_status FROM public.campaigns WHERE id = v_campaign_id;

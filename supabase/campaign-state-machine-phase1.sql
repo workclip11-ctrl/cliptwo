@@ -28,7 +28,33 @@ COMMENT ON COLUMN public.campaigns.status IS
 COMMENT ON COLUMN public.campaigns.launch_payment_status IS
   'Payment verification status. Only Admin-controlled RPCs may set this to verified.';
 
--- ── 2. Remove p_status from create_campaign ─────────────────────────────────
+-- ── 2. Enforce safe defaults on INSERT (defense-in-depth) ───────────────────
+-- Safety net: even if a direct INSERT bypasses the column defaults or the
+-- create_campaign RPC, this trigger forces status='draft' and
+-- launch_payment_status='pending'. Prevents any path to an open/unverified
+-- campaign via direct INSERT.
+
+CREATE OR REPLACE FUNCTION public.enforce_campaign_insert_defaults()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  -- Always force safe initial state on INSERT, regardless of provided values
+  NEW.status := 'draft';
+  NEW.launch_payment_status := 'pending';
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS enforce_campaign_insert_defaults ON public.campaigns;
+CREATE TRIGGER enforce_campaign_insert_defaults
+  BEFORE INSERT ON public.campaigns
+  FOR EACH ROW
+  EXECUTE FUNCTION public.enforce_campaign_insert_defaults();
+
+-- ── 3. Remove p_status from create_campaign ─────────────────────────────────
 -- The caller must never be able to request an unsafe initial state.
 -- Status is always forced to 'draft' with launch_payment_status='pending'.
 
@@ -139,7 +165,7 @@ GRANT EXECUTE ON FUNCTION public.create_campaign(
   jsonb, jsonb, jsonb, jsonb, numeric, text, text, text, jsonb
 ) TO authenticated;
 
--- ── 3. UPDATE trigger: open requires verified payment ────────────────────────
+-- ── 4. UPDATE trigger: open requires verified payment ────────────────────────
 -- Safety net: prevents any direct UPDATE from setting status='open' when
 -- launch_payment_status is not 'verified'. Admin SECURITY DEFINER RPCs
 -- (verify_campaign_launch_payment) set both in the same UPDATE statement,
@@ -166,7 +192,7 @@ CREATE TRIGGER enforce_campaign_open_requires_verified
   FOR EACH ROW
   EXECUTE FUNCTION public.enforce_campaign_open_requires_verified();
 
--- ── 4. Fix campaign_action('publish'): require verified payment ──────────────
+-- ── 5. Fix campaign_action('publish'): require verified payment ──────────────
 -- The owner 'publish' action previously transitioned draft -> open without
 -- checking launch_payment_status. This is now gated on payment verification.
 
