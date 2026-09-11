@@ -37,7 +37,7 @@ DELETE FROM public.campaigns WHERE title IN (
 
 -- ===================== DATA SETUP (campaigns RLS + trigger off) =====================
 ALTER TABLE public.campaigns DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.campaigns DISABLE TRIGGER set_campaign_created_by;
+ALTER TABLE public.campaigns DISABLE TRIGGER set_created_by;
 
 -- TEST A: Creator A's own private asset (should read)
 INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
@@ -118,7 +118,7 @@ SELECT public.insert_test_storage_object(
 );
 
 -- ===================== RE-ENABLE SECURITY =====================
-ALTER TABLE public.campaigns ENABLE TRIGGER set_campaign_created_by;
+ALTER TABLE public.campaigns ENABLE TRIGGER set_created_by;
 ALTER TABLE public.campaigns ENABLE ROW LEVEL SECURITY;
 
 -- ===================== SELECT TESTS (RLS ON) =====================
