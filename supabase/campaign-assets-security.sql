@@ -36,22 +36,26 @@ BEGIN
 END $$;
 
 -- 2. Public can read non-private files (3-part path: user/campaign/file)
+--    NOTE: storage.foldername() excludes the filename, so a 3-segment path
+--    produces an array of length 2, not 3.
 CREATE POLICY "campaign_assets_select_public" ON storage.objects
   FOR SELECT TO public
   USING (
     bucket_id = 'campaign-assets'
-    AND array_length(storage.foldername(name), 1) = 3
+    AND array_length(storage.foldername(name), 1) = 2
   );
 
 -- 3. Authenticated users can read private files (4-part path with 'private' prefix)
 --    Creator: own files only
 --    Admin: all files
 --    Clipper: open+verified campaign files ONLY when profile role = 'clipper'
+--    NOTE: storage.foldername() excludes the filename, so a 4-segment path
+--    (user/campaign/private/file) produces an array of length 3.
 CREATE POLICY "campaign_assets_select_private" ON storage.objects
   FOR SELECT TO authenticated
   USING (
     bucket_id = 'campaign-assets'
-    AND array_length(storage.foldername(name), 1) = 4
+    AND array_length(storage.foldername(name), 1) = 3
     AND (storage.foldername(name))[3] = 'private'
     AND (
       -- Creator: own files
@@ -77,6 +81,9 @@ CREATE POLICY "campaign_assets_select_private" ON storage.objects
   );
 
 -- 4. Update INSERT policy to support both public and private paths
+--    NOTE: storage.foldername() excludes the filename.
+--    Public path: {user_id}/{campaign_id}/{filename} → foldername length 2
+--    Private path: {user_id}/{campaign_id}/private/{filename} → foldername length 3
 CREATE POLICY "campaign_assets_insert" ON storage.objects
   FOR INSERT TO authenticated
   WITH CHECK (
@@ -85,7 +92,7 @@ CREATE POLICY "campaign_assets_insert" ON storage.objects
     AND (
       -- Public path: {user_id}/{campaign_id}/{filename}
       (
-        array_length(storage.foldername(name), 1) = 3
+        array_length(storage.foldername(name), 1) = 2
         AND (storage.foldername(name))[2] ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
         AND EXISTS (
           SELECT 1 FROM public.campaigns
@@ -96,7 +103,7 @@ CREATE POLICY "campaign_assets_insert" ON storage.objects
       OR
       -- Private path: {user_id}/{campaign_id}/private/{filename}
       (
-        array_length(storage.foldername(name), 1) = 4
+        array_length(storage.foldername(name), 1) = 3
         AND (storage.foldername(name))[3] = 'private'
         AND (storage.foldername(name))[2] ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
         AND EXISTS (
@@ -109,6 +116,7 @@ CREATE POLICY "campaign_assets_insert" ON storage.objects
   );
 
 -- 5. Update DELETE policy to support both public and private paths
+--    NOTE: storage.foldername() excludes the filename.
 CREATE POLICY "campaign_assets_delete" ON storage.objects
   FOR DELETE TO authenticated
   USING (
@@ -117,7 +125,7 @@ CREATE POLICY "campaign_assets_delete" ON storage.objects
     AND (
       -- Public path
       (
-        array_length(storage.foldername(name), 1) = 3
+        array_length(storage.foldername(name), 1) = 2
         AND (storage.foldername(name))[2] ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
         AND EXISTS (
           SELECT 1 FROM public.campaigns
@@ -128,7 +136,7 @@ CREATE POLICY "campaign_assets_delete" ON storage.objects
       OR
       -- Private path
       (
-        array_length(storage.foldername(name), 1) = 4
+        array_length(storage.foldername(name), 1) = 3
         AND (storage.foldername(name))[3] = 'private'
         AND (storage.foldername(name))[2] ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
         AND EXISTS (

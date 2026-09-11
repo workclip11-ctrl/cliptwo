@@ -44,7 +44,7 @@ BEGIN
 END;
 $$;
 
--- Insert storage objects
+-- Insert storage objects with correct 4-part paths (private) and 3-part paths (public)
 SELECT public.insert_test_storage_object('e92427b0-254e-44cc-b2df-be83792c8a94/' || id::text || '/private/test-a.mp4', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid) FROM public.campaigns WHERE title = 'TA-Private';
 SELECT public.insert_test_storage_object('e92427b0-254e-44cc-b2df-be83792c8a94/' || id::text || '/private/test-b.mp4', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid) FROM public.campaigns WHERE title = 'TB-Private';
 SELECT public.insert_test_storage_object('e92427b0-254e-44cc-b2df-be83792c8a94/' || id::text || '/private/test-c.mp4', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid) FROM public.campaigns WHERE title = 'TC-Private';
@@ -60,5 +60,11 @@ SELECT public.insert_test_storage_object('e92427b0-254e-44cc-b2df-be83792c8a94/'
 ALTER TABLE public.campaigns ENABLE TRIGGER set_created_by;
 ALTER TABLE public.campaigns ENABLE ROW LEVEL SECURITY;
 
--- Verify: should show 10 objects
-SELECT count(*) AS total_objects FROM storage.objects WHERE bucket_id = 'campaign-assets' AND name LIKE '%/test-%';
+-- Verify: should show 10 objects with correct foldername lengths
+-- NOTE: storage.foldername() excludes filename, so:
+--   3-part path (private) → foldername length 3
+--   2-part path (public) → foldername length 2
+SELECT name, array_length(storage.foldername(name), 1) AS folder_depth
+FROM storage.objects
+WHERE bucket_id = 'campaign-assets' AND name LIKE '%/test-%'
+ORDER BY name;
