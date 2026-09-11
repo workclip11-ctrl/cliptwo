@@ -273,10 +273,11 @@ on conflict (id) do nothing;
 -- CAMPAIGNS: Strict creator-only authorization with server-side enforcement
 -- ---------------------------------------------------------------------------
 
--- SELECT: world-readable (clippers need to browse campaigns)
-drop policy if exists "campaigns_select" on public.campaigns;
-create policy "campaigns_select" on public.campaigns
-  for select using (true);
+-- SELECT: role-based visibility enforced by campaign-visibility.sql
+-- DO NOT create a world-readable SELECT policy here. campaign-visibility.sql
+-- provides role-based SELECT policies (creator/admin/clipper) that enforce
+-- launch_payment_status visibility rules. If you re-run this file, also
+-- re-run campaign-visibility.sql to restore the correct policies.
 
 -- INSERT: only users with role='creator' can create campaigns
 -- created_by is ALWAYS set to auth.uid() by the trigger (cannot be spoofed)
@@ -976,6 +977,10 @@ begin
     when 'publish' then
       if v_campaign.status != 'draft' then
         raise exception 'Can only publish a draft campaign (current: %)', v_campaign.status;
+      end if;
+      -- PHASE 1: Launch payment must be verified before publishing
+      if v_campaign.launch_payment_status is distinct from 'verified' then
+        raise exception 'Cannot publish: launch payment has not been verified (current payment status: %)', v_campaign.launch_payment_status;
       end if;
       v_new_status := 'open';
   end case;

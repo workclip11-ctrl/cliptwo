@@ -1,7 +1,15 @@
 -- ===========================================================================
--- PHASE 4 SECURITY FIX — REGRESSION TESTS
+-- [LEGACY] PHASE 4 SECURITY FIX — REGRESSION TESTS
 -- ===========================================================================
--- Tests A-G verifying the Phase 4 security fixes.
+-- NOTE: This file is LEGACY and kept for historical reference.
+-- The AUTHORITATIVE Phase 4 storage security test suite is:
+--   1. campaign-assets-security.sql     (policies — run first)
+--   2. campaign-assets-test-setup.sql   (data setup)
+--   3. campaign-assets-test-queries.sql (tests A-H)
+--
+-- Tests A-E below test payment integrity (campaign table) and are still valid.
+-- Tests F-G test storage policy existence (structural checks only).
+-- For actual storage access regression tests, see campaign-assets-test-queries.sql.
 --
 -- Prerequisites:
 --   1. Run campaign-visibility.sql (RLS policies)
@@ -274,11 +282,11 @@ BEGIN
     AND policyname = 'campaign_assets_select_public'
     AND cmd = 'SELECT';
 
-  -- Verify it checks for 3-part paths (array_length = 3)
+  -- Verify it checks for 3-part paths (array_length = 2, foldername excludes filename)
   ASSERT v_policy_qual LIKE '%array_length%',
     'Public policy should check array_length for 3-part paths';
-  ASSERT v_policy_qual LIKE '%= 3%',
-    'Public policy should require exactly 3 folder parts';
+  ASSERT v_policy_qual LIKE '%= 2%',
+    'Public policy should require array_length = 2 (foldername excludes filename for 3-segment path)';
 END $$;
 
 SELECT 'TEST G PASSED' AS result;
