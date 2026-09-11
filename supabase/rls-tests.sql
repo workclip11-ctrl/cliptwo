@@ -1,19 +1,13 @@
 -- ===========================================================================
 -- RLS TEST SUITE — Run in Supabase SQL Editor to verify security hardening
 --
--- How to use:
---   1. Create two test users in Supabase Dashboard > Auth > Users
---   2. Note their UUIDs as 'user_a' and 'user_b'
---   3. Replace the placeholder UUIDs below
---   4. Run each test individually and verify the expected outcome
+-- Test UUIDs (must exist in auth.users + profiles):
+--   User A (creator): e92427b0-254e-44cc-b2df-be83792c8a94
+--   User B (clipper): fe542ad2-8b40-40ea-8aba-ad8dc63140ce
 --
 -- Tests use SET LOCAL to simulate different authenticated users.
 -- Each test is wrapped in a BEGIN/ROLLBACK so no data is modified.
 -- ===========================================================================
-
--- Replace these with real test user UUIDs:
--- \set user_a '00000000-0000-0000-0000-000000000001'
--- \set user_b '00000000-0000-0000-0000-000000000002'
 
 -- ===========================================================================
 -- TEST A: User A tries to read User B's financial_records
@@ -21,9 +15,9 @@
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_USER_A_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 SELECT count(*) AS test_a_result FROM public.financial_records
-WHERE clipper_id = 'REPLACE_WITH_USER_B_UUID';
+WHERE clipper_id = 'fe542ad2-8b40-40ea-8aba-ad8dc63140ce';
 -- Expected: 0 rows
 ROLLBACK;
 
@@ -33,9 +27,9 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_USER_A_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 SELECT count(*) AS test_b_result FROM public.payout_requests
-WHERE user_id = 'REPLACE_WITH_USER_B_UUID';
+WHERE user_id = 'fe542ad2-8b40-40ea-8aba-ad8dc63140ce';
 -- Expected: 0 rows
 ROLLBACK;
 
@@ -45,9 +39,9 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_USER_A_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 INSERT INTO public.payout_requests (user_id, amount, net_amount, upi_id, finance_record_ids)
-VALUES ('REPLACE_WITH_USER_A_UUID', 10000, 10000, 'test@upi', '{}');
+VALUES ('e92427b0-254e-44cc-b2df-be83792c8a94', 10000, 10000, 'test@upi', '{}');
 -- Expected: ERROR (new row violates row-level security policy)
 ROLLBACK;
 
@@ -57,8 +51,8 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_USER_A_UUID", "role": "authenticated"}';
-SELECT public.get_wallet_balance('REPLACE_WITH_USER_B_UUID');
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
+SELECT public.get_wallet_balance('fe542ad2-8b40-40ea-8aba-ad8dc63140ce');
 -- Expected: {"error": "Unauthorized", ...}
 ROLLBACK;
 
@@ -68,8 +62,8 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_USER_A_UUID", "role": "authenticated"}';
-SELECT public.get_clipper_earnings('REPLACE_WITH_USER_B_UUID');
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
+SELECT public.get_clipper_earnings('fe542ad2-8b40-40ea-8aba-ad8dc63140ce');
 -- Expected: {"error": "Unauthorized", ...}
 ROLLBACK;
 
@@ -79,8 +73,8 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_USER_A_UUID", "role": "authenticated"}';
-UPDATE public.social_accounts SET handle = 'hacked' WHERE user_id = 'REPLACE_WITH_USER_B_UUID';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
+UPDATE public.social_accounts SET handle = 'hacked' WHERE user_id = 'fe542ad2-8b40-40ea-8aba-ad8dc63140ce';
 -- Expected: 0 rows updated (RLS blocks cross-user update)
 ROLLBACK;
 
@@ -90,8 +84,8 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_USER_A_UUID", "role": "authenticated"}';
-UPDATE public.social_accounts SET verified = true WHERE user_id = 'REPLACE_WITH_USER_A_UUID';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
+UPDATE public.social_accounts SET verified = true WHERE user_id = 'e92427b0-254e-44cc-b2df-be83792c8a94';
 -- Expected: ERROR (trigger: Only admins can change verified status)
 ROLLBACK;
 
@@ -101,7 +95,7 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_USER_A_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 INSERT INTO public.audit_logs (id, actor, action, entity_type, entity_id)
 VALUES ('fake-audit', 'admin@fake.com', 'clip_approved', 'clip', 'fake-id');
 -- Expected: ERROR (new row violates row-level security policy)
@@ -124,7 +118,7 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_USER_A_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 SELECT public.admin_clip_action('00000000-0000-0000-0000-000000000000'::uuid, 'reject');
 -- Expected: ERROR (Only admins can perform clip actions)
 ROLLBACK;
@@ -135,8 +129,8 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_USER_A_UUID", "role": "authenticated"}';
-SELECT public.admin_user_action('REPLACE_WITH_USER_B_UUID', 'suspend');
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
+SELECT public.admin_user_action('fe542ad2-8b40-40ea-8aba-ad8dc63140ce', 'suspend');
 -- Expected: ERROR (Only admins can perform user actions)
 ROLLBACK;
 
@@ -146,9 +140,9 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_USER_A_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 INSERT INTO public.notifications (user_id, title, message, type)
-VALUES ('REPLACE_WITH_USER_B_UUID', 'Fake notification', 'Hacked', 'system');
+VALUES ('fe542ad2-8b40-40ea-8aba-ad8dc63140ce', 'Fake notification', 'Hacked', 'system');
 -- Expected: ERROR (new row violates row-level security policy)
 ROLLBACK;
 
@@ -158,9 +152,9 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_USER_A_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 INSERT INTO public.social_accounts (user_id, platform, handle, status)
-VALUES ('REPLACE_WITH_USER_A_UUID', 'YouTube', '@test', 'not_connected');
+VALUES ('e92427b0-254e-44cc-b2df-be83792c8a94', 'YouTube', '@test', 'not_connected');
 -- Expected: ERROR (new row violates row-level security policy)
 ROLLBACK;
 
@@ -170,9 +164,9 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_USER_A_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 INSERT INTO public.social_connections (social_account_id, user_id, platform)
-VALUES ('00000000-0000-0000-0000-000000000000'::uuid, 'REPLACE_WITH_USER_A_UUID', 'YouTube');
+VALUES ('00000000-0000-0000-0000-000000000000'::uuid, 'e92427b0-254e-44cc-b2df-be83792c8a94', 'YouTube');
 -- Expected: ERROR (new row violates row-level security policy)
 ROLLBACK;
 
@@ -182,19 +176,16 @@ ROLLBACK;
 -- ===========================================================================
 BEGIN;
 SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "REPLACE_WITH_USER_A_UUID", "role": "authenticated"}';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
 INSERT INTO public.social_oauth_states (user_id, platform, state, expires_at)
-VALUES ('REPLACE_WITH_USER_A_UUID', 'YouTube', 'fake-state', now() + interval '10 minutes');
+VALUES ('e92427b0-254e-44cc-b2df-be83792c8a94', 'YouTube', 'fake-state', now() + interval '10 minutes');
 -- Expected: ERROR (new row violates row-level security policy)
 ROLLBACK;
 
 -- ===========================================================================
--- TEST P: User A tries to upload to another user's storage folder
--- Expected: DENIED (storage policy requires matching user_id folder)
--- ===========================================================================
--- Note: Storage tests must be done via the Supabase JS client or API.
+-- TEST P: Storage tests must be done via the Supabase JS client or API.
 -- Direct SQL testing of storage.objects is limited.
--- Verify manually: user A cannot upload to user B's folder path.
+-- ===========================================================================
 
 -- ===========================================================================
 -- ALL TESTS COMPLETE

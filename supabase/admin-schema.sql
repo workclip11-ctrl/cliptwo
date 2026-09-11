@@ -296,10 +296,10 @@ drop policy if exists "campaigns_update" on public.campaigns;
 create policy "campaigns_update" on public.campaigns
   for update using (auth.uid() = created_by or public.is_admin());
 
--- DELETE: only campaign owner or admin
+-- DELETE: admin only (creators should archive, not delete)
 drop policy if exists "campaigns_delete" on public.campaigns;
 create policy "campaigns_delete" on public.campaigns
-  for delete using (auth.uid() = created_by or public.is_admin());
+  for delete using (public.is_admin());
 
 -- Trigger: force created_by = auth.uid() on INSERT (prevents spoofing)
 create or replace function public.set_campaign_created_by()
@@ -319,6 +319,27 @@ create trigger set_created_by
   before insert on public.campaigns
   for each row
   execute function public.set_campaign_created_by();
+
+-- Trigger: prevent changing created_by after INSERT (ownership integrity)
+create or replace function public.prevent_created_by_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if NEW.created_by is distinct from OLD.created_by then
+    raise exception 'Cannot change campaign owner';
+  end if;
+  return NEW;
+end;
+$$;
+
+drop trigger if exists prevent_created_by_update on public.campaigns;
+create trigger prevent_created_by_update
+  before update on public.campaigns
+  for each row
+  execute function public.prevent_created_by_change();
 
 -- ---------------------------------------------------------------------------
 -- RPC: Secure campaign creation (creator-only)
@@ -880,17 +901,30 @@ begin
     end if;
   end if;
 
+  -- State transition validation: enforce valid status changes
   case p_action
     when 'pause' then
+      if v_campaign.status != 'open' then
+        raise exception 'Cannot pause: campaign must be open (current: %)', v_campaign.status;
+      end if;
       update public.campaigns set status = 'paused' where id = p_campaign_id;
       v_new_status := 'paused';
     when 'resume' then
+      if v_campaign.status != 'paused' then
+        raise exception 'Cannot resume: campaign must be paused (current: %)', v_campaign.status;
+      end if;
       update public.campaigns set status = 'open' where id = p_campaign_id;
       v_new_status := 'open';
     when 'close' then
+      if v_campaign.status not in ('open', 'paused') then
+        raise exception 'Cannot close: campaign must be open or paused (current: %)', v_campaign.status;
+      end if;
       update public.campaigns set status = 'closed' where id = p_campaign_id;
       v_new_status := 'closed';
     when 'reopen' then
+      if v_campaign.status != 'closed' then
+        raise exception 'Cannot reopen: campaign must be closed (current: %)', v_campaign.status;
+      end if;
       update public.campaigns set status = 'open' where id = p_campaign_id;
       v_new_status := 'open';
     when 'archive' then
@@ -3228,6 +3262,11 @@ begin
   -- 5. Require campaign status = 'open'
   if v_campaign.status != 'open' then
     raise exception 'Campaign is not open (status: %)', v_campaign.status;
+  end if;
+
+  -- 5b. Require launch payment to be verified
+  if v_campaign.launch_payment_status != 'verified' then
+    raise exception 'Campaign launch payment has not been verified';
   end if;
 
   -- 6. Verify campaign still has available budget using authoritative financial_records

@@ -598,7 +598,7 @@ ROLLBACK;
 -- TEST  8: Clipper cannot see verified + paused campaign
 -- TEST  9: Clipper cannot see verified + budget_reached campaign
 -- TEST 10: Clipper cannot change launch_payment_status
--- TEST 11: Creator can directly set launch_payment_status (demonstrates need for RPC workflow)
+-- TEST 11: Creator cannot directly set launch_payment_status (integrity trigger blocks)
 -- TEST 12: Creator cannot force unpaid campaign to open (trigger blocks)
 -- TEST 13: Admin can see all campaign states
 -- TEST 14: Anonymous user cannot access campaign rows
