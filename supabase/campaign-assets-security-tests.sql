@@ -2,7 +2,8 @@
 -- Campaign Assets Security Regression Tests
 -- ===========================================================================
 -- Tests private file access security model via SELECT policies.
--- Data setup: RLS + trigger disabled (superuser inserts directly).
+-- Uses a SECURITY DEFINER function for storage inserts (bypasses RLS).
+-- Campaign inserts: trigger disabled, RLS off on campaigns only.
 -- SELECT tests: RLS enabled, role-switched via SET LOCAL.
 --
 -- UUIDs:
@@ -12,91 +13,113 @@
 --   Creator B: 11111111-1111-1111-1111-111111111111
 -- ===========================================================================
 
+-- ===================== HELPER FUNCTION =====================
+-- SECURITY DEFINER: runs as owner (superuser), bypasses storage RLS.
+CREATE OR REPLACE FUNCTION public.insert_test_storage_object(
+  p_name text,
+  p_owner uuid
+) RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  INSERT INTO storage.objects (bucket_id, name, owner, metadata)
+  VALUES ('campaign-assets', p_name, p_owner, '{}');
+END;
+$$;
+
 -- ===================== CLEANUP PREVIOUS RUNS =====================
--- Remove leftover campaigns from prior runs (storage objects orphaned automatically)
 DELETE FROM public.campaigns WHERE title IN (
   'TA-Private','TB-Private','TC-Private','TD-Private',
   'TE-Draft','TE-Unverified','TE-Closed',
   'TF-Private','TG-Private','TH-Public'
 );
 
--- ===================== DATA SETUP (RLS + TRIGGER OFF) =====================
-ALTER TABLE storage.objects DISABLE ROW LEVEL SECURITY;
+-- ===================== DATA SETUP (campaigns RLS + trigger off) =====================
 ALTER TABLE public.campaigns DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.campaigns DISABLE TRIGGER set_campaign_created_by;
 
 -- TEST A: Creator A's own private asset (should read)
 INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
 VALUES ('TA-Private', 'Brief', 'YouTube', 50, 'Creator A', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, 1000::numeric, 'draft', 'pending');
-INSERT INTO storage.objects (bucket_id, name, owner, metadata)
-SELECT 'campaign-assets', 'e92427b0-254e-44cc-b2df-be83792c8a94/' || id::text || '/private/test-a.mp4', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '{}'
-FROM public.campaigns WHERE title = 'TA-Private';
+SELECT public.insert_test_storage_object(
+  'e92427b0-254e-44cc-b2df-be83792c8a94/' || (SELECT id FROM public.campaigns WHERE title = 'TA-Private')::text || '/private/test-a.mp4',
+  'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid
+);
 
 -- TEST B: Creator A's campaign (Creator B tries to read, should be blocked)
 INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
 VALUES ('TB-Private', 'Brief', 'YouTube', 50, 'Creator A', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, 1000::numeric, 'draft', 'pending');
-INSERT INTO storage.objects (bucket_id, name, owner, metadata)
-SELECT 'campaign-assets', 'e92427b0-254e-44cc-b2df-be83792c8a94/' || id::text || '/private/test-b.mp4', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '{}'
-FROM public.campaigns WHERE title = 'TB-Private';
+SELECT public.insert_test_storage_object(
+  'e92427b0-254e-44cc-b2df-be83792c8a94/' || (SELECT id FROM public.campaigns WHERE title = 'TB-Private')::text || '/private/test-b.mp4',
+  'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid
+);
 
 -- TEST C: Admin reads private asset (should read)
 INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
 VALUES ('TC-Private', 'Brief', 'YouTube', 50, 'Creator A', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, 1000::numeric, 'draft', 'pending');
-INSERT INTO storage.objects (bucket_id, name, owner, metadata)
-SELECT 'campaign-assets', 'e92427b0-254e-44cc-b2df-be83792c8a94/' || id::text || '/private/test-c.mp4', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '{}'
-FROM public.campaigns WHERE title = 'TC-Private';
+SELECT public.insert_test_storage_object(
+  'e92427b0-254e-44cc-b2df-be83792c8a94/' || (SELECT id FROM public.campaigns WHERE title = 'TC-Private')::text || '/private/test-c.mp4',
+  'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid
+);
 
 -- TEST D: Clipper reads open+verified (should read)
 INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
 VALUES ('TD-Private', 'Brief', 'YouTube', 50, 'Creator A', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, 1000::numeric, 'open', 'verified');
-INSERT INTO storage.objects (bucket_id, name, owner, metadata)
-SELECT 'campaign-assets', 'e92427b0-254e-44cc-b2df-be83792c8a94/' || id::text || '/private/test-d.mp4', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '{}'
-FROM public.campaigns WHERE title = 'TD-Private';
+SELECT public.insert_test_storage_object(
+  'e92427b0-254e-44cc-b2df-be83792c8a94/' || (SELECT id FROM public.campaigns WHERE title = 'TD-Private')::text || '/private/test-d.mp4',
+  'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid
+);
 
 -- TEST E: Clipper blocked from draft/unverified/closed
 INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
 VALUES ('TE-Draft', 'B', 'YouTube', 50, 'A', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, 100, 'draft', 'pending');
-INSERT INTO storage.objects (bucket_id, name, owner, metadata)
-SELECT 'campaign-assets', 'e92427b0-254e-44cc-b2df-be83792c8a94/' || id::text || '/private/test-e1.mp4', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '{}'
-FROM public.campaigns WHERE title = 'TE-Draft';
+SELECT public.insert_test_storage_object(
+  'e92427b0-254e-44cc-b2df-be83792c8a94/' || (SELECT id FROM public.campaigns WHERE title = 'TE-Draft')::text || '/private/test-e1.mp4',
+  'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid
+);
 
 INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
 VALUES ('TE-Unverified', 'B', 'YouTube', 50, 'A', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, 100, 'open', 'pending');
-INSERT INTO storage.objects (bucket_id, name, owner, metadata)
-SELECT 'campaign-assets', 'e92427b0-254e-44cc-b2df-be83792c8a94/' || id::text || '/private/test-e2.mp4', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '{}'
-FROM public.campaigns WHERE title = 'TE-Unverified';
+SELECT public.insert_test_storage_object(
+  'e92427b0-254e-44cc-b2df-be83792c8a94/' || (SELECT id FROM public.campaigns WHERE title = 'TE-Unverified')::text || '/private/test-e2.mp4',
+  'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid
+);
 
 INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
 VALUES ('TE-Closed', 'B', 'YouTube', 50, 'A', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, 100, 'closed', 'verified');
-INSERT INTO storage.objects (bucket_id, name, owner, metadata)
-SELECT 'campaign-assets', 'e92427b0-254e-44cc-b2df-be83792c8a94/' || id::text || '/private/test-e3.mp4', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '{}'
-FROM public.campaigns WHERE title = 'TE-Closed';
+SELECT public.insert_test_storage_object(
+  'e92427b0-254e-44cc-b2df-be83792c8a94/' || (SELECT id FROM public.campaigns WHERE title = 'TE-Closed')::text || '/private/test-e3.mp4',
+  'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid
+);
 
 -- TEST F: Non-clipper blocked from open+verified
 INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
 VALUES ('TF-Private', 'B', 'YouTube', 50, 'A', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, 100, 'open', 'verified');
-INSERT INTO storage.objects (bucket_id, name, owner, metadata)
-SELECT 'campaign-assets', 'e92427b0-254e-44cc-b2df-be83792c8a94/' || id::text || '/private/test-f.mp4', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '{}'
-FROM public.campaigns WHERE title = 'TF-Private';
+SELECT public.insert_test_storage_object(
+  'e92427b0-254e-44cc-b2df-be83792c8a94/' || (SELECT id FROM public.campaigns WHERE title = 'TF-Private')::text || '/private/test-f.mp4',
+  'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid
+);
 
 -- TEST G: Anonymous blocked from open+verified
 INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
 VALUES ('TG-Private', 'B', 'YouTube', 50, 'A', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, 100, 'open', 'verified');
-INSERT INTO storage.objects (bucket_id, name, owner, metadata)
-SELECT 'campaign-assets', 'e92427b0-254e-44cc-b2df-be83792c8a94/' || id::text || '/private/test-g.mp4', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '{}'
-FROM public.campaigns WHERE title = 'TG-Private';
+SELECT public.insert_test_storage_object(
+  'e92427b0-254e-44cc-b2df-be83792c8a94/' || (SELECT id FROM public.campaigns WHERE title = 'TG-Private')::text || '/private/test-g.mp4',
+  'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid
+);
 
 -- TEST H: Public thumbnail readable by all
 INSERT INTO public.campaigns (title, brief, platform, payout, creator, created_by, budget, status, launch_payment_status)
 VALUES ('TH-Public', 'B', 'YouTube', 50, 'A', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, 100, 'draft', 'pending');
-INSERT INTO storage.objects (bucket_id, name, owner, metadata)
-SELECT 'campaign-assets', 'e92427b0-254e-44cc-b2df-be83792c8a94/' || id::text || '/test-h-thumb.jpg', 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '{}'
-FROM public.campaigns WHERE title = 'TH-Public';
+SELECT public.insert_test_storage_object(
+  'e92427b0-254e-44cc-b2df-be83792c8a94/' || (SELECT id FROM public.campaigns WHERE title = 'TH-Public')::text || '/test-h-thumb.jpg',
+  'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid
+);
 
 -- ===================== RE-ENABLE SECURITY =====================
 ALTER TABLE public.campaigns ENABLE TRIGGER set_campaign_created_by;
 ALTER TABLE public.campaigns ENABLE ROW LEVEL SECURITY;
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 
 -- ===================== SELECT TESTS (RLS ON) =====================
 
@@ -169,6 +192,7 @@ SELECT count(*) AS test_h_anon FROM storage.objects WHERE bucket_id = 'campaign-
 ROLLBACK;
 
 -- ===================== CLEANUP =====================
+DROP FUNCTION IF EXISTS public.insert_test_storage_object(text, uuid);
 DELETE FROM public.campaigns WHERE title IN (
   'TA-Private','TB-Private','TC-Private','TD-Private',
   'TE-Draft','TE-Unverified','TE-Closed',
