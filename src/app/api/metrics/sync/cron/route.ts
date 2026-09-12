@@ -18,6 +18,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { getMetricProvider, isMetricProviderConfigured } from "@/lib/metric-providers";
 import { getProvider } from "@/lib/social-providers";
 import { decryptToken, encryptToken, isTokenExpired } from "@/lib/token-crypto";
+import { sanitizeError } from "@/lib/api-helpers";
 import type { Platform } from "@/lib/types";
 
 const BATCH_SIZE = 50;
@@ -273,13 +274,13 @@ async function handleSync(request: Request) {
             }));
 
             if (ingestError) {
-              results.push({ clipId: clip.id, status: "error", error: ingestError.message });
+              results.push({ clipId: clip.id, status: "error", error: sanitizeError(ingestError.message) });
               continue;
             }
 
             results.push({ clipId: clip.id, status: "synced" });
           } catch (e) {
-            results.push({ clipId: clip.id, status: "error", error: e instanceof Error ? e.message : "Sync failed" });
+            results.push({ clipId: clip.id, status: "error", error: e instanceof Error ? sanitizeError(e.message) : "Sync failed" });
           }
         }
 

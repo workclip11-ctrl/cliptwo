@@ -14,6 +14,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { getMetricProvider, isMetricProviderConfigured } from "@/lib/metric-providers";
 import { getProvider } from "@/lib/social-providers";
 import { decryptToken, encryptToken, isTokenExpired } from "@/lib/token-crypto";
+import { sanitizeError } from "@/lib/api-helpers";
 import type { Platform } from "@/lib/types";
 
 export async function POST(request: Request) {
@@ -319,7 +320,7 @@ export async function POST(request: Request) {
         }));
 
         if (ingestError) {
-          results.push({ clipId: cid, status: "error", error: ingestError.message });
+          results.push({ clipId: cid, status: "error", error: sanitizeError(ingestError.message) });
           continue;
         }
 
@@ -338,7 +339,7 @@ export async function POST(request: Request) {
         results.push({
           clipId: cid,
           status: "error",
-          error: e instanceof Error ? e.message : "Sync failed",
+          error: e instanceof Error ? sanitizeError(e.message) : "Sync failed",
         });
       }
     }

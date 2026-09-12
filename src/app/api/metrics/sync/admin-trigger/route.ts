@@ -16,6 +16,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { getMetricProvider, isMetricProviderConfigured } from "@/lib/metric-providers";
 import { getProvider } from "@/lib/social-providers";
 import { decryptToken, encryptToken, isTokenExpired } from "@/lib/token-crypto";
+import { sanitizeError } from "@/lib/api-helpers";
 import type { Platform } from "@/lib/types";
 
 const LOCK_KEY = "metrics_sync";
@@ -314,7 +315,7 @@ export async function POST(request: Request) {
             }));
 
             if (ingestError) {
-              results.push({ clipId: clip.id, status: "error", error: ingestError.message });
+              results.push({ clipId: clip.id, status: "error", error: sanitizeError(ingestError.message) });
               return;
             }
 
@@ -327,7 +328,7 @@ export async function POST(request: Request) {
             results.push({
               clipId: clip.id,
               status: "error",
-              error: e instanceof Error ? e.message : "Sync failed",
+              error: e instanceof Error ? sanitizeError(e.message) : "Sync failed",
             });
           }
         }));

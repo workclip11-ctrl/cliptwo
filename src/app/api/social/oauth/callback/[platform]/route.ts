@@ -17,6 +17,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getProvider } from "@/lib/social-providers";
 import { encryptToken, tokenExpiresIn } from "@/lib/token-crypto";
+import { sanitizeError } from "@/lib/api-helpers";
 import type { Platform } from "@/lib/types";
 
 const LOG_PREFIX = "[oauth/callback";
@@ -127,7 +128,7 @@ export async function GET(request: NextRequest) {
 
     if (!tokenResult.providerAccountId) {
       logError("Token exchange succeeded but no provider account ID returned");
-      throw new Error("Token exchange failed: no provider account ID returned");
+      throw new Error("Token exchange failed");
     }
 
     log(`Token exchange successful — channel: ${tokenResult.handle || "unknown"}, account: ${tokenResult.providerAccountId.slice(0, 8)}...`);
@@ -166,7 +167,7 @@ export async function GET(request: NextRequest) {
         .eq("user_id", userId);
       if (acctErr) {
         logError(`social_accounts update failed: ${acctErr.message}`);
-        throw new Error(`Failed to update social account: ${acctErr.message}`);
+        throw new Error("Failed to update social account");
       }
 
       // Preserve existing refresh token if Google didn't return a new one
@@ -197,7 +198,7 @@ export async function GET(request: NextRequest) {
       );
       if (connErr) {
         logError(`social_connections upsert failed: ${connErr.message}`);
-        throw new Error(`Failed to store tokens: ${connErr.message}`);
+        throw new Error("Failed to store tokens");
       }
       log("Social account and connection updated");
     } else {
@@ -218,7 +219,7 @@ export async function GET(request: NextRequest) {
 
       if (insertErr || !newAccount) {
         logError(`social_accounts insert failed: ${insertErr?.message ?? "unknown"}`);
-        throw new Error(`Failed to create social account: ${insertErr?.message ?? "unknown"}`);
+        throw new Error("Failed to create social account");
       }
 
       socialAccountId = newAccount.id;
@@ -236,7 +237,7 @@ export async function GET(request: NextRequest) {
       });
       if (connErr) {
         logError(`social_connections insert failed: ${connErr.message}`);
-        throw new Error(`Failed to store tokens: ${connErr.message}`);
+        throw new Error("Failed to store tokens");
       }
       log("Social account and connection created");
     }
@@ -300,7 +301,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   } catch (e) {
     logError(`FAILED: ${e instanceof Error ? e.message : "unknown error"}`);
-    const errorMessage = e instanceof Error ? e.message : "callback_failed";
+    const errorMessage = e instanceof Error ? sanitizeError(e.message) : "callback_failed";
     return NextResponse.redirect(
       new URL(
         `${baseRedirect}?error=${encodeURIComponent(errorMessage)}&platform=${platform}`,

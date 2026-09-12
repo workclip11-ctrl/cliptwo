@@ -60,6 +60,8 @@ CREATE INDEX IF NOT EXISTS idx_campaign_launch_payments_creator
   ON public.campaign_launch_payments(creator_id);
 
 -- ── 3. RLS policies ────────────────────────────────────────────────────────
+-- SECURITY POLICY: All writes to this table go through SECURITY DEFINER RPCs
+-- only. Direct authenticated INSERT/UPDATE/DELETE is revoked below.
 
 ALTER TABLE public.campaign_launch_payments ENABLE ROW LEVEL SECURITY;
 
@@ -75,30 +77,15 @@ CREATE POLICY campaign_launch_payments_select_admin
   ON public.campaign_launch_payments FOR SELECT
   USING (public.is_admin());
 
--- Creator: can insert payment records for their own campaigns
-DROP POLICY IF EXISTS campaign_launch_payments_insert_creator ON public.campaign_launch_payments;
-CREATE POLICY campaign_launch_payments_insert_creator
-  ON public.campaign_launch_payments FOR INSERT
-  WITH CHECK (
-    auth.uid() = creator_id
-    AND EXISTS (
-      SELECT 1 FROM public.campaigns c
-      WHERE c.id = campaign_id AND c.created_by = auth.uid()
-    )
-  );
+-- SECURITY: Remove direct table writes from the normal authenticated role.
+-- The SECURITY DEFINER RPCs (submit/verify/reject) bypass RLS and can still
+-- perform the required INSERT/UPDATE after validating auth.uid().
+REVOKE INSERT, UPDATE, DELETE
+  ON public.campaign_launch_payments
+  FROM authenticated;
 
--- Creator: can update own payment records (for resubmission after rejection)
-DROP POLICY IF EXISTS campaign_launch_payments_update_creator ON public.campaign_launch_payments;
-CREATE POLICY campaign_launch_payments_update_creator
-  ON public.campaign_launch_payments FOR UPDATE
-  USING (auth.uid() = creator_id)
-  WITH CHECK (auth.uid() = creator_id);
-
--- Admin: can update all payment records (for verification/rejection)
-DROP POLICY IF EXISTS campaign_launch_payments_update_admin ON public.campaign_launch_payments;
-CREATE POLICY campaign_launch_payments_update_admin
-  ON public.campaign_launch_payments FOR UPDATE
-  USING (public.is_admin());
+COMMENT ON TABLE public.campaign_launch_payments IS
+  'Financial launch-payment records. Creator writes via submit_campaign_launch_payment(); Admin verifies/rejects via verify/reject RPCs. No direct authenticated writes.';
 
 -- ── 4. Platform fee constant ───────────────────────────────────────────────
 
