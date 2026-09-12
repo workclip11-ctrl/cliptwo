@@ -121,7 +121,7 @@ export default function ClipperWalletPage() {
   );
 
   return (
-    <div className="mx-auto max-w-[1120px] space-y-14 px-5 py-10 sm:px-8">
+    <div className="mx-auto max-w-[1120px] space-y-10 px-5 py-8 sm:space-y-14 sm:px-8 sm:py-10">
       {/* ── Header ──────────────────────────────────────── */}
       <div>
         <h1 className="text-[28px] font-bold tracking-tight sm:text-[32px]">
@@ -248,87 +248,151 @@ export default function ClipperWalletPage() {
         <h2 className="mb-5 text-[18px] font-bold tracking-tight">
           Transaction history
         </h2>
-        <div className="overflow-hidden rounded-[12px] border border-border/40 bg-card">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-[14px]">
-              <thead>
-                <tr className="border-b border-border/40 text-left text-[13px] text-muted">
-                  <th className="px-5 py-3 font-medium">Date</th>
-                  <th className="px-5 py-3 font-medium">Campaign</th>
-                  <th className="px-5 py-3 font-medium">Clip</th>
-                  <th className="px-5 py-3 text-right font-medium">Views</th>
-                  <th className="px-5 py-3 text-right font-medium">Amount</th>
-                  <th className="px-5 py-3 font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/30">
-                {visible.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-5 py-12">
-                      <div className="rounded-xl border border-border/40 bg-card p-8 text-center">
-                        <p className="text-[15px] font-medium text-foreground">No transactions yet</p>
-                        <p className="mt-1 text-[13px] text-muted">
-                          Your clip submissions and earnings will appear here.
+        {/* Mobile: card-based list */}
+        <div className="block sm:hidden">
+          <div className="space-y-3">
+            {visible.length === 0 ? (
+              <div className="rounded-[12px] border border-dashed bg-card p-8 text-center">
+                <p className="text-[15px] font-medium text-foreground">No transactions yet</p>
+                <p className="mt-1 text-[13px] text-muted">
+                  Your clip submissions and earnings will appear here.
+                </p>
+              </div>
+            ) : (
+              visible.map((k) => {
+                const camp = campaigns.find((c) => c.id === k.campaignId);
+                const record = myFinanceRecords.find((r) => r.clipId === k.id);
+                return (
+                  <div key={k.id} className="rounded-[12px] border bg-card p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <Link
+                          href={`/campaigns/${k.campaignId}`}
+                          className="text-[14px] font-medium hover:underline underline-offset-2"
+                        >
+                          {camp?.title ?? k.campaignId}
+                        </Link>
+                        <p className="mt-0.5 truncate text-[13px] text-muted">
+                          <span className="inline-flex items-center gap-1">
+                            <PlatformIcon p={k.platform || camp?.platform || "Instagram"} size={12} />
+                            {k.caption}
+                          </span>
                         </p>
                       </div>
-                    </td>
-                  </tr>
-                ) : (
-                  visible.map((k) => {
-                    const camp = campaigns.find((c) => c.id === k.campaignId);
-                    const record = myFinanceRecords.find((r) => r.clipId === k.id);
-                    return (
-                      <tr key={k.id} className="align-top transition-colors hover:bg-accent-soft/30">
-                        <td className="whitespace-nowrap px-5 py-3.5 text-muted">
-                          {fmtDate(k.submittedAt)}
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <Link
-                            href={`/campaigns/${k.campaignId}`}
-                            className="cursor-pointer font-medium hover:underline underline-offset-2"
-                          >
-                            {camp?.title ?? k.campaignId}
-                          </Link>
-                        </td>
-                        <td className="max-w-[220px] px-5 py-3.5">
-                          <Link
-                            href={`/clip/${k.id}`}
-                            className="cursor-pointer inline-flex items-center gap-1.5 hover:underline underline-offset-2"
-                          >
-                            <PlatformIcon p={k.platform || camp?.platform || "Instagram"} size={14} />
-                            <span className="line-clamp-1">{k.caption}</span>
-                          </Link>
-                        </td>
-                        <td className="px-5 py-3.5 text-right font-mono tabular-nums">
-                          {fmtViews(k.verifiedViews ?? k.views)}
-                        </td>
-                        <td className="px-5 py-3.5 text-right font-mono tabular-nums font-semibold">
+                      <StatusPill status={k.status} />
+                    </div>
+                    <div className="mt-2.5 flex items-center justify-between text-[13px]">
+                      <span className="text-muted">{fmtDate(k.submittedAt)}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono text-muted">{fmtViews(k.verifiedViews ?? k.views)} views</span>
+                        <span className="font-mono font-semibold">
                           {record ? (
                             <span className="text-green">{rup(record.netAmount / 100)}</span>
                           ) : (
                             <span className="text-muted">—</span>
                           )}
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <StatusPill status={k.status} />
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
           {txns.length > visible.length && (
-            <div className="border-t border-border/40 px-5 py-3 text-center">
-              <button
-                onClick={() => setPage((p) => p + 1)}
-                className="cursor-pointer text-[13px] font-medium text-accent hover:underline"
-              >
-                Load more
-              </button>
-            </div>
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              className="mt-3 flex w-full items-center justify-center rounded-[12px] border bg-card py-3 text-[13px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft"
+            >
+              Load more
+            </button>
           )}
+        </div>
+
+        {/* Desktop: table */}
+        <div className="hidden sm:block">
+          <div className="overflow-hidden rounded-[12px] border border-border/40 bg-card">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] text-[14px]">
+                <thead>
+                  <tr className="border-b border-border/40 text-left text-[13px] text-muted">
+                    <th className="px-5 py-3 font-medium">Date</th>
+                    <th className="px-5 py-3 font-medium">Campaign</th>
+                    <th className="px-5 py-3 font-medium">Clip</th>
+                    <th className="px-5 py-3 text-right font-medium">Views</th>
+                    <th className="px-5 py-3 text-right font-medium">Amount</th>
+                    <th className="px-5 py-3 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/30">
+                  {visible.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-5 py-12">
+                        <div className="rounded-xl border border-border/40 bg-card p-8 text-center">
+                          <p className="text-[15px] font-medium text-foreground">No transactions yet</p>
+                          <p className="mt-1 text-[13px] text-muted">
+                            Your clip submissions and earnings will appear here.
+                          </p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    visible.map((k) => {
+                      const camp = campaigns.find((c) => c.id === k.campaignId);
+                      const record = myFinanceRecords.find((r) => r.clipId === k.id);
+                      return (
+                        <tr key={k.id} className="align-top transition-colors hover:bg-accent-soft/30">
+                          <td className="whitespace-nowrap px-5 py-3.5 text-muted">
+                            {fmtDate(k.submittedAt)}
+                          </td>
+                          <td className="px-5 py-3.5">
+                            <Link
+                              href={`/campaigns/${k.campaignId}`}
+                              className="cursor-pointer font-medium hover:underline underline-offset-2"
+                            >
+                              {camp?.title ?? k.campaignId}
+                            </Link>
+                          </td>
+                          <td className="max-w-[220px] px-5 py-3.5">
+                            <Link
+                              href={`/clip/${k.id}`}
+                              className="cursor-pointer inline-flex items-center gap-1.5 hover:underline underline-offset-2"
+                            >
+                              <PlatformIcon p={k.platform || camp?.platform || "Instagram"} size={14} />
+                              <span className="line-clamp-1">{k.caption}</span>
+                            </Link>
+                          </td>
+                          <td className="px-5 py-3.5 text-right font-mono tabular-nums">
+                            {fmtViews(k.verifiedViews ?? k.views)}
+                          </td>
+                          <td className="px-5 py-3.5 text-right font-mono tabular-nums font-semibold">
+                            {record ? (
+                              <span className="text-green">{rup(record.netAmount / 100)}</span>
+                            ) : (
+                              <span className="text-muted">—</span>
+                            )}
+                          </td>
+                          <td className="px-5 py-3.5">
+                            <StatusPill status={k.status} />
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {txns.length > visible.length && (
+              <div className="border-t border-border/40 px-5 py-3 text-center">
+                <button
+                  onClick={() => setPage((p) => p + 1)}
+                  className="cursor-pointer text-[13px] font-medium text-accent hover:underline"
+                >
+                  Load more
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </section>
 
@@ -344,7 +408,7 @@ export default function ClipperWalletPage() {
         <div className="rounded-[12px] border border-border/40 bg-card p-5 sm:p-6">
           <label className="block text-[14px]">
             <span className="mb-1.5 block text-muted">UPI ID</span>
-            <div className="flex items-center gap-2.5">
+            <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-2.5">
               {editingUpi ? (
                 <>
                   <input
@@ -352,25 +416,27 @@ export default function ClipperWalletPage() {
                     onChange={(e) => setUpiInput(e.target.value)}
                     placeholder="yourname@upi"
                     autoFocus
-                    className="h-11 flex-1 rounded-[10px] border border-border/60 bg-background px-3.5 font-mono text-[14px] outline-none transition-colors focus:border-foreground/30 sm:max-w-xs"
+                    className="h-11 flex-1 rounded-[10px] border border-border/60 bg-background px-3.5 font-mono text-[14px] outline-none transition-colors focus:border-foreground/30"
                   />
-                  <button
-                    onClick={() => {
-                      if (upiInput.trim()) {
-                        updateProfile(user!.id, { upi: upiInput.trim() });
-                        setEditingUpi(false);
-                      }
-                    }}
-                    className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[10px] bg-accent px-4 text-[14px] font-medium text-white transition-colors duration-150 hover:bg-foreground/90"
-                  >
-                    <Save size={14} /> Save
-                  </button>
-                  <button
-                    onClick={() => { setEditingUpi(false); setUpiInput(profile?.upi ?? ""); }}
-                    className="inline-flex h-10 cursor-pointer items-center rounded-[10px] border border-border/60 px-4 text-[14px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground"
-                  >
-                    Cancel
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        if (upiInput.trim()) {
+                          updateProfile(user!.id, { upi: upiInput.trim() });
+                          setEditingUpi(false);
+                        }
+                      }}
+                      className="inline-flex h-10 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[10px] bg-accent px-4 text-[14px] font-medium text-white transition-colors duration-150 hover:bg-foreground/90 sm:flex-initial"
+                    >
+                      <Save size={14} /> Save
+                    </button>
+                    <button
+                      onClick={() => { setEditingUpi(false); setUpiInput(profile?.upi ?? ""); }}
+                      className="inline-flex h-10 flex-1 cursor-pointer items-center justify-center rounded-[10px] border border-border/60 px-4 text-[14px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground sm:flex-initial"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </>
               ) : (
                 <>

@@ -150,8 +150,8 @@ export default function ClipperCampaignsPage() {
       </div>
 
       {/* ── Toolbar ─────────────────────────────────────── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="relative min-w-0 flex-1 sm:max-w-[400px]">
+      <div className="flex flex-col gap-3">
+        <div className="relative min-w-0 flex-1">
           <Search
             size={16}
             className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted"
@@ -160,15 +160,16 @@ export default function ClipperCampaignsPage() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search campaigns..."
+            aria-label="Search campaigns"
             className="h-11 w-full rounded-[10px] border bg-background pl-10 pr-4 text-[14px] outline-none transition-colors placeholder:text-muted/50 focus:border-foreground"
           />
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value)}
-            className="h-11 rounded-[10px] border bg-background px-3.5 text-[14px] outline-none transition-colors focus:border-foreground"
+            className="h-10 rounded-[10px] border bg-background px-3 text-[13px] outline-none transition-colors focus:border-foreground sm:h-11 sm:px-3.5 sm:text-[14px]"
           >
             {SORT_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -179,13 +180,13 @@ export default function ClipperCampaignsPage() {
 
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`inline-flex h-11 items-center gap-2 rounded-[10px] border px-3.5 text-[14px] font-medium transition-colors ${
+            className={`inline-flex h-10 items-center gap-1.5 rounded-[10px] border px-3 text-[13px] font-medium transition-colors sm:h-11 sm:gap-2 sm:px-3.5 sm:text-[14px] ${
               showFilters || activeFilterCount > 0
                 ? "border-foreground bg-accent-soft text-foreground"
                 : "text-muted hover:bg-accent-soft/60"
             }`}
           >
-            <SlidersHorizontal size={15} />
+            <SlidersHorizontal size={14} />
             Filters
             {activeFilterCount > 0 && (
               <span className="rounded-full bg-accent px-1.5 text-[10px] text-white">
@@ -196,14 +197,14 @@ export default function ClipperCampaignsPage() {
 
           <button
             onClick={() => setShowSaved(!showSaved)}
-            className={`inline-flex h-11 items-center gap-2 rounded-[10px] border px-3.5 text-[14px] font-medium transition-colors ${
+            className={`inline-flex h-10 items-center gap-1.5 rounded-[10px] border px-3 text-[13px] font-medium transition-colors sm:h-11 sm:gap-2 sm:px-3.5 sm:text-[14px] ${
               showSaved
                 ? "border-foreground bg-accent-soft text-foreground"
                 : "text-muted hover:bg-accent-soft/60"
             }`}
           >
             <Heart
-              size={15}
+              size={14}
               className={showSaved ? "fill-red text-red" : ""}
             />
             Saved
@@ -331,7 +332,7 @@ export default function ClipperCampaignsPage() {
 
       {/* ── Opportunity Summary ─────────────────────────── */}
       {allActive.length > 0 && !showSaved && !q && activeFilterCount === 0 && (
-        <div className="flex items-center gap-4 text-[13px] text-muted">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted sm:gap-x-4">
           <span>
             <span className="font-medium text-foreground">
               {allActive.length}

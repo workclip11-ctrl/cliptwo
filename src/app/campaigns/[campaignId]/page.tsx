@@ -186,7 +186,7 @@ export default function CampaignDetailPage() {
           <div className="flex flex-col">
             {/* Title + status */}
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-bold tracking-tight">{campaign.title}</h1>
+              <h1 className="text-[20px] font-bold tracking-tight sm:text-xl">{campaign.title}</h1>
               <StatusPill status={campaign.status} />
               {campaign.verified && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-green/20 bg-green/10 px-2 py-0.5 text-xs font-medium text-green">
@@ -200,7 +200,7 @@ export default function CampaignDetailPage() {
 
             {/* Payout — dominant */}
             <div className="mt-4">
-              <p className="font-mono text-3xl font-bold tracking-tight">
+              <p className="font-mono text-[26px] font-bold tracking-tight sm:text-3xl">
                 {rup(campaign.payout)}
               </p>
               <p className="text-sm text-muted">per 1,000 views</p>
@@ -259,7 +259,7 @@ export default function CampaignDetailPage() {
             )}
 
             {/* Secondary actions */}
-            <div className="mt-3 flex items-center gap-2">
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               <button
                 onClick={() => toggleSaveCampaign(id)}
                 className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-accent-soft ${saved ? "text-accent" : ""}`}

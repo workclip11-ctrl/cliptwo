@@ -48,22 +48,22 @@ export default function ClipperPage() {
       {/* ─────────────────────────────────────────────
           1. WELCOME / ACTION HEADER
       ───────────────────────────────────────────── */}
-      <section className="flex flex-wrap items-end justify-between gap-6">
+      <section className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-[28px] font-bold leading-tight tracking-tight sm:text-[32px]">
+          <h1 className="text-[24px] font-bold leading-tight tracking-tight sm:text-[28px]">
             Welcome back, @{user?.name ?? user?.email ?? "clipper"}
           </h1>
-          <p className="mt-2.5 max-w-lg text-[15px] leading-relaxed text-muted">
+          <p className="mt-2 max-w-lg text-[14px] leading-relaxed text-muted sm:text-[15px]">
             Find campaigns worth clipping and turn views into earnings.
           </p>
         </div>
         <Link
           href="/clipper/campaigns"
-          className="group inline-flex items-center gap-2.5 rounded-[10px] bg-accent px-6 py-3 text-[15px] font-medium text-white transition-all duration-200 hover:bg-foreground/90 active:scale-[0.98]"
+          className="group inline-flex items-center gap-2 rounded-[10px] bg-accent px-5 py-2.5 text-[14px] font-medium text-white transition-all duration-200 hover:bg-foreground/90 active:scale-[0.98] sm:px-6 sm:py-3 sm:text-[15px]"
         >
           Find campaigns
           <ArrowRight
-            size={16}
+            size={15}
             className="transition-transform duration-200 group-hover:translate-x-0.5"
           />
         </Link>
@@ -73,8 +73,8 @@ export default function ClipperPage() {
           2. EARNINGS OVERVIEW
       ───────────────────────────────────────────── */}
       <section>
-        <div className="rounded-xl border bg-card px-6 py-6 sm:px-8 sm:py-7">
-          <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+        <div className="rounded-xl border bg-card px-4 py-5 sm:px-8 sm:py-7">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             {/* Total earnings — dominant */}
             <div>
               <p className="text-[13px] font-medium text-muted">
@@ -91,7 +91,7 @@ export default function ClipperPage() {
             </div>
 
             {/* Breakdown — typography-based, no boxes */}
-            <div className="flex flex-wrap gap-x-10 gap-y-4">
+            <div className="flex flex-wrap gap-x-6 gap-y-3 sm:gap-x-10 sm:gap-y-4">
               <Link
                 href="/clipper/wallet"
                 className={`min-w-[100px] transition-colors duration-150 hover:opacity-80 ${available > 0 ? "cursor-pointer" : "cursor-default"}`}
@@ -360,7 +360,7 @@ export default function ClipperPage() {
       <section className="border-t border-border/60 pt-8">
         <div className="flex flex-col gap-6 sm:flex-row sm:gap-10">
           {/* Connected Accounts */}
-          <div className="flex-1">
+          <div className="min-w-0 flex-1">
             <h3 className="mb-3 text-[13px] font-semibold text-foreground">
               Connected accounts
             </h3>
