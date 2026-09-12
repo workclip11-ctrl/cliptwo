@@ -102,14 +102,14 @@ export function SubmitClipModal({
         <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button
             onClick={onClose}
-            className="rounded-lg border px-3 py-2.5 text-sm font-medium sm:py-1.5"
+            className="rounded-lg border px-3 py-2.5 text-sm font-medium hover:bg-accent-soft sm:py-1.5"
           >
             Cancel
           </button>
           <button
             disabled={isDisabled}
             onClick={() => onSubmit(caption, videoUrl, platform)}
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40 sm:py-1.5"
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-foreground px-3 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40 sm:py-1.5"
           >
             <Send size={13} /> {isAtBudget ? "Submissions closed" : "Submit for review"}
           </button>

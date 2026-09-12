@@ -377,7 +377,7 @@ export default function ClipperCampaignsPage() {
           {activeFilterCount > 0 && (
             <button
               onClick={clearFilters}
-              className="mt-5 inline-flex h-11 items-center gap-2 rounded-[10px] border px-5 text-[14px] font-medium transition-colors hover:bg-accent-soft"
+              className="mt-5 inline-flex h-11 items-center gap-2 rounded-[10px] border bg-card px-5 text-[14px] font-medium transition-colors hover:bg-accent-soft"
             >
               Clear filters
             </button>

@@ -450,7 +450,7 @@ function CreatorDrawer({
                   setShowSuspend(false);
                   setSuspendReason("");
                 }}
-                className="cursor-pointer rounded-[8px] bg-red px-4 py-2.5 text-[14px] font-medium text-white"
+                className="cursor-pointer rounded-[8px] bg-red px-4 py-2.5 text-[14px] font-medium text-white hover:opacity-90"
               >
                 Suspend
               </button>
@@ -703,7 +703,7 @@ function CreatorDrawer({
             />
             <button
               onClick={() => saveAdminNotes(profile.id, notes, actor ?? "")}
-              className="mt-2 cursor-pointer rounded-[8px] bg-foreground px-4 py-2.5 text-[14px] font-medium text-background"
+              className="mt-2 cursor-pointer rounded-[8px] bg-foreground px-4 py-2.5 text-[14px] font-medium text-background hover:opacity-90"
             >
               Save notes
             </button>

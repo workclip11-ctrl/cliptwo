@@ -496,7 +496,7 @@ export default function NewCampaignWizard() {
               type="button"
               onClick={submitPayment}
               disabled={isSubmittingPayment || !utrReference.trim()}
-              className="flex-1 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+              className="flex-1 rounded-lg bg-foreground px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
               {isSubmittingPayment ? "Submitting..." : "I've Paid — Submit for Verification"}
             </button>
@@ -548,7 +548,7 @@ export default function NewCampaignWizard() {
           <button
             type="button"
             onClick={() => router.push("/creator/campaigns")}
-            className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white"
+            className="w-full rounded-lg bg-foreground px-4 py-2.5 text-sm font-medium text-white hover:opacity-90"
           >
             Go to My Campaigns
           </button>
@@ -1378,7 +1378,7 @@ export default function NewCampaignWizard() {
               type="button"
               onClick={() => goStep(Math.min(STEPS.length - 1, step + 1))}
               disabled={isSubmitting}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
               Next <ArrowRight size={14} />
             </button>
@@ -1387,7 +1387,7 @@ export default function NewCampaignWizard() {
               type="button"
               onClick={() => submit("open")}
               disabled={isSubmitting}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
               <Send size={14} /> {isSubmitting ? "Publishing…" : "Publish campaign"}
             </button>

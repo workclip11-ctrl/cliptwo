@@ -340,14 +340,14 @@ export default function CreatorCampaignDetailPage() {
         {/* Secondary actions */}
         <button
           onClick={() => setEditing(true)}
-          className="inline-flex h-11 items-center gap-2 rounded-[10px] border px-5 text-[14px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground"
+          className="inline-flex h-11 items-center gap-2 rounded-[10px] border bg-card px-5 text-[14px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground"
         >
           <Pencil size={15} /> Edit
         </button>
         {!isClosed && (
           <button
             onClick={() => setAdjusting(true)}
-            className="inline-flex h-11 items-center gap-2 rounded-[10px] border px-5 text-[14px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground"
+            className="inline-flex h-11 items-center gap-2 rounded-[10px] border bg-card px-5 text-[14px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground"
           >
             <Wallet size={15} /> Adjust budget
           </button>

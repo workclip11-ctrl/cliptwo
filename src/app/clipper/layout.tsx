@@ -44,7 +44,7 @@ export default function ClipperLayout({ children }: { children: ReactNode }) {
           {/* Mobile hamburger */}
           <button
             onClick={() => setSidebarOpen(true)}
-            className="fixed bottom-5 left-5 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-accent text-white shadow-md sm:hidden"
+            className="fixed bottom-5 left-5 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-accent text-white shadow-md hover:opacity-90 sm:hidden"
             aria-label="Open navigation"
           >
             <Menu size={20} />

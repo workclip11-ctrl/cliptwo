@@ -267,7 +267,7 @@ export function EditCampaignModal({
             </Field>
             <Field label="Brief">
               <textarea
-                className="input min-h-[70px]"
+                className="w-full min-h-[70px] resize-none rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
                 value={brief}
                 onChange={(e) => setBrief(e.target.value)}
               />
@@ -376,7 +376,7 @@ export function EditCampaignModal({
           <Group title="Rules">
             <Field label="Campaign rules">
               <textarea
-                className="input min-h-[70px]"
+                className="w-full min-h-[70px] resize-none rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
                 value={rules}
                 onChange={(e) => setRules(e.target.value)}
                 placeholder="What clippers must / must not do"
@@ -511,7 +511,7 @@ export function EditCampaignModal({
           <button
             onClick={handleSave}
             disabled={needsConfirm && !confirmRules}
-            className="rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40"
+            className="rounded-lg bg-foreground px-3.5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40"
           >
             Save changes
           </button>

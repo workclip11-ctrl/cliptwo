@@ -114,7 +114,7 @@ export default function CreatorCampaignsPage() {
         <div className="flex items-center gap-2.5">
           <button
             onClick={() => setOpen(true)}
-            className="inline-flex h-11 items-center gap-2 rounded-[10px] border px-5 text-[14px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground"
+            className="inline-flex h-11 items-center gap-2 rounded-[10px] border bg-card px-5 text-[14px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground"
           >
             Quick add
           </button>
@@ -155,7 +155,7 @@ export default function CreatorCampaignsPage() {
             <button
               key={f.key}
               onClick={() => setStatusFilter(f.key)}
-              className={`inline-flex h-11 items-center rounded-[10px] border px-4 text-[13px] font-medium transition-all duration-150 ${
+              className={`inline-flex h-11 cursor-pointer items-center rounded-[10px] border px-4 text-[13px] font-medium transition-all duration-150 ${
                 statusFilter === f.key
                   ? "border-foreground bg-accent-soft text-foreground"
                   : "border-transparent text-muted hover:bg-accent-soft/60"

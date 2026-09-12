@@ -585,7 +585,7 @@ function EmptyCampaigns({ onBrowse }: { onBrowse: () => void }) {
       </p>
       <button
         onClick={onBrowse}
-        className="mt-6 inline-flex items-center gap-2 rounded-[10px] bg-accent px-6 py-3 text-[14px] font-medium text-white transition-all duration-200 hover:bg-foreground/90 active:scale-[0.98]"
+        className="mt-6 inline-flex items-center gap-2 rounded-[10px] bg-foreground px-6 py-3 text-[14px] font-medium text-white transition-all duration-200 hover:bg-foreground/90 active:scale-[0.98]"
       >
         Browse campaigns <ArrowRight size={14} />
       </button>
@@ -603,7 +603,7 @@ function EmptySubmissions({ onBrowse }: { onBrowse: () => void }) {
       </p>
       <button
         onClick={onBrowse}
-        className="mt-6 inline-flex items-center gap-2 rounded-[10px] bg-accent px-6 py-3 text-[14px] font-medium text-white transition-all duration-200 hover:bg-foreground/90 active:scale-[0.98]"
+        className="mt-6 inline-flex items-center gap-2 rounded-[10px] bg-foreground px-6 py-3 text-[14px] font-medium text-white transition-all duration-200 hover:bg-foreground/90 active:scale-[0.98]"
       >
         Find campaigns <ArrowRight size={14} />
       </button>

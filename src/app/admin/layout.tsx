@@ -64,7 +64,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           {/* Mobile hamburger */}
           <button
             onClick={() => setSidebarOpen(true)}
-            className="fixed bottom-4 left-4 z-30 flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-accent text-white shadow-lg sm:hidden"
+            className="fixed bottom-4 left-4 z-30 flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-accent text-white shadow-lg hover:opacity-90 sm:hidden"
             aria-label="Open navigation"
           >
             <Menu size={20} />

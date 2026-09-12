@@ -274,7 +274,7 @@ export function NewCampaignModal({
         <div className="mt-6 flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="rounded-lg border px-3 py-1.5 text-sm font-medium"
+            className="rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-accent-soft"
           >
             Cancel
           </button>

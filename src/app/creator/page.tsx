@@ -60,13 +60,13 @@ export default function CreatorPage() {
         <div className="flex items-center gap-2.5">
           <Link
             href="/creator/analytics"
-            className="inline-flex h-11 items-center gap-2 rounded-[10px] border px-5 text-[14px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground"
+            className="inline-flex h-11 items-center gap-2 rounded-[10px] border bg-card px-5 text-[14px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground"
           >
             <BarChart3 size={16} /> Analytics
           </Link>
           <button
             onClick={() => setOpen(true)}
-            className="inline-flex h-11 items-center gap-2 rounded-[10px] border px-5 text-[14px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground"
+            className="inline-flex h-11 items-center gap-2 rounded-[10px] border bg-card px-5 text-[14px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground"
           >
             Quick add
           </button>
@@ -630,7 +630,7 @@ function CampaignDetailModal({
 
         <button
           onClick={onClose}
-          className="mt-6 flex h-11 w-full items-center justify-center rounded-[10px] border text-[14px] font-medium transition-colors duration-150 hover:bg-accent-soft"
+          className="mt-6 flex h-11 w-full items-center justify-center rounded-[10px] border bg-card text-[14px] font-medium transition-colors duration-150 hover:bg-accent-soft"
         >
           Close
         </button>

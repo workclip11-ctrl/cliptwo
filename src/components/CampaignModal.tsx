@@ -128,7 +128,7 @@ export function CampaignModal({
                 if (user?.role !== "clipper") return;
                 setSubmitOpen(true);
               }}
-              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+              className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
             >
               Join campaign
             </button>

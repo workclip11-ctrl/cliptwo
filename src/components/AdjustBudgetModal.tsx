@@ -78,7 +78,7 @@ export function AdjustBudgetModal({
           <button
             onClick={handleSave}
             disabled={saving}
-            className="rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+            className="rounded-lg bg-foreground px-3.5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
           >
             {saving ? <Loader2 size={14} className="mr-1 inline animate-spin" /> : null}
             Save budget

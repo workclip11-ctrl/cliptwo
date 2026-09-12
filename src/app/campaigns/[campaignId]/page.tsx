@@ -252,7 +252,7 @@ export default function CampaignDetailPage() {
             {campaign.status === "open" && isClipper && (
               <button
                 onClick={join}
-                className="mt-5 flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-4 py-3 text-sm font-medium text-white hover:opacity-90"
+                className="mt-5 flex w-full items-center justify-center gap-1.5 rounded-lg bg-foreground px-4 py-3 text-sm font-medium text-white hover:opacity-90"
               >
                 <Plus size={15} /> Submit a Clip
               </button>
