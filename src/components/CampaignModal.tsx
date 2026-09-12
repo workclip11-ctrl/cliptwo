@@ -117,19 +117,22 @@ export function CampaignModal({
           >
             Open full page <ArrowUpRight size={14} />
           </button>
-          <button
-            onClick={() => {
-              if (!isSignedIn) {
-                onClose();
-                router.push("/login");
-                return;
-              }
-              setSubmitOpen(true);
-            }}
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-          >
-            Join campaign
-          </button>
+          {campaign.status === "open" && (
+            <button
+              onClick={() => {
+                if (!isSignedIn) {
+                  onClose();
+                  router.push("/login");
+                  return;
+                }
+                if (user?.role !== "clipper") return;
+                setSubmitOpen(true);
+              }}
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+            >
+              Join campaign
+            </button>
+          )}
         </div>
       </div>
 

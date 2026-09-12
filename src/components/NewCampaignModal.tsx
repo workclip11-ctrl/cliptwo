@@ -5,7 +5,12 @@ import { BadgeCheck, Upload, Film } from "lucide-react";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import type { Platform } from "@/lib/types";
 
-const PLATFORMS: Platform[] = ["YouTube", "Instagram", "Kick"];
+const PLATFORMS: Platform[] = ["YouTube", "Instagram"];
+const ALL_PLATFORMS: { value: Platform; disabled?: boolean }[] = [
+  { value: "YouTube" },
+  { value: "Instagram" },
+  { value: "Kick", disabled: true },
+];
 const NICHES = ["Tech", "Gaming", "Finance", "Comedy", "Fitness", "Podcast"];
 
 export interface NewCampaignExtra {
@@ -54,6 +59,7 @@ export function NewCampaignModal({
   const [branding, setBranding] = useState("");
 
   function togglePlatform(p: Platform) {
+    if (p === "Kick") return;
     setPlatforms((prev) =>
       prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p],
     );
@@ -78,7 +84,7 @@ export function NewCampaignModal({
       >
         <h3 className="text-lg font-semibold">New campaign</h3>
         <p className="mt-1 text-sm text-muted">
-          Set your rate and budget — clippers can claim it immediately.
+          Set your campaign rate and budget. After payment verification, your campaign will go live for clippers.
         </p>
 
         <label className="mt-4 block text-sm font-medium">Title</label>
@@ -128,14 +134,22 @@ export function NewCampaignModal({
         <div className="mt-4">
           <label className="block text-sm font-medium">Supported platforms</label>
           <div className="mt-1.5 flex flex-wrap gap-2">
-            {PLATFORMS.map((p) => (
+            {ALL_PLATFORMS.map((p) => (
               <button
-                key={p}
+                key={p.value}
                 type="button"
-                onClick={() => togglePlatform(p)}
-                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium ${platforms.includes(p) ? "border-accent bg-accent-soft" : "text-muted"}`}
+                disabled={p.disabled}
+                onClick={() => togglePlatform(p.value)}
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium ${
+                  p.disabled
+                    ? "cursor-not-allowed border-border/40 text-muted/50"
+                    : platforms.includes(p.value)
+                      ? "border-accent bg-accent-soft"
+                      : "text-muted"
+                }`}
               >
-                <PlatformIcon p={p} size={13} /> {p}
+                <PlatformIcon p={p.value} size={13} /> {p.value}
+                {p.disabled && <span className="text-[11px] text-muted/50">(coming soon)</span>}
               </button>
             ))}
           </div>
@@ -289,7 +303,7 @@ export function NewCampaignModal({
             }
             className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40"
           >
-            <BadgeCheck size={14} /> Fund &amp; launch
+            <BadgeCheck size={14} /> Create campaign
           </button>
         </div>
       </div>

@@ -63,7 +63,7 @@ function AuthForm() {
         router.push(
           u?.role === "admin"
             ? "/admin"
-            : desiredRole === "creator"
+            : u?.role === "creator"
               ? "/creator"
               : "/clipper",
         );

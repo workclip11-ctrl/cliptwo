@@ -98,11 +98,11 @@ const FAQ_CATEGORIES = [
     items: [
       {
         q: "How do I launch a campaign?",
-        a: "Go to Creator → Campaigns → New Campaign. Fill in the brief, upload source material, set your budget and CPM rate, and publish. Your campaign appears on the marketplace for clippers to browse.",
+        a: "Go to Creator → Campaigns → New Campaign. Fill in the brief, upload source material, set your budget and CPM rate, and submit. After you complete the UPI payment and our team verifies it, your campaign goes live on the marketplace for clippers.",
       },
       {
         q: "How much does it cost?",
-        a: "You set your own budget and CPM rate. You only pay for approved views your clips receive. There are no upfront fees — you pay as clips earn.",
+        a: "You set your own budget and CPM rate. A 10% platform fee is added to your campaign budget and paid upfront via UPI. Your campaign budget is then fully allocated for clipper payouts based on verified views.",
       },
       {
         q: "How is CPM determined?",

@@ -48,7 +48,7 @@ export function CampaignCard({
         )}
 
         {/* Single badge — platform/category combined */}
-        <div className="absolute left-3 top-3">
+        <div className="absolute left-3 top-3 z-10">
           <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/90 px-2.5 py-1.5 text-[12px] font-medium text-foreground shadow-sm backdrop-blur">
             <PlatformIcon p={campaign.platform} size={12} />
             {campaign.platform}
@@ -61,14 +61,14 @@ export function CampaignCard({
           </span>
         </div>
 
-        {/* Save button */}
+        {/* Save button — independent interactive element */}
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
-            e.preventDefault();
             toggleSaveCampaign(campaign.id);
           }}
-          className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/80 backdrop-blur transition-colors duration-150 hover:bg-white"
+          className="absolute right-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-white/80 backdrop-blur transition-colors duration-150 hover:bg-white"
           title={isSaved ? "Unsave" : "Save"}
           aria-label={isSaved ? "Unsave campaign" : "Save campaign"}
         >
@@ -149,27 +149,35 @@ export function CampaignCard({
 
   if (onView) {
     return (
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={() => onView(campaign)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") onView(campaign);
-        }}
-        className="group flex flex-col cursor-pointer overflow-hidden rounded-[12px] border bg-card transition-all duration-200 hover:border-foreground/12 hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)]"
+      <article
+        className="group relative flex flex-col cursor-pointer overflow-hidden rounded-[12px] border bg-card transition-all duration-200 hover:border-foreground/12 hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)]"
       >
+        {/* Full-card clickable overlay — sits behind the Save button */}
+        <button
+          type="button"
+          onClick={() => onView(campaign)}
+          className="absolute inset-0 z-0 cursor-pointer"
+          aria-label={`View ${campaign.title}`}
+          tabIndex={-1}
+        />
         {inner}
-      </div>
+      </article>
     );
   }
 
   return (
-    <Link
-      href={`/campaigns/${campaign.id}`}
-      className="group flex flex-col overflow-hidden rounded-[12px] border bg-card transition-all duration-200 hover:border-foreground/12 hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)]"
+    <article
+      className="group relative flex flex-col overflow-hidden rounded-[12px] border bg-card transition-all duration-200 hover:border-foreground/12 hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)]"
     >
+      {/* Full-card clickable link — sits behind the Save button */}
+      <Link
+        href={`/campaigns/${campaign.id}`}
+        className="absolute inset-0 z-0"
+        aria-label={`View ${campaign.title}`}
+        tabIndex={-1}
+      />
       {inner}
-    </Link>
+    </article>
   );
 }
 

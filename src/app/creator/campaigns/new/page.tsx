@@ -49,10 +49,10 @@ const STEPS = [
   "Review",
 ];
 
-const PLATFORM_OPTIONS: { label: string; value: Platform }[] = [
+const PLATFORM_OPTIONS: { label: string; value: Platform; disabled?: boolean }[] = [
   { label: "Instagram", value: "Instagram" },
   { label: "YouTube", value: "YouTube" },
-  { label: "Kick", value: "Kick" },
+  { label: "Kick", value: "Kick", disabled: true },
 ];
 
 const CATEGORIES = [
@@ -156,7 +156,6 @@ export default function NewCampaignWizard() {
   const [donts, setDonts] = useState<string[]>([""]);
 
   // Step 8
-  const [autoReview, setAutoReview] = useState(false);
   const [reviewTime, setReviewTime] = useState("");
   const [rejectionReasons, setRejectionReasons] = useState<string[]>([""]);
 
@@ -168,6 +167,7 @@ export default function NewCampaignWizard() {
   const [rightsOtherText, setRightsOtherText] = useState("");
 
   function togglePlatform(value: Platform) {
+    if (value === "Kick") return;
     setPlatforms((prev) =>
       prev.includes(value) ? prev.filter((x) => x !== value) : [...prev, value],
     );
@@ -210,14 +210,12 @@ export default function NewCampaignWizard() {
     const cleanDonts = donts.map((d) => d.trim()).filter(Boolean);
     const cleanReject = rejectionReasons.map((r) => r.trim()).filter(Boolean);
     const approval: CampaignApproval = {
-      afterSubmission: autoReview
-        ? "Auto-approved on submit once view thresholds are met."
-        : "Manual review by the brand team.",
+      afterSubmission: "Manual review by the admin team.",
       reviewTime: reviewTime.trim() || undefined,
       criteria: "",
       rejectionReasons: cleanReject,
       appeal: "Reply to the decision email within 7 days.",
-      autoReview,
+      autoReview: false,
     };
     const rights: CampaignRights = {
       ads: rightsAds,
@@ -899,19 +897,29 @@ export default function NewCampaignWizard() {
                   <button
                     key={p.value}
                     type="button"
+                    disabled={p.disabled}
                     onClick={() => togglePlatform(p.value)}
                     className={`flex items-center justify-between rounded-xl border p-4 text-left text-sm font-medium ${
-                      on ? "border-accent bg-accent-soft" : "hover:bg-background"
+                      p.disabled
+                        ? "cursor-not-allowed border-border/40 text-muted/50"
+                        : on
+                          ? "border-accent bg-accent-soft"
+                          : "hover:bg-background"
                     }`}
                   >
-                    {p.label}
-                    <span
-                      className={`flex h-5 w-5 items-center justify-center rounded-full border ${
-                        on ? "border-accent bg-accent text-white" : "text-muted"
-                      }`}
-                    >
-                      {on && <Check size={12} />}
+                    <span className="flex items-center gap-2">
+                      {p.label}
+                      {p.disabled && <span className="text-[11px] text-muted/50">(coming soon)</span>}
                     </span>
+                    {!p.disabled && (
+                      <span
+                        className={`flex h-5 w-5 items-center justify-center rounded-full border ${
+                          on ? "border-accent bg-accent text-white" : "text-muted"
+                        }`}
+                      >
+                        {on && <Check size={12} />}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -1166,15 +1174,6 @@ export default function NewCampaignWizard() {
         {/* STEP 8 */}
         {step === 7 && (
           <div className="space-y-4">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={autoReview}
-                onChange={(e) => setAutoReview(e.target.checked)}
-                className="h-4 w-4"
-              />
-              Auto-approve clips (manual review off)
-            </label>
             <Field label="Expected review time" hint="optional">
               <input
                 className={inputCls}
@@ -1325,7 +1324,7 @@ export default function NewCampaignWizard() {
             <ReviewRow label="DON&apos;T" value={donts.filter(Boolean).join("; ")} />
             <ReviewRow
               label="Review"
-              value={`${autoReview ? "Auto" : "Manual"}${
+              value={`Manual review${
                 reviewTime ? ` · ${reviewTime}` : ""
               }`}
             />
