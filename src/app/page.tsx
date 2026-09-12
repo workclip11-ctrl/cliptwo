@@ -367,7 +367,7 @@ function Journey() {
             </button>
           ))}
         </div>
-        <div className="rounded-[14px] border border-border/40 bg-card p-6">
+        <div className="rounded-xl border border-border/40 bg-card p-6">
           <h3 className="text-[18px] font-bold tracking-tight">{stage.title}</h3>
           <p className="mt-2 max-w-md text-[14px] leading-relaxed text-muted">{stage.body}</p>
           <div className="mt-6">
@@ -398,7 +398,7 @@ function FAQ() {
           </button>
         ))}
       </div>
-      <div className="divide-y divide-border/30 rounded-[14px] border border-border/40 bg-card">
+      <div className="divide-y divide-border/30 rounded-xl border border-border/40 bg-card">
         {cat.items.map((f) => (
           <div key={f.q}>
             <button
@@ -622,7 +622,7 @@ export default function Home() {
       </div>
 
       {/* ── Platforms ── */}
-      <div className="mx-auto max-w-[1120px] px-6 py-12 text-center">
+      <div className="mx-auto max-w-[1120px] px-6 py-16 text-center">
         <p className="text-[11px] font-semibold uppercase tracking-widest text-muted">
           Built for every niche, and every platform that matters
         </p>
@@ -700,7 +700,7 @@ export default function Home() {
         <div className="mt-14">
           <FAQ />
         </div>
-        <div className="mx-auto mt-14 max-w-2xl rounded-[14px] border border-border/40 bg-card p-8 text-center">
+        <div className="mx-auto mt-14 max-w-2xl rounded-xl border border-border/40 bg-card p-8 text-center">
           <h3 className="text-[18px] font-bold tracking-tight">Still have questions?</h3>
           <p className="mt-2 text-[14px] text-muted">
             Can&apos;t find what you&apos;re looking for? Reach out to our support team and we&apos;ll get back to you.

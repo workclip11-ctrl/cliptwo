@@ -314,7 +314,7 @@ export default function SocialAccountsPage() {
     <div className="mx-auto max-w-[1120px] space-y-8 px-5 py-10 sm:px-8">
       {/* ── Header ──────────────────────────────────────── */}
       <div>
-        <h1 className="text-[28px] font-semibold leading-tight tracking-tight sm:text-[30px]">
+        <h1 className="text-[28px] sm:text-[32px] font-bold tracking-tight leading-tight">
           Connected accounts
         </h1>
         <p className="mt-2 max-w-lg text-[14px] leading-relaxed text-muted sm:text-[15px]">

@@ -163,7 +163,7 @@ export default function FAQPage() {
         <p className="text-xs font-semibold uppercase tracking-widest text-muted">
           Help Center
         </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight">
+        <h1 className="mt-3 text-[28px] font-bold tracking-tight leading-tight">
           Frequently Asked Questions
         </h1>
         <p className="mt-3 max-w-lg text-[15px] leading-relaxed text-muted">

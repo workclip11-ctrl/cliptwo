@@ -106,7 +106,7 @@ export default function ClipperSubmissionsPage() {
     <div className="mx-auto max-w-[1120px] space-y-8 px-5 py-10 sm:px-8">
       {/* ── Header ──────────────────────────────────────── */}
       <div>
-        <h1 className="text-[28px] font-semibold leading-tight tracking-tight sm:text-[26px]">
+        <h1 className="text-[28px] sm:text-[32px] font-bold tracking-tight leading-tight">
           My Submissions
         </h1>
         <p className="mt-2 text-[14px] text-muted sm:text-[15px]">

@@ -825,12 +825,12 @@ export default function CreatorCampaignDetailPage() {
           <table className="w-full text-[14px]">
             <thead>
               <tr className="border-b border-border/50 text-left text-[13px] text-muted">
-                <th className="pb-2.5 pr-4 font-medium">Date</th>
-                <th className="pb-2.5 pr-4 font-medium">Clipper</th>
-                <th className="pb-2.5 pr-4 font-medium">Status</th>
-                <th className="pb-2.5 pl-4 text-right font-medium">Gross</th>
-                <th className="pb-2.5 pl-4 text-right font-medium">Fee</th>
-                <th className="pb-2.5 text-right font-medium">Net</th>
+                <th className="px-4 py-3 font-medium">Date</th>
+                <th className="px-4 py-3 font-medium">Clipper</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 text-right font-medium">Gross</th>
+                <th className="px-4 py-3 text-right font-medium">Fee</th>
+                <th className="px-4 py-3 text-right font-medium">Net</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/30">
@@ -844,20 +844,20 @@ export default function CreatorCampaignDetailPage() {
                   const fee = creatorFee(gross);
                   return (
                     <tr key={k.id} className="transition-colors duration-100 hover:bg-accent-soft/30">
-                      <td className="py-3 pr-4 text-muted">
+                      <td className="px-4 py-3 text-muted">
                         {fmtDateTime(k.submittedAt)}
                       </td>
-                      <td className="py-3 pr-4 font-medium">@{k.clipper}</td>
-                      <td className="py-3 pr-4">
+                      <td className="px-4 py-3 font-medium">@{k.clipper}</td>
+                      <td className="px-4 py-3">
                         <StatusPill status={k.status} />
                       </td>
-                      <td className="py-3 pl-4 text-right font-mono tabular-nums">
+                      <td className="px-4 py-3 text-right font-mono tabular-nums">
                         {rup(gross)}
                       </td>
-                      <td className="py-3 pl-4 text-right font-mono tabular-nums text-muted">
+                      <td className="px-4 py-3 text-right font-mono tabular-nums text-muted">
                         {rup(fee)}
                       </td>
-                      <td className="py-3 text-right font-mono tabular-nums font-semibold">
+                      <td className="px-4 py-3 text-right font-mono tabular-nums font-semibold">
                         {rup(gross - fee)}
                       </td>
                     </tr>

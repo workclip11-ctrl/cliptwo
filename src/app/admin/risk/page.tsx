@@ -69,7 +69,7 @@ export default function AdminRiskPage() {
   }, [clips, campaigns, q, severityFilter, statusFilter]);
 
   return (
-    <div className="mx-auto max-w-[1120px] space-y-12">
+    <div className="mx-auto max-w-[1120px] space-y-8">
       {/* ── Header ──────────────────────────────────────── */}
       <div>
         <h1 className="text-[28px] font-bold tracking-tight sm:text-[30px]">

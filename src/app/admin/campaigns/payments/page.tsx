@@ -373,7 +373,7 @@ export default function AdminCampaignPayments() {
       {/* ── Reject modal ────────────────────────────────── */}
       {rejectModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="mx-4 w-full max-w-[460px] rounded-xl border border-border/40 bg-card p-6 shadow-xl">
+          <div className="mx-4 w-full max-w-[460px] rounded-2xl border border-border/40 bg-card p-6">
             <h3 className="text-[18px] font-bold tracking-tight">Reject Payment</h3>
             <p className="mt-1.5 text-[14px] text-muted">
               Provide a reason for rejecting this payment. The creator will be notified.

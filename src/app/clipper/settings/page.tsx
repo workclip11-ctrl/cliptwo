@@ -55,7 +55,7 @@ export default function ClipperSettingsPage() {
       {/* ── Header ──────────────────────────────────────── */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-[28px] font-semibold leading-tight tracking-tight sm:text-[30px]">
+          <h1 className="text-[28px] sm:text-[32px] font-bold tracking-tight leading-tight">
             Settings
           </h1>
           <p className="mt-2 text-[14px] text-muted sm:text-[15px]">

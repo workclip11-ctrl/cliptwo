@@ -21,7 +21,7 @@ export function PolicyPage({
           Back to ClipTwo
         </Link>
 
-        <h1 className="mt-8 text-3xl font-semibold tracking-tight">{title}</h1>
+        <h1 className="mt-8 text-[28px] font-bold tracking-tight leading-tight">{title}</h1>
         <p className="mt-2 text-sm text-muted">Last updated: {lastUpdated}</p>
 
         <div className="mt-8 space-y-6 text-[15px] leading-relaxed text-foreground/80">

@@ -46,7 +46,7 @@ export default function CreatorPage() {
     .slice(0, 5);
 
   return (
-    <div className="mx-auto max-w-[1120px] space-y-12 px-5 py-10 sm:px-8">
+    <div className="mx-auto max-w-[1120px] space-y-8 px-5 py-10 sm:px-8">
       {/* ── Header / Action Area ────────────────────────── */}
       <section className="flex flex-wrap items-end justify-between gap-6">
         <div>
@@ -552,14 +552,14 @@ function CampaignDetailModal({
 
   return (
     <div
-      className="fixed inset-0 z-20 flex cursor-pointer items-center justify-center bg-black/30 p-4"
+      className="fixed inset-0 z-30 flex cursor-pointer items-center justify-center bg-black/40 p-4"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-[16px] border bg-card p-6"
+        className="flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border bg-card"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start justify-between gap-3 p-6 pb-0">
           <div className="min-w-0">
             <h3 className="text-[18px] font-semibold">{campaign.title}</h3>
             <p className="mt-0.5 text-[13px] text-muted">
@@ -577,60 +577,62 @@ function CampaignDetailModal({
           </span>
         </div>
 
-        {campaign.thumbnails?.[0] && (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={campaign.thumbnails[0]}
-            alt=""
-            className="mt-3 h-24 w-40 rounded-lg border object-cover"
-          />
-        )}
-
-        <p className="mt-3 text-[14px] text-muted">{campaign.brief}</p>
-
-        {campaign.sourceLink && (
-          <div className="mt-4">
-            <p className="text-[13px] text-muted">Video resource</p>
-            {/^https?:\/\//i.test(campaign.sourceLink) ? (
-              <a
-                href={campaign.sourceLink}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-1 inline-flex items-center gap-1.5 text-[14px] font-medium text-accent hover:underline underline-offset-2"
-              >
-                Open source video
-              </a>
-            ) : (
-              <p className="mt-1 inline-flex items-center gap-1.5 text-[14px] text-muted">
-                {campaign.sourceLink}
-              </p>
-            )}
-          </div>
-        )}
-
-        <div className="mt-4">
-          <div className="mb-1 flex items-center justify-between text-[12px] text-muted">
-            <span>{rup(spent)} spent</span>
-            <span>{rup(remaining)} left</span>
-          </div>
-          <div className="h-[4px] w-full overflow-hidden rounded-full bg-accent-soft">
-            <div
-              className="h-full rounded-full bg-foreground"
-              style={{ width: `${pct}%` }}
+        <div className="flex-1 overflow-y-auto p-6">
+          {campaign.thumbnails?.[0] && (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={campaign.thumbnails[0]}
+              alt=""
+              className="mt-3 h-24 w-40 rounded-lg border object-cover"
             />
-          </div>
-        </div>
+          )}
 
-        <div className="mt-4 flex flex-wrap items-center gap-3 text-[13px] text-muted">
-          <span>{campClips.length} clips</span>
-          <span className="text-green">{approvedN} approved</span>
-          <span className="text-amber">{pendingN} pending</span>
-          <span>{campaign.daysLeft} days left</span>
+          <p className="mt-3 text-[14px] text-muted">{campaign.brief}</p>
+
+          {campaign.sourceLink && (
+            <div className="mt-4">
+              <p className="text-[13px] text-muted">Video resource</p>
+              {/^https?:\/\//i.test(campaign.sourceLink) ? (
+                <a
+                  href={campaign.sourceLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-1 inline-flex items-center gap-1.5 text-[14px] font-medium text-accent hover:underline underline-offset-2"
+                >
+                  Open source video
+                </a>
+              ) : (
+                <p className="mt-1 inline-flex items-center gap-1.5 text-[14px] text-muted">
+                  {campaign.sourceLink}
+                </p>
+              )}
+            </div>
+          )}
+
+          <div className="mt-4">
+            <div className="mb-1 flex items-center justify-between text-[12px] text-muted">
+              <span>{rup(spent)} spent</span>
+              <span>{rup(remaining)} left</span>
+            </div>
+            <div className="h-[4px] w-full overflow-hidden rounded-full bg-accent-soft">
+              <div
+                className="h-full rounded-full bg-foreground"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3 text-[13px] text-muted">
+            <span>{campClips.length} clips</span>
+            <span className="text-green">{approvedN} approved</span>
+            <span className="text-amber">{pendingN} pending</span>
+            <span>{campaign.daysLeft} days left</span>
+          </div>
         </div>
 
         <button
           onClick={onClose}
-          className="mt-6 flex h-11 w-full items-center justify-center rounded-[10px] border bg-card text-[14px] font-medium transition-colors duration-150 hover:bg-accent-soft"
+          className="flex h-11 w-full shrink-0 items-center justify-center rounded-b-2xl border-t bg-card text-[14px] font-medium transition-colors duration-150 hover:bg-accent-soft"
         >
           Close
         </button>

@@ -44,7 +44,7 @@ export default function ClipperPage() {
   );
 
   return (
-    <div className="mx-auto max-w-[1120px] space-y-14 px-5 py-10 sm:px-8">
+    <div className="mx-auto max-w-[1120px] space-y-8 px-5 py-10 sm:px-8">
       {/* ─────────────────────────────────────────────
           1. WELCOME / ACTION HEADER
       ───────────────────────────────────────────── */}

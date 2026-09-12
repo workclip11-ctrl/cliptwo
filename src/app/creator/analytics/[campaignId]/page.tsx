@@ -48,7 +48,7 @@ export default function CampaignAnalyticsPage() {
           >
             <ArrowLeft size={14} /> Back to analytics
           </Link>
-          <h1 className="mt-3 text-2xl font-semibold tracking-tight">
+          <h1 className="mt-3 text-[28px] font-bold tracking-tight leading-tight">
             Campaign not found
           </h1>
           <p className="mt-1 text-sm text-muted">
@@ -80,7 +80,7 @@ export default function CampaignAnalyticsPage() {
         </Link>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
+            <h1 className="text-[28px] font-bold tracking-tight leading-tight">
               {camp.title}
             </h1>
             <p className="mt-1 text-sm text-muted">
@@ -161,18 +161,26 @@ export default function CampaignAnalyticsPage() {
                 No clippers yet.
               </div>
             ) : (
-              <table className="w-full text-sm">
+              <table className="w-full text-[14px]">
+                <thead>
+                  <tr className="border-b border-border/40 text-left text-[13px] text-muted">
+                    <th className="px-4 py-2.5 font-medium">#</th>
+                    <th className="px-4 py-2.5 font-medium">Clipper</th>
+                    <th className="px-4 py-2.5 text-right font-medium">Views</th>
+                    <th className="px-4 py-2.5 text-right font-medium">Earned</th>
+                  </tr>
+                </thead>
                 <tbody className="divide-y">
                   {topClipperList.map((c, i) => (
                     <tr key={c.handle}>
-                      <td className="py-2.5 font-mono text-xs text-muted">
+                      <td className="px-4 py-3 font-mono text-xs text-muted">
                         {i + 1}
                       </td>
-                      <td className="py-2.5 font-medium">@{c.handle}</td>
-                      <td className="py-2.5 text-right font-mono">
+                      <td className="px-4 py-3 font-medium">@{c.handle}</td>
+                      <td className="px-4 py-3 text-right font-mono">
                         {fmtViews(c.views)}
                       </td>
-                      <td className="py-2.5 text-right font-mono text-muted">
+                      <td className="px-4 py-3 text-right font-mono text-muted">
                         {rup(c.earned)}
                       </td>
                     </tr>

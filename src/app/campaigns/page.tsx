@@ -147,7 +147,7 @@ export default function CampaignsPage() {
       <TopBar />
       <section className="mx-auto max-w-5xl px-6 py-12">
         <p className="text-xs font-semibold uppercase tracking-widest text-muted">Browse</p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight">All campaigns</h1>
+        <h1 className="mt-3 text-[28px] font-bold tracking-tight leading-tight">All campaigns</h1>
         <p className="mt-3 max-w-lg text-[15px] leading-relaxed text-muted">
           Open campaigns from creators looking for clippers. Tap a card to see the brief, budget and how to join.
         </p>

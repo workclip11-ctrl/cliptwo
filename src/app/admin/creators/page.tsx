@@ -550,12 +550,12 @@ function CreatorDrawer({
                 <table className="w-full text-[14px]">
                   <thead>
                     <tr className="border-b border-border/40 text-left text-[13px] text-muted">
-                      <th className="px-3 py-2.5 font-medium">Campaign</th>
-                      <th className="px-3 py-2.5 font-medium">Clipper</th>
-                      <th className="px-3 py-2.5 font-medium">Platform</th>
-                      <th className="px-3 py-2.5 text-right font-medium">Views</th>
-                      <th className="px-3 py-2.5 font-medium">Status</th>
-                      <th className="px-3 py-2.5 text-right font-medium">Earnings</th>
+                      <th className="px-4 py-2.5 font-medium">Campaign</th>
+                      <th className="px-4 py-2.5 font-medium">Clipper</th>
+                      <th className="px-4 py-2.5 font-medium">Platform</th>
+                      <th className="px-4 py-2.5 text-right font-medium">Views</th>
+                      <th className="px-4 py-2.5 font-medium">Status</th>
+                      <th className="px-4 py-2.5 text-right font-medium">Earnings</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/40">
@@ -563,21 +563,21 @@ function CreatorDrawer({
                       const camp = campaigns.find((c) => c.id === k.campaignId);
                       return (
                         <tr key={k.id}>
-                          <td className="px-3 py-3">
+                          <td className="px-4 py-3.5">
                             <div className="font-medium">{camp?.title ?? k.campaignId}</div>
                             <div className="text-[13px] text-muted">{k.caption}</div>
                           </td>
-                          <td className="px-3 py-3 font-medium">@{k.clipper}</td>
-                          <td className="px-3 py-3">
+                          <td className="px-4 py-3.5 font-medium">@{k.clipper}</td>
+                          <td className="px-4 py-3.5">
                             <PlatformIcon p={k.platform ?? "Instagram"} size={14} />
                           </td>
-                          <td className="px-3 py-3 text-right font-mono">
+                          <td className="px-4 py-3.5 text-right font-mono">
                             {fmtViews(k.verifiedViews ?? 0)}
                           </td>
-                          <td className="px-3 py-3">
+                          <td className="px-4 py-3.5">
                             <StatusPill status={k.status} />
                           </td>
-                          <td className="px-3 py-3 text-right font-mono">
+                          <td className="px-4 py-3.5 text-right font-mono">
                             {rup(clipEarnings(k, campaigns))}
                           </td>
                         </tr>

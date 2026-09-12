@@ -68,7 +68,7 @@ export default function CreatorAnalyticsPage() {
   const topClipperList = topClippers(received, campaigns, 8);
 
   return (
-    <div className="mx-auto max-w-[1120px] space-y-16 px-5 py-10 sm:px-8">
+    <div className="mx-auto max-w-[1120px] space-y-8 px-5 py-10 sm:px-8">
       {/* ── Header ──────────────────────────────────────── */}
       <div>
         <h1 className="text-[28px] font-bold tracking-tight sm:text-[32px]">

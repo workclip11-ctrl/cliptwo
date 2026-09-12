@@ -25,17 +25,17 @@ export function TopClipsTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[640px] text-sm">
+      <table className="w-full min-w-[640px] text-[14px]">
         <thead>
           <tr className="border-b text-left text-xs text-muted">
-            <th className="px-3 py-2.5 font-medium">#</th>
-            <th className="px-3 py-2.5 font-medium">Clip</th>
-            <th className="px-3 py-2.5 font-medium">Clipper</th>
-            <th className="px-3 py-2.5 font-medium">Platform</th>
-            <th className="px-3 py-2.5 text-right font-medium">Views</th>
-            <th className="px-3 py-2.5 text-right font-medium">Engagement</th>
-            <th className="px-3 py-2.5 text-right font-medium">CPM</th>
-            <th className="px-3 py-2.5 text-right font-medium">Amount paid</th>
+            <th className="px-4 py-2.5 font-medium">#</th>
+            <th className="px-4 py-2.5 font-medium">Clip</th>
+            <th className="px-4 py-2.5 font-medium">Clipper</th>
+            <th className="px-4 py-2.5 font-medium">Platform</th>
+            <th className="px-4 py-2.5 text-right font-medium">Views</th>
+            <th className="px-4 py-2.5 text-right font-medium">Engagement</th>
+            <th className="px-4 py-2.5 text-right font-medium">CPM</th>
+            <th className="px-4 py-2.5 text-right font-medium">Amount paid</th>
           </tr>
         </thead>
         <tbody className="divide-y">
@@ -50,8 +50,8 @@ export function TopClipsTable({
             const earned = clipEarnings(k, campaigns);
             return (
               <tr key={k.id} className="hover:bg-accent-soft/30">
-                <td className="px-3 py-3 font-mono text-muted">{i + 1}</td>
-                <td className="px-3 py-3">
+                <td className="px-4 py-3 font-mono text-muted">{i + 1}</td>
+                <td className="px-4 py-3">
                   <Link
                     href={`/clip/${k.id}`}
                     className="line-clamp-1 max-w-[220px] font-medium hover:underline underline-offset-2"
@@ -60,22 +60,22 @@ export function TopClipsTable({
                   </Link>
                   <p className="truncate text-xs text-muted">{camp?.title}</p>
                 </td>
-                <td className="px-3 py-3">
+                <td className="px-4 py-3">
                   <span className="font-medium">@{k.clipper}</span>
                 </td>
-                <td className="px-3 py-3">
+                <td className="px-4 py-3">
                   <PlatformIcon p={k.platform ?? "Instagram"} size={15} />
                 </td>
-                <td className="px-3 py-3 text-right font-mono">
+                <td className="px-4 py-3 text-right font-mono">
                   {fmtViews(k.views)}
                 </td>
-                <td className="px-3 py-3 text-right font-mono text-muted">
+                <td className="px-4 py-3 text-right font-mono text-muted">
                   {eng > 0 ? fmtViews(eng) : "—"}
                 </td>
-                <td className="px-3 py-3 text-right font-mono">
+                <td className="px-4 py-3 text-right font-mono">
                   {rup(clipCPM(k, campaigns))}
                 </td>
-                <td className="px-3 py-3 text-right font-mono font-semibold">
+                <td className="px-4 py-3 text-right font-mono font-semibold">
                   {rup(earned)}
                 </td>
               </tr>

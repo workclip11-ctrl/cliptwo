@@ -65,7 +65,7 @@ export default function AdminBackend() {
 
         <div className="mt-6 space-y-4">
           {/* Status row */}
-          <div className="flex items-center justify-between rounded-[10px] border border-border/40 bg-card px-5 py-4">
+          <div className="flex items-center justify-between rounded-xl border border-border/40 bg-card px-5 py-4">
             <div>
               <p className="text-[15px] font-medium">Connection status</p>
               <p className="mt-0.5 text-[13px] text-muted">
@@ -87,7 +87,7 @@ export default function AdminBackend() {
           </div>
 
           {/* Host row */}
-          <div className="flex items-center justify-between rounded-[10px] border border-border/40 bg-card px-5 py-4">
+          <div className="flex items-center justify-between rounded-xl border border-border/40 bg-card px-5 py-4">
             <div>
               <p className="text-[15px] font-medium">Host</p>
               <p className="mt-0.5 text-[13px] text-muted">
@@ -100,7 +100,7 @@ export default function AdminBackend() {
           </div>
 
           {/* Test connection row */}
-          <div className="flex items-center justify-between rounded-[10px] border border-border/40 bg-card px-5 py-4">
+          <div className="flex items-center justify-between rounded-xl border border-border/40 bg-card px-5 py-4">
             <div>
               <p className="text-[15px] font-medium">Live ping</p>
               <p className="mt-0.5 text-[13px] text-muted">
@@ -128,7 +128,7 @@ export default function AdminBackend() {
 
           {/* Config warning */}
           {!isSupabaseConfigured && (
-            <div className="rounded-[10px] border border-amber/20 bg-amber/5 px-5 py-4 text-[13px] text-amber">
+            <div className="rounded-xl border border-amber/20 bg-amber/5 px-5 py-4 text-[13px] text-amber">
               Set <code className="font-mono">NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
               <code className="font-mono">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> to enable
               live data. The app currently runs on seed data.
@@ -156,7 +156,7 @@ export default function AdminBackend() {
           ].map((item) => (
             <div
               key={item.label}
-              className="rounded-[10px] border border-border/40 bg-card px-5 py-4"
+              className="rounded-xl border border-border/40 bg-card px-5 py-4"
             >
               <p className="text-[22px] font-bold tracking-tight">{item.value}</p>
               <p className="mt-0.5 text-[13px] text-muted">{item.label}</p>
