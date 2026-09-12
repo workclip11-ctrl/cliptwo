@@ -479,21 +479,21 @@ export default function Home() {
     <main className="min-h-screen">
       {/* ── Header ── */}
       <header className="sticky top-0 z-40 border-b border-border/40 bg-background/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-[1120px] items-center justify-between px-6 py-4">
+        <div className="mx-auto flex max-w-[1120px] items-center justify-between px-6 py-3.5">
           <Link href="/" className="flex items-center gap-2.5 font-bold tracking-tight cursor-pointer">
-            <img src="/cliptwo-logo.png" alt="ClipTwo" className="h-8 w-8 rounded-[8px] object-contain" />
-            <span className="text-[17px]">cliptwo</span>
+            <img src="/cliptwo-logo.png" alt="ClipTwo" className="h-7 w-7 rounded-[8px] object-contain" />
+            <span className="text-[16px]">cliptwo</span>
           </Link>
-          <nav className="hidden items-center gap-7 text-[14px] text-muted md:flex">
+          <nav className="hidden items-center gap-6 text-[13px] text-muted md:flex">
             <a href="#how" className="transition-colors hover:text-foreground cursor-pointer">How it works</a>
             <a href="#why" className="transition-colors hover:text-foreground cursor-pointer">Why cliptwo</a>
             <a href="#faq" className="transition-colors hover:text-foreground cursor-pointer">FAQ</a>
           </nav>
-          <div className="flex items-center gap-2.5">
-            <Link href="/login" className="rounded-[8px] border border-border/60 px-4 py-2 text-[14px] font-medium transition-colors hover:bg-accent-soft cursor-pointer">
+          <div className="flex items-center gap-2">
+            <Link href="/login" className="rounded-[8px] border border-border/60 px-3.5 py-1.5 text-[13px] font-medium transition-colors hover:bg-accent-soft cursor-pointer">
               Log in
             </Link>
-            <Link href="/login?mode=signup" className="rounded-[8px] bg-foreground px-4 py-2 text-[14px] font-medium text-background transition-opacity hover:opacity-90 cursor-pointer">
+            <Link href="/login?mode=signup" className="rounded-[8px] bg-foreground px-3.5 py-1.5 text-[13px] font-medium text-background transition-opacity hover:opacity-90 cursor-pointer">
               Sign up
             </Link>
           </div>
@@ -501,41 +501,41 @@ export default function Home() {
       </header>
 
       {/* ── Hero ── */}
-      <section className="mx-auto grid max-w-[1120px] gap-16 px-6 py-24 lg:grid-cols-2 lg:items-center">
+      <section className="mx-auto grid max-w-[1120px] items-center gap-12 px-6 pt-20 pb-16 lg:grid-cols-2 lg:gap-16 lg:pt-24 lg:pb-20">
         <div>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-border/40 bg-card px-3.5 py-1 text-[12px] font-medium text-muted">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border/40 bg-card px-3 py-1 text-[12px] font-medium text-muted">
             India&apos;s clipping marketplace
           </span>
-          <h1 className="mt-7 text-[36px] font-bold tracking-tight leading-[1.15] sm:text-[44px] lg:text-[52px]">
+          <h1 className="mt-6 text-[32px] font-bold tracking-tight leading-[1.15] sm:text-[40px] lg:text-[48px]">
             {heroTitle}
           </h1>
-          <p className="mt-6 max-w-md text-[17px] leading-relaxed text-muted">
+          <p className="mt-5 max-w-md text-[16px] leading-relaxed text-muted">
             {heroSubtitle}
           </p>
-          <div className="mt-9 flex flex-wrap gap-3">
-            <Link href="/login?role=clipper" className="inline-flex h-12 items-center gap-2.5 rounded-[10px] bg-foreground px-7 text-[15px] font-semibold text-background transition-opacity hover:opacity-90 cursor-pointer">
-              <Scissors size={16} /> Start clipping
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link href="/login?role=clipper" className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-foreground px-6 text-[14px] font-semibold text-background transition-opacity hover:opacity-90 cursor-pointer">
+              <Scissors size={15} /> Start clipping
             </Link>
-            <Link href="/login?role=creator" className="inline-flex h-12 items-center gap-2.5 rounded-[10px] border border-border/60 bg-card px-7 text-[15px] font-semibold transition-colors hover:bg-accent-soft cursor-pointer">
-              <Film size={16} /> Launch a campaign
+            <Link href="/login?role=creator" className="inline-flex h-11 items-center gap-2 rounded-[10px] border border-border/60 bg-card px-6 text-[14px] font-semibold transition-colors hover:bg-accent-soft cursor-pointer">
+              <Film size={15} /> Launch a campaign
             </Link>
           </div>
-          <div className="mt-9 flex flex-wrap items-center gap-6 text-[14px] text-muted">
-            <span className="flex items-center gap-2"><ShieldCheck size={16} className="text-green" /> Admin-reviewed clips</span>
-            <span className="flex items-center gap-2"><IndianRupee size={16} className="text-amber" /> UPI-native payouts</span>
+          <div className="mt-8 flex flex-wrap items-center gap-5 text-[13px] text-muted">
+            <span className="flex items-center gap-1.5"><ShieldCheck size={14} className="text-green" /> Admin-reviewed clips</span>
+            <span className="flex items-center gap-1.5"><IndianRupee size={14} className="text-amber" /> UPI-native payouts</span>
           </div>
         </div>
 
         {/* Phone mockup — Reel playing inside phone */}
         <div className="relative mx-auto w-full max-w-md lg:max-w-lg">
-          <div className="group relative mx-auto w-[260px] sm:w-[280px]">
+          <div className="group relative mx-auto w-[240px] sm:w-[260px]">
             {/* Phone body */}
-            <div className="relative overflow-hidden rounded-[2.5rem] border border-border/30 bg-black shadow-2xl shadow-black/10">
+            <div className="relative overflow-hidden rounded-[2.5rem] border border-border/30 bg-black shadow-xl shadow-black/8">
               {/* Notch */}
-              <div className="absolute left-1/2 top-0 z-20 h-6 w-28 -translate-x-1/2 rounded-b-2xl bg-black" />
+              <div className="absolute left-1/2 top-0 z-20 h-5 w-24 -translate-x-1/2 rounded-b-2xl bg-black" />
 
               {/* Screen — 9:16 Reel */}
-              <div className="relative aspect-[9/19] overflow-hidden bg-gradient-to-b from-slate-900 to-slate-800">
+              <div className="relative aspect-[9/19] overflow-hidden bg-black">
                 {/* Reel video — fills entire screen */}
                 <video
                   ref={videoRef}
@@ -552,14 +552,11 @@ export default function Home() {
                   className="absolute inset-0 h-full w-full object-cover"
                 />
 
-                {/* Subtle gradient overlay for depth */}
-                <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/40" />
-
                 {/* Live progress bar */}
-                <div className="absolute inset-x-3 bottom-16 z-10">
+                <div className="absolute inset-x-3 bottom-14 z-10">
                   <div className="h-[2px] w-full overflow-hidden rounded-full bg-white/20">
                     <div
-                      className="h-full rounded-full bg-white/80"
+                      className="h-full rounded-full bg-white/70"
                       style={{ width: `${progress}%` }}
                     />
                   </div>
@@ -572,11 +569,11 @@ export default function Home() {
                   className="absolute inset-0 z-10 flex items-center justify-center opacity-0 transition-opacity duration-200 group-hover:opacity-100 cursor-pointer"
                   aria-label={isPlaying ? "Pause video" : "Play video"}
                 >
-                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm">
                     {isPlaying ? (
-                      <Pause className="h-6 w-6 text-white" />
+                      <Pause className="h-5 w-5 text-white" />
                     ) : (
-                      <Play className="ml-0.5 h-6 w-6 text-white" />
+                      <Play className="ml-0.5 h-5 w-5 text-white" />
                     )}
                   </div>
                 </button>
@@ -584,25 +581,25 @@ export default function Home() {
             </div>
 
             {/* Floating card — Views */}
-            <div className="absolute -right-10 top-20 z-30 w-[120px] rounded-[12px] border border-border/20 bg-white p-3 shadow-lg shadow-black/8 sm:-right-14 sm:w-[130px]">
+            <div className="absolute -right-8 top-16 z-30 rounded-[10px] border border-border/20 bg-white px-3 py-2.5 shadow-md shadow-black/5 sm:-right-12">
               <div className="flex items-center gap-1.5">
-                <span className="flex h-5 w-5 items-center justify-center rounded-[6px] bg-blue-500/10">
-                  <Eye size={11} className="text-blue-500" />
+                <span className="flex h-4 w-4 items-center justify-center rounded-[5px] bg-blue-500/10">
+                  <Eye size={10} className="text-blue-500" />
                 </span>
                 <span className="text-[10px] font-medium text-muted">Views</span>
               </div>
-              <p className="mt-1.5 font-mono text-[18px] font-bold tracking-tight">24.8K</p>
+              <p className="mt-1 font-mono text-[16px] font-bold tracking-tight">24.8K</p>
             </div>
 
             {/* Floating card — Earned */}
-            <div className="absolute -left-10 bottom-28 z-30 w-[120px] rounded-[12px] border border-border/20 bg-white p-3 shadow-lg shadow-black/8 sm:-left-14 sm:w-[130px]">
+            <div className="absolute -left-8 bottom-24 z-30 rounded-[10px] border border-border/20 bg-white px-3 py-2.5 shadow-md shadow-black/5 sm:-left-12">
               <div className="flex items-center gap-1.5">
-                <span className="flex h-5 w-5 items-center justify-center rounded-[6px] bg-green/10">
-                  <IndianRupee size={11} className="text-green" />
+                <span className="flex h-4 w-4 items-center justify-center rounded-[5px] bg-green/10">
+                  <IndianRupee size={10} className="text-green" />
                 </span>
                 <span className="text-[10px] font-medium text-muted">Earned</span>
               </div>
-              <p className="mt-1.5 font-mono text-[18px] font-bold tracking-tight">₹4,960</p>
+              <p className="mt-1 font-mono text-[16px] font-bold tracking-tight">₹4,960</p>
             </div>
           </div>
         </div>
@@ -613,8 +610,8 @@ export default function Home() {
         <div className="overflow-hidden">
           <div className="flex w-max animate-ticker">
             {[...TICKER, ...TICKER, ...TICKER, ...TICKER, ...TICKER, ...TICKER].map((t, i) => (
-              <span key={i} className="flex items-center gap-2 px-8 text-[11px] font-semibold uppercase tracking-wide text-muted">
-                <span className="text-foreground/30">●</span> {t}
+              <span key={i} className="flex items-center gap-2 px-7 text-[11px] font-medium uppercase tracking-wider text-muted/70">
+                <span className="text-foreground/20">●</span> {t}
               </span>
             ))}
           </div>
@@ -622,39 +619,39 @@ export default function Home() {
       </div>
 
       {/* ── Platforms ── */}
-      <div className="mx-auto max-w-[1120px] px-6 py-16 text-center">
+      <div className="mx-auto max-w-[1120px] px-6 py-14 text-center">
         <p className="text-[11px] font-semibold uppercase tracking-widest text-muted">
           Built for every niche, and every platform that matters
         </p>
-        <div className="mt-5 flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-x-7 gap-y-2.5">
           {NICHES.map((n) => (
-            <span key={n} className="text-[13px] font-medium text-muted">{n}</span>
+            <span key={n} className="text-[13px] font-medium text-muted/70">{n}</span>
           ))}
-          <span className="flex items-center gap-1.5 text-[13px] font-medium text-muted"><PlatformIcon p="Instagram" size={14} /> Instagram</span>
-          <span className="flex items-center gap-1.5 text-[13px] font-medium text-muted"><PlatformIcon p="YouTube" size={14} /> YouTube</span>
-          <span className="flex items-center gap-1.5 text-[13px] font-medium text-muted/50"><PlatformIcon p="Kick" size={14} /> Kick <span className="text-[10px]">(coming soon)</span></span>
+          <span className="flex items-center gap-1.5 text-[13px] font-medium text-muted"><PlatformIcon p="Instagram" size={13} /> Instagram</span>
+          <span className="flex items-center gap-1.5 text-[13px] font-medium text-muted"><PlatformIcon p="YouTube" size={13} /> YouTube</span>
+          <span className="flex items-center gap-1.5 text-[13px] text-muted/50"><PlatformIcon p="Kick" size={13} /> Kick <span className="text-[10px]">(coming soon)</span></span>
         </div>
       </div>
 
       {/* ── How it works ── */}
-      <section id="how" className="mx-auto max-w-[1120px] px-6 py-24">
+      <section id="how" className="mx-auto max-w-[1120px] px-6 py-20">
         <p className="text-center text-[11px] font-semibold uppercase tracking-widest text-muted">How it works</p>
-        <h2 className="mx-auto mt-4 max-w-xl text-center text-[32px] font-bold tracking-tight sm:text-[40px]">One loop, two sides.</h2>
-        <p className="mx-auto mt-4 max-w-lg text-center text-[16px] leading-relaxed text-muted">
+        <h2 className="mx-auto mt-3 max-w-xl text-center text-[28px] font-bold tracking-tight sm:text-[32px]">One loop, two sides.</h2>
+        <p className="mx-auto mt-3 max-w-lg text-center text-[15px] leading-relaxed text-muted">
           The platform&apos;s only job is to run this loop reliably — without either side chasing the other for money or footage.
         </p>
-        <div className="mt-14">
+        <div className="mt-12">
           <Journey />
         </div>
       </section>
 
       {/* ── Live campaigns ── */}
       {featured.length > 0 && (
-        <section className="mx-auto max-w-[1120px] px-6 py-24">
+        <section className="mx-auto max-w-[1120px] px-6 py-20">
           <div className="flex items-end justify-between">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-widest text-muted">Live now</p>
-              <h2 className="mt-4 text-[32px] font-bold tracking-tight sm:text-[40px]">Active campaigns</h2>
+              <h2 className="mt-3 text-[28px] font-bold tracking-tight sm:text-[32px]">Active campaigns</h2>
             </div>
             <button
               onClick={() => router.push("/campaigns")}
@@ -663,7 +660,7 @@ export default function Home() {
               Browse all <ArrowRight size={14} />
             </button>
           </div>
-          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {featured.map((c, i) => (
               <CampaignCard key={c.id} campaign={c} index={i} onView={setActive} />
             ))}
@@ -673,20 +670,20 @@ export default function Home() {
 
       {/* ── Why ClipTwo ── */}
       <section id="why" className="border-y border-border/30 bg-card">
-        <div className="mx-auto max-w-[1120px] px-6 py-24">
+        <div className="mx-auto max-w-[1120px] px-6 py-20">
           <p className="text-[11px] font-semibold uppercase tracking-widest text-muted">Why cliptwo</p>
-          <h2 className="mt-4 text-[32px] font-bold tracking-tight sm:text-[40px]">Trust is the product.</h2>
-          <p className="mt-4 max-w-lg text-[16px] leading-relaxed text-muted">
+          <h2 className="mt-3 text-[28px] font-bold tracking-tight sm:text-[32px]">Trust is the product.</h2>
+          <p className="mt-3 max-w-lg text-[15px] leading-relaxed text-muted">
             Clipping platforms live or die on whether clippers believe they&apos;ll actually get paid. These are the mechanics that make that a promise, not a claim.
           </p>
-          <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {TRUST.map((t) => (
               <div key={t.title} className="py-1">
-                <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-accent-soft">
-                  <t.icon size={18} className="text-foreground" />
+                <div className="flex h-9 w-9 items-center justify-center rounded-[8px] bg-accent-soft">
+                  <t.icon size={16} className="text-foreground" />
                 </div>
-                <h4 className="mt-4 text-[16px] font-bold tracking-tight">{t.title}</h4>
-                <p className="mt-2 text-[14px] leading-relaxed text-muted">{t.body}</p>
+                <h4 className="mt-3 text-[15px] font-bold tracking-tight">{t.title}</h4>
+                <p className="mt-1.5 text-[14px] leading-relaxed text-muted">{t.body}</p>
               </div>
             ))}
           </div>
@@ -694,14 +691,14 @@ export default function Home() {
       </section>
 
       {/* ── FAQ ── */}
-      <section id="faq" className="mx-auto max-w-[1120px] px-6 py-24">
+      <section id="faq" className="mx-auto max-w-[1120px] px-6 py-20">
         <p className="text-center text-[11px] font-semibold uppercase tracking-widest text-muted">FAQ</p>
-        <h2 className="mx-auto mt-4 max-w-xl text-center text-[32px] font-bold tracking-tight sm:text-[40px]">Frequently asked</h2>
-        <div className="mt-14">
+        <h2 className="mx-auto mt-3 max-w-xl text-center text-[28px] font-bold tracking-tight sm:text-[32px]">Frequently asked</h2>
+        <div className="mt-12">
           <FAQ />
         </div>
-        <div className="mx-auto mt-14 max-w-2xl rounded-xl border border-border/40 bg-card p-8 text-center">
-          <h3 className="text-[18px] font-bold tracking-tight">Still have questions?</h3>
+        <div className="mx-auto mt-12 max-w-2xl rounded-xl border border-border/40 bg-card p-8 text-center">
+          <h3 className="text-[17px] font-bold tracking-tight">Still have questions?</h3>
           <p className="mt-2 text-[14px] text-muted">
             Can&apos;t find what you&apos;re looking for? Reach out to our support team and we&apos;ll get back to you.
           </p>
@@ -716,24 +713,24 @@ export default function Home() {
 
       {/* ── Final CTA ── */}
       <section className="border-y border-border/30 bg-card">
-        <div className="mx-auto max-w-[1120px] px-6 py-24 text-center">
-          <h2 className="text-[32px] font-bold tracking-tight sm:text-[40px]">Ready to start?</h2>
-          <p className="mx-auto mt-4 max-w-md text-[16px] leading-relaxed text-muted">
+        <div className="mx-auto max-w-[1120px] px-6 py-20 text-center">
+          <h2 className="text-[28px] font-bold tracking-tight sm:text-[32px]">Ready to start?</h2>
+          <p className="mx-auto mt-3 max-w-md text-[15px] leading-relaxed text-muted">
             Whether you want to earn by clipping or grow your brand through
             creator content, ClipTwo is where it happens.
           </p>
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link
               href="/login?role=clipper"
-              className="inline-flex h-12 items-center gap-2.5 rounded-[10px] bg-foreground px-8 text-[15px] font-semibold text-background transition-opacity hover:opacity-90 cursor-pointer"
+              className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-foreground px-7 text-[14px] font-semibold text-background transition-opacity hover:opacity-90 cursor-pointer"
             >
-              <Scissors size={16} /> Start clipping
+              <Scissors size={15} /> Start clipping
             </Link>
             <Link
               href="/login?role=creator"
-              className="inline-flex h-12 items-center gap-2.5 rounded-[10px] border border-border/60 bg-card px-8 text-[15px] font-semibold transition-colors hover:bg-accent-soft cursor-pointer"
+              className="inline-flex h-11 items-center gap-2 rounded-[10px] border border-border/60 bg-card px-7 text-[14px] font-semibold transition-colors hover:bg-accent-soft cursor-pointer"
             >
-              <Film size={16} /> Launch a campaign
+              <Film size={15} /> Launch a campaign
             </Link>
           </div>
         </div>
@@ -741,28 +738,28 @@ export default function Home() {
 
       {/* ── Footer ── */}
       <footer className="border-t border-border/30 bg-card">
-        <div className="mx-auto max-w-[1120px] px-6 py-16">
-          <div className="grid gap-12 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
+        <div className="mx-auto max-w-[1120px] px-6 py-14">
+          <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
             <div>
               <div className="flex items-center gap-2.5 font-bold tracking-tight">
-                <img src="/cliptwo-logo.png" alt="ClipTwo" className="h-8 w-8 rounded-[8px] object-contain" />
-                <span className="text-[17px]">cliptwo</span>
+                <img src="/cliptwo-logo.png" alt="ClipTwo" className="h-7 w-7 rounded-[8px] object-contain" />
+                <span className="text-[16px]">cliptwo</span>
               </div>
-              <p className="mt-4 max-w-xs text-[14px] leading-relaxed text-muted">
+              <p className="mt-3 max-w-xs text-[13px] leading-relaxed text-muted">
                 India&apos;s clipping marketplace — connect creators with clippers, paid per view and settled straight to UPI.
               </p>
-              <div className="mt-5 flex items-center gap-2">
+              <div className="mt-4 flex items-center gap-2">
                 {(["Instagram", "YouTube"] as const).map((p) => (
-                  <span key={p} className="flex h-9 w-9 items-center justify-center rounded-[8px] border border-border/40 bg-background text-muted transition-colors hover:bg-accent-soft cursor-pointer">
-                    <PlatformIcon p={p} size={16} />
+                  <span key={p} className="flex h-8 w-8 items-center justify-center rounded-[8px] border border-border/40 bg-background text-muted transition-colors hover:bg-accent-soft cursor-pointer">
+                    <PlatformIcon p={p} size={15} />
                   </span>
                 ))}
               </div>
             </div>
 
             <div>
-              <h5 className="text-[13px] font-bold uppercase tracking-wider text-muted">Product</h5>
-              <ul className="mt-4 space-y-2.5 text-[14px] text-muted">
+              <h5 className="text-[12px] font-bold uppercase tracking-wider text-muted">Product</h5>
+              <ul className="mt-3 space-y-2 text-[13px] text-muted">
                 <li><Link href="/clipper" className="transition-colors hover:text-foreground cursor-pointer">For clippers</Link></li>
                 <li><Link href="/creator" className="transition-colors hover:text-foreground cursor-pointer">For creators</Link></li>
                 <li><a href="#how" className="transition-colors hover:text-foreground cursor-pointer">How it works</a></li>
@@ -771,16 +768,16 @@ export default function Home() {
             </div>
 
             <div>
-              <h5 className="text-[13px] font-bold uppercase tracking-wider text-muted">Company</h5>
-              <ul className="mt-4 space-y-2.5 text-[14px] text-muted">
+              <h5 className="text-[12px] font-bold uppercase tracking-wider text-muted">Company</h5>
+              <ul className="mt-3 space-y-2 text-[13px] text-muted">
                 <li><Link href="/login" className="transition-colors hover:text-foreground cursor-pointer">Log in</Link></li>
                 <li><a href="mailto:support@cliptwo.com" className="transition-colors hover:text-foreground cursor-pointer">Contact</a></li>
               </ul>
             </div>
 
             <div>
-              <h5 className="text-[13px] font-bold uppercase tracking-wider text-muted">Legal</h5>
-              <ul className="mt-4 space-y-2.5 text-[14px] text-muted">
+              <h5 className="text-[12px] font-bold uppercase tracking-wider text-muted">Legal</h5>
+              <ul className="mt-3 space-y-2 text-[13px] text-muted">
                 <li><Link href="/terms" className="transition-colors hover:text-foreground cursor-pointer">Terms</Link></li>
                 <li><Link href="/privacy" className="transition-colors hover:text-foreground cursor-pointer">Privacy</Link></li>
                 <li><Link href="/payout-policy" className="transition-colors hover:text-foreground cursor-pointer">Payout policy</Link></li>
@@ -790,7 +787,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="mt-12 flex flex-col items-start justify-between gap-3 border-t border-border/30 pt-8 text-[12px] text-muted sm:flex-row sm:items-center">
+          <div className="mt-10 flex flex-col items-start justify-between gap-2 border-t border-border/30 pt-6 text-[12px] text-muted sm:flex-row sm:items-center">
             <p>&copy; {new Date().getFullYear()} cliptwo.</p>
             <p>Made for creators &amp; clippers across India.</p>
           </div>
