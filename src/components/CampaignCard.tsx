@@ -136,12 +136,15 @@ export function CampaignCard({
 
   if (onView) {
     return (
-      <button
-        type="button"
-        onClick={() => onView(campaign)}
-        className="group relative flex flex-col cursor-pointer overflow-hidden rounded-[12px] border bg-card text-left transition-all duration-200 hover:border-foreground/12 hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
-      >
-        {/* Save button — captures click/key to prevent card activation */}
+      <article className="group relative flex flex-col overflow-hidden rounded-[12px] border bg-card transition-all duration-200 hover:border-foreground/12 hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
+        {/* Campaign navigation — keyboard accessible, visually covers the card */}
+        <button
+          type="button"
+          onClick={() => onView(campaign)}
+          className="absolute inset-0 z-0 cursor-pointer bg-transparent text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+          aria-label={`View ${campaign.title}`}
+        />
+        {/* Save button — independent sibling, sits above the navigation */}
         <button
           type="button"
           onClick={(e) => {
@@ -156,16 +159,19 @@ export function CampaignCard({
           <HeartIcon saved={isSaved} />
         </button>
         {inner}
-      </button>
+      </article>
     );
   }
 
   return (
-    <Link
-      href={`/campaigns/${campaign.id}`}
-      className="group relative flex flex-col overflow-hidden rounded-[12px] border bg-card transition-all duration-200 hover:border-foreground/12 hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
-    >
-      {/* Save button — captures click/key to prevent link navigation */}
+    <article className="group relative flex flex-col overflow-hidden rounded-[12px] border bg-card transition-all duration-200 hover:border-foreground/12 hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
+      {/* Campaign navigation — keyboard accessible, visually covers the card */}
+      <Link
+        href={`/campaigns/${campaign.id}`}
+        className="absolute inset-0 z-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+        aria-label={`View ${campaign.title}`}
+      />
+      {/* Save button — independent sibling, sits above the navigation */}
       <button
         type="button"
         onClick={(e) => {
@@ -180,7 +186,7 @@ export function CampaignCard({
         <HeartIcon saved={isSaved} />
       </button>
       {inner}
-    </Link>
+    </article>
   );
 }
 
