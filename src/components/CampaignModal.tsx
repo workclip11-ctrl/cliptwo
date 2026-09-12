@@ -117,7 +117,7 @@ export function CampaignModal({
           >
             Open full page <ArrowUpRight size={14} />
           </button>
-          {campaign.status === "open" && (
+          {campaign.status === "open" && campaign.launchPaymentStatus === "verified" && (
             <button
               onClick={() => {
                 if (!isSignedIn) {

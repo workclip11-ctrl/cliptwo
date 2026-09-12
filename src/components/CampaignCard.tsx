@@ -61,19 +61,6 @@ export function CampaignCard({
           </span>
         </div>
 
-        {/* Save button — independent interactive element */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleSaveCampaign(campaign.id);
-          }}
-          className="absolute right-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-white/80 backdrop-blur transition-colors duration-150 hover:bg-white"
-          title={isSaved ? "Unsave" : "Save"}
-          aria-label={isSaved ? "Unsave campaign" : "Save campaign"}
-        >
-          <HeartIcon saved={isSaved} />
-        </button>
       </div>
 
       {/* ── Content ─────────────────────────────────────── */}
@@ -149,35 +136,51 @@ export function CampaignCard({
 
   if (onView) {
     return (
-      <article
-        className="group relative flex flex-col cursor-pointer overflow-hidden rounded-[12px] border bg-card transition-all duration-200 hover:border-foreground/12 hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)]"
+      <button
+        type="button"
+        onClick={() => onView(campaign)}
+        className="group relative flex flex-col cursor-pointer overflow-hidden rounded-[12px] border bg-card text-left transition-all duration-200 hover:border-foreground/12 hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
       >
-        {/* Full-card clickable overlay — sits behind the Save button */}
+        {/* Save button — captures click/key to prevent card activation */}
         <button
           type="button"
-          onClick={() => onView(campaign)}
-          className="absolute inset-0 z-0 cursor-pointer"
-          aria-label={`View ${campaign.title}`}
-          tabIndex={-1}
-        />
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleSaveCampaign(campaign.id);
+          }}
+          onKeyDown={(e) => e.stopPropagation()}
+          className="absolute right-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-white/80 backdrop-blur transition-colors duration-150 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+          title={isSaved ? "Unsave" : "Save"}
+          aria-label={isSaved ? "Unsave campaign" : "Save campaign"}
+        >
+          <HeartIcon saved={isSaved} />
+        </button>
         {inner}
-      </article>
+      </button>
     );
   }
 
   return (
-    <article
-      className="group relative flex flex-col overflow-hidden rounded-[12px] border bg-card transition-all duration-200 hover:border-foreground/12 hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)]"
+    <Link
+      href={`/campaigns/${campaign.id}`}
+      className="group relative flex flex-col overflow-hidden rounded-[12px] border bg-card transition-all duration-200 hover:border-foreground/12 hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
     >
-      {/* Full-card clickable link — sits behind the Save button */}
-      <Link
-        href={`/campaigns/${campaign.id}`}
-        className="absolute inset-0 z-0"
-        aria-label={`View ${campaign.title}`}
-        tabIndex={-1}
-      />
+      {/* Save button — captures click/key to prevent link navigation */}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          toggleSaveCampaign(campaign.id);
+        }}
+        onKeyDown={(e) => e.stopPropagation()}
+        className="absolute right-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-white/80 backdrop-blur transition-colors duration-150 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+        title={isSaved ? "Unsave" : "Save"}
+        aria-label={isSaved ? "Unsave campaign" : "Save campaign"}
+      >
+        <HeartIcon saved={isSaved} />
+      </button>
       {inner}
-    </article>
+    </Link>
   );
 }
 
