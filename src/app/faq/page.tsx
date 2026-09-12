@@ -14,22 +14,22 @@ function AccordionItem({
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="border-b last:border-b-0">
+    <div className="border-b border-border/40 last:border-b-0">
       <button
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between gap-4 py-4 text-left text-sm font-medium hover:text-accent transition-colors"
+        className="flex w-full items-center justify-between gap-4 py-4 text-left text-[14px] font-medium text-foreground transition-colors hover:text-foreground/80 cursor-pointer"
       >
         {question}
         <ChevronDown
           size={16}
-          className={`shrink-0 text-muted transition-transform ${open ? "rotate-180" : ""}`}
+          className={`shrink-0 text-muted transition-transform duration-200 ${open ? "rotate-180" : ""}`}
         />
       </button>
       <div
         className="overflow-hidden transition-all duration-200"
         style={{ maxHeight: open ? "500px" : "0px" }}
       >
-        <p className="pb-4 text-sm leading-relaxed text-muted">{answer}</p>
+        <p className="pb-4 text-[14px] leading-relaxed text-muted">{answer}</p>
       </div>
     </div>
   );
@@ -44,7 +44,7 @@ function Category({
 }) {
   return (
     <section>
-      <h2 className="mb-3 text-lg font-semibold tracking-tight">{title}</h2>
+      <h2 className="mb-3 text-[16px] font-semibold tracking-tight">{title}</h2>
       <div className="rounded-xl border bg-card px-5">
         {items.map((item) => (
           <AccordionItem key={item.q} question={item.q} answer={item.a} />
@@ -88,11 +88,11 @@ const clipperFAQ = [
 const creatorFAQ = [
   {
     q: "How do I launch a campaign?",
-    a: "Go to Creator → Campaigns → New Campaign. Fill in the brief, upload source material, set your budget and CPM rate, and publish. Your campaign will appear on the marketplace for clippers to browse.",
+    a: "Go to Creator → Campaigns → New Campaign. Fill in the brief, upload source material, set your budget and CPM rate, and submit. Complete the UPI payment with the 10% platform fee — once our team verifies the payment, your campaign goes live on the marketplace for clippers.",
   },
   {
     q: "How much does it cost?",
-    a: "You set your own budget (total spend) and CPM rate (per 1,000 views). You only pay for approved views your clips receive. There are no upfront fees — you pay as clips earn.",
+    a: "You set your own budget (total spend) and CPM rate (per 1,000 views). A 10% platform fee is added to your campaign budget and paid upfront via UPI. Once our team verifies the payment, your campaign goes live. Your budget is then allocated for clipper payouts based on verified views.",
   },
   {
     q: "How is CPM determined?",
@@ -163,38 +163,40 @@ export default function FAQPage() {
     <main className="min-h-screen bg-background">
       <TopBar />
       <section className="mx-auto max-w-3xl px-6 py-12">
-        <p className="text-xs font-semibold uppercase tracking-widest text-muted">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-muted">
           Help Center
         </p>
         <h1 className="mt-3 text-[28px] font-bold tracking-tight leading-tight">
-          Frequently Asked Questions
+          Frequently asked questions
         </h1>
         <p className="mt-3 max-w-lg text-[15px] leading-relaxed text-muted">
           Everything you need to know about clipping, creating campaigns, and
           getting paid on ClipTwo.
         </p>
 
-        <div className="mt-10 space-y-10">
+        <div className="mt-10 space-y-8">
           <Category title="For Clippers" items={clipperFAQ} />
           <Category title="For Creators" items={creatorFAQ} />
           <Category title="Payments" items={paymentFAQ} />
           <Category title="Trust & Safety" items={safetyFAQ} />
         </div>
 
-        <div className="mt-12 rounded-xl border bg-card p-6">
-          <p className="text-sm text-muted">
-            Still have questions?{" "}
-            <a
-              href="mailto:support@cliptwo.com"
-              className="font-medium text-accent hover:underline"
-            >
-              Contact support
-            </a>{" "}
-            — we&apos;re happy to help.
+        <div className="mt-12 rounded-xl border bg-card p-6 text-center">
+          <p className="text-[14px] font-medium text-foreground">
+            Still have questions?
           </p>
+          <p className="mt-1.5 text-[14px] text-muted">
+            Our team is happy to help.
+          </p>
+          <a
+            href="mailto:support@cliptwo.com"
+            className="mt-4 inline-flex h-10 items-center gap-2 rounded-lg bg-foreground px-5 text-[13px] font-medium text-background transition-opacity hover:opacity-90 cursor-pointer"
+          >
+            Contact support
+          </a>
         </div>
 
-        <div className="mt-8 flex flex-wrap gap-4 text-sm text-muted">
+        <div className="mt-8 flex flex-wrap gap-4 text-[13px] text-muted">
           <Link
             href="/payout-policy"
             className="hover:text-foreground transition-colors"

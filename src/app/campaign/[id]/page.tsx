@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Plus, Link2, Film } from "lucide-react";
+import { ArrowLeft, Plus, Film } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
 import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
@@ -75,7 +75,7 @@ export default function CampaignDetail() {
     <main className="min-h-screen">
       <TopBar />
       <div className="mx-auto max-w-3xl px-6 py-8">
-        <div className="flex items-center gap-3 text-sm text-muted">
+        <div className="flex items-center gap-3 text-[13px] text-muted">
           <button
             type="button"
             onClick={() => {
@@ -83,127 +83,141 @@ export default function CampaignDetail() {
                 router.back();
               else router.push(isClipper ? "/clipper/campaigns" : "/creator");
             }}
-            className="inline-flex items-center gap-1 hover:text-foreground"
+            className="inline-flex items-center gap-1 hover:text-foreground cursor-pointer"
           >
             <ArrowLeft size={14} /> {isClipper ? "Campaigns" : "Creator"}
           </button>
         </div>
 
-        <div
-          className={`mt-4 flex h-40 items-center justify-center rounded-2xl bg-gradient-to-br ${gradientFor(campaign.id)} text-foreground/70`}
-        >
-          <PlatformIcon p={campaign.platform} size={42} />
+        {/* Thumbnail */}
+        <div className="mt-6 aspect-video w-full overflow-hidden rounded-xl bg-accent-soft">
+          {campaign.thumbnails?.[0] ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={campaign.thumbnails[0]}
+              alt={campaign.title}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className={`flex h-full items-center justify-center bg-gradient-to-br ${gradientFor(campaign.id)}`}>
+              <PlatformIcon p={campaign.platform} size={42} />
+            </div>
+          )}
         </div>
 
-        <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
+        {/* Title + payout */}
+        <div className="mt-6 flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2.5">
               <h1 className="text-[28px] font-bold tracking-tight leading-tight">{campaign.title}</h1>
               {campaign.status === "closed" && (
-                <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs text-muted">
-                  Closed
-                </span>
+                <StatusPill status={campaign.status} />
               )}
             </div>
-            <p className="mt-1 text-sm text-muted">
+            <p className="mt-1.5 text-[14px] text-muted">
               by {campaign.creator} · {campaign.niche} · {campaign.platform}
             </p>
           </div>
-          <div className="text-right">
-            <p className="font-mono text-2xl font-medium text-amber">{rup(campaign.payout)}</p>
-            <p className="text-[11px] text-muted">per 1K views</p>
+          <div className="text-right shrink-0">
+            <p className="font-mono text-[28px] font-bold tracking-tight">{rup(campaign.payout)}</p>
+            <p className="text-[12px] text-muted">per 1K views</p>
           </div>
         </div>
 
-        <p className="mt-4 rounded-xl border bg-card p-4 text-sm text-muted">
-          {campaign.brief}
-        </p>
+        {/* Brief */}
+        {campaign.brief && (
+          <p className="mt-5 rounded-xl border bg-card p-5 text-[14px] leading-relaxed text-muted">
+            {campaign.brief}
+          </p>
+        )}
 
+        {/* Source link */}
         {campaign.sourceLink && (
           <div className="mt-3 rounded-xl border bg-card p-4">
-            <p className="text-xs text-muted">Video resource</p>
+            <p className="text-[12px] text-muted">Video resource</p>
             {/^https?:\/\//i.test(campaign.sourceLink) ? (
               <a
                 href={campaign.sourceLink}
                 target="_blank"
                 rel="noreferrer"
-                className="mt-1 inline-flex items-center gap-1.5 text-sm font-medium text-accent hover:underline underline-offset-2"
+                className="mt-1.5 inline-flex items-center gap-1.5 text-[14px] font-medium text-foreground hover:underline underline-offset-2"
               >
                 <Film size={14} /> Open source video
               </a>
             ) : (
-              <p className="mt-1 inline-flex items-center gap-1.5 text-sm text-muted">
+              <p className="mt-1.5 inline-flex items-center gap-1.5 text-[14px] text-muted">
                 <Film size={14} /> {campaign.sourceLink}
               </p>
             )}
           </div>
         )}
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        {/* Metric cards */}
+        <div className="mt-5 grid gap-3 sm:grid-cols-3">
           <div className="rounded-xl border bg-card p-4">
-            <p className="text-xs text-muted">Budget</p>
-            <p className="mt-1 font-mono text-lg font-medium">{rup(campaign.budget ?? 0)}</p>
-            <p className="text-[11px] text-muted">{rup(remaining)} left</p>
-            <p className="text-[11px] text-muted">{rup(spent)} paid out</p>
+            <p className="text-[12px] text-muted">Budget</p>
+            <p className="mt-1.5 font-mono text-[18px] font-semibold">{rup(campaign.budget ?? 0)}</p>
+            <p className="mt-0.5 text-[11px] text-muted">{rup(remaining)} left · {rup(spent)} spent</p>
           </div>
           <div className="rounded-xl border bg-card p-4">
-            <p className="text-xs text-muted">Clippers in</p>
-            <p className="mt-1 font-mono text-lg font-medium">{clippersIn}</p>
-            <p className="text-[11px] text-muted">{campClips.length} submissions</p>
+            <p className="text-[12px] text-muted">Clippers</p>
+            <p className="mt-1.5 font-mono text-[18px] font-semibold">{clippersIn}</p>
+            <p className="mt-0.5 text-[11px] text-muted">{campClips.length} submissions</p>
           </div>
           <div className="rounded-xl border bg-card p-4">
-            <p className="text-xs text-muted">Time left</p>
-            <p className="mt-1 font-mono text-lg font-medium">{campaign.daysLeft}d</p>
-            <p className="text-[11px] text-muted">to join</p>
+            <p className="text-[12px] text-muted">Time left</p>
+            <p className="mt-1.5 font-mono text-[18px] font-semibold">{campaign.daysLeft}d</p>
+            <p className="mt-0.5 text-[11px] text-muted">to join</p>
           </div>
         </div>
 
-        <div className="mt-3 rounded-xl border bg-card p-4">
-          <div className="mb-1 flex items-center justify-between text-[11px] text-muted">
-            <span>{rup(spent)} spent</span>
-            <span>{rup(remaining)} left</span>
-          </div>
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-accent-soft">
-            <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
-          </div>
-        </div>
-
-        {(campaign.sourceLink || campaign.rules) && (
-          <div className="mt-3 space-y-3">
-            {campaign.sourceLink && (
-              <div className="flex items-center gap-2 rounded-xl border bg-card p-4 text-sm">
-                <Link2 size={15} className="shrink-0 text-muted" />
-                <span className="shrink-0 text-muted">Source footage:</span>
-                <a
-                  href={campaign.sourceLink}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="truncate font-mono text-xs text-foreground hover:underline"
-                >
-                  {campaign.sourceLink}
-                </a>
-              </div>
-            )}
-            {campaign.rules && (
-              <div className="rounded-xl border bg-card p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Rules</p>
-                <p className="mt-1.5 text-sm text-muted">{campaign.rules}</p>
-              </div>
-            )}
+        {/* Budget bar */}
+        {(campaign.budget ?? 0) > 0 && (
+          <div className="mt-3 rounded-xl border bg-card p-4">
+            <div className="mb-1.5 flex items-center justify-between text-[11px] text-muted">
+              <span>{rup(spent)} spent</span>
+              <span>{rup(remaining)} left</span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-accent-soft">
+              <div
+                className={`h-full rounded-full ${
+                  pct >= 90 ? "bg-red" : pct >= 70 ? "bg-amber" : "bg-foreground"
+                }`}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
           </div>
         )}
 
+        {/* Rules */}
+        {campaign.rules && (
+          <div className="mt-3 rounded-xl border bg-card p-4">
+            <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">Rules</p>
+            <p className="mt-1.5 text-[14px] leading-relaxed text-muted">{campaign.rules}</p>
+          </div>
+        )}
+
+        {/* CTA */}
         {campaign.status === "open" && campaign.launchPaymentStatus === "verified" && isClipper && (
           <button
             onClick={join}
-            className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+            className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-foreground px-5 py-2.5 text-[14px] font-medium text-white hover:opacity-90 cursor-pointer"
           >
             <Plus size={15} /> Submit a clip
           </button>
         )}
+        {campaign.status === "open" && !isSignedIn && (
+          <Link
+            href="/login"
+            className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-foreground px-5 py-2.5 text-[14px] font-medium text-white hover:opacity-90"
+          >
+            Log in to join
+          </Link>
+        )}
 
+        {/* Submissions */}
         <section className="mt-8">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
+          <h2 className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-muted">
             Submissions
           </h2>
           <div className="space-y-3">
@@ -213,12 +227,12 @@ export default function CampaignDetail() {
                   <div className="min-w-0">
                     <Link
                       href={`/clip/${k.id}`}
-                      className="font-medium hover:underline underline-offset-2"
+                      className="font-medium text-[14px] hover:underline underline-offset-2"
                     >
                       @{k.clipper}
                     </Link>
-                    <p className="truncate text-xs text-muted">{k.caption}</p>
-                    <p className="mt-1 text-xs text-muted">
+                    <p className="mt-0.5 truncate text-[12px] text-muted">{k.caption}</p>
+                    <p className="mt-1 text-[12px] text-muted">
                       {fmtViews(k.verifiedViews ?? 0)} views · {clipEarnings(k, campaigns) ? rup(clipEarnings(k, campaigns)) : "—"}
                     </p>
                   </div>
@@ -229,8 +243,8 @@ export default function CampaignDetail() {
               </div>
             ))}
             {campClips.length === 0 && (
-              <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted">
-                No clips submitted yet.
+              <p className="rounded-xl border border-dashed border-border/60 bg-card px-6 py-10 text-center text-[14px] text-muted">
+                No clips submitted yet. Be the first to contribute.
               </p>
             )}
           </div>

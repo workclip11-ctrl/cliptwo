@@ -99,22 +99,22 @@ function AuthForm() {
       {/* ── Left: Brand area (desktop) ── */}
       <div className="hidden w-1/2 flex-col justify-between bg-foreground p-12 lg:flex">
         <Link href="/" className="flex items-center gap-2.5 font-bold tracking-tight cursor-pointer">
-          <img src="/cliptwo-logo.png" alt="ClipTwo" className="h-8 w-8 rounded-[8px] object-contain" />
-          <span className="text-[17px] text-background">cliptwo</span>
+          <img src="/cliptwo-logo.png" alt="ClipTwo" className="h-7 w-7 rounded-[8px] object-contain" />
+          <span className="text-[16px] text-background">cliptwo</span>
         </Link>
 
         <div className="max-w-md">
-          <h2 className="text-[40px] font-bold leading-[1.1] tracking-tight text-background">
+          <h2 className="text-[36px] font-bold leading-[1.1] tracking-tight text-background">
             Turn attention into&nbsp;opportunity.
           </h2>
-          <p className="mt-5 text-[17px] leading-relaxed text-background/60">
+          <p className="mt-4 text-[16px] leading-relaxed text-background/60">
             ClipTwo connects creators with clippers who turn long-form content
             into short-form clips — paid per verified view, settled straight
             to&nbsp;UPI.
           </p>
         </div>
 
-        <div className="flex items-center gap-6 text-[13px] text-background/40">
+        <div className="flex items-center gap-5 text-[13px] text-background/40">
           <span className="flex items-center gap-2">
             <Scissors size={14} /> For clippers
           </span>
@@ -132,14 +132,14 @@ function AuthForm() {
           className="mb-10 flex items-center justify-center gap-2 font-semibold tracking-tight lg:hidden cursor-pointer"
         >
           <img src="/cliptwo-logo.png" alt="ClipTwo" className="h-7 w-7 rounded-md object-contain" />
-          <span className="text-[17px]">cliptwo</span>
+          <span className="text-[16px]">cliptwo</span>
         </Link>
 
         <div className="mx-auto w-full max-w-[400px]">
           <h1 className="text-[28px] font-bold tracking-tight">
             {mode === "signin" ? "Welcome back" : "Create your account"}
           </h1>
-          <p className="mt-2 text-[15px] text-muted">
+          <p className="mt-2 text-[14px] text-muted">
             {mode === "signin"
               ? "Log in to keep clipping and earning."
               : desiredRole === "creator"
@@ -161,7 +161,7 @@ function AuthForm() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Your name"
-                    className="h-12 w-full rounded-[10px] border border-border/60 bg-card px-4 text-[15px] outline-none transition-colors focus:border-foreground/30"
+                    className="h-11 w-full rounded-[10px] border border-border/60 bg-card px-4 text-[14px] outline-none transition-colors focus:border-foreground/30"
                   />
                 </div>
 
@@ -174,7 +174,7 @@ function AuthForm() {
                     <button
                       type="button"
                       onClick={() => setDesiredRole("clipper")}
-                      className={`flex h-12 cursor-pointer items-center justify-center gap-2 rounded-[10px] border text-[15px] font-medium transition-all duration-150 ${
+                      className={`flex h-[72px] cursor-pointer flex-col items-center justify-center gap-1 rounded-[10px] border text-[14px] font-medium transition-all duration-150 ${
                         desiredRole === "clipper"
                           ? "border-foreground bg-foreground text-background"
                           : "border-border/60 bg-card text-muted hover:border-foreground/20 hover:text-foreground"
@@ -182,11 +182,14 @@ function AuthForm() {
                     >
                       <Scissors size={16} />
                       Clipper
+                      <span className={`text-[11px] font-normal ${desiredRole === "clipper" ? "text-background/60" : "text-muted/70"}`}>
+                        Create clips, earn from views
+                      </span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setDesiredRole("creator")}
-                      className={`flex h-12 cursor-pointer items-center justify-center gap-2 rounded-[10px] border text-[15px] font-medium transition-all duration-150 ${
+                      className={`flex h-[72px] cursor-pointer flex-col items-center justify-center gap-1 rounded-[10px] border text-[14px] font-medium transition-all duration-150 ${
                         desiredRole === "creator"
                           ? "border-foreground bg-foreground text-background"
                           : "border-border/60 bg-card text-muted hover:border-foreground/20 hover:text-foreground"
@@ -194,6 +197,9 @@ function AuthForm() {
                     >
                       <Film size={16} />
                       Creator
+                      <span className={`text-[11px] font-normal ${desiredRole === "creator" ? "text-background/60" : "text-muted/70"}`}>
+                        Launch campaigns, grow reach
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -203,7 +209,7 @@ function AuthForm() {
                   type="button"
                   onClick={handleGoogleSignIn}
                   disabled={googleLoading}
-                  className="flex h-12 w-full cursor-pointer items-center justify-center gap-3 rounded-[10px] border border-border/60 bg-card text-[15px] font-medium text-foreground transition-colors hover:border-foreground/20 hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex h-11 w-full cursor-pointer items-center justify-center gap-3 rounded-[10px] border border-border/60 bg-card text-[14px] font-medium text-foreground transition-colors hover:border-foreground/20 hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
@@ -230,7 +236,7 @@ function AuthForm() {
                   type="button"
                   onClick={handleGoogleSignIn}
                   disabled={googleLoading}
-                  className="flex h-12 w-full cursor-pointer items-center justify-center gap-3 rounded-[10px] border border-border/60 bg-card text-[15px] font-medium text-foreground transition-colors hover:border-foreground/20 hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex h-11 w-full cursor-pointer items-center justify-center gap-3 rounded-[10px] border border-border/60 bg-card text-[14px] font-medium text-foreground transition-colors hover:border-foreground/20 hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
@@ -262,7 +268,7 @@ function AuthForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="h-12 w-full rounded-[10px] border border-border/60 bg-card px-4 text-[15px] outline-none transition-colors focus:border-foreground/30"
+                className="h-11 w-full rounded-[10px] border border-border/60 bg-card px-4 text-[14px] outline-none transition-colors focus:border-foreground/30"
               />
             </div>
 
@@ -278,13 +284,13 @@ function AuthForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="h-12 w-full rounded-[10px] border border-border/60 bg-card px-4 text-[15px] outline-none transition-colors focus:border-foreground/30"
+                className="h-11 w-full rounded-[10px] border border-border/60 bg-card px-4 text-[14px] outline-none transition-colors focus:border-foreground/30"
               />
             </div>
 
             {/* Error */}
             {error && (
-              <div className="rounded-[10px] border border-red/20 bg-red/5 px-4 py-3 text-[14px] text-red">
+              <div className="rounded-[10px] border border-red/20 bg-red/5 px-4 py-3 text-[13px] text-red">
                 {error}
               </div>
             )}
@@ -293,19 +299,19 @@ function AuthForm() {
             <button
               type="submit"
               disabled={loading}
-              className="flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-[10px] bg-foreground text-[15px] font-semibold text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-[10px] bg-foreground text-[14px] font-semibold text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading
                 ? "Please wait…"
                 : mode === "signin"
                   ? "Log in"
                   : "Create account"}
-              {!loading && <ArrowRight size={16} />}
+              {!loading && <ArrowRight size={15} />}
             </button>
           </form>
 
           {/* Mode switch */}
-          <p className="mt-6 text-center text-[14px] text-muted">
+          <p className="mt-6 text-center text-[13px] text-muted">
             {mode === "signin" ? "New to ClipTwo? " : "Already have an account? "}
             <button
               type="button"
