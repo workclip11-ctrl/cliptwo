@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/supabase/auth-helpers";
 import { createClient } from "@supabase/supabase-js";
+import { sanitizeError } from "@/lib/api-helpers";
 
 export async function GET(
   request: Request,
@@ -58,7 +59,7 @@ export async function GET(
   });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ error: sanitizeError(error.message) }, { status: 400 });
   }
 
   return NextResponse.json(data);

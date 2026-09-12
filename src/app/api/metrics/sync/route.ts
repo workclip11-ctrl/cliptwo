@@ -43,9 +43,10 @@ export async function POST(request: Request) {
     const isAdmin = profile?.role === "admin";
 
     // Determine which clips to sync
+    const MAX_CLIPS_PER_REQUEST = 20;
     let targetClipIds: string[] = [];
     if (clipIds && clipIds.length > 0) {
-      targetClipIds = clipIds;
+      targetClipIds = clipIds.slice(0, MAX_CLIPS_PER_REQUEST);
     } else if (clipId) {
       targetClipIds = [clipId];
     } else {

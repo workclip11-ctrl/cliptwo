@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/supabase/auth-helpers";
 import { createClient } from "@supabase/supabase-js";
+import { sanitizeError } from "@/lib/api-helpers";
 
 export async function POST(request: Request) {
   const user = await getAuthenticatedUser(request);
@@ -41,6 +42,15 @@ export async function POST(request: Request) {
     );
   }
 
+  // Validate UTR reference length (prevent storage bomb)
+  const trimmedUtr = utrReference.trim();
+  if (trimmedUtr.length > 50) {
+    return NextResponse.json(
+      { error: "UTR reference is too long (max 50 characters)" },
+      { status: 400 },
+    );
+  }
+
   // Ownership check: verify the campaign belongs to this creator (defense-in-depth)
   const { data: campaign, error: campaignError } = await supabase
     .from("campaigns")
@@ -66,12 +76,12 @@ export async function POST(request: Request) {
     "submit_campaign_launch_payment",
     {
       p_campaign_id: campaignId,
-      p_utr_reference: utrReference.trim(),
+      p_utr_reference: trimmedUtr,
     },
   );
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ error: sanitizeError(error.message) }, { status: 400 });
   }
 
   return NextResponse.json(data);

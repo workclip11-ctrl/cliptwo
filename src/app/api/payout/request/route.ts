@@ -19,6 +19,7 @@
 
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/supabase/auth-helpers";
+import { sanitizeError } from "@/lib/api-helpers";
 
 export async function POST(request: Request) {
   try {
@@ -70,15 +71,16 @@ export async function POST(request: Request) {
 
     if (rpcError) {
       return NextResponse.json(
-        { error: rpcError.message ?? "Payout request failed" },
+        { error: sanitizeError(rpcError.message) },
         { status: 400 },
       );
     }
 
     return NextResponse.json({ payout: data, success: true });
-  } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Internal server error";
-    return NextResponse.json({ error: message }, { status: 500 });
+  } catch {
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

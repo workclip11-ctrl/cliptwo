@@ -12,7 +12,7 @@
 // ---------------------------------------------------------------------------
 
 import { NextResponse } from "next/server";
-import { randomUUID } from "crypto";
+import { randomUUID, timingSafeEqual } from "crypto";
 import { getAuthenticatedUser } from "@/lib/supabase/auth-helpers";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getMetricProvider, isMetricProviderConfigured } from "@/lib/metric-providers";
@@ -29,7 +29,15 @@ async function handleSync(request: Request) {
     // ── Authorization ──────────────────────────────────────────────────────
     const authHeader = request.headers.get("authorization");
     const cronSecret = process.env.CRON_SECRET;
-    const isCronAuth = cronSecret && authHeader === `Bearer ${cronSecret}`;
+    let isCronAuth = false;
+    if (cronSecret && authHeader?.startsWith("Bearer ")) {
+      const token = authHeader.slice(7);
+      const secretBuf = Buffer.from(cronSecret);
+      const tokenBuf = Buffer.from(token);
+      if (secretBuf.length === tokenBuf.length) {
+        isCronAuth = timingSafeEqual(secretBuf, tokenBuf);
+      }
+    }
 
     if (!isCronAuth) {
       // Fall back to admin session check

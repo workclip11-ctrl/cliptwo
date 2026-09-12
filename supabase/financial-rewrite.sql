@@ -686,7 +686,7 @@ AS $$
     SELECT * FROM public.financial_records
     WHERE clipper_id = p_clipper_id
     ORDER BY created_at DESC
-    LIMIT p_limit OFFSET p_offset
+    LIMIT greatest(1, least(coalesce(p_limit, 50), 100)) OFFSET p_offset
   ) fr;
 $$;
 
@@ -710,7 +710,7 @@ AS $$
     SELECT * FROM public.payout_requests
     WHERE user_id = p_user_id
     ORDER BY created_at DESC
-    LIMIT p_limit OFFSET p_offset
+    LIMIT greatest(1, least(coalesce(p_limit, 20), 100)) OFFSET p_offset
   ) pr;
 $$;
 
@@ -734,7 +734,7 @@ AS $$
     SELECT * FROM public.payout_requests
     WHERE (p_status IS NULL OR status = p_status)
     ORDER BY created_at DESC
-    LIMIT p_limit OFFSET p_offset
+    LIMIT greatest(1, least(coalesce(p_limit, 50), 100)) OFFSET p_offset
   ) pr;
 $$;
 
