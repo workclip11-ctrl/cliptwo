@@ -17,7 +17,8 @@ function AccordionItem({
     <div className="border-b border-border/40 last:border-b-0">
       <button
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between gap-4 py-4 text-left text-[14px] font-medium text-foreground transition-colors hover:text-foreground/80 cursor-pointer"
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-4 py-4 text-left text-[14px] font-medium text-foreground transition-colors hover:text-foreground cursor-pointer"
       >
         {question}
         <ChevronDown

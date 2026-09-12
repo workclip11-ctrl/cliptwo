@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useRef, useCallback } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -45,7 +45,7 @@ const TRUST = [
   {
     icon: IndianRupee,
     title: "Reliable payouts",
-    body: "Payouts settle directly to your UPI once the cycle closes. Every action is recorded in an audit trail — nothing is manual or opaque.",
+    body: "Payouts settle directly to your UPI once the cycle closes. Every step — from clip approval to payout confirmation — is tracked on-platform with a full audit trail.",
   },
   {
     icon: Eye,
@@ -403,6 +403,7 @@ function FAQ() {
           <div key={f.q}>
             <button
               onClick={() => setOpen(open === f.q ? null : f.q)}
+              aria-expanded={open === f.q}
               className="flex w-full items-center justify-between px-6 py-5 text-left text-[15px] font-medium cursor-pointer"
             >
               {f.q}
@@ -435,6 +436,26 @@ export default function Home() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(true);
   const [progress, setProgress] = useState(0);
+  const reducedMotionRef = useRef(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    reducedMotionRef.current = mq.matches;
+    const handler = (e: MediaQueryListEvent) => {
+      reducedMotionRef.current = e.matches;
+      const v = videoRef.current;
+      if (!v) return;
+      if (e.matches) {
+        v.pause();
+        setIsPlaying(false);
+      } else {
+        v.play().catch(() => {});
+        setIsPlaying(true);
+      }
+    };
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
 
   const handleTimeUpdate = useCallback(() => {
     const v = videoRef.current;
@@ -530,7 +551,7 @@ export default function Home() {
         <div className="relative mx-auto w-full max-w-md lg:max-w-lg">
           <div className="group relative mx-auto w-[240px] sm:w-[260px]">
             {/* Phone body */}
-            <div className="relative overflow-hidden rounded-[2.5rem] border border-border/30 bg-black shadow-xl shadow-black/8">
+            <div className="relative overflow-hidden rounded-[2.5rem] border border-border/30 bg-black shadow-lg shadow-black/5">
               {/* Notch */}
               <div className="absolute left-1/2 top-0 z-20 h-5 w-24 -translate-x-1/2 rounded-b-2xl bg-black" />
 
@@ -544,6 +565,8 @@ export default function Home() {
                   muted
                   loop
                   playsInline
+                  preload="metadata"
+                  aria-label="Demo reel showing cliptwo platform in action"
                   onTimeUpdate={handleTimeUpdate}
                   onPlay={handlePlayStateChange}
                   onPause={handlePlayStateChange}
@@ -581,7 +604,7 @@ export default function Home() {
             </div>
 
             {/* Floating card — Views */}
-            <div className="absolute -right-8 top-16 z-30 rounded-[10px] border border-border/20 bg-white px-3 py-2.5 shadow-md shadow-black/5 sm:-right-12">
+            <div className="absolute -right-8 top-16 z-30 rounded-[10px] border border-border/20 bg-card px-3 py-2.5 shadow-md shadow-black/5 sm:-right-12">
               <div className="flex items-center gap-1.5">
                 <span className="flex h-4 w-4 items-center justify-center rounded-[5px] bg-blue-500/10">
                   <Eye size={10} className="text-blue-500" />
@@ -591,8 +614,7 @@ export default function Home() {
               <p className="mt-1 font-mono text-[16px] font-bold tracking-tight">24.8K</p>
             </div>
 
-            {/* Floating card — Earned */}
-            <div className="absolute -left-8 bottom-24 z-30 rounded-[10px] border border-border/20 bg-white px-3 py-2.5 shadow-md shadow-black/5 sm:-left-12">
+            <div className="absolute -left-8 bottom-24 z-30 rounded-[10px] border border-border/20 bg-card px-3 py-2.5 shadow-md shadow-black/5 sm:-left-12">
               <div className="flex items-center gap-1.5">
                 <span className="flex h-4 w-4 items-center justify-center rounded-[5px] bg-green/10">
                   <IndianRupee size={10} className="text-green" />

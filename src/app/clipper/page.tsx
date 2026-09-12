@@ -485,7 +485,7 @@ function CampaignCardLarge({
         )}
         {/* Platform badge — only one */}
         <div className="absolute left-3 top-3">
-          <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/90 px-3 py-1.5 text-[12px] font-medium text-foreground shadow-sm backdrop-blur">
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-card/90 px-3 py-1.5 text-[12px] font-medium text-foreground shadow-sm backdrop-blur">
             <PlatformIcon p={campaign.platform} size={13} />
             {campaign.platform}
           </span>
@@ -497,7 +497,7 @@ function CampaignCardLarge({
             e.preventDefault();
             toggleSaveCampaign(campaign.id);
           }}
-          className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/80 backdrop-blur transition-colors duration-150 hover:bg-white"
+          className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-card/80 backdrop-blur transition-colors duration-150 hover:bg-card"
           title={isSaved ? "Unsave" : "Save"}
         >
           <HeartIcon saved={isSaved} />

@@ -99,3 +99,9 @@ a[aria-disabled="true"] {
 .animate-ticker {
   animation: ticker-scroll 20s linear infinite;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-ticker {
+    animation: none;
+  }
+}

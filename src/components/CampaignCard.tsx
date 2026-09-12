@@ -49,7 +49,7 @@ export function CampaignCard({
 
         {/* Single badge — platform/category combined */}
         <div className="absolute left-3 top-3 z-10">
-          <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/90 px-2.5 py-1.5 text-[12px] font-medium text-foreground shadow-sm backdrop-blur">
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-card/90 px-2.5 py-1.5 text-[12px] font-medium text-foreground shadow-sm backdrop-blur">
             <PlatformIcon p={campaign.platform} size={12} />
             {campaign.platform}
             {(campaign.category || campaign.niche) && (
@@ -152,7 +152,7 @@ export function CampaignCard({
             toggleSaveCampaign(campaign.id);
           }}
           onKeyDown={(e) => e.stopPropagation()}
-          className="absolute right-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-white/80 backdrop-blur transition-colors duration-150 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+          className="absolute right-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-card/80 backdrop-blur transition-colors duration-150 hover:bg-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
           title={isSaved ? "Unsave" : "Save"}
           aria-label={isSaved ? "Unsave campaign" : "Save campaign"}
         >
@@ -179,7 +179,7 @@ export function CampaignCard({
           toggleSaveCampaign(campaign.id);
         }}
         onKeyDown={(e) => e.stopPropagation()}
-        className="absolute right-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-white/80 backdrop-blur transition-colors duration-150 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+        className="absolute right-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-card/80 backdrop-blur transition-colors duration-150 hover:bg-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
         title={isSaved ? "Unsave" : "Save"}
         aria-label={isSaved ? "Unsave campaign" : "Save campaign"}
       >

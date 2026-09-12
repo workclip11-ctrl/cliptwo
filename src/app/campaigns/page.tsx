@@ -160,11 +160,13 @@ export default function CampaignsPage() {
               value={filters.search}
               onChange={(e) => updateFilter("search", e.target.value)}
               placeholder="Search campaigns…"
+              aria-label="Search campaigns"
               className="w-full rounded-lg border bg-background pl-9 pr-3 py-2.5 text-[14px] outline-none focus:border-foreground"
             />
             {filters.search && (
               <button
                 onClick={() => updateFilter("search", "")}
+                aria-label="Clear search"
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-foreground cursor-pointer"
               >
                 <X size={14} />

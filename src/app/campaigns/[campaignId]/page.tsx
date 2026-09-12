@@ -174,7 +174,7 @@ export default function CampaignDetailPage() {
               {platforms.map((p) => (
                 <span
                   key={p}
-                  className="inline-flex items-center gap-1 rounded-md bg-white/90 px-2 py-[3px] text-[10px] font-medium text-foreground shadow-sm backdrop-blur"
+                  className="inline-flex items-center gap-1 rounded-md bg-card/90 px-2 py-[3px] text-[10px] font-medium text-foreground shadow-sm backdrop-blur"
                 >
                   <PlatformIcon p={p} size={10} /> {p}
                 </span>
