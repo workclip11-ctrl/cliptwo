@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { X, Loader2 } from "lucide-react";
 import { rup } from "@/lib/format";
 import type { Campaign } from "@/lib/types";
@@ -19,6 +19,7 @@ export function AdjustBudgetModal({
   const [budget, setBudget] = useState(String(campaign.budget ?? 0));
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -27,6 +28,15 @@ export function AdjustBudgetModal({
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  useEffect(() => {
+    const el = dialogRef.current;
+    if (!el) return;
+    const focusable = el.querySelector<HTMLElement>(
+      'input, button, [tabindex]:not([tabindex="-1"])',
+    );
+    focusable?.focus();
+  }, []);
 
   const handleSave = async () => {
     const b = Number(budget) || 0;
@@ -53,6 +63,7 @@ export function AdjustBudgetModal({
       aria-labelledby="adjust-budget-title"
     >
       <div
+        ref={dialogRef}
         className="w-full max-w-md rounded-2xl border bg-card p-5"
         onClick={(e) => e.stopPropagation()}
       >

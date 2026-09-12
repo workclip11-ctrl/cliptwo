@@ -112,7 +112,7 @@ export default function ClipDetail() {
 
         {clip.status === "pending" && (
           <p className="mt-6 text-sm text-muted">
-            Awaiting admin review — status will update once our team approves or
+            Waiting for review — status will update once our team approves or
             rejects this clip.
           </p>
         )}
@@ -123,7 +123,7 @@ export default function ClipDetail() {
         )}
         {clip.status === "held" && (
           <p className="mt-6 text-sm text-muted">
-            This clip is currently held and under review.
+            This clip is on hold.
           </p>
         )}
       </div>

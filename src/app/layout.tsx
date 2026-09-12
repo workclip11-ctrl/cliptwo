@@ -22,6 +22,23 @@ export const metadata: Metadata = {
   icons: {
     icon: "/favicon.png",
   },
+  openGraph: {
+    title: "cliptwo — clip long videos into shorts",
+    description:
+      "A two-sided marketplace connecting creators with clippers who turn long videos into shorts.",
+    siteName: "cliptwo",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "cliptwo — clip long videos into shorts",
+    description:
+      "A two-sided marketplace connecting creators with clippers who turn long videos into shorts.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout(props: LayoutProps<"/">) {

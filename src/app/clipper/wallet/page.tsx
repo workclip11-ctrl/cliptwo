@@ -496,7 +496,7 @@ export default function ClipperWalletPage() {
                         : "bg-accent-soft text-muted"
                   }`}
                 >
-                  {p.status}
+                  {p.status.charAt(0).toUpperCase() + p.status.slice(1)}
                 </span>
               </div>
             ))}

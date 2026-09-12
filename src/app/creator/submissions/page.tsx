@@ -92,7 +92,7 @@ export default function CreatorSubmissionsPage() {
       {/* ── Summary ─────────────────────────────────────── */}
       <div className="flex flex-wrap items-baseline gap-x-10 gap-y-3">
         <SummaryItem value={all.length} label="Total" />
-        <SummaryItem value={count("pending")} label="Awaiting review" />
+        <SummaryItem value={count("pending")} label="Waiting for review" />
         <SummaryItem value={approvedCount} label="Approved" />
         <SummaryItem value={count("rejected")} label="Rejected" />
       </div>

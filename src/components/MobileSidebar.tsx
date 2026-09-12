@@ -24,7 +24,9 @@ export function MobileSidebar({
   title: string;
 }) {
   const pathname = usePathname();
-  const ref = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -35,6 +37,20 @@ export function MobileSidebar({
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  // Body scroll lock + focus management
+  useEffect(() => {
+    if (!open) return;
+    previousFocusRef.current = document.activeElement as HTMLElement;
+    document.body.style.overflow = "hidden";
+    // Focus the close button after a tick so the DOM is mounted
+    const t = setTimeout(() => closeButtonRef.current?.focus(), 0);
+    return () => {
+      document.body.style.overflow = "";
+      clearTimeout(t);
+      previousFocusRef.current?.focus();
+    };
+  }, [open]);
+
   if (!open) return null;
 
   return (
@@ -44,13 +60,14 @@ export function MobileSidebar({
         onClick={onClose}
       />
       <div
-        ref={ref}
+        ref={panelRef}
         className="absolute inset-y-0 left-0 w-72 overflow-y-auto bg-card shadow-xl"
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b px-5 py-4">
           <p className="text-lg font-bold tracking-tight">{title}</p>
           <button
+            ref={closeButtonRef}
             onClick={onClose}
             className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg hover:bg-accent-soft"
             aria-label="Close navigation"

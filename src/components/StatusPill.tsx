@@ -15,6 +15,7 @@ const map: Record<string, { label: string; cls: string }> = {
   archived: { label: "Archived", cls: "bg-amber/10 text-amber border-amber/20" },
   budget_reached: { label: "Budget Reached", cls: "bg-red/10 text-red border-red/20" },
   near_budget: { label: "Near Budget", cls: "bg-amber/10 text-amber border-amber/20" },
+  paid: { label: "Paid", cls: "bg-green/10 text-green border-green/20" },
   active: { label: "Active", cls: "bg-green/10 text-green border-green/20" },
   suspended: { label: "Suspended", cls: "bg-red/10 text-red border-red/20" },
   deactivated: { label: "Deactivated", cls: "bg-muted/10 text-muted border-muted/20" },
