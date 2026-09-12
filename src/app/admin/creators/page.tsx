@@ -175,8 +175,59 @@ export default function AdminCreators() {
         </div>
       </div>
 
-      {/* ── Table ───────────────────────────────────────── */}
-      <div className="overflow-hidden rounded-xl border border-border/40 bg-card">
+      {/* ── Mobile cards ─────────────────────────────────── */}
+      <div className="space-y-3 sm:hidden">
+        {rows.map((p) => {
+          const s = creatorStats(p, campaigns, clips, financeRecords);
+          return (
+            <button
+              key={p.id}
+              onClick={() => setSelectedId(p.id)}
+              className="w-full cursor-pointer rounded-[12px] border border-border/40 bg-card p-4 text-left transition-colors hover:border-foreground/10"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-[13px] font-semibold text-foreground">
+                    {(p.name ?? "?").slice(0, 1).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate font-medium">{p.name}</span>
+                      {p.verified && <BadgeCheck size={14} className="shrink-0 text-green" />}
+                    </div>
+                    <p className="truncate text-[13px] text-muted">{p.company ?? "—"}</p>
+                  </div>
+                </div>
+                <span className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-[12px] font-medium ${p.status === "suspended" ? "bg-red/10 text-red" : "bg-green/10 text-green"}`}>
+                  {p.status === "suspended" ? "Suspended" : "Active"}
+                </span>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2 text-[13px]">
+                <div><span className="text-muted">Campaigns </span><span className="font-mono font-medium">{s.campaigns}</span></div>
+                <div><span className="text-muted">Budget </span><span className="font-mono font-medium">{rup(s.totalBudget)}</span></div>
+                <div><span className="text-muted">Clips </span><span className="font-mono font-medium">{s.clipsReceived}</span></div>
+              </div>
+              <div className="mt-2 flex items-center gap-2 text-[12px]">
+                {s.outstanding > 0 ? (
+                  <span className="inline-flex items-center rounded-full bg-amber/10 px-2 py-0.5 font-medium text-amber">Pending payout</span>
+                ) : (
+                  <span className="inline-flex items-center rounded-full bg-green/10 px-2 py-0.5 font-medium text-green">Settled</span>
+                )}
+                <span className="ml-auto text-muted">{fmtDate(p.createdAt)}</span>
+              </div>
+            </button>
+          );
+        })}
+        {rows.length === 0 && (
+          <div className="rounded-[12px] border border-border/40 bg-card p-8 text-center">
+            <p className="text-[15px] font-medium">No creators found</p>
+            <p className="mt-1 text-[13px] text-muted">{profiles.filter((p) => p.role === "creator").length === 0 ? "No creator accounts exist yet." : "Try adjusting your search or filters."}</p>
+          </div>
+        )}
+      </div>
+
+      {/* ── Desktop table ────────────────────────────────── */}
+      <div className="hidden overflow-hidden rounded-xl border border-border/40 bg-card sm:block">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1000px] text-[14px]">
             <thead>
@@ -360,7 +411,7 @@ function CreatorDrawer({
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 cursor-pointer bg-black/40" onClick={onClose} />
-      <div className="relative flex h-full w-full max-w-2xl flex-col overflow-y-auto bg-card shadow-xl">
+      <div className="relative flex h-full w-full flex-col overflow-y-auto bg-card shadow-xl sm:max-w-2xl">
         {/* ── Header ────────────────────────────────────── */}
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-border/40 bg-card px-7 py-5">
           <div className="min-w-0">

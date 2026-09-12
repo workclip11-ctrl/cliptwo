@@ -195,8 +195,75 @@ export default function AdminPayoutsPage() {
         </div>
       </div>
 
-      {/* ── Table ───────────────────────────────────────── */}
-      <div className="overflow-hidden rounded-xl border border-border/40 bg-card">
+      {/* ── Mobile cards ─────────────────────────────────── */}
+      <div className="space-y-3 sm:hidden">
+        {filtered.map((payout) => {
+          const profile = profiles.find((p) => p.id === payout.userId);
+          const isProcessing = processingId === payout.id;
+          const isCompleting = completingId === payout.id;
+          return (
+            <div key={payout.id} className="rounded-[12px] border border-border/40 bg-card p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[14px] font-medium">{profile?.name ?? profile?.username ?? "Unknown"}</p>
+                  <p className="mt-0.5 text-[13px] text-muted">@{profile?.username ?? "unknown"} · {payout.upiId}</p>
+                </div>
+                <PayoutStatusBadge status={payout.status} />
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-[13px]">
+                <div><span className="text-muted">Amount </span><span className="font-mono font-medium">{rup(payout.amount / 100)}</span></div>
+                <div><span className="text-muted">Net </span><span className="font-mono font-medium">{rup(payout.netAmount / 100)}</span></div>
+                <div><span className="text-muted">Requested </span><span className="font-mono">{fmtDate(payout.createdAt)}</span></div>
+                <div><span className="text-muted">UTR </span><span className="font-mono">{payout.paymentReference || "—"}</span></div>
+              </div>
+              {payout.status === "pending" && (
+                <div className="mt-3">
+                  <button
+                    onClick={() => handleProcess(payout)}
+                    disabled={isProcessing}
+                    className="inline-flex h-10 w-full cursor-pointer items-center justify-center gap-1.5 rounded-[8px] bg-foreground px-4 text-[13px] font-medium text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isProcessing ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={13} />}
+                    Start Processing
+                  </button>
+                </div>
+              )}
+              {payout.status === "processing" && (
+                <div className="mt-3 space-y-2">
+                  <input
+                    value={completingId === payout.id ? utrInput : ""}
+                    onChange={(e) => { setCompletingId(payout.id); setUtrInput(e.target.value); }}
+                    onFocus={() => setCompletingId(payout.id)}
+                    placeholder="Enter UPI UTR"
+                    className="h-10 w-full rounded-[8px] border border-border/60 bg-background px-3.5 font-mono text-[14px] outline-none transition-colors focus:border-foreground/30"
+                  />
+                  <button
+                    onClick={() => handleComplete(payout)}
+                    disabled={isCompleting || !utrInput.trim()}
+                    className="inline-flex h-10 w-full cursor-pointer items-center justify-center gap-1.5 rounded-[8px] bg-green px-4 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isCompleting ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={13} />}
+                    Mark Paid
+                  </button>
+                  <p className="text-[12px] text-muted">Send UPI payment to {payout.upiId} first, then record the UTR.</p>
+                </div>
+              )}
+              {payout.status === "paid" && (
+                <p className="mt-2 text-[13px] text-muted">Paid {fmtDate(payout.paidAt)}{payout.paidBy ? ` by ${payout.paidBy}` : ""}</p>
+              )}
+            </div>
+          );
+        })}
+        {filtered.length === 0 && (
+          <div className="rounded-[12px] border border-border/40 bg-card p-8 text-center">
+            <p className="text-[15px] font-medium">No payout requests found</p>
+            <p className="mt-1 text-[13px] text-muted">Payout requests will appear here when clippers submit withdrawal requests.</p>
+          </div>
+        )}
+      </div>
+
+      {/* ── Desktop table ────────────────────────────────── */}
+      <div className="hidden overflow-hidden rounded-xl border border-border/40 bg-card sm:block">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[960px] text-[14px]">
             <thead>

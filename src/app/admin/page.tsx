@@ -212,7 +212,7 @@ export default function AdminDashboard() {
             <button
               onClick={triggerSync}
               disabled={syncing}
-              className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-[8px] border border-border/60 px-3.5 text-[13px] font-medium text-muted transition-colors duration-150 hover:border-foreground/20 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[8px] border border-border/60 px-3.5 text-[13px] font-medium text-muted transition-colors duration-150 hover:border-foreground/20 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 sm:h-11"
             >
               {syncing ? (
                 <Loader2 size={13} className="animate-spin" />

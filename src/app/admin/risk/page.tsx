@@ -142,8 +142,98 @@ export default function AdminRiskPage() {
         </select>
       </div>
 
-      {/* ── Table ───────────────────────────────────────── */}
-      <div className="overflow-hidden rounded-xl border border-border/40 bg-card">
+      {/* ── Mobile cards ─────────────────────────────────── */}
+      <div className="space-y-3 sm:hidden">
+        {flagged.map((c) => {
+          const camp = campaigns.find((x) => x.id === c.campaignId);
+          const flags = c.riskFlags ?? [];
+          const topFlag = flags[flags.length - 1];
+          const expanded = expandedId === c.id;
+          return (
+            <div key={c.id} className="rounded-[12px] border border-border/40 bg-card p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-[14px] font-medium">{c.caption}</p>
+                  <p className="mt-0.5 text-[13px] text-muted">@{c.clipper} · {camp?.title ?? "Campaign"}</p>
+                </div>
+                {topFlag && (
+                  <span className={`inline-flex shrink-0 items-center rounded-[4px] px-2 py-0.5 text-[11px] font-medium ${SEVERITY_COLORS[topFlag.severity]}`}>
+                    {topFlag.type.replace(/_/g, " ")}
+                  </span>
+                )}
+              </div>
+              <div className="mt-2 flex items-center gap-3 text-[13px]">
+                <span className="text-muted">Views {fmtViews(c.views)}</span>
+                {topFlag?.status && (
+                  <span className={`inline-flex items-center rounded-[4px] px-1.5 py-0.5 text-[11px] font-medium ${STATUS_COLORS[topFlag.status] ?? ""}`}>
+                    {topFlag.status}
+                  </span>
+                )}
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => setExpandedId(expanded ? null : c.id)}
+                  className="inline-flex h-10 shrink-0 cursor-pointer items-center rounded-[8px] border border-border/60 px-3.5 text-[13px] font-medium transition-colors hover:bg-accent-soft"
+                >
+                  {expanded ? "Close" : "Review"}
+                </button>
+                <button
+                  onClick={() => holdClip(c.id, "Risk review held")}
+                  className="inline-flex h-10 shrink-0 cursor-pointer items-center rounded-[8px] border border-red/20 px-3.5 text-[13px] font-medium text-red transition-colors hover:bg-red/5"
+                >
+                  Hold
+                </button>
+              </div>
+              {expanded && (
+                <div className="mt-3 space-y-3 rounded-[10px] border border-border/40 bg-background/50 p-4">
+                  <div className="space-y-2">
+                    {flags.map((f, i) => (
+                      <div key={i} className="flex items-start gap-2.5 text-[13px]">
+                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/40" />
+                        <div>
+                          <span className={`inline-block rounded-[4px] px-1.5 py-0.5 text-[11px] font-medium ${SEVERITY_COLORS[f.severity]}`}>{f.type.replace(/_/g, " ")}</span>
+                          <span className="ml-1.5 text-muted">{f.note}</span>
+                          {f.at && <span className="ml-1.5 text-[12px] text-muted">{new Date(f.at).toLocaleDateString()}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {flaggingId === c.id ? (
+                    <div className="space-y-3 rounded-[10px] border border-red/20 bg-red/5 p-4">
+                      <p className="text-[13px] font-medium text-red">Add risk flag</p>
+                      <select value={flagType} onChange={(e) => setFlagType(e.target.value as RiskType)} className="h-10 w-full cursor-pointer rounded-[8px] border border-border/60 bg-card px-3 text-[13px] outline-none focus:border-foreground/30">
+                        {RISK_TYPES.map((t) => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
+                      </select>
+                      <select value={flagSeverity} onChange={(e) => setFlagSeverity(e.target.value as Severity)} className="h-10 w-full cursor-pointer rounded-[8px] border border-border/60 bg-card px-3 text-[13px] outline-none focus:border-foreground/30">
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                      </select>
+                      <textarea value={flagNote} onChange={(e) => setFlagNote(e.target.value)} rows={2} placeholder="Note…" className="w-full resize-none rounded-[8px] border border-border/60 bg-card px-3 py-2 text-[13px] outline-none focus:border-foreground/30" />
+                      <div className="flex gap-2">
+                        <button onClick={() => { holdClip(c.id, flagNote || "Risk flag added"); setFlaggingId(null); setFlagNote(""); }} className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[8px] bg-red px-4 text-[13px] font-medium text-white transition-opacity hover:opacity-90">Add flag</button>
+                        <button onClick={() => setFlaggingId(null)} className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[8px] border border-border/60 px-4 text-[13px] font-medium transition-colors hover:bg-accent-soft">Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button onClick={() => setFlaggingId(c.id)} className="inline-flex h-10 cursor-pointer items-center rounded-[8px] border border-border/60 px-3.5 text-[13px] font-medium transition-colors hover:bg-accent-soft">+ Add flag</button>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {flagged.length === 0 && (
+          <div className="rounded-[12px] border border-border/40 bg-card p-8 text-center">
+            <p className="text-[15px] font-medium">
+              {clips.some((c) => (c.riskFlags ?? []).length > 0) ? "No flagged clips match your filters." : "No flagged clips. Flag clips from the review page or add flags here."}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* ── Desktop table ────────────────────────────────── */}
+      <div className="hidden overflow-hidden rounded-xl border border-border/40 bg-card sm:block">
         <table className="w-full text-[14px]">
           <thead>
             <tr className="border-b border-border/40 text-left text-[13px] text-muted">

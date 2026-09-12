@@ -247,8 +247,61 @@ export default function AdminCampaignPayments() {
         </div>
       </div>
 
-      {/* ── Table ───────────────────────────────────────── */}
-      <div className="overflow-hidden rounded-xl border border-border/40 bg-card">
+      {/* ── Mobile cards ─────────────────────────────────── */}
+      <div className="space-y-3 sm:hidden">
+        {filtered.map((p) => (
+          <div key={p.id} className="rounded-[12px] border border-border/40 bg-card p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-[14px] font-medium">{p.campaign_title}</p>
+                <p className="mt-0.5 text-[13px] text-muted">{p.creator_name} · {p.campaign_status}</p>
+              </div>
+              <StatusBadge status={p.payment_status} />
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2 text-[13px]">
+              <div><span className="text-muted">Budget </span><span className="font-mono font-medium">{rup(p.campaign_budget_rupees)}</span></div>
+              <div><span className="text-muted">Fee </span><span className="font-mono text-muted">{rup(Math.floor(p.platform_fee_paise / 100))}</span></div>
+              <div><span className="text-muted">Total </span><span className="font-mono font-semibold">{rup(Math.floor(p.total_payable_paise / 100))}</span></div>
+            </div>
+            <div className="mt-2 text-[13px]">
+              <span className="text-muted">UTR </span><span className="font-mono">{p.utr_reference || "—"}</span>
+            </div>
+            {p.payment_status === "submitted" && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  onClick={() => handleVerify(p.id)}
+                  disabled={actionLoading === p.id}
+                  className="inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-[8px] bg-green/10 px-3 text-[13px] font-medium text-green transition-colors hover:bg-green/20 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <CheckCircle size={14} /> Verify
+                </button>
+                <button
+                  onClick={() => { setRejectModal(p.id); setRejectReason(""); }}
+                  disabled={actionLoading === p.id}
+                  className="inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-[8px] bg-red/10 px-3 text-[13px] font-medium text-red transition-colors hover:bg-red/20 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <XCircle size={14} /> Reject
+                </button>
+              </div>
+            )}
+            {p.payment_status === "verified" && (
+              <p className="mt-2 text-[13px] text-green"><CheckCircle size={14} className="mr-1 inline" />Verified</p>
+            )}
+            {p.payment_status === "rejected" && (
+              <p className="mt-2 text-[13px] text-red"><XCircle size={14} className="mr-1 inline" />Rejected</p>
+            )}
+          </div>
+        ))}
+        {filtered.length === 0 && (
+          <div className="rounded-[12px] border border-border/40 bg-card p-8 text-center">
+            <p className="text-[15px] font-medium">{loading ? "Loading payments…" : "No payment records found."}</p>
+            {!loading && <p className="mt-1 text-[13px] text-muted">Campaign payments will appear here when creators submit launch payments.</p>}
+          </div>
+        )}
+      </div>
+
+      {/* ── Desktop table ────────────────────────────────── */}
+      <div className="hidden overflow-hidden rounded-xl border border-border/40 bg-card sm:block">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-[14px]">
             <thead>
@@ -373,7 +426,7 @@ export default function AdminCampaignPayments() {
       {/* ── Reject modal ────────────────────────────────── */}
       {rejectModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="mx-4 w-full max-w-[460px] rounded-2xl border border-border/40 bg-card p-6">
+          <div className="mx-4 w-full max-w-[460px] rounded-2xl border border-border/40 bg-card p-5 sm:p-6">
             <h3 className="text-[18px] font-bold tracking-tight">Reject Payment</h3>
             <p className="mt-1.5 text-[14px] text-muted">
               Provide a reason for rejecting this payment. The creator will be notified.

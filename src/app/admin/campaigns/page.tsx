@@ -114,8 +114,70 @@ export default function AdminCampaigns() {
         </div>
       </div>
 
-      {/* ── Table ───────────────────────────────────────── */}
-      <div className="overflow-hidden rounded-xl border border-border/40 bg-card">
+      {/* ── Mobile cards ─────────────────────────────────── */}
+      <div className="space-y-3 sm:hidden">
+        {filtered.map((c) => {
+          const n = clips.filter((k) => k.campaignId === c.id).length;
+          const budget = c.budget ?? 0;
+          const spent = campaignSpent(c, financeRecords);
+          const pct = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
+          const isArchived = c.status === "archived";
+          return (
+            <div key={c.id} className={`rounded-[12px] border border-border/40 bg-card p-4 ${isArchived ? "opacity-50" : ""}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-[14px] font-medium">{c.title}</p>
+                  <p className="mt-0.5 text-[13px] text-muted">{c.creator}</p>
+                </div>
+                <StatusPill status={c.status} />
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-[13px]">
+                <div><span className="text-muted">Budget </span><span className="font-mono font-medium">{rup(budget)}</span></div>
+                <div><span className="text-muted">Spent </span><span className="font-mono font-medium">{rup(spent)}</span></div>
+                <div><span className="text-muted">Clips </span><span className="font-mono font-medium">{n}</span></div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-border/40">
+                      <div className="h-full rounded-full bg-foreground" style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="text-muted">{pct}%</span>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {c.status === "open" && (
+                  <button onClick={() => closeCampaign(c.id)} className="inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-[10px] border border-border/60 px-3 text-[13px] font-medium transition-colors hover:bg-accent-soft">
+                    <Ban size={13} /> Close
+                  </button>
+                )}
+                <Link href="/admin/clips" className="inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-[10px] border border-border/60 px-3 text-[13px] font-medium transition-colors hover:bg-accent-soft">
+                  <Megaphone size={13} /> Clips
+                </Link>
+                {!isArchived && (
+                  <button
+                    onClick={() => {
+                      if (confirm(`Archive campaign "${c.title}"?\n\nAll clips, earnings, and audit history will be preserved.`))
+                        deleteCampaign(c.id);
+                    }}
+                    className="inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-[10px] border border-amber-500/30 px-3 text-[13px] font-medium text-amber-600 transition-colors hover:bg-amber-500/10"
+                  >
+                    <Archive size={13} /> Archive
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+        {filtered.length === 0 && (
+          <div className="rounded-[12px] border border-border/40 bg-card p-8 text-center">
+            <p className="text-[15px] font-medium">No campaigns found</p>
+            <p className="mt-1 text-[13px] text-muted">{campaigns.length === 0 ? "Campaigns will appear here once created." : "Try adjusting your search or filters."}</p>
+          </div>
+        )}
+      </div>
+
+      {/* ── Desktop table ────────────────────────────────── */}
+      <div className="hidden overflow-hidden rounded-xl border border-border/40 bg-card sm:block">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[800px] text-[14px]">
             <thead>

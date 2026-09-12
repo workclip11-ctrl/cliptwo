@@ -191,8 +191,59 @@ export default function AdminClippers() {
         </div>
       </div>
 
-      {/* ── Table ───────────────────────────────────────── */}
-      <div className="overflow-hidden rounded-xl border border-border/40 bg-card">
+      {/* ── Mobile cards ─────────────────────────────────── */}
+      <div className="space-y-3 sm:hidden">
+        {rows.map((p) => {
+          const s = clipperStats(p, clips, campaigns, financeRecords);
+          return (
+            <button
+              key={p.id}
+              onClick={() => setSelectedId(p.id)}
+              className="w-full cursor-pointer rounded-[12px] border border-border/40 bg-card p-4 text-left transition-colors hover:border-foreground/10"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-[13px] font-semibold text-foreground">
+                    {(p.name ?? p.username ?? "?").slice(0, 1).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate font-medium">{p.name}</span>
+                      {p.riskFlag && <AlertTriangle size={12} className="shrink-0 text-red" />}
+                    </div>
+                    <p className="truncate text-[13px] text-muted">@{p.username}</p>
+                  </div>
+                </div>
+                <span className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-[12px] font-medium ${p.status === "suspended" ? "bg-red/10 text-red" : "bg-green/10 text-green"}`}>
+                  {p.status === "suspended" ? "Suspended" : "Active"}
+                </span>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2 text-[13px]">
+                <div><span className="text-muted">Clips </span><span className="font-mono font-medium">{s.total}</span></div>
+                <div><span className="text-muted">Earned </span><span className="font-mono font-medium">{rup(s.earned)}</span></div>
+                <div><span className="text-muted">Approval </span><span className="font-mono font-medium">{s.approvalRate === null ? "—" : `${s.approvalRate}%`}</span></div>
+              </div>
+              <div className="mt-2 flex items-center gap-1.5">
+                {accountsFor(p, socialAccounts).map((a) => (
+                  <span key={a.id} className={`inline-flex h-5 w-5 items-center justify-center rounded-md border ${a.verified ? "border-green/20 bg-green/10 text-green" : "border-border/40 bg-accent-soft text-muted"}`}>
+                    <PlatformIcon p={a.platform} size={11} />
+                  </span>
+                ))}
+                <span className="ml-auto text-[12px] text-muted">{fmtDate(p.createdAt)}</span>
+              </div>
+            </button>
+          );
+        })}
+        {rows.length === 0 && (
+          <div className="rounded-[12px] border border-border/40 bg-card p-8 text-center">
+            <p className="text-[15px] font-medium">No clippers found</p>
+            <p className="mt-1 text-[13px] text-muted">{profiles.length === 0 ? "No clipper accounts exist yet." : "Try adjusting your search or filters."}</p>
+          </div>
+        )}
+      </div>
+
+      {/* ── Desktop table ────────────────────────────────── */}
+      <div className="hidden overflow-hidden rounded-xl border border-border/40 bg-card sm:block">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[960px] text-[14px]">
             <thead>
@@ -413,7 +464,7 @@ function ClipperDrawer({
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 cursor-pointer bg-black/40" onClick={onClose} />
-      <div className="relative flex h-full w-full max-w-2xl flex-col overflow-y-auto bg-card shadow-xl">
+      <div className="relative flex h-full w-full flex-col overflow-y-auto bg-card shadow-xl sm:max-w-2xl">
         {/* ── Header ────────────────────────────────────── */}
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-border/40 bg-card px-7 py-5">
           <div className="min-w-0">

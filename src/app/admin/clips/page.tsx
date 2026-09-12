@@ -352,142 +352,182 @@ function ReviewTable({
   const empty = emptyMessages[tab] ?? { heading: "No clips", sub: "" };
 
   return (
-    <table className="w-full min-w-[900px] text-[14px]">
-      <thead>
-        <tr className="border-b border-border/40 text-left text-[13px] text-muted">
-          <th className="px-5 py-3 font-medium">Clip</th>
-          <th className="px-5 py-3 font-medium">Clipper</th>
-          <th className="px-5 py-3 font-medium">Campaign</th>
-          <th className="px-5 py-3 font-medium">Platform</th>
-          <th className="px-5 py-3 font-medium">Submitted</th>
-          <th className="px-5 py-3 text-right font-medium">Views</th>
-          <th className="px-5 py-3 font-medium">Status</th>
-          <th className="px-5 py-3"></th>
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-border/40">
+    <>
+      {/* Mobile cards */}
+      <div className="space-y-3 p-4 sm:hidden">
         {clips.map((k) => {
           const c = campaigns.find((x) => x.id === k.campaignId);
           return (
-            <FragmentRow
-              key={k.id}
-              colSpan={8}
-              extra={
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {onApprove && (
-                    <button
-                      onClick={() => onApprove(k)}
-                      className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-[8px] bg-green/10 px-3 text-[13px] font-medium text-green transition-colors hover:bg-green/20"
-                    >
-                      <Check size={14} /> Approve
-                    </button>
-                  )}
-                  {onReject && (
-                    <button
-                      onClick={() => onReject(k)}
-                      className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-[8px] bg-red/10 px-3 text-[13px] font-medium text-red transition-colors hover:bg-red/20"
-                    >
-                      <Ban size={14} /> Reject
-                    </button>
-                  )}
-                  {onHold && (
-                    <button
-                      onClick={() => onHold(k)}
-                      className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-[8px] border border-border/60 px-3 text-[13px] font-medium transition-colors hover:bg-accent-soft"
-                    >
-                      <ShieldAlert size={14} /> Hold
-                    </button>
-                  )}
-                  <button
-                    onClick={() => onToggleAudit(k.id)}
-                    className={`inline-flex h-9 cursor-pointer items-center gap-1 rounded-[8px] border border-border/60 px-3 text-[13px] font-medium transition-colors hover:bg-accent-soft ${
-                      auditId === k.id ? "bg-accent-soft" : ""
-                    }`}
-                  >
-                    <History size={14} /> Audit
-                    {k.audit?.length ? ` (${k.audit.length})` : ""}
-                  </button>
-                </div>
-              }
-              audit={
-                auditId === k.id ? (
-                  <div className="mt-2 rounded-[8px] border border-border/40 bg-background px-5 py-4">
-                    <p className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-muted">
-                      Audit trail
-                    </p>
-                    <AuditTrail clip={k} />
-                  </div>
-                ) : null
-              }
-            >
-              <td className="px-5 py-4">
+            <div key={k.id} className="rounded-[10px] border border-border/40 bg-background p-4">
+              <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="truncate font-medium">{k.caption}</p>
-                  {k.videoUrl && (
-                    <a
-                      href={k.videoUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-0.5 inline-block text-[13px] text-foreground/60 hover:underline"
-                    >
-                      View clip ↗
-                    </a>
-                  )}
+                  <p className="truncate text-[14px] font-medium">{k.caption}</p>
+                  <p className="mt-0.5 text-[13px] text-muted">@{k.clipper} · {c?.title ?? "Campaign"}</p>
                 </div>
-              </td>
-              <td className="px-5 py-4 font-medium">@{k.clipper}</td>
-              <td className="px-5 py-4 text-muted">{c?.title ?? "Campaign"}</td>
-              <td className="px-5 py-4">
-                {k.platform && <PlatformIcon p={k.platform} size={15} />}
-              </td>
-              <td className="px-5 py-4 text-[13px] text-muted">{fmtDate(k.submittedAt)}</td>
-              <td className="px-5 py-4 text-right font-mono">{fmtViews(k.verifiedViews ?? 0)}</td>
-              <td className="px-5 py-4">
                 <StatusPill status={k.status} />
-              </td>
-            </FragmentRow>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-3 text-[13px] text-muted">
+                <span>{fmtDate(k.submittedAt)}</span>
+                <span className="font-mono">{fmtViews(k.verifiedViews ?? 0)} views</span>
+                {k.platform && <PlatformIcon p={k.platform} size={13} />}
+                {k.videoUrl && (
+                  <a href={k.videoUrl} target="_blank" rel="noreferrer" className="text-foreground/60 hover:underline">
+                    View ↗
+                  </a>
+                )}
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                {onApprove && (
+                  <button onClick={() => onApprove(k)} className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-[8px] bg-green/10 px-3 text-[13px] font-medium text-green transition-colors hover:bg-green/20">
+                    <Check size={14} /> Approve
+                  </button>
+                )}
+                {onReject && (
+                  <button onClick={() => onReject(k)} className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-[8px] bg-red/10 px-3 text-[13px] font-medium text-red transition-colors hover:bg-red/20">
+                    <Ban size={14} /> Reject
+                  </button>
+                )}
+                {onHold && (
+                  <button onClick={() => onHold(k)} className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-[8px] border border-border/60 px-3 text-[13px] font-medium transition-colors hover:bg-accent-soft">
+                    <ShieldAlert size={14} /> Hold
+                  </button>
+                )}
+                <button onClick={() => onToggleAudit(k.id)} className={`inline-flex h-9 cursor-pointer items-center gap-1 rounded-[8px] border border-border/60 px-3 text-[13px] font-medium transition-colors hover:bg-accent-soft ${auditId === k.id ? "bg-accent-soft" : ""}`}>
+                  <History size={14} /> Audit{k.audit?.length ? ` (${k.audit.length})` : ""}
+                </button>
+              </div>
+              {auditId === k.id && (
+                <div className="mt-3 rounded-[8px] border border-border/40 bg-card px-4 py-3">
+                  <p className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-muted">Audit trail</p>
+                  <AuditTrail clip={k} />
+                </div>
+              )}
+            </div>
           );
         })}
-        {clips.length === 0 && (
-          <tr>
-            <td colSpan={8} className="px-5 py-12 text-center">
-              <p className="text-[15px] font-medium">{empty.heading}</p>
-              <p className="mt-1 text-[13px] text-muted">{empty.sub}</p>
-            </td>
-          </tr>
-        )}
         {rejectingId && (
-          <RejectFormRow
-            colSpan={8}
-            reason={rejectReason}
-            details={rejectDetails}
-            onReason={setRejectReason}
-            onDetails={setRejectDetails}
-            onConfirm={() => {
-              const k = clips.find((x) => x.id === rejectingId);
-              if (k) onConfirmReject(k);
-            }}
-            onCancel={onCancelReject}
-          />
+          <div className="space-y-3 rounded-[10px] border border-red/20 bg-red/5 p-4">
+            <p className="text-[14px] font-medium text-red">Reason</p>
+            <input value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="Reason (e.g. Campaign rule violation)" className="w-full rounded-[8px] border border-border/60 bg-card px-3.5 py-2.5 text-[14px] outline-none transition-colors focus:border-foreground/30" />
+            <textarea value={rejectDetails} onChange={(e) => setRejectDetails(e.target.value)} rows={2} placeholder="Details (optional)" className="w-full resize-none rounded-[8px] border border-border/60 bg-card px-3.5 py-2.5 text-[14px] outline-none transition-colors focus:border-foreground/30" />
+            <div className="flex gap-2">
+              <button onClick={() => { const k = clips.find((x) => x.id === rejectingId); if (k) onConfirmReject(k); }} className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[8px] bg-red px-4 text-[14px] font-medium text-white transition-colors hover:opacity-90">
+                <Ban size={14} /> Confirm
+              </button>
+              <button onClick={onCancelReject} className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[8px] border border-border/60 px-4 text-[14px] font-medium transition-colors hover:bg-accent-soft">
+                <X size={14} /> Cancel
+              </button>
+            </div>
+          </div>
         )}
         {holdingId && (
-          <RejectFormRow
-            colSpan={8}
-            reason={holdReason}
-            details=""
-            title="Hold reason"
-            placeholder="e.g. Copyright review"
-            onReason={setHoldReason}
-            onDetails={() => {}}
-            onConfirm={() => {
-              const k = clips.find((x) => x.id === holdingId);
-              if (k) onConfirmHold(k);
-            }}
-            onCancel={onCancelHold}
-          />
+          <div className="space-y-3 rounded-[10px] border border-amber/20 bg-amber/5 p-4">
+            <p className="text-[14px] font-medium text-amber">Hold reason</p>
+            <input value={holdReason} onChange={(e) => setHoldReason(e.target.value)} placeholder="e.g. Copyright review" className="w-full rounded-[8px] border border-border/60 bg-card px-3.5 py-2.5 text-[14px] outline-none transition-colors focus:border-foreground/30" />
+            <div className="flex gap-2">
+              <button onClick={() => { const k = clips.find((x) => x.id === holdingId); if (k) onConfirmHold(k); }} className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[8px] bg-amber px-4 text-[14px] font-medium text-white transition-colors hover:opacity-90">
+                <ShieldAlert size={14} /> Confirm
+              </button>
+              <button onClick={onCancelHold} className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[8px] border border-border/60 px-4 text-[14px] font-medium transition-colors hover:bg-accent-soft">
+                <X size={14} /> Cancel
+              </button>
+            </div>
+          </div>
         )}
-      </tbody>
-    </table>
+        {clips.length === 0 && (
+          <div className="rounded-[10px] border border-border/40 bg-card p-8 text-center">
+            <p className="text-[15px] font-medium">{empty.heading}</p>
+            <p className="mt-1 text-[13px] text-muted">{empty.sub}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Desktop table */}
+      <table className="hidden w-full min-w-[900px] text-[14px] sm:table">
+        <thead>
+          <tr className="border-b border-border/40 text-left text-[13px] text-muted">
+            <th className="px-5 py-3 font-medium">Clip</th>
+            <th className="px-5 py-3 font-medium">Clipper</th>
+            <th className="px-5 py-3 font-medium">Campaign</th>
+            <th className="px-5 py-3 font-medium">Platform</th>
+            <th className="px-5 py-3 font-medium">Submitted</th>
+            <th className="px-5 py-3 text-right font-medium">Views</th>
+            <th className="px-5 py-3 font-medium">Status</th>
+            <th className="px-5 py-3"></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border/40">
+          {clips.map((k) => {
+            const c = campaigns.find((x) => x.id === k.campaignId);
+            return (
+              <FragmentRow
+                key={k.id}
+                colSpan={8}
+                extra={
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {onApprove && (
+                      <button onClick={() => onApprove(k)} className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-[8px] bg-green/10 px-3 text-[13px] font-medium text-green transition-colors hover:bg-green/20">
+                        <Check size={14} /> Approve
+                      </button>
+                    )}
+                    {onReject && (
+                      <button onClick={() => onReject(k)} className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-[8px] bg-red/10 px-3 text-[13px] font-medium text-red transition-colors hover:bg-red/20">
+                        <Ban size={14} /> Reject
+                      </button>
+                    )}
+                    {onHold && (
+                      <button onClick={() => onHold(k)} className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-[8px] border border-border/60 px-3 text-[13px] font-medium transition-colors hover:bg-accent-soft">
+                        <ShieldAlert size={14} /> Hold
+                      </button>
+                    )}
+                    <button onClick={() => onToggleAudit(k.id)} className={`inline-flex h-9 cursor-pointer items-center gap-1 rounded-[8px] border border-border/60 px-3 text-[13px] font-medium transition-colors hover:bg-accent-soft ${auditId === k.id ? "bg-accent-soft" : ""}`}>
+                      <History size={14} /> Audit{k.audit?.length ? ` (${k.audit.length})` : ""}
+                    </button>
+                  </div>
+                }
+                audit={
+                  auditId === k.id ? (
+                    <div className="mt-2 rounded-[8px] border border-border/40 bg-background px-5 py-4">
+                      <p className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-muted">Audit trail</p>
+                      <AuditTrail clip={k} />
+                    </div>
+                  ) : null
+                }
+              >
+                <td className="px-5 py-4">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{k.caption}</p>
+                    {k.videoUrl && (
+                      <a href={k.videoUrl} target="_blank" rel="noreferrer" className="mt-0.5 inline-block text-[13px] text-foreground/60 hover:underline">
+                        View clip ↗
+                      </a>
+                    )}
+                  </div>
+                </td>
+                <td className="px-5 py-4 font-medium">@{k.clipper}</td>
+                <td className="px-5 py-4 text-muted">{c?.title ?? "Campaign"}</td>
+                <td className="px-5 py-4">{k.platform && <PlatformIcon p={k.platform} size={15} />}</td>
+                <td className="px-5 py-4 text-[13px] text-muted">{fmtDate(k.submittedAt)}</td>
+                <td className="px-5 py-4 text-right font-mono">{fmtViews(k.verifiedViews ?? 0)}</td>
+                <td className="px-5 py-4"><StatusPill status={k.status} /></td>
+              </FragmentRow>
+            );
+          })}
+          {clips.length === 0 && (
+            <tr><td colSpan={8} className="px-5 py-12 text-center">
+              <p className="text-[15px] font-medium">{empty.heading}</p>
+              <p className="mt-1 text-[13px] text-muted">{empty.sub}</p>
+            </td></tr>
+          )}
+          {rejectingId && (
+            <RejectFormRow colSpan={8} reason={rejectReason} details={rejectDetails} onReason={setRejectReason} onDetails={setRejectDetails} onConfirm={() => { const k = clips.find((x) => x.id === rejectingId); if (k) onConfirmReject(k); }} onCancel={onCancelReject} />
+          )}
+          {holdingId && (
+            <RejectFormRow colSpan={8} reason={holdReason} details="" title="Hold reason" placeholder="e.g. Copyright review" onReason={setHoldReason} onDetails={() => {}} onConfirm={() => { const k = clips.find((x) => x.id === holdingId); if (k) onConfirmHold(k); }} onCancel={onCancelHold} />
+          )}
+        </tbody>
+      </table>
+    </>
   );
 }
 
@@ -509,7 +549,70 @@ function ApprovedClipsTable({
   onToggleAudit: (id: string) => void;
 }) {
   return (
-    <table className="w-full min-w-[1000px] text-[14px]">
+    <>
+      {/* Mobile cards */}
+      <div className="space-y-3 p-4 sm:hidden">
+        {financeRecords.map((r) => {
+          const clip = clips.find((c) => c.id === r.clipId);
+          const c = campaigns.find((x) => x.id === r.campaignId);
+          const paymentLabel = r.status === "paid" ? "Paid" : r.status === "processing" ? "Processing" : "Payable";
+          const paymentStyle = r.status === "paid" ? "bg-green/10 text-green" : r.status === "processing" ? "bg-amber/10 text-amber" : "bg-amber/10 text-amber";
+          return (
+            <div key={r.id} className="rounded-[10px] border border-border/40 bg-background p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-[14px] font-medium">{clip?.caption ?? "—"}</p>
+                  <p className="mt-0.5 text-[13px] text-muted">@{clip?.clipper ?? "—"} · {c?.title ?? "Campaign"}</p>
+                </div>
+                <span className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-[12px] font-medium ${paymentStyle}`}>{paymentLabel}</span>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-[13px]">
+                <div><span className="text-muted">Views </span><span className="font-mono font-medium">{fmtViews(clip?.verifiedViews ?? 0)}</span></div>
+                <div><span className="text-muted">Gross </span><span className="font-mono font-medium">{rup(r.grossAmount / 100)}</span></div>
+                <div><span className="text-muted">Fee </span><span className="font-mono text-muted">{rup(r.platformFee / 100)}</span></div>
+                <div><span className="text-muted">Net </span><span className="font-mono font-semibold text-green">{rup(r.netAmount / 100)}</span></div>
+              </div>
+              {clip?.videoUrl && (
+                <a href={clip.videoUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block text-[13px] text-foreground/60 hover:underline">View clip ↗</a>
+              )}
+              <div className="mt-3 flex items-center gap-2">
+                <button onClick={() => onToggleAudit(r.id)} className={`inline-flex h-9 cursor-pointer items-center gap-1 rounded-[8px] border border-border/60 px-3 text-[13px] font-medium transition-colors hover:bg-accent-soft ${auditId === r.id ? "bg-accent-soft" : ""}`}>
+                  <History size={14} /> Audit
+                </button>
+                {r.paidAt && <span className="text-[12px] text-muted">Paid {fmtDate(r.paidAt)}</span>}
+              </div>
+              {auditId === r.id && (
+                <div className="mt-3 rounded-[8px] border border-border/40 bg-card px-4 py-3">
+                  <p className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-muted">Audit trail</p>
+                  {r.audit && r.audit.length > 0 ? (
+                    <ol className="space-y-3">
+                      {r.audit.map((e, i) => (
+                        <li key={i} className="flex items-start gap-2.5">
+                          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/30" />
+                          <div className="min-w-0">
+                            <p className="text-[14px] font-medium capitalize">{e.action.replace(/_/g, " ")}</p>
+                            <p className="text-[13px] text-muted">{e.by ? `${e.by} · ` : ""}{fmtDateTime(e.at)}</p>
+                            {e.note && <p className="mt-0.5 text-[13px] text-muted">{e.note}</p>}
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                  ) : <p className="text-[13px] text-muted">No audit entries.</p>}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {financeRecords.length === 0 && (
+          <div className="rounded-[10px] border border-border/40 bg-card p-8 text-center">
+            <p className="text-[15px] font-medium">No approved clips</p>
+            <p className="mt-1 text-[13px] text-muted">Approved clips will move through the payout workflow here.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Desktop table */}
+      <table className="hidden w-full min-w-[1000px] text-[14px] sm:table">
       <thead>
         <tr className="border-b border-border/40 text-left text-[13px] text-muted">
           <th className="px-5 py-3 font-medium">Clip</th>
@@ -633,6 +736,7 @@ function ApprovedClipsTable({
         )}
       </tbody>
     </table>
+    </>
   );
 }
 
