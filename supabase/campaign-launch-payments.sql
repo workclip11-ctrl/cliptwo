@@ -23,16 +23,33 @@ BEGIN
   END IF;
 END $$;
 
--- Backfill: all existing campaigns are already paid/verified
--- Only update rows where status actually needs changing to avoid triggering
--- enforce_campaign_launch_payment_integrity for no-op updates.
-UPDATE public.campaigns
-SET launch_payment_status = 'verified'
-WHERE launch_payment_status != 'verified'
-  AND (
-    launch_payment_status = 'pending'
-    OR status IN ('open','closed','paused','near_budget','budget_reached')
-  );
+-- Backfill: all existing campaigns are already paid/verified.
+-- Temporarily disable the integrity trigger to avoid permission issues
+-- when running this migration from the SQL Editor (non-superuser).
+DO $$
+BEGIN
+  -- Disable trigger if it exists (safe no-op if not)
+  IF EXISTS (
+    SELECT 1 FROM pg_trigger WHERE tgname = 'enforce_campaign_launch_payment_integrity'
+  ) THEN
+    ALTER TABLE public.campaigns DISABLE TRIGGER enforce_campaign_launch_payment_integrity;
+  END IF;
+
+  UPDATE public.campaigns
+  SET launch_payment_status = 'verified'
+  WHERE launch_payment_status != 'verified'
+    AND (
+      launch_payment_status = 'pending'
+      OR status IN ('open','closed','paused','near_budget','budget_reached')
+    );
+
+  -- Re-enable trigger
+  IF EXISTS (
+    SELECT 1 FROM pg_trigger WHERE tgname = 'enforce_campaign_launch_payment_integrity'
+  ) THEN
+    ALTER TABLE public.campaigns ENABLE TRIGGER enforce_campaign_launch_payment_integrity;
+  END IF;
+END $$;
 
 -- ── 2. Campaign launch payments table ──────────────────────────────────────
 

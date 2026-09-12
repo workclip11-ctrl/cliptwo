@@ -508,10 +508,13 @@ export default function Home() {
 
               {/* Screen — 9:16 Reel */}
               <div className="relative aspect-[9/19] overflow-hidden bg-gradient-to-b from-slate-900 to-slate-800">
-                {/* Reel image — fills entire screen */}
-                <img
-                  src="/hero-reel.jpg"
-                  alt=""
+                {/* Reel video — fills entire screen */}
+                <video
+                  src="/hero-reel.mp4"
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
                   className="absolute inset-0 h-full w-full object-cover"
                 />
 
