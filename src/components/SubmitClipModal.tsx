@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Send, AlertTriangle } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { campaignBudget } from "@/lib/finance";
 import { rup } from "@/lib/format";
+import { useFocusTrap } from "@/lib/use-focus-trap";
 import type { Campaign, Platform } from "@/lib/types";
 
 function derivePlatform(url: string): Platform {
@@ -28,7 +29,7 @@ export function SubmitClipModal({
   const [caption, setCaption] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [platform, setPlatform] = useState<Platform>(campaign.platform);
-  const dialogRef = useRef<HTMLDivElement>(null);
+  const { containerRef, onKeyDown } = useFocusTrap(true);
 
   const budget = campaignBudget(campaign, financeRecords);
   const isAtBudget = budget.status === "budget_reached";
@@ -43,15 +44,6 @@ export function SubmitClipModal({
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  useEffect(() => {
-    const el = dialogRef.current;
-    if (!el) return;
-    const focusable = el.querySelector<HTMLElement>(
-      'input, textarea, button, [tabindex]:not([tabindex="-1"])',
-    );
-    focusable?.focus();
-  }, []);
-
   return (
     <div
       className="fixed inset-0 z-30 flex cursor-pointer items-center justify-center bg-black/40 p-4"
@@ -61,7 +53,8 @@ export function SubmitClipModal({
       aria-labelledby="submit-clip-title"
     >
       <div
-        ref={dialogRef}
+        ref={containerRef}
+        onKeyDown={onKeyDown}
         className="w-full max-w-md rounded-2xl border bg-card p-6"
         onClick={(e) => e.stopPropagation()}
       >

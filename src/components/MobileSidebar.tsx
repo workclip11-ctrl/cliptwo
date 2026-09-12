@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
@@ -11,6 +11,9 @@ interface NavItem {
   icon: React.ComponentType<{ size?: number }>;
   exact?: boolean;
 }
+
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 export function MobileSidebar({
   open,
@@ -37,6 +40,27 @@ export function MobileSidebar({
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  const onPanelKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key !== "Tab" || !panelRef.current) return;
+    const focusable = Array.from(
+      panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE),
+    );
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey) {
+      if (document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else {
+      if (document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }, []);
+
   // Body scroll lock + focus management
   useEffect(() => {
     if (!open) return;
@@ -61,6 +85,7 @@ export function MobileSidebar({
       />
       <div
         ref={panelRef}
+        onKeyDown={onPanelKeyDown}
         className="absolute inset-y-0 left-0 w-72 overflow-y-auto bg-card shadow-xl"
       >
         {/* Header */}

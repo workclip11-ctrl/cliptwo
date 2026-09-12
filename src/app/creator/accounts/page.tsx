@@ -1,1 +1,5 @@
-export { default } from "@/app/clipper/accounts/page";
+import { notFound } from "next/navigation";
+
+export default function CreatorAccountsPage() {
+  notFound();
+}

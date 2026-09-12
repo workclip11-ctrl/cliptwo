@@ -5,6 +5,7 @@ import { X, Upload, Loader2, ImageIcon, FileText, XCircle } from "lucide-react";
 import { rup } from "@/lib/format";
 import { uploadCampaignFile } from "@/lib/upload";
 import { isStoragePath, resolveAssetUrl } from "@/lib/private-assets";
+import { useFocusTrap } from "@/lib/use-focus-trap";
 import type { Campaign, CampaignRights, Platform } from "@/lib/types";
 
 const PLATFORM_OPTIONS: Platform[] = ["Instagram", "YouTube", "Kick"];
@@ -87,7 +88,7 @@ export function EditCampaignModal({
   const [reviewTime, setReviewTime] = useState(campaign.approval?.reviewTime ?? "");
   const [rights, setRights] = useState<CampaignRights>(campaign.rights ?? emptyRights());
   const [sourceLink, setSourceLink] = useState(campaign.sourceLink ?? "");
-  const dialogRef = useRef<HTMLDivElement>(null);
+  const { containerRef, onKeyDown } = useFocusTrap(true);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -97,14 +98,6 @@ export function EditCampaignModal({
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  useEffect(() => {
-    const el = dialogRef.current;
-    if (!el) return;
-    const focusable = el.querySelector<HTMLElement>(
-      'input, textarea, select, button, [tabindex]:not([tabindex="-1"])',
-    );
-    focusable?.focus();
-  }, []);
   const [thumbnail, setThumbnail] = useState<string | null>(
     campaign.thumbnails?.[0] ?? null,
   );
@@ -237,7 +230,8 @@ export function EditCampaignModal({
       aria-labelledby="edit-campaign-title"
     >
       <div
-        ref={dialogRef}
+        ref={containerRef}
+        onKeyDown={onKeyDown}
         className="flex max-h-[88vh] w-full max-w-2xl flex-col rounded-2xl border bg-card"
         onClick={(e) => e.stopPropagation()}
       >

@@ -55,7 +55,7 @@ const TRUST = [
   {
     icon: AlertTriangle,
     title: "Fraud protection",
-    body: "Admins review clips for quality and authenticity. Suspicious earnings are frozen and held for investigation before payout.",
+    body: "Admins review clips for quality and authenticity. Suspicious earnings may be frozen and held for investigation before payout.",
   },
 ];
 
@@ -174,7 +174,7 @@ const CREATOR_JOURNEY = [
   { num: "01", label: "Create a campaign", title: "Set your rate and budget", body: "Pick a CPM, set a total budget, upload your source footage and guidelines. Submit your campaign with the 10% platform fee via UPI — once our team verifies the payment, your campaign goes live.", visual: "launch" },
   { num: "02", label: "Clippers join in", title: "Watch submissions come in", body: "Once verified, your campaign appears on the marketplace. Clippers browse by niche and CPM, claim your brief, and start cutting.", visual: "submissions" },
   { num: "03", label: "Approve what fits", title: "Admin reviews every clip", body: "Every submitted clip is reviewed by our admin team against your guidelines. Nothing gets paid until admin approval — no auto-approvals, no self-reported metrics.", visual: "review" },
-  { num: "04", label: "Budget tracks views", title: "Spend only on verified performance", body: "Your prepaid budget depletes as clips are approved and views accumulate. Every rupee goes toward real, verified engagement — nothing speculative.", visual: "budget" },
+  { num: "04", label: "Budget tracks views", title: "Spend only on verified performance", body: "Your prepaid budget depletes as clips are approved and views accumulate. Spend goes toward real, verified engagement — nothing speculative.", visual: "budget" },
 ];
 
 function JourneyVisual({ stageKey }: { stageKey: string }) {
@@ -196,6 +196,7 @@ function JourneyVisual({ stageKey }: { stageKey: string }) {
             <span className="font-mono text-[14px] font-semibold">{rup(c.cpm)}</span>
           </div>
         ))}
+        <p className="text-center text-[11px] text-muted/50">Example campaigns</p>
       </div>
     );
   }
@@ -216,6 +217,7 @@ function JourneyVisual({ stageKey }: { stageKey: string }) {
             </span>
           </div>
         ))}
+        <p className="text-center text-[11px] text-muted/50">Example handles</p>
       </div>
     );
   }
@@ -271,6 +273,7 @@ function JourneyVisual({ stageKey }: { stageKey: string }) {
             ))}
           </tbody>
         </table>
+        <p className="px-4 py-2 text-center text-[11px] text-muted/50">Example payouts</p>
       </div>
     );
   }
@@ -301,21 +304,25 @@ function JourneyVisual({ stageKey }: { stageKey: string }) {
             <span className={`text-[12px] font-medium ${s.status === "approved" ? "text-green" : "text-amber"}`}>{s.status}</span>
           </div>
         ))}
+        <p className="text-center text-[11px] text-muted/50">Example submissions</p>
       </div>
     );
   }
   if (stageKey === "review") {
     return (
-      <div className="flex items-center justify-between rounded-[10px] border border-border/40 bg-background px-4 py-3 text-[13px]">
-        <span className="flex items-center gap-2">
-          <span className="font-medium">Arjun Rao</span>
-          <span className="font-mono text-[12px] text-muted">reel/pw001</span>
-        </span>
-        <span className="flex gap-1.5">
-          <span className="flex h-7 w-7 items-center justify-center rounded-[6px] border border-border/60 text-green"><Check size={14} /></span>
-          <span className="flex h-7 w-7 items-center justify-center rounded-[6px] border border-border/60 text-red"><AlertTriangle size={14} /></span>
-        </span>
-      </div>
+      <>
+        <div className="flex items-center justify-between rounded-[10px] border border-border/40 bg-background px-4 py-3 text-[13px]">
+          <span className="flex items-center gap-2">
+            <span className="font-medium">Arjun Rao</span>
+            <span className="font-mono text-[12px] text-muted">reel/pw001</span>
+          </span>
+          <span className="flex gap-1.5">
+            <span className="flex h-7 w-7 items-center justify-center rounded-[6px] border border-border/60 text-green"><Check size={14} /></span>
+            <span className="flex h-7 w-7 items-center justify-center rounded-[6px] border border-border/60 text-red"><AlertTriangle size={14} /></span>
+          </span>
+        </div>
+        <p className="text-center text-[11px] text-muted/50">Example review</p>
+      </>
     );
   }
   if (stageKey === "budget") {
@@ -325,6 +332,7 @@ function JourneyVisual({ stageKey }: { stageKey: string }) {
           <div className="h-full w-[46%] rounded-full bg-foreground" />
         </div>
         <p className="mt-1.5 font-mono text-[12px] text-muted">₹18,400 / ₹40,000 spent</p>
+        <p className="mt-1 text-center text-[11px] text-muted/50">Example budget</p>
       </div>
     );
   }
@@ -612,6 +620,7 @@ export default function Home() {
                 <span className="text-[10px] font-medium text-muted">Views</span>
               </div>
               <p className="mt-1 font-mono text-[16px] font-bold tracking-tight">24.8K</p>
+              <p className="text-[9px] text-muted/50">example</p>
             </div>
 
             <div className="absolute -left-8 bottom-24 z-30 rounded-[10px] border border-border/20 bg-card px-3 py-2.5 shadow-md shadow-black/5 sm:-left-12">
@@ -622,6 +631,7 @@ export default function Home() {
                 <span className="text-[10px] font-medium text-muted">Earned</span>
               </div>
               <p className="mt-1 font-mono text-[16px] font-bold tracking-tight">₹4,960</p>
+              <p className="text-[9px] text-muted/50">example</p>
             </div>
           </div>
         </div>

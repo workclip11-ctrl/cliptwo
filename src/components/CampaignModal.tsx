@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { X, ExternalLink, ArrowUpRight } from "lucide-react";
 import { PlatformIcon } from "@/components/PlatformIcon";
@@ -8,6 +8,7 @@ import { SubmitClipModal } from "@/components/SubmitClipModal";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup } from "@/lib/format";
+import { useFocusTrap } from "@/lib/use-focus-trap";
 import type { Campaign } from "@/lib/types";
 
 const GRADIENTS = [
@@ -28,7 +29,7 @@ export function CampaignModal({
   const { isSignedIn, user } = useAuth();
   const { campaigns, clips, addClip } = useStore();
   const [submitOpen, setSubmitOpen] = useState(false);
-  const dialogRef = useRef<HTMLDivElement>(null);
+  const { containerRef, onKeyDown } = useFocusTrap(true);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -37,15 +38,6 @@ export function CampaignModal({
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
-
-  useEffect(() => {
-    const el = dialogRef.current;
-    if (!el) return;
-    const focusable = el.querySelector<HTMLElement>(
-      'button, a, input, [tabindex]:not([tabindex="-1"])',
-    );
-    focusable?.focus();
-  }, []);
 
   if (!campaign) return null;
 
@@ -63,7 +55,8 @@ export function CampaignModal({
       aria-labelledby="campaign-modal-title"
     >
       <div
-        ref={dialogRef}
+        ref={containerRef}
+        onKeyDown={onKeyDown}
         className="flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border bg-card"
         onClick={(e) => e.stopPropagation()}
       >

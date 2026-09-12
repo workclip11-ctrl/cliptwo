@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { BadgeCheck, Upload, Film } from "lucide-react";
 import { PlatformIcon } from "@/components/PlatformIcon";
+import { useFocusTrap } from "@/lib/use-focus-trap";
 import type { Platform } from "@/lib/types";
 
 const PLATFORMS: Platform[] = ["YouTube", "Instagram"];
@@ -57,7 +58,7 @@ export function NewCampaignModal({
   const [cta, setCta] = useState("");
   const [hook, setHook] = useState("");
   const [branding, setBranding] = useState("");
-  const dialogRef = useRef<HTMLDivElement>(null);
+  const { containerRef, onKeyDown } = useFocusTrap(true);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -66,15 +67,6 @@ export function NewCampaignModal({
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
-
-  useEffect(() => {
-    const el = dialogRef.current;
-    if (!el) return;
-    const focusable = el.querySelector<HTMLElement>(
-      'input, textarea, select, button, [tabindex]:not([tabindex="-1"])',
-    );
-    focusable?.focus();
-  }, []);
 
   function togglePlatform(p: Platform) {
     if (p === "Kick") return;
@@ -100,7 +92,8 @@ export function NewCampaignModal({
       aria-labelledby="new-campaign-title"
     >
       <div
-        ref={dialogRef}
+        ref={containerRef}
+        onKeyDown={onKeyDown}
         className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl border bg-card p-6"
         onClick={(e) => e.stopPropagation()}
       >
