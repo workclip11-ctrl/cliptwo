@@ -24,10 +24,15 @@ BEGIN
 END $$;
 
 -- Backfill: all existing campaigns are already paid/verified
+-- Only update rows where status actually needs changing to avoid triggering
+-- enforce_campaign_launch_payment_integrity for no-op updates.
 UPDATE public.campaigns
 SET launch_payment_status = 'verified'
-WHERE launch_payment_status = 'pending'
-   OR status IN ('open','closed','paused','near_budget','budget_reached');
+WHERE launch_payment_status != 'verified'
+  AND (
+    launch_payment_status = 'pending'
+    OR status IN ('open','closed','paused','near_budget','budget_reached')
+  );
 
 -- ── 2. Campaign launch payments table ──────────────────────────────────────
 
