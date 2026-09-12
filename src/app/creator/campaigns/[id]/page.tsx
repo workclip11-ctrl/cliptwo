@@ -292,13 +292,13 @@ export default function CreatorCampaignDetailPage() {
       </section>
 
       {/* ── Actions ─────────────────────────────────────── */}
-      <section className="flex flex-wrap items-center gap-2.5">
+      <section className="flex flex-wrap items-center gap-2 sm:gap-2.5">
         {/* Primary action */}
         {isDraft && (
           <button
             onClick={handlePublish}
             disabled={publishing}
-            className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-accent px-5 text-[14px] font-medium text-white transition-all duration-150 hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-accent px-4 text-[13px] font-medium text-white transition-all duration-150 hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed sm:h-11 sm:px-5 sm:text-[14px]"
           >
             {publishing ? (
               <Loader2 size={16} className="animate-spin" />
@@ -312,7 +312,7 @@ export default function CreatorCampaignDetailPage() {
           <button
             onClick={handleResume}
             disabled={resuming}
-            className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-accent px-5 text-[14px] font-medium text-white transition-all duration-150 hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-accent px-4 text-[13px] font-medium text-white transition-all duration-150 hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed sm:h-11 sm:px-5 sm:text-[14px]"
           >
             {resuming ? (
               <Loader2 size={16} className="animate-spin" />
@@ -326,7 +326,7 @@ export default function CreatorCampaignDetailPage() {
           <button
             onClick={handleReopen}
             disabled={reopening}
-            className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-accent px-5 text-[14px] font-medium text-white transition-all duration-150 hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-accent px-4 text-[13px] font-medium text-white transition-all duration-150 hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed sm:h-11 sm:px-5 sm:text-[14px]"
           >
             {reopening ? (
               <Loader2 size={16} className="animate-spin" />
@@ -340,14 +340,14 @@ export default function CreatorCampaignDetailPage() {
         {/* Secondary actions */}
         <button
           onClick={() => setEditing(true)}
-          className="inline-flex h-11 items-center gap-2 rounded-[10px] border bg-card px-5 text-[14px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground"
+          className="inline-flex h-10 items-center gap-2 rounded-[10px] border bg-card px-4 text-[13px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground sm:h-11 sm:px-5 sm:text-[14px]"
         >
           <Pencil size={15} /> Edit
         </button>
         {!isClosed && (
           <button
             onClick={() => setAdjusting(true)}
-            className="inline-flex h-11 items-center gap-2 rounded-[10px] border bg-card px-5 text-[14px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground"
+            className="inline-flex h-10 items-center gap-2 rounded-[10px] border bg-card px-4 text-[13px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground sm:h-11 sm:px-5 sm:text-[14px]"
           >
             <Wallet size={15} /> Adjust budget
           </button>
@@ -358,7 +358,7 @@ export default function CreatorCampaignDetailPage() {
           <button
             onClick={handlePause}
             disabled={pausing}
-            className="inline-flex h-11 items-center gap-2 rounded-[10px] border px-5 text-[14px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex h-10 items-center gap-2 rounded-[10px] border px-4 text-[13px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed sm:h-11 sm:px-5 sm:text-[14px]"
           >
             {pausing ? (
               <Loader2 size={16} className="animate-spin" />
@@ -372,7 +372,7 @@ export default function CreatorCampaignDetailPage() {
           <button
             onClick={handleEnd}
             disabled={ending}
-            className="inline-flex h-11 items-center gap-2 rounded-[10px] border border-red/30 px-5 text-[14px] font-medium text-red transition-colors duration-150 hover:bg-red/5 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex h-10 items-center gap-2 rounded-[10px] border border-red/30 px-4 text-[13px] font-medium text-red transition-colors duration-150 hover:bg-red/5 disabled:opacity-50 disabled:cursor-not-allowed sm:h-11 sm:px-5 sm:text-[14px]"
           >
             {ending ? (
               <Loader2 size={16} className="animate-spin" />
@@ -821,63 +821,99 @@ export default function CreatorCampaignDetailPage() {
           Payout ledger for approved clips. A{" "}
           {Math.round(PLATFORM_FEE_RATE * 100)}% platform fee applies.
         </p>
-        <div className="overflow-x-auto">
-          <table className="w-full text-[14px]">
-            <thead>
-              <tr className="border-b border-border/50 text-left text-[13px] text-muted">
-                <th className="px-4 py-3 font-medium">Date</th>
-                <th className="px-4 py-3 font-medium">Clipper</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 text-right font-medium">Gross</th>
-                <th className="px-4 py-3 text-right font-medium">Fee</th>
-                <th className="px-4 py-3 text-right font-medium">Net</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/30">
-              {campClips
-                .filter(
-                  (k) => k.status === "approved" || k.status === "held",
-                )
-                .sort((a, b) => b.submittedAt - a.submittedAt)
-                .map((k) => {
+        {(() => {
+          const approvedClips = campClips
+            .filter((k) => k.status === "approved" || k.status === "held")
+            .sort((a, b) => b.submittedAt - a.submittedAt);
+
+          if (approvedClips.length === 0) {
+            return (
+              <p className="py-8 text-center text-[14px] text-muted">
+                No payouts yet.
+              </p>
+            );
+          }
+
+          return (
+            <>
+              {/* Mobile cards */}
+              <div className="space-y-2 sm:hidden">
+                {approvedClips.map((k) => {
                   const gross = clipEarnings(k, campaigns);
                   const fee = creatorFee(gross);
                   return (
-                    <tr key={k.id} className="transition-colors duration-100 hover:bg-accent-soft/30">
-                      <td className="px-4 py-3 text-muted">
-                        {fmtDateTime(k.submittedAt)}
-                      </td>
-                      <td className="px-4 py-3 font-medium">@{k.clipper}</td>
-                      <td className="px-4 py-3">
+                    <div
+                      key={k.id}
+                      className="rounded-[10px] border border-border/40 bg-card p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-[14px] font-medium">
+                            @{k.clipper}
+                          </p>
+                          <p className="mt-0.5 text-[13px] text-muted">
+                            {fmtDateTime(k.submittedAt)}
+                          </p>
+                        </div>
                         <StatusPill status={k.status} />
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono tabular-nums">
-                        {rup(gross)}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono tabular-nums text-muted">
-                        {rup(fee)}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono tabular-nums font-semibold">
-                        {rup(gross - fee)}
-                      </td>
-                    </tr>
+                      </div>
+                      <div className="mt-3 flex items-center gap-4 text-[13px]">
+                        <span className="text-muted">Gross</span>
+                        <span className="font-mono font-medium">{rup(gross)}</span>
+                        <span className="text-muted">Fee</span>
+                        <span className="font-mono text-muted">{rup(fee)}</span>
+                        <span className="text-muted">Net</span>
+                        <span className="font-mono font-semibold">{rup(gross - fee)}</span>
+                      </div>
+                    </div>
                   );
                 })}
-              {campClips.filter(
-                (k) => k.status === "approved" || k.status === "held",
-              ).length === 0 && (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="py-8 text-center text-muted"
-                  >
-                    No payouts yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </div>
+
+              {/* Desktop table */}
+              <div className="hidden overflow-x-auto sm:block">
+                <table className="w-full text-[14px]">
+                  <thead>
+                    <tr className="border-b border-border/50 text-left text-[13px] text-muted">
+                      <th className="px-4 py-3 font-medium">Date</th>
+                      <th className="px-4 py-3 font-medium">Clipper</th>
+                      <th className="px-4 py-3 font-medium">Status</th>
+                      <th className="px-4 py-3 text-right font-medium">Gross</th>
+                      <th className="px-4 py-3 text-right font-medium">Fee</th>
+                      <th className="px-4 py-3 text-right font-medium">Net</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/30">
+                    {approvedClips.map((k) => {
+                      const gross = clipEarnings(k, campaigns);
+                      const fee = creatorFee(gross);
+                      return (
+                        <tr key={k.id} className="transition-colors duration-100 hover:bg-accent-soft/30">
+                          <td className="px-4 py-3 text-muted">
+                            {fmtDateTime(k.submittedAt)}
+                          </td>
+                          <td className="px-4 py-3 font-medium">@{k.clipper}</td>
+                          <td className="px-4 py-3">
+                            <StatusPill status={k.status} />
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono tabular-nums">
+                            {rup(gross)}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono tabular-nums text-muted">
+                            {rup(fee)}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono tabular-nums font-semibold">
+                            {rup(gross - fee)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          );
+        })()}
       </section>
 
       {/* ── Content Rights ───────────────────────────────── */}
@@ -986,8 +1022,8 @@ export default function CreatorCampaignDetailPage() {
 
 function DefRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex gap-2 text-[14px]">
-      <dt className="w-44 shrink-0 text-muted">{label}</dt>
+    <div className="flex flex-col gap-1 text-[14px] sm:flex-row sm:gap-2">
+      <dt className="shrink-0 text-muted sm:w-44">{label}</dt>
       <dd className="min-w-0 flex-1">{value}</dd>
     </div>
   );
@@ -1011,7 +1047,7 @@ function AssetRow({ label, value }: { label: string; value: string }) {
       ) : (
         <ExternalLink size={13} className="shrink-0 text-muted" />
       )}
-      <span className="w-28 shrink-0 text-[13px] text-muted">{label}</span>
+      <span className="w-20 shrink-0 truncate text-[13px] text-muted sm:w-28">{label}</span>
       <span className="min-w-0 truncate text-[14px] font-medium text-accent">
         {displayName}
       </span>

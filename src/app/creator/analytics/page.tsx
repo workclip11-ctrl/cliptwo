@@ -48,7 +48,7 @@ export default function CreatorAnalyticsPage() {
           </p>
           <Link
             href="/creator/campaigns"
-            className="mt-6 inline-flex h-10 cursor-pointer items-center gap-2 rounded-[10px] bg-accent px-5 text-[14px] font-medium text-white transition-colors duration-150 hover:bg-foreground/90"
+            className="mt-6 inline-flex h-10 cursor-pointer items-center gap-2 rounded-[10px] bg-accent px-5 text-[14px] font-medium text-white transition-colors duration-150 hover:bg-foreground/90 sm:h-11"
           >
             View campaigns <ArrowRight size={14} />
           </Link>

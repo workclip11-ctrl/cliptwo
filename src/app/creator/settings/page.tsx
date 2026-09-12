@@ -50,7 +50,7 @@ export default function CreatorSettingsPage() {
   return (
     <div className="mx-auto max-w-[1120px] space-y-14 px-5 py-10 sm:px-8">
       {/* ── Header ──────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-[28px] font-bold tracking-tight sm:text-[32px]">
             Settings

@@ -111,16 +111,16 @@ export default function CreatorCampaignsPage() {
             Manage your active, pending, and past campaigns.
           </p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setOpen(true)}
-            className="inline-flex h-11 items-center gap-2 rounded-[10px] border bg-card px-5 text-[14px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground"
+            className="inline-flex h-10 items-center gap-2 rounded-[10px] border bg-card px-4 text-[13px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground sm:h-11 sm:px-5 sm:text-[14px]"
           >
             Quick add
           </button>
           <Link
             href="/creator/campaigns/new"
-            className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-accent px-5 text-[14px] font-medium text-white transition-all duration-150 hover:bg-foreground/90 active:scale-[0.98]"
+            className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-accent px-4 text-[13px] font-medium text-white transition-all duration-150 hover:bg-foreground/90 active:scale-[0.98] sm:h-11 sm:px-5 sm:text-[14px]"
           >
             <Plus size={16} /> Create campaign
           </Link>
@@ -155,7 +155,7 @@ export default function CreatorCampaignsPage() {
             <button
               key={f.key}
               onClick={() => setStatusFilter(f.key)}
-              className={`inline-flex h-11 cursor-pointer items-center rounded-[10px] border px-4 text-[13px] font-medium transition-all duration-150 ${
+              className={`inline-flex h-10 cursor-pointer items-center rounded-[10px] border px-3 text-[12px] font-medium transition-all duration-150 sm:h-11 sm:px-4 sm:text-[13px] ${
                 statusFilter === f.key
                   ? "border-foreground bg-accent-soft text-foreground"
                   : "border-transparent text-muted hover:bg-accent-soft/60"

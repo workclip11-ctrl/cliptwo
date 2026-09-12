@@ -57,22 +57,22 @@ export default function CreatorPage() {
             Manage campaigns, review clips, and track spend.
           </p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <Link
             href="/creator/analytics"
-            className="inline-flex h-11 items-center gap-2 rounded-[10px] border bg-card px-5 text-[14px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground"
+            className="inline-flex h-10 items-center gap-2 rounded-[10px] border bg-card px-4 text-[13px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground sm:h-11 sm:px-5 sm:text-[14px]"
           >
             <BarChart3 size={16} /> Analytics
           </Link>
           <button
             onClick={() => setOpen(true)}
-            className="inline-flex h-11 items-center gap-2 rounded-[10px] border bg-card px-5 text-[14px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground"
+            className="inline-flex h-10 items-center gap-2 rounded-[10px] border bg-card px-4 text-[13px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground sm:h-11 sm:px-5 sm:text-[14px]"
           >
             Quick add
           </button>
           <Link
             href="/creator/campaigns/new"
-            className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-accent px-5 text-[14px] font-medium text-white transition-all duration-150 hover:bg-foreground/90 active:scale-[0.98]"
+            className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-accent px-4 text-[13px] font-medium text-white transition-all duration-150 hover:bg-foreground/90 active:scale-[0.98] sm:h-11 sm:px-5 sm:text-[14px]"
           >
             <Plus size={16} /> Create campaign
           </Link>
@@ -316,15 +316,15 @@ export default function CreatorPage() {
                   </div>
 
                   {/* Metrics */}
-                  <div className="flex shrink-0 items-center gap-6">
+                  <div className="flex shrink-0 items-center gap-3 sm:gap-6">
                     <div className="text-right">
-                      <p className="font-mono text-[15px] font-bold">
+                      <p className="font-mono text-[14px] font-bold sm:text-[15px]">
                         {fmtViews(k.verifiedViews ?? 0)}
                       </p>
                       <p className="text-[11px] text-muted">views</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-mono text-[15px] font-bold">
+                      <p className="font-mono text-[14px] font-bold sm:text-[15px]">
                         {rup(earned)}
                       </p>
                       <p className="text-[11px] text-muted">earned</p>

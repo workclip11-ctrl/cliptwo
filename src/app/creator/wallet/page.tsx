@@ -102,7 +102,7 @@ export default function CreatorWalletPage() {
             </p>
             <Link
               href="/creator/campaigns/new"
-              className="mt-5 inline-flex h-10 cursor-pointer items-center gap-2 rounded-[10px] bg-accent px-5 text-[14px] font-medium text-white transition-colors duration-150 hover:bg-foreground/90"
+              className="mt-5 inline-flex h-10 cursor-pointer items-center gap-2 rounded-[10px] bg-accent px-5 text-[14px] font-medium text-white transition-colors duration-150 hover:bg-foreground/90 sm:h-11"
             >
               Create campaign <ArrowRight size={14} />
             </Link>
