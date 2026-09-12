@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, Loader2 } from "lucide-react";
 import { rup } from "@/lib/format";
 import type { Campaign } from "@/lib/types";
@@ -19,6 +19,14 @@ export function AdjustBudgetModal({
   const [budget, setBudget] = useState(String(campaign.budget ?? 0));
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   const handleSave = async () => {
     const b = Number(budget) || 0;
@@ -40,14 +48,17 @@ export function AdjustBudgetModal({
     <div
       className="fixed inset-0 z-30 flex cursor-pointer items-center justify-center bg-black/40 p-4"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="adjust-budget-title"
     >
       <div
         className="w-full max-w-md rounded-2xl border bg-card p-5"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Adjust budget</h3>
-          <button onClick={onClose} className="text-muted hover:text-foreground">
+          <h3 id="adjust-budget-title" className="text-lg font-semibold">Adjust budget</h3>
+          <button onClick={onClose} aria-label="Close" className="cursor-pointer text-muted hover:text-foreground">
             <X size={18} />
           </button>
         </div>

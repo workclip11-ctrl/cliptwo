@@ -108,6 +108,7 @@ export default function CreatorSubmissionsPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by clipper, caption, or campaign"
+            aria-label="Search submissions"
             className="h-11 w-full rounded-[10px] border border-border/60 bg-card pl-10 pr-4 text-[14px] outline-none transition-colors placeholder:text-muted/60 focus:border-foreground/30"
           />
         </div>

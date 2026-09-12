@@ -138,6 +138,7 @@ export default function CreatorCampaignsPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search campaigns..."
+            aria-label="Search campaigns"
             className="h-11 w-full rounded-[10px] border bg-background pl-10 pr-4 text-[14px] outline-none transition-colors placeholder:text-muted/50 focus:border-foreground"
           />
           {query && (

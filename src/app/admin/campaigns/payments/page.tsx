@@ -232,6 +232,7 @@ export default function AdminCampaignPayments() {
             <input
               className="h-11 w-full rounded-[10px] border border-border/60 bg-card pl-10 pr-4 text-[14px] outline-none transition-colors focus:border-foreground/30"
               placeholder="Search campaigns, creators, UTR…"
+              aria-label="Search campaigns, creators, UTR"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -435,6 +436,7 @@ export default function AdminCampaignPayments() {
               className="mt-4 w-full rounded-[8px] border border-border/60 bg-background px-3.5 py-2.5 text-[14px] outline-none transition-colors focus:border-foreground/30"
               rows={3}
               placeholder="Rejection reason (optional)"
+              aria-label="Rejection reason"
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
             />

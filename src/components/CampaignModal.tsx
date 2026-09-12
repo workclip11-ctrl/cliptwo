@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { X, ExternalLink, ArrowUpRight } from "lucide-react";
 import { PlatformIcon } from "@/components/PlatformIcon";
@@ -29,6 +29,14 @@ export function CampaignModal({
   const { campaigns, clips, addClip } = useStore();
   const [submitOpen, setSubmitOpen] = useState(false);
 
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   if (!campaign) return null;
 
   const index = Math.max(0, campaigns.findIndex((c) => c.id === campaign.id));
@@ -40,6 +48,9 @@ export function CampaignModal({
     <div
       className="fixed inset-0 z-30 flex cursor-pointer items-center justify-center bg-black/40 p-4"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="campaign-modal-title"
     >
       <div
         className="flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border bg-card"

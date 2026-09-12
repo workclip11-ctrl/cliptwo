@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { BadgeCheck, Upload, Film } from "lucide-react";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import type { Platform } from "@/lib/types";
@@ -58,6 +58,14 @@ export function NewCampaignModal({
   const [hook, setHook] = useState("");
   const [branding, setBranding] = useState("");
 
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   function togglePlatform(p: Platform) {
     if (p === "Kick") return;
     setPlatforms((prev) =>
@@ -77,12 +85,15 @@ export function NewCampaignModal({
     <div
       className="fixed inset-0 z-30 flex cursor-pointer items-center justify-center bg-black/40 p-4"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="new-campaign-title"
     >
       <div
         className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl border bg-card p-6"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-lg font-semibold">New campaign</h3>
+        <h3 id="new-campaign-title" className="text-lg font-semibold">New campaign</h3>
         <p className="mt-1 text-sm text-muted">
           Set your campaign rate and budget. After payment verification, your campaign will go live for clippers.
         </p>

@@ -38,7 +38,7 @@ export function MobileSidebar({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 sm:hidden">
+    <div className="fixed inset-0 z-50 sm:hidden" role="dialog" aria-modal="true" aria-label={title}>
       <div
         className="absolute inset-0 cursor-pointer bg-black/40"
         onClick={onClose}
@@ -52,7 +52,7 @@ export function MobileSidebar({
           <p className="text-lg font-bold tracking-tight">{title}</p>
           <button
             onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-lg hover:bg-accent-soft"
+            className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg hover:bg-accent-soft"
             aria-label="Close navigation"
           >
             <X size={20} />
@@ -70,7 +70,7 @@ export function MobileSidebar({
                 key={n.href}
                 href={n.href}
                 onClick={onClose}
-                className={`flex items-center gap-3 rounded-lg px-4 py-3 text-[15px] font-medium transition-colors ${
+                className={`flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-[15px] font-medium transition-colors ${
                   active
                     ? "bg-accent-soft text-foreground"
                     : "text-muted hover:bg-accent-soft/60 hover:text-foreground"

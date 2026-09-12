@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Send, AlertTriangle } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { campaignBudget } from "@/lib/finance";
@@ -34,16 +34,27 @@ export function SubmitClipModal({
   const isNearBudget = budget.status === "near_budget";
   const isDisabled = isAtBudget || !videoUrl || !caption;
 
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   return (
     <div
       className="fixed inset-0 z-30 flex cursor-pointer items-center justify-center bg-black/40 p-4"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="submit-clip-title"
     >
       <div
         className="w-full max-w-md rounded-2xl border bg-card p-6"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-lg font-semibold">Submit a clip</h3>
+        <h3 id="submit-clip-title" className="text-lg font-semibold">Submit a clip</h3>
         <p className="mt-1 text-sm text-muted">{campaign.title}</p>
         <p className="mt-2 rounded-lg bg-accent-soft px-3 py-2 text-xs text-muted">
           You earn{" "}

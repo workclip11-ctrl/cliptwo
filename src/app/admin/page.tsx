@@ -92,7 +92,7 @@ export default function AdminDashboard() {
     <div className="space-y-12">
       {/* ── Header ──────────────────────────────────────── */}
       <div>
-        <h1 className="text-[28px] font-bold tracking-tight sm:text-[32px]">
+        <h1 className="text-[28px] font-bold tracking-tight sm:text-[30px]">
           Operations
         </h1>
         <p className="mt-2 text-[15px] text-muted">

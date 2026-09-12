@@ -465,10 +465,7 @@ function CampaignCardLarge({
   ).size;
 
   return (
-    <Link
-      href={`/campaigns/${campaign.id}`}
-      className="group flex flex-col overflow-hidden rounded-xl border bg-card transition-all duration-200 hover:border-foreground/12 hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)]"
-    >
+    <div className="group relative flex flex-col overflow-hidden rounded-xl border bg-card transition-all duration-200 hover:border-foreground/12 hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
       {/* Thumbnail */}
       <div className="relative aspect-[16/9] w-full overflow-hidden bg-accent-soft">
         {thumb ? (
@@ -484,24 +481,30 @@ function CampaignCardLarge({
           </div>
         )}
         {/* Platform badge — only one */}
-        <div className="absolute left-3 top-3">
+        <div className="absolute left-3 top-3 z-10">
           <span className="inline-flex items-center gap-1.5 rounded-lg bg-card/90 px-3 py-1.5 text-[12px] font-medium text-foreground shadow-sm backdrop-blur">
             <PlatformIcon p={campaign.platform} size={13} />
             {campaign.platform}
           </span>
         </div>
-        {/* Save */}
+        {/* Save — independent button, not nested in Link */}
         <button
           onClick={(e) => {
             e.stopPropagation();
-            e.preventDefault();
             toggleSaveCampaign(campaign.id);
           }}
-          className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-card/80 backdrop-blur transition-colors duration-150 hover:bg-card"
-          title={isSaved ? "Unsave" : "Save"}
+          onKeyDown={(e) => e.stopPropagation()}
+          aria-label={isSaved ? "Unsave campaign" : "Save campaign"}
+          className="absolute right-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-card/80 backdrop-blur transition-colors duration-150 hover:bg-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
         >
           <HeartIcon saved={isSaved} />
         </button>
+        {/* Link overlay — covers entire thumbnail */}
+        <Link
+          href={`/campaigns/${campaign.id}`}
+          aria-label={campaign.title}
+          className="absolute inset-0 z-10"
+        />
       </div>
 
       {/* Content */}
@@ -537,13 +540,16 @@ function CampaignCardLarge({
           <span className="text-[13px] text-muted">
             {clippersIn > 0 ? `${clippersIn} clippers` : "Be the first"}
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-accent px-4 py-2.5 text-[13px] font-medium text-white transition-all duration-200 group-hover:bg-foreground/90">
+          <Link
+            href={`/campaigns/${campaign.id}`}
+            className="inline-flex items-center gap-1.5 rounded-[10px] bg-accent px-4 py-2.5 text-[13px] font-medium text-white transition-all duration-200 group-hover:bg-foreground/90"
+          >
             View campaign
             <ArrowRight size={12} />
-          </span>
+          </Link>
         </div>
       </div>
-    </Link>
+    </div>
   );
 }
 

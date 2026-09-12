@@ -43,6 +43,15 @@ function NotificationBell({ userId }: { userId: string }) {
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+
   const markAllRead = useCallback(async () => {
     if (!isSupabaseConfigured) return;
     const unread = notifications.filter((n) => !n.read);
@@ -61,7 +70,8 @@ function NotificationBell({ userId }: { userId: string }) {
       <button
         onClick={() => setOpen((o) => !o)}
         aria-label="Notifications"
-        className="relative flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-accent-soft hover:text-foreground"
+        aria-expanded={open}
+        className="relative flex h-10 w-10 items-center justify-center rounded-lg text-muted hover:bg-accent-soft hover:text-foreground sm:h-11 sm:w-11"
       >
         <Bell size={18} />
         {unreadCount > 0 && (
@@ -77,7 +87,7 @@ function NotificationBell({ userId }: { userId: string }) {
             {unreadCount > 0 && (
               <button
                 onClick={markAllRead}
-                className="flex items-center gap-1 text-xs text-accent hover:underline"
+                className="flex cursor-pointer items-center gap-1 text-xs text-accent hover:underline"
               >
                 <Check size={12} /> Mark all read
               </button>
@@ -123,6 +133,15 @@ export function TopBar() {
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+
   const initial = user?.name?.[0]?.toUpperCase() ?? "U";
   const isClipper = user?.role === "clipper";
   const isCreator = user?.role === "creator";
@@ -155,7 +174,8 @@ export function TopBar() {
             <button
               onClick={() => setOpen((o) => !o)}
               aria-label="Account menu"
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-sm font-semibold text-white"
+              aria-expanded={open}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-accent text-sm font-semibold text-white sm:h-11 sm:w-11"
             >
               {initial}
             </button>
@@ -173,7 +193,7 @@ export function TopBar() {
                         ? "/creator/settings"
                         : "/clipper/settings"
                   }
-                  className="block px-4 py-2.5 text-sm hover:bg-accent-soft"
+                  className="block cursor-pointer px-4 py-2.5 text-sm hover:bg-accent-soft"
                 >
                   Settings
                 </Link>
@@ -183,7 +203,7 @@ export function TopBar() {
                     setOpen(false);
                     router.push("/");
                   }}
-                  className="block w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-accent-soft"
+                  className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm text-red-500 hover:bg-accent-soft"
                 >
                   Log out
                 </button>
@@ -194,7 +214,7 @@ export function TopBar() {
         ) : (
           <Link
             href="/login"
-            className="rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-accent-soft"
+            className="cursor-pointer rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-accent-soft"
           >
             Log in
           </Link>

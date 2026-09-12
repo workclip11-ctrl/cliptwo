@@ -115,12 +115,14 @@ export default function AdminRiskPage() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search clipper or campaign…"
+            aria-label="Search clipper or campaign"
             className="h-11 w-full rounded-[10px] border border-border/60 bg-card pl-10 pr-4 text-[14px] outline-none transition-colors focus:border-foreground/30"
           />
         </div>
         <select
           value={severityFilter}
           onChange={(e) => setSeverityFilter(e.target.value as Severity | "")}
+          aria-label="Filter by severity"
           className="h-11 cursor-pointer rounded-[10px] border border-border/60 bg-card px-4 text-[14px] outline-none transition-colors focus:border-foreground/30"
         >
           <option value="">All severities</option>
@@ -131,6 +133,7 @@ export default function AdminRiskPage() {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as RiskStatus | "")}
+          aria-label="Filter by status"
           className="h-11 cursor-pointer rounded-[10px] border border-border/60 bg-card px-4 text-[14px] outline-none transition-colors focus:border-foreground/30"
         >
           <option value="">All statuses</option>

@@ -94,6 +94,7 @@ export default function AdminCampaigns() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search campaigns or creators…"
+            aria-label="Search campaigns or creators"
             className="h-11 w-full rounded-[10px] border border-border/60 bg-card pl-10 pr-4 text-[14px] outline-none transition-colors focus:border-foreground/30"
           />
         </div>

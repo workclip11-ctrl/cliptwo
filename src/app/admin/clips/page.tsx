@@ -202,6 +202,7 @@ export default function AdminClips() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search clipper, campaign, caption…"
+            aria-label="Search clipper, campaign, caption"
             className="h-11 w-full rounded-[10px] border border-border/60 bg-card pl-10 pr-4 text-[14px] outline-none transition-colors focus:border-foreground/30"
           />
         </div>
@@ -808,6 +809,7 @@ function RejectFormRow({
             value={reason}
             onChange={(e) => onReason(e.target.value)}
             placeholder={placeholder}
+            aria-label={title}
             className="w-full rounded-[8px] border border-border/60 bg-card px-3.5 py-2.5 text-[14px] outline-none transition-colors focus:border-foreground/30"
           />
           {details !== undefined && (
@@ -816,6 +818,7 @@ function RejectFormRow({
               onChange={(e) => onDetails(e.target.value)}
               rows={2}
               placeholder="Details (optional)"
+              aria-label="Details"
               className="w-full resize-none rounded-[8px] border border-border/60 bg-card px-3.5 py-2.5 text-[14px] outline-none transition-colors focus:border-foreground/30"
             />
           )}

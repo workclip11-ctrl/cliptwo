@@ -190,6 +190,7 @@ export default function AdminPayoutsPage() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search by UPI ID, username, or UTR…"
+            aria-label="Search by UPI ID, username, or UTR"
             className="h-11 w-full rounded-[10px] border border-border/60 bg-card pl-10 pr-4 text-[14px] outline-none transition-colors focus:border-foreground/30"
           />
         </div>

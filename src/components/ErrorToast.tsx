@@ -22,7 +22,8 @@ export function ErrorToast() {
         <p className="flex-1 text-sm text-red">{lastError}</p>
         <button
           onClick={() => clearError()}
-          className="shrink-0 rounded p-0.5 text-red/60 hover:text-red"
+          aria-label="Dismiss error"
+          className="shrink-0 cursor-pointer rounded p-0.5 text-red/60 hover:text-red"
         >
           <X size={14} />
         </button>

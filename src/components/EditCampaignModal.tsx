@@ -87,6 +87,14 @@ export function EditCampaignModal({
   const [reviewTime, setReviewTime] = useState(campaign.approval?.reviewTime ?? "");
   const [rights, setRights] = useState<CampaignRights>(campaign.rights ?? emptyRights());
   const [sourceLink, setSourceLink] = useState(campaign.sourceLink ?? "");
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
   const [thumbnail, setThumbnail] = useState<string | null>(
     campaign.thumbnails?.[0] ?? null,
   );
@@ -214,14 +222,17 @@ export function EditCampaignModal({
     <div
       className="fixed inset-0 z-30 flex cursor-pointer items-center justify-center bg-black/40 p-4"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="edit-campaign-title"
     >
       <div
         className="flex max-h-[88vh] w-full max-w-2xl flex-col rounded-2xl border bg-card"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b p-5">
-          <h3 className="text-lg font-semibold">Edit campaign</h3>
-          <button onClick={onClose} className="text-muted hover:text-foreground">
+          <h3 id="edit-campaign-title" className="text-lg font-semibold">Edit campaign</h3>
+          <button onClick={onClose} aria-label="Close" className="cursor-pointer text-muted hover:text-foreground">
             <X size={18} />
           </button>
         </div>
