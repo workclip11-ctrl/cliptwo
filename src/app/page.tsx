@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -16,6 +16,8 @@ import {
   Eye,
   TrendingUp,
   AlertTriangle,
+  Play,
+  Pause,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { PlatformIcon } from "@/components/PlatformIcon";
@@ -430,6 +432,32 @@ export default function Home() {
   const { campaigns, siteSettings } = useStore();
   const [active, setActive] = useState<Campaign | null>(null);
 
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [progress, setProgress] = useState(0);
+
+  const handleTimeUpdate = useCallback(() => {
+    const v = videoRef.current;
+    if (v && v.duration > 0) {
+      setProgress((v.currentTime / v.duration) * 100);
+    }
+  }, []);
+
+  const handlePlayStateChange = useCallback(() => {
+    const v = videoRef.current;
+    if (v) setIsPlaying(!v.paused);
+  }, []);
+
+  const togglePlay = useCallback(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused) {
+      v.play().catch(() => {});
+    } else {
+      v.pause();
+    }
+  }, []);
+
   const heroTitle =
     siteSettings.heroTitle || "Turn creator content into clips. Get paid for the views.";
   const heroSubtitle =
@@ -510,32 +538,48 @@ export default function Home() {
               <div className="relative aspect-[9/19] overflow-hidden bg-gradient-to-b from-slate-900 to-slate-800">
                 {/* Reel video — fills entire screen */}
                 <video
+                  ref={videoRef}
                   src="/hero-reel.mp4"
                   autoPlay
                   muted
                   loop
                   playsInline
+                  onTimeUpdate={handleTimeUpdate}
+                  onPlay={handlePlayStateChange}
+                  onPause={handlePlayStateChange}
+                  onLoadedMetadata={handleTimeUpdate}
+                  onEnded={handlePlayStateChange}
                   className="absolute inset-0 h-full w-full object-cover"
                 />
 
                 {/* Subtle gradient overlay for depth */}
                 <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/40" />
 
-                {/* Tiny progress bar near bottom */}
+                {/* Live progress bar */}
                 <div className="absolute inset-x-3 bottom-16 z-10">
                   <div className="h-[2px] w-full overflow-hidden rounded-full bg-white/20">
-                    <div className="h-full w-[35%] rounded-full bg-white/80" />
+                    <div
+                      className="h-full rounded-full bg-white/80"
+                      style={{ width: `${progress}%` }}
+                    />
                   </div>
                 </div>
 
-                {/* Play/pause indicator — subtle */}
-                <div className="absolute inset-0 z-10 flex items-center justify-center opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                {/* Play/pause control — visible on hover, functional */}
+                <button
+                  type="button"
+                  onClick={togglePlay}
+                  className="absolute inset-0 z-10 flex items-center justify-center opacity-0 transition-opacity duration-200 group-hover:opacity-100 cursor-pointer"
+                  aria-label={isPlaying ? "Pause video" : "Play video"}
+                >
                   <div className="flex h-14 w-14 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm">
-                    <svg className="ml-1 h-6 w-6 text-white" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
+                    {isPlaying ? (
+                      <Pause className="h-6 w-6 text-white" />
+                    ) : (
+                      <Play className="ml-0.5 h-6 w-6 text-white" />
+                    )}
                   </div>
-                </div>
+                </button>
               </div>
             </div>
 
