@@ -439,7 +439,7 @@ export function EditCampaignModal({
                   type="button"
                   onClick={() => thumbInputRef.current?.click()}
                   disabled={thumbnailUploading}
-                  className="flex h-24 w-40 items-center justify-center gap-2 rounded-lg border border-dashed text-sm text-muted hover:border-foreground/30 disabled:opacity-50"
+                  className="flex h-24 w-40 items-center justify-center gap-2 rounded-lg border border-dashed text-sm text-muted hover:border-foreground/30 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {thumbnailUploading ? (
                     <Loader2 size={16} className="animate-spin" />
@@ -484,7 +484,7 @@ export function EditCampaignModal({
                   type="button"
                   onClick={() => brandInputRef.current?.click()}
                   disabled={brandAssetUploading}
-                  className="flex h-24 w-40 items-center justify-center gap-2 rounded-lg border border-dashed text-sm text-muted hover:border-foreground/30 disabled:opacity-50"
+                  className="flex h-24 w-40 items-center justify-center gap-2 rounded-lg border border-dashed text-sm text-muted hover:border-foreground/30 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {brandAssetUploading ? (
                     <Loader2 size={16} className="animate-spin" />
@@ -511,7 +511,7 @@ export function EditCampaignModal({
           <button
             onClick={handleSave}
             disabled={needsConfirm && !confirmRules}
-            className="rounded-lg bg-foreground px-3.5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40"
+            className="rounded-lg bg-foreground px-3.5 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Save changes
           </button>

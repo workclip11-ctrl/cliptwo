@@ -18,7 +18,7 @@ import type { PayoutRequest, PayoutRequestStatus } from "@/lib/types";
 
 const STATUS_STYLES: Record<PayoutRequestStatus, string> = {
   pending: "bg-amber/10 text-amber",
-  processing: "bg-blue-500/10 text-blue-600",
+  processing: "bg-amber/10 text-amber",
   paid: "bg-green/10 text-green",
 };
 
@@ -214,11 +214,13 @@ export default function AdminPayoutsPage() {
             <tbody className="divide-y divide-border/40">
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-5 py-12 text-center">
-                    <p className="text-[15px] font-medium">No payout requests found.</p>
-                    <p className="mt-1 text-[13px] text-muted">
-                      Payout requests will appear here when clippers submit withdrawal requests.
-                    </p>
+                  <td colSpan={8} className="px-5 py-12">
+                    <div className="rounded-xl border border-border/40 bg-card p-8 text-center">
+                      <p className="text-[15px] font-medium text-foreground">No payout requests found</p>
+                      <p className="mt-1 text-[13px] text-muted">
+                        Payout requests will appear here when clippers submit withdrawal requests.
+                      </p>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -276,7 +278,7 @@ export default function AdminPayoutsPage() {
                           className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[8px] bg-foreground px-4 text-[14px] font-medium text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {isProcessing ? (
-                            <Loader2 size={14} className="animate-spin" />
+                            <Loader2 size={16} className="animate-spin" />
                           ) : (
                             <ArrowRight size={14} />
                           )}
@@ -302,7 +304,7 @@ export default function AdminPayoutsPage() {
                               className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[8px] bg-green px-4 text-[14px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               {isCompleting ? (
-                                <Loader2 size={14} className="animate-spin" />
+                                <Loader2 size={16} className="animate-spin" />
                               ) : (
                                 <CheckCircle2 size={14} />
                               )}

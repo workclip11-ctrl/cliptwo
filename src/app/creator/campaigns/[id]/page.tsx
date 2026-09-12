@@ -298,7 +298,7 @@ export default function CreatorCampaignDetailPage() {
           <button
             onClick={handlePublish}
             disabled={publishing}
-            className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-accent px-5 text-[14px] font-medium text-white transition-all duration-150 hover:bg-foreground/90 disabled:opacity-50"
+            className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-accent px-5 text-[14px] font-medium text-white transition-all duration-150 hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {publishing ? (
               <Loader2 size={16} className="animate-spin" />
@@ -312,7 +312,7 @@ export default function CreatorCampaignDetailPage() {
           <button
             onClick={handleResume}
             disabled={resuming}
-            className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-accent px-5 text-[14px] font-medium text-white transition-all duration-150 hover:bg-foreground/90 disabled:opacity-50"
+            className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-accent px-5 text-[14px] font-medium text-white transition-all duration-150 hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {resuming ? (
               <Loader2 size={16} className="animate-spin" />
@@ -326,7 +326,7 @@ export default function CreatorCampaignDetailPage() {
           <button
             onClick={handleReopen}
             disabled={reopening}
-            className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-accent px-5 text-[14px] font-medium text-white transition-all duration-150 hover:bg-foreground/90 disabled:opacity-50"
+            className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-accent px-5 text-[14px] font-medium text-white transition-all duration-150 hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {reopening ? (
               <Loader2 size={16} className="animate-spin" />
@@ -358,7 +358,7 @@ export default function CreatorCampaignDetailPage() {
           <button
             onClick={handlePause}
             disabled={pausing}
-            className="inline-flex h-11 items-center gap-2 rounded-[10px] border px-5 text-[14px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground disabled:opacity-50"
+            className="inline-flex h-11 items-center gap-2 rounded-[10px] border px-5 text-[14px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {pausing ? (
               <Loader2 size={16} className="animate-spin" />
@@ -372,7 +372,7 @@ export default function CreatorCampaignDetailPage() {
           <button
             onClick={handleEnd}
             disabled={ending}
-            className="inline-flex h-11 items-center gap-2 rounded-[10px] border border-red/30 px-5 text-[14px] font-medium text-red transition-colors duration-150 hover:bg-red/5 disabled:opacity-50"
+            className="inline-flex h-11 items-center gap-2 rounded-[10px] border border-red/30 px-5 text-[14px] font-medium text-red transition-colors duration-150 hover:bg-red/5 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {ending ? (
               <Loader2 size={16} className="animate-spin" />

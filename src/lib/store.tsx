@@ -1564,9 +1564,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           setState((s) => ({
             ...s,
             campaigns: s.campaigns.filter((x) => x.id !== optimistic.id),
-            lastError: `Failed to create campaign: ${error.message}`,
+            lastError: "Failed to create campaign. Please try again.",
           }));
-          throw new Error(error.message);
+          throw new Error("Failed to create campaign.");
         }
         if (data) {
           setState((s) => ({
@@ -1610,9 +1610,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           setState((s) => ({
             ...s,
             clips: s.clips.filter((x) => x.id !== optimistic.id),
-            lastError: `Failed to submit clip: ${error.message}`,
+            lastError: "Failed to submit clip. Please try again.",
           }));
-          throw new Error(error.message);
+          throw new Error("Failed to submit clip.");
         }
         if (data) {
           // Replace optimistic clip with server-returned clip
@@ -1651,7 +1651,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           });
           if (error) {
             console.error("RPC approve_clip failed:", error.message);
-            setState((s) => ({ ...s, clips: prevClips, financeRecords: prevFinance, lastError: `Approve clip failed: ${error.message}` }));
+            setState((s) => ({ ...s, clips: prevClips, financeRecords: prevFinance, lastError: "Failed to approve clip. Please try again." }));
             return;
           }
           // Server returns the financial record
@@ -1686,7 +1686,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           });
           if (error) {
             console.error("RPC admin_clip_action (reject) failed:", error.message);
-            setState((s) => ({ ...s, clips: prevClips, lastError: `Reject clip failed: ${error.message}` }));
+            setState((s) => ({ ...s, clips: prevClips, lastError: "Failed to reject clip. Please try again." }));
           }
           },
 
@@ -1711,7 +1711,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           });
           if (error) {
             console.error("RPC admin_clip_action (hold) failed:", error.message);
-            setState((s) => ({ ...s, clips: prevClips, lastError: `Hold clip failed: ${error.message}` }));
+            setState((s) => ({ ...s, clips: prevClips, lastError: "Failed to hold clip. Please try again." }));
           }
            },
 
@@ -1725,7 +1725,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           const { data, error } = await supabase.rpc("request_payout");
           if (error) {
             console.error("RPC request_payout failed:", error.message);
-            setState((s) => ({ ...s, lastError: `Payout request failed: ${error.message}` }));
+            setState((s) => ({ ...s, lastError: "Failed to request payout. Please try again." }));
             return;
           }
           const payout = data as Record<string, unknown>;
@@ -2355,7 +2355,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           .eq("id", id);
         if (error) {
           console.error("Profile update failed:", error.message);
-          setState((s) => ({ ...s, profiles: prevProfiles, lastError: `Profile update failed: ${error.message}` }));
+        setState((s) => ({ ...s, profiles: prevProfiles, lastError: "Profile update failed. Please try again." }));
         }
       },
 

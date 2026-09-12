@@ -537,7 +537,7 @@ function ApprovedClipsTable({
             "Payable";
           const paymentStyle =
             r.status === "paid" ? "bg-green/10 text-green" :
-            r.status === "processing" ? "bg-blue-500/10 text-blue-600" :
+            r.status === "processing" ? "bg-amber/10 text-amber" :
             "bg-amber/10 text-amber";
 
           return (

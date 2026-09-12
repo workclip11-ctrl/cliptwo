@@ -25,9 +25,12 @@ function AccordionItem({
           className={`shrink-0 text-muted transition-transform ${open ? "rotate-180" : ""}`}
         />
       </button>
-      {open && (
+      <div
+        className="overflow-hidden transition-all duration-200"
+        style={{ maxHeight: open ? "500px" : "0px" }}
+      >
         <p className="pb-4 text-sm leading-relaxed text-muted">{answer}</p>
-      )}
+      </div>
     </div>
   );
 }

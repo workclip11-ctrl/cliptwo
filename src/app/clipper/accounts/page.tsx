@@ -415,7 +415,7 @@ export default function SocialAccountsPage() {
                           <button
                             onClick={() => verifyAccount(acc)}
                             disabled={isVerifying}
-                            className="inline-flex h-10 items-center gap-1.5 rounded-[10px] border border-green/30 px-4 text-[13px] font-medium text-green transition-colors duration-150 hover:bg-accent-soft disabled:opacity-50"
+                            className="inline-flex h-10 items-center gap-1.5 rounded-[10px] border border-green/30 px-4 text-[13px] font-medium text-green transition-colors duration-150 hover:bg-accent-soft disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <ShieldCheck size={14} /> Verify ownership
                           </button>
@@ -428,7 +428,7 @@ export default function SocialAccountsPage() {
                       <button
                         onClick={() => reconnect(acc)}
                         disabled={isConnecting}
-                        className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-accent px-4 text-[13px] font-medium text-white transition-colors duration-150 hover:bg-foreground/90 disabled:opacity-50"
+                        className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-accent px-4 text-[13px] font-medium text-white transition-colors duration-150 hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Plug size={14} /> Reconnect
                       </button>
@@ -437,7 +437,10 @@ export default function SocialAccountsPage() {
                       acc.status !== "connection_error" &&
                       acc.status !== "verification_failed" && (
                         <button
-                          onClick={() => disconnect(acc)}
+                          onClick={() => {
+                            if (!window.confirm(`Disconnect ${acc.platform}? You can reconnect it later.`)) return;
+                            disconnect(acc);
+                          }}
                           disabled={isConnecting || acc.status === "connecting"}
                           className="inline-flex h-10 items-center gap-1.5 rounded-[10px] border border-red/30 px-4 text-[13px] font-medium text-red transition-colors duration-150 hover:bg-red/5 disabled:opacity-50"
                         >
@@ -465,7 +468,7 @@ export default function SocialAccountsPage() {
                   <button
                     onClick={() => openConnect(platform)}
                     disabled={isConnecting}
-                    className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-accent px-4 text-[13px] font-medium text-white transition-colors duration-150 hover:bg-foreground/90 disabled:opacity-50"
+                    className="inline-flex h-10 items-center gap-1.5 rounded-[10px] bg-accent px-4 text-[13px] font-medium text-white transition-colors duration-150 hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Link2 size={14} />
                     {isConnecting ? "Connecting…" : "Connect account"}
@@ -562,7 +565,7 @@ export default function SocialAccountsPage() {
               <button
                 onClick={submitConnect}
                 disabled={!!connecting}
-                className="inline-flex flex-1 h-11 items-center justify-center gap-1.5 rounded-[10px] bg-accent text-[14px] font-medium text-white transition-colors duration-150 hover:bg-foreground/90 disabled:opacity-50"
+                className="inline-flex flex-1 h-11 items-center justify-center gap-1.5 rounded-[10px] bg-accent text-[14px] font-medium text-white transition-colors duration-150 hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {connecting ? (
                   <Loader2 size={14} className="animate-spin" />

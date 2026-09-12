@@ -65,10 +65,10 @@ const ACTION_COLORS: Record<string, string> = {
   clip_rejected: "bg-red/10 text-red",
   clip_hold: "bg-amber/10 text-amber",
   clip_held: "bg-amber/10 text-amber",
-  clip_processing: "bg-blue-500/10 text-blue-500",
+  clip_processing: "bg-amber/10 text-amber",
   clip_paid: "bg-green/10 text-green",
   clip_failed: "bg-red/10 text-red",
-  clip_retry: "bg-blue-500/10 text-blue-500",
+  clip_retry: "bg-amber/10 text-amber",
   clip_release: "bg-green/10 text-green",
   clip_revert: "bg-amber/10 text-amber",
   user_suspend: "bg-red/10 text-red",
@@ -93,7 +93,7 @@ const ACTION_COLORS: Record<string, string> = {
   campaign_reopen: "bg-green/10 text-green",
   campaign_archive: "bg-amber/10 text-amber",
   campaign_created: "bg-green/10 text-green",
-  campaign_edited: "bg-blue-500/10 text-blue-500",
+  campaign_edited: "bg-amber/10 text-amber",
 };
 
 function fmtDateTime(ts: string): string {
@@ -236,12 +236,12 @@ export default function AdminAuditPage() {
       <div className="overflow-hidden rounded-xl border border-border/40 bg-card">
         {loading ? (
           <div className="flex flex-col items-center gap-3 p-12 text-center text-muted">
-            <Loader2 size={24} className="animate-spin" />
+            <Loader2 size={16} className="animate-spin" />
             <p className="text-[14px]">Loading audit logs…</p>
           </div>
         ) : logs.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 p-12 text-center text-muted">
-            <p className="text-[15px] font-medium">No audit logs found.</p>
+          <div className="p-8 text-center">
+            <p className="text-[15px] font-medium text-foreground">No audit logs found</p>
             {(q || action || entityType || actor) && (
               <button
                 onClick={() => {
@@ -250,7 +250,7 @@ export default function AdminAuditPage() {
                   setEntityType("");
                   setActor("");
                 }}
-                className="cursor-pointer text-[13px] text-muted underline transition-colors hover:text-foreground"
+                className="mt-1 cursor-pointer text-[13px] text-muted underline transition-colors hover:text-foreground"
               >
                 Clear filters
               </button>

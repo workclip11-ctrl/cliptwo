@@ -510,7 +510,7 @@ function ClipperDrawer({
               <button
                 onClick={onSuspend}
                 disabled={!can("clipper.suspend")}
-                className="cursor-pointer rounded-[8px] bg-red px-4 py-2.5 text-[14px] font-medium text-white hover:opacity-90 disabled:opacity-50"
+                className="cursor-pointer rounded-[8px] bg-red px-4 py-2.5 text-[14px] font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Suspend
               </button>
@@ -821,7 +821,7 @@ function ClipperDrawer({
             <button
               disabled={!can("clipper.notes")}
               onClick={() => saveAdminNotes(profile.id, notes, actor ?? "")}
-                  className="mt-2 cursor-pointer rounded-[8px] bg-foreground px-4 py-2.5 text-[14px] font-medium text-background hover:opacity-90 disabled:opacity-50"
+                  className="mt-2 cursor-pointer rounded-[8px] bg-foreground px-4 py-2.5 text-[14px] font-medium text-background hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Save notes
             </button>
@@ -911,7 +911,10 @@ function AppealRow({
               Approve
             </button>
             <button
-              onClick={() => onRespond(response, "rejected")}
+              onClick={() => {
+                if (!window.confirm("Reject this appeal?")) return;
+                onRespond(response, "rejected");
+              }}
               className="cursor-pointer rounded-[8px] bg-red px-3.5 py-2 text-[14px] font-medium text-white hover:opacity-90"
             >
               Reject

@@ -329,7 +329,10 @@ export default function ClipperSubmissionsPage() {
                 </button>
 
                 {/* ── Expanded Details ─────────────────────── */}
-                {isOpen && (
+                <div
+                  className="overflow-hidden transition-all duration-200"
+                  style={{ maxHeight: isOpen ? "500px" : "0px" }}
+                >
                   <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 border-t border-border/50 pt-3 text-[13px] sm:grid-cols-3">
                     <div>
                       <span className="text-muted">CPM </span>
@@ -369,7 +372,7 @@ export default function ClipperSubmissionsPage() {
                       Clip URL <ExternalLink size={11} />
                     </a>
                   </div>
-                )}
+                </div>
 
                 {/* ── Actions ─────────────────────────────── */}
                 <div className="mt-4 flex flex-wrap items-center gap-2">

@@ -184,13 +184,13 @@ export default function CreatorCampaignsPage() {
 
       {/* ── Campaign List ───────────────────────────────── */}
       {filtered.length === 0 ? (
-        <div className="rounded-[12px] border border-dashed bg-card py-16 text-center">
-          <p className="text-[16px] font-medium">
+        <div className="rounded-xl border border-border/40 bg-card p-8 text-center">
+          <p className="text-[15px] font-medium text-foreground">
             {query || statusFilter !== "all"
               ? "No campaigns match your filters"
               : "No campaigns yet"}
           </p>
-          <p className="mt-2 text-[14px] text-muted">
+          <p className="mt-1 text-[13px] text-muted">
             {query || statusFilter !== "all"
               ? "Try adjusting your search or filter criteria."
               : "Create your first campaign to start receiving clips."}

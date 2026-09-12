@@ -130,14 +130,13 @@ export default function CreatorSubmissionsPage() {
 
       {/* ── List ────────────────────────────────────────── */}
       {filtered.length === 0 ? (
-        <div className="py-20 text-center">
-          <Inbox size={32} className="mx-auto mb-3 text-border" />
-          <p className="text-[15px] font-medium">
+        <div className="rounded-xl border border-border/40 bg-card p-8 text-center">
+          <p className="text-[15px] font-medium text-foreground">
             {all.length === 0
               ? "No submissions yet"
               : "No submissions match this filter"}
           </p>
-          <p className="mt-1 text-[14px] text-muted">
+          <p className="mt-1 text-[13px] text-muted">
             {all.length === 0
               ? "Clips submitted to your campaigns will appear here."
               : "Try adjusting your search or filter."}

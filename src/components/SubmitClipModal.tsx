@@ -109,7 +109,7 @@ export function SubmitClipModal({
           <button
             disabled={isDisabled}
             onClick={() => onSubmit(caption, videoUrl, platform)}
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-foreground px-3 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40 sm:py-1.5"
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-foreground px-3 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed sm:py-1.5"
           >
             <Send size={13} /> {isAtBudget ? "Submissions closed" : "Submit for review"}
           </button>

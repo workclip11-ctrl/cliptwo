@@ -264,8 +264,13 @@ export default function ClipperWalletPage() {
               <tbody className="divide-y divide-border/30">
                 {visible.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-5 py-8 text-center text-muted">
-                      No transactions yet.
+                    <td colSpan={6} className="px-5 py-12">
+                      <div className="rounded-xl border border-border/40 bg-card p-8 text-center">
+                        <p className="text-[15px] font-medium text-foreground">No transactions yet</p>
+                        <p className="mt-1 text-[13px] text-muted">
+                          Your clip submissions and earnings will appear here.
+                        </p>
+                      </div>
                     </td>
                   </tr>
                 ) : (

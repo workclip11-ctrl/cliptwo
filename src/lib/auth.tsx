@@ -49,7 +49,9 @@ function mapError(err: { message: string }): string {
   if (m.includes("user already registered"))
     return "An account with this email already exists.";
   if (m.includes("password")) return "Password must be at least 6 characters.";
-  return err.message;
+  if (m.includes("rate limit")) return "Too many attempts. Please try again later.";
+  if (m.includes("network") || m.includes("fetch")) return "Network error. Please check your connection.";
+  return "Something went wrong. Please try again.";
 }
 
 function profileFromUser(user: {

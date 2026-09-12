@@ -14,7 +14,7 @@ const SEVERITY_COLORS: Record<Severity, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  New: "bg-blue-500/10 text-blue-500",
+  New: "bg-amber/10 text-amber",
   "Under Review": "bg-amber/10 text-amber",
   Cleared: "bg-green/10 text-green",
   Confirmed: "bg-red/10 text-red",
