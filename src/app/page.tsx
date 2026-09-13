@@ -190,10 +190,10 @@ function JourneyVisual({ stageKey }: { stageKey: string }) {
               <PlatformIcon p={c.platform} size={16} />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[14px] font-medium">{c.title}</p>
-              <p className="text-[12px] text-muted">{c.niche}</p>
+              <p className="truncate text-sm font-medium">{c.title}</p>
+              <p className="text-xs text-muted">{c.niche}</p>
             </div>
-            <span className="font-mono text-[14px] font-semibold">{rup(c.cpm)}</span>
+            <span className="font-mono text-sm font-semibold">{rup(c.cpm)}</span>
           </div>
         ))}
         <p className="text-center text-[11px] text-muted/50">Example campaigns</p>
@@ -210,9 +210,9 @@ function JourneyVisual({ stageKey }: { stageKey: string }) {
           <div key={a.handle} className="flex items-center justify-between rounded-[10px] border border-border/40 bg-background px-4 py-3">
             <span className="flex items-center gap-2.5">
               <PlatformIcon p={a.platform} size={16} />
-              <span className="font-mono text-[14px]">{a.handle}</span>
+              <span className="font-mono text-sm">{a.handle}</span>
             </span>
-            <span className="flex items-center gap-1 text-[12px] font-medium text-green">
+            <span className="flex items-center gap-1 text-xs font-medium text-green">
               <BadgeCheck size={13} /> Verified
             </span>
           </div>
@@ -224,7 +224,7 @@ function JourneyVisual({ stageKey }: { stageKey: string }) {
   if (stageKey === "payout") {
     return (
       <div className="rounded-[10px] border border-border/40 bg-background p-4">
-        <div className="flex items-center gap-2 font-mono text-[14px]">
+        <div className="flex items-center gap-2 font-mono text-sm">
           <IndianRupee size={15} className="text-amber" />
           priya@okhdfcbank
           <BadgeCheck size={14} className="ml-auto text-green" />
@@ -252,7 +252,7 @@ function JourneyVisual({ stageKey }: { stageKey: string }) {
       <div className="overflow-hidden rounded-[10px] border border-border/40">
         <table className="w-full text-[13px]">
           <thead>
-            <tr className="border-b border-border/30 text-left text-[12px] text-muted">
+            <tr className="border-b border-border/30 text-left text-xs text-muted">
               <th className="px-4 py-2.5 font-medium">Campaign</th>
               <th className="px-4 py-2.5 font-medium">Status</th>
               <th className="px-4 py-2.5 text-right font-medium">Amount</th>
@@ -266,7 +266,7 @@ function JourneyVisual({ stageKey }: { stageKey: string }) {
               <tr key={c as string}>
                 <td className="px-4 py-2.5">{c}</td>
                 <td className="px-4 py-2.5">
-                  <span className={`text-[12px] font-medium ${s === "paid" ? "text-green" : "text-amber"}`}>{s}</span>
+                  <span className={`text-xs font-medium ${s === "paid" ? "text-green" : "text-amber"}`}>{s}</span>
                 </td>
                 <td className="px-4 py-2.5 text-right font-mono">{rup(a as number)}</td>
               </tr>
@@ -301,7 +301,7 @@ function JourneyVisual({ stageKey }: { stageKey: string }) {
         ].map((s) => (
           <div key={s.name} className="flex items-center justify-between rounded-[10px] border border-border/40 bg-background px-4 py-3 text-[13px]">
             <span className="font-medium">{s.name}</span>
-            <span className={`text-[12px] font-medium ${s.status === "approved" ? "text-green" : "text-amber"}`}>{s.status}</span>
+            <span className={`text-xs font-medium ${s.status === "approved" ? "text-green" : "text-amber"}`}>{s.status}</span>
           </div>
         ))}
         <p className="text-center text-[11px] text-muted/50">Example submissions</p>
@@ -314,7 +314,7 @@ function JourneyVisual({ stageKey }: { stageKey: string }) {
         <div className="flex items-center justify-between rounded-[10px] border border-border/40 bg-background px-4 py-3 text-[13px]">
           <span className="flex items-center gap-2">
             <span className="font-medium">Arjun Rao</span>
-            <span className="font-mono text-[12px] text-muted">reel/pw001</span>
+            <span className="font-mono text-xs text-muted">reel/pw001</span>
           </span>
           <span className="flex gap-1.5">
             <span className="flex h-7 w-7 items-center justify-center rounded-[6px] border border-border/60 text-green"><Check size={14} /></span>
@@ -331,7 +331,7 @@ function JourneyVisual({ stageKey }: { stageKey: string }) {
         <div className="h-1.5 w-full overflow-hidden rounded-full bg-accent-soft">
           <div className="h-full w-[46%] rounded-full bg-foreground" />
         </div>
-        <p className="mt-1.5 font-mono text-[12px] text-muted">₹18,400 / ₹40,000 spent</p>
+        <p className="mt-1.5 font-mono text-xs text-muted">₹18,400 / ₹40,000 spent</p>
         <p className="mt-1 text-center text-[11px] text-muted/50">Example budget</p>
       </div>
     );
@@ -350,13 +350,13 @@ function Journey() {
       <div className="inline-flex rounded-[10px] border border-border/40 bg-card p-1">
         <button
           onClick={() => { setTab("clipper"); setStep(0); }}
-          className={`flex items-center gap-1.5 rounded-[8px] px-4 py-2 text-[14px] font-medium transition-colors cursor-pointer ${tab === "clipper" ? "bg-foreground text-background" : "text-muted hover:text-foreground"}`}
+          className={`flex items-center gap-1.5 rounded-[8px] px-4 py-2 text-sm font-medium transition-colors cursor-pointer ${tab === "clipper" ? "bg-foreground text-background" : "text-muted hover:text-foreground"}`}
         >
           <Scissors size={14} /> I&apos;m a clipper
         </button>
         <button
           onClick={() => { setTab("creator"); setStep(0); }}
-          className={`flex items-center gap-1.5 rounded-[8px] px-4 py-2 text-[14px] font-medium transition-colors cursor-pointer ${tab === "creator" ? "bg-foreground text-background" : "text-muted hover:text-foreground"}`}
+          className={`flex items-center gap-1.5 rounded-[8px] px-4 py-2 text-sm font-medium transition-colors cursor-pointer ${tab === "creator" ? "bg-foreground text-background" : "text-muted hover:text-foreground"}`}
         >
           <Film size={14} /> I&apos;m a creator
         </button>
@@ -371,14 +371,14 @@ function Journey() {
               className={`border-l-2 py-3 pl-4 text-left transition-colors cursor-pointer ${i === step ? "border-foreground" : "border-border/40"}`}
             >
               <span className={`font-mono text-[11px] ${i === step ? "text-foreground" : "text-muted"}`}>{s.num}</span>
-              <span className={`block text-[14px] font-medium ${i === step ? "text-foreground" : "text-muted"}`}>{s.label}</span>
+              <span className={`block text-sm font-medium ${i === step ? "text-foreground" : "text-muted"}`}>{s.label}</span>
             </button>
           ))}
         </div>
-        <div className="rounded-xl border border-border/40 bg-card p-6">
-          <h3 className="text-[18px] font-bold tracking-tight">{stage.title}</h3>
-          <p className="mt-2 max-w-md text-[14px] leading-relaxed text-muted">{stage.body}</p>
-          <div className="mt-6">
+        <div className="rounded-xl border border-border/40 bg-card p-5 sm:p-6">
+          <h3 className="text-lg font-bold tracking-tight">{stage.title}</h3>
+          <p className="mt-2 max-w-md text-sm leading-relaxed text-muted">{stage.body}</p>
+          <div className="mt-5 sm:mt-6">
             <JourneyVisual stageKey={stage.visual} />
           </div>
         </div>
@@ -390,15 +390,18 @@ function Journey() {
 function FAQ() {
   const [tab, setTab] = useState(FAQ_CATEGORIES[0].title);
   const [open, setOpen] = useState<string | null>(null);
+  const [selectorOpen, setSelectorOpen] = useState(false);
   const cat = FAQ_CATEGORIES.find((c) => c.title === tab) ?? FAQ_CATEGORIES[0];
+
   return (
     <div>
-      <div className="mx-auto mb-8 flex w-fit gap-1 rounded-[10px] border border-border/40 bg-card p-1">
+      {/* Desktop tabs — visible at lg+ */}
+      <div className="mx-auto mb-8 hidden lg:flex w-fit gap-1 rounded-[10px] border border-border/40 bg-card p-1">
         {FAQ_CATEGORIES.map((c) => (
           <button
             key={c.title}
             onClick={() => { setTab(c.title); setOpen(null); }}
-            className={`rounded-[8px] px-5 py-2 text-[14px] font-medium transition-colors cursor-pointer ${
+            className={`rounded-[8px] px-5 py-2 text-sm font-medium transition-colors cursor-pointer ${
               tab === c.title ? "bg-foreground text-background" : "text-muted hover:text-foreground"
             }`}
           >
@@ -406,13 +409,47 @@ function FAQ() {
           </button>
         ))}
       </div>
+
+      {/* Mobile/tablet category selector — visible below lg */}
+      <div className="mb-6 lg:hidden">
+        <button
+          onClick={() => setSelectorOpen(!selectorOpen)}
+          className="flex w-full items-center justify-between rounded-[10px] border border-border/40 bg-card px-5 py-3.5 text-left text-sm font-medium cursor-pointer"
+          aria-expanded={selectorOpen}
+          aria-haspopup="listbox"
+        >
+          <span>{tab}</span>
+          <ChevronDown
+            size={18}
+            className={`shrink-0 text-muted transition-transform duration-200 ${selectorOpen ? "rotate-180" : ""}`}
+          />
+        </button>
+        {selectorOpen && (
+          <div className="mt-1 overflow-hidden rounded-[10px] border border-border/40 bg-card" role="listbox">
+            {FAQ_CATEGORIES.map((c) => (
+              <button
+                key={c.title}
+                role="option"
+                aria-selected={tab === c.title}
+                onClick={() => { setTab(c.title); setOpen(null); setSelectorOpen(false); }}
+                className={`flex w-full items-center px-5 py-3.5 text-left text-sm font-medium transition-colors cursor-pointer ${
+                  tab === c.title ? "bg-accent-soft text-foreground" : "text-muted hover:bg-accent-soft/60 hover:text-foreground"
+                }`}
+              >
+                {c.title}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="divide-y divide-border/30 rounded-xl border border-border/40 bg-card">
         {cat.items.map((f) => (
           <div key={f.q}>
             <button
               onClick={() => setOpen(open === f.q ? null : f.q)}
               aria-expanded={open === f.q}
-              className="flex w-full items-center justify-between px-6 py-5 text-left text-[15px] font-medium cursor-pointer"
+              className="flex w-full items-center justify-between px-5 py-4.5 text-left text-[15px] font-medium cursor-pointer sm:px-6 sm:py-5"
             >
               {f.q}
               <ChevronDown
@@ -425,7 +462,7 @@ function FAQ() {
                 open === f.q ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
               }`}
             >
-              <p className="px-6 pb-5 text-[14px] leading-relaxed text-muted">
+              <p className="px-5 pb-5 text-sm leading-relaxed text-muted sm:px-6">
                 {f.a}
               </p>
             </div>
@@ -505,15 +542,15 @@ export default function Home() {
   }, [campaigns, featuredIds]);
 
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen overflow-x-hidden">
       {/* ── Header ── */}
       <header className="sticky top-0 z-40 border-b border-border/40 bg-background/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-[1120px] items-center justify-between px-6 py-3.5">
+        <div className="mx-auto flex max-w-[1200px] items-center justify-between px-5 py-3 sm:px-6 lg:py-3.5">
           <Link href="/" className="flex items-center gap-2.5 font-bold tracking-tight cursor-pointer">
             <img src="/cliptwo-logo.png" alt="ClipTwo" className="h-7 w-7 rounded-[8px] object-contain" />
-            <span className="text-[16px]">cliptwo</span>
+            <span className="text-base">cliptwo</span>
           </Link>
-          <nav className="hidden items-center gap-6 text-[13px] text-muted md:flex">
+          <nav className="hidden items-center gap-7 text-sm text-muted md:flex">
             <a href="#how" className="transition-colors hover:text-foreground cursor-pointer">How it works</a>
             <a href="#why" className="transition-colors hover:text-foreground cursor-pointer">Why cliptwo</a>
             <a href="#faq" className="transition-colors hover:text-foreground cursor-pointer">FAQ</a>
@@ -530,34 +567,34 @@ export default function Home() {
       </header>
 
       {/* ── Hero ── */}
-      <section className="mx-auto grid max-w-[1120px] items-center gap-12 px-6 pt-20 pb-16 lg:grid-cols-2 lg:gap-16 lg:pt-24 lg:pb-20">
+      <section className="mx-auto grid max-w-[1200px] items-center gap-10 px-5 pt-14 pb-12 sm:px-6 sm:pt-20 sm:pb-16 lg:grid-cols-2 lg:gap-16 lg:pt-24 lg:pb-20">
         <div>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-border/40 bg-card px-3 py-1 text-[12px] font-medium text-muted">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border/40 bg-card px-3 py-1 text-xs font-medium text-muted">
             India&apos;s clipping marketplace
           </span>
-          <h1 className="mt-6 text-[32px] font-bold tracking-tight leading-[1.15] sm:text-[40px] lg:text-[48px]">
+          <h1 className="mt-5 text-[28px] font-bold tracking-tight leading-[1.15] sm:text-[36px] md:text-[40px] lg:text-[48px] xl:text-[52px]">
             {heroTitle}
           </h1>
-          <p className="mt-5 max-w-md text-[16px] leading-relaxed text-muted">
+          <p className="mt-4 max-w-md text-base leading-relaxed text-muted sm:mt-5 lg:text-lg">
             {heroSubtitle}
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Link href="/login?role=clipper" className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-foreground px-6 text-[14px] font-semibold text-background transition-opacity hover:opacity-90 cursor-pointer">
+          <div className="mt-6 flex flex-wrap gap-3 sm:mt-8">
+            <Link href="/login?role=clipper" className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-foreground px-5 text-sm font-semibold text-background transition-opacity hover:opacity-90 cursor-pointer sm:h-12 sm:px-6 sm:text-[15px]">
               <Scissors size={15} /> Start clipping
             </Link>
-            <Link href="/login?role=creator" className="inline-flex h-11 items-center gap-2 rounded-[10px] border border-border/60 bg-card px-6 text-[14px] font-semibold transition-colors hover:bg-accent-soft cursor-pointer">
+            <Link href="/login?role=creator" className="inline-flex h-11 items-center gap-2 rounded-[10px] border border-border/60 bg-card px-5 text-sm font-semibold transition-colors hover:bg-accent-soft cursor-pointer sm:h-12 sm:px-6 sm:text-[15px]">
               <Film size={15} /> Launch a campaign
             </Link>
           </div>
-          <div className="mt-8 flex flex-wrap items-center gap-5 text-[13px] text-muted">
+          <div className="mt-6 flex flex-wrap items-center gap-4 text-[13px] text-muted sm:mt-8 sm:gap-5">
             <span className="flex items-center gap-1.5"><ShieldCheck size={14} className="text-green" /> Admin-reviewed clips</span>
             <span className="flex items-center gap-1.5"><IndianRupee size={14} className="text-amber" /> UPI-native payouts</span>
           </div>
         </div>
 
         {/* Phone mockup — Reel playing inside phone */}
-        <div className="relative mx-auto w-full max-w-md lg:max-w-lg">
-          <div className="group relative mx-auto w-[240px] sm:w-[260px]">
+        <div className="relative mx-auto w-full max-w-sm sm:max-w-md lg:max-w-lg">
+          <div className="group relative mx-auto w-[220px] sm:w-[260px] lg:w-[280px] xl:w-[300px]">
             {/* Phone body */}
             <div className="relative overflow-hidden rounded-[2.5rem] border border-border/30 bg-black shadow-lg shadow-black/5">
               {/* Notch */}
@@ -612,25 +649,25 @@ export default function Home() {
             </div>
 
             {/* Floating card — Views */}
-            <div className="absolute -right-8 top-16 z-30 rounded-[10px] border border-border/20 bg-card px-3 py-2.5 shadow-md shadow-black/5 sm:-right-12">
+            <div className="absolute -right-6 top-16 z-30 rounded-[10px] border border-border/20 bg-card px-3 py-2.5 shadow-md shadow-black/5 sm:-right-10 lg:-right-12">
               <div className="flex items-center gap-1.5">
                 <span className="flex h-4 w-4 items-center justify-center rounded-[5px] bg-blue-500/10">
                   <Eye size={10} className="text-blue-500" />
                 </span>
                 <span className="text-[10px] font-medium text-muted">Views</span>
               </div>
-              <p className="mt-1 font-mono text-[16px] font-bold tracking-tight">24.8K</p>
+              <p className="mt-1 font-mono text-base font-bold tracking-tight">24.8K</p>
               <p className="text-[9px] text-muted/50">example</p>
             </div>
 
-            <div className="absolute -left-8 bottom-24 z-30 rounded-[10px] border border-border/20 bg-card px-3 py-2.5 shadow-md shadow-black/5 sm:-left-12">
+            <div className="absolute -left-6 bottom-24 z-30 rounded-[10px] border border-border/20 bg-card px-3 py-2.5 shadow-md shadow-black/5 sm:-left-10 lg:-left-12">
               <div className="flex items-center gap-1.5">
                 <span className="flex h-4 w-4 items-center justify-center rounded-[5px] bg-green/10">
                   <IndianRupee size={10} className="text-green" />
                 </span>
                 <span className="text-[10px] font-medium text-muted">Earned</span>
               </div>
-              <p className="mt-1 font-mono text-[16px] font-bold tracking-tight">₹4,960</p>
+              <p className="mt-1 font-mono text-base font-bold tracking-tight">₹4,960</p>
               <p className="text-[9px] text-muted/50">example</p>
             </div>
           </div>
@@ -651,11 +688,11 @@ export default function Home() {
       </div>
 
       {/* ── Platforms ── */}
-      <div className="mx-auto max-w-[1120px] px-6 py-14 text-center">
+      <div className="mx-auto max-w-[1200px] px-5 py-12 text-center sm:px-6 sm:py-14">
         <p className="text-[11px] font-semibold uppercase tracking-widest text-muted">
           Built for every niche, and every platform that matters
         </p>
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-x-7 gap-y-2.5">
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-2.5 sm:gap-x-7">
           {NICHES.map((n) => (
             <span key={n} className="text-[13px] font-medium text-muted/70">{n}</span>
           ))}
@@ -666,28 +703,28 @@ export default function Home() {
       </div>
 
       {/* ── How it works ── */}
-      <section id="how" className="mx-auto max-w-[1120px] px-6 py-20">
+      <section id="how" className="mx-auto max-w-[1200px] px-5 py-16 sm:px-6 sm:py-20 lg:py-24">
         <p className="text-center text-[11px] font-semibold uppercase tracking-widest text-muted">How it works</p>
-        <h2 className="mx-auto mt-3 max-w-xl text-center text-[28px] font-bold tracking-tight sm:text-[32px]">One loop, two sides.</h2>
+        <h2 className="mx-auto mt-3 max-w-xl text-center text-2xl font-bold tracking-tight sm:text-[28px] lg:text-[32px]">One loop, two sides.</h2>
         <p className="mx-auto mt-3 max-w-lg text-center text-[15px] leading-relaxed text-muted">
           The platform&apos;s only job is to run this loop reliably — without either side chasing the other for money or footage.
         </p>
-        <div className="mt-12">
+        <div className="mt-10 sm:mt-12">
           <Journey />
         </div>
       </section>
 
       {/* ── Live campaigns ── */}
       {featured.length > 0 && (
-        <section className="mx-auto max-w-[1120px] px-6 py-20">
-          <div className="flex items-end justify-between">
+        <section className="mx-auto max-w-[1200px] px-5 py-16 sm:px-6 sm:py-20 lg:py-24">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-widest text-muted">Live now</p>
-              <h2 className="mt-3 text-[28px] font-bold tracking-tight sm:text-[32px]">Active campaigns</h2>
+              <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-[28px] lg:text-[32px]">Active campaigns</h2>
             </div>
             <button
               onClick={() => router.push("/campaigns")}
-              className="inline-flex h-10 items-center gap-1.5 rounded-[8px] border border-border/60 bg-card px-5 text-[14px] font-semibold transition-colors hover:bg-accent-soft cursor-pointer"
+              className="inline-flex h-10 w-fit items-center gap-1.5 rounded-[8px] border border-border/60 bg-card px-5 text-sm font-semibold transition-colors hover:bg-accent-soft cursor-pointer"
             >
               Browse all <ArrowRight size={14} />
             </button>
@@ -702,20 +739,20 @@ export default function Home() {
 
       {/* ── Why ClipTwo ── */}
       <section id="why" className="border-y border-border/30 bg-card">
-        <div className="mx-auto max-w-[1120px] px-6 py-20">
+        <div className="mx-auto max-w-[1200px] px-5 py-16 sm:px-6 sm:py-20 lg:py-24">
           <p className="text-[11px] font-semibold uppercase tracking-widest text-muted">Why cliptwo</p>
-          <h2 className="mt-3 text-[28px] font-bold tracking-tight sm:text-[32px]">Trust is the product.</h2>
+          <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-[28px] lg:text-[32px]">Trust is the product.</h2>
           <p className="mt-3 max-w-lg text-[15px] leading-relaxed text-muted">
             Clipping platforms live or die on whether clippers believe they&apos;ll actually get paid. These are the mechanics that make that a promise, not a claim.
           </p>
-          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 sm:mt-12">
             {TRUST.map((t) => (
               <div key={t.title} className="py-1">
                 <div className="flex h-9 w-9 items-center justify-center rounded-[8px] bg-accent-soft">
                   <t.icon size={16} className="text-foreground" />
                 </div>
                 <h4 className="mt-3 text-[15px] font-bold tracking-tight">{t.title}</h4>
-                <p className="mt-1.5 text-[14px] leading-relaxed text-muted">{t.body}</p>
+                <p className="mt-1.5 text-sm leading-relaxed text-muted">{t.body}</p>
               </div>
             ))}
           </div>
@@ -723,20 +760,20 @@ export default function Home() {
       </section>
 
       {/* ── FAQ ── */}
-      <section id="faq" className="mx-auto max-w-[1120px] px-6 py-20">
+      <section id="faq" className="mx-auto max-w-[1200px] px-5 py-16 sm:px-6 sm:py-20 lg:py-24">
         <p className="text-center text-[11px] font-semibold uppercase tracking-widest text-muted">FAQ</p>
-        <h2 className="mx-auto mt-3 max-w-xl text-center text-[28px] font-bold tracking-tight sm:text-[32px]">Frequently asked</h2>
-        <div className="mt-12">
+        <h2 className="mx-auto mt-3 max-w-xl text-center text-2xl font-bold tracking-tight sm:text-[28px] lg:text-[32px]">Frequently asked</h2>
+        <div className="mt-8 sm:mt-12">
           <FAQ />
         </div>
-        <div className="mx-auto mt-12 max-w-2xl rounded-xl border border-border/40 bg-card p-8 text-center">
-          <h3 className="text-[17px] font-bold tracking-tight">Still have questions?</h3>
-          <p className="mt-2 text-[14px] text-muted">
+        <div className="mx-auto mt-10 max-w-2xl rounded-xl border border-border/40 bg-card p-6 text-center sm:mt-12 sm:p-8">
+          <h3 className="text-lg font-bold tracking-tight">Still have questions?</h3>
+          <p className="mt-2 text-sm text-muted">
             Can&apos;t find what you&apos;re looking for? Reach out to our support team and we&apos;ll get back to you.
           </p>
           <a
             href="mailto:support@cliptwo.com"
-            className="mt-5 inline-flex h-10 items-center gap-2 rounded-[8px] bg-foreground px-5 text-[14px] font-medium text-background transition-opacity hover:opacity-90 cursor-pointer"
+            className="mt-5 inline-flex h-10 items-center gap-2 rounded-[8px] bg-foreground px-5 text-sm font-medium text-background transition-opacity hover:opacity-90 cursor-pointer"
           >
             Contact Support
           </a>
@@ -745,8 +782,8 @@ export default function Home() {
 
       {/* ── Final CTA ── */}
       <section className="border-y border-border/30 bg-card">
-        <div className="mx-auto max-w-[1120px] px-6 py-20 text-center">
-          <h2 className="text-[28px] font-bold tracking-tight sm:text-[32px]">Ready to start?</h2>
+        <div className="mx-auto max-w-[1200px] px-5 py-16 text-center sm:px-6 sm:py-20 lg:py-24">
+          <h2 className="text-2xl font-bold tracking-tight sm:text-[28px] lg:text-[32px]">Ready to start?</h2>
           <p className="mx-auto mt-3 max-w-md text-[15px] leading-relaxed text-muted">
             Whether you want to earn by clipping or grow your brand through
             creator content, ClipTwo is where it happens.
@@ -754,13 +791,13 @@ export default function Home() {
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link
               href="/login?role=clipper"
-              className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-foreground px-7 text-[14px] font-semibold text-background transition-opacity hover:opacity-90 cursor-pointer"
+              className="inline-flex h-11 items-center gap-2 rounded-[10px] bg-foreground px-6 text-sm font-semibold text-background transition-opacity hover:opacity-90 cursor-pointer sm:h-12 sm:px-7 sm:text-[15px]"
             >
               <Scissors size={15} /> Start clipping
             </Link>
             <Link
               href="/login?role=creator"
-              className="inline-flex h-11 items-center gap-2 rounded-[10px] border border-border/60 bg-card px-7 text-[14px] font-semibold transition-colors hover:bg-accent-soft cursor-pointer"
+              className="inline-flex h-11 items-center gap-2 rounded-[10px] border border-border/60 bg-card px-6 text-sm font-semibold transition-colors hover:bg-accent-soft cursor-pointer sm:h-12 sm:px-7 sm:text-[15px]"
             >
               <Film size={15} /> Launch a campaign
             </Link>
@@ -770,12 +807,12 @@ export default function Home() {
 
       {/* ── Footer ── */}
       <footer className="border-t border-border/30 bg-card">
-        <div className="mx-auto max-w-[1120px] px-6 py-14">
+        <div className="mx-auto max-w-[1200px] px-5 py-12 sm:px-6 sm:py-14">
           <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
             <div>
               <div className="flex items-center gap-2.5 font-bold tracking-tight">
                 <img src="/cliptwo-logo.png" alt="ClipTwo" className="h-7 w-7 rounded-[8px] object-contain" />
-                <span className="text-[16px]">cliptwo</span>
+                <span className="text-base">cliptwo</span>
               </div>
               <p className="mt-3 max-w-xs text-[13px] leading-relaxed text-muted">
                 India&apos;s clipping marketplace — connect creators with clippers, paid per view and settled straight to UPI.
@@ -790,8 +827,8 @@ export default function Home() {
             </div>
 
             <div>
-              <h5 className="text-[12px] font-bold uppercase tracking-wider text-muted">Product</h5>
-              <ul className="mt-3 space-y-2 text-[13px] text-muted">
+              <h5 className="text-xs font-bold uppercase tracking-wider text-muted">Product</h5>
+              <ul className="mt-3 space-y-2.5 text-[13px] text-muted">
                 <li><Link href="/clipper" className="transition-colors hover:text-foreground cursor-pointer">For clippers</Link></li>
                 <li><Link href="/creator" className="transition-colors hover:text-foreground cursor-pointer">For creators</Link></li>
                 <li><a href="#how" className="transition-colors hover:text-foreground cursor-pointer">How it works</a></li>
@@ -800,16 +837,16 @@ export default function Home() {
             </div>
 
             <div>
-              <h5 className="text-[12px] font-bold uppercase tracking-wider text-muted">Company</h5>
-              <ul className="mt-3 space-y-2 text-[13px] text-muted">
+              <h5 className="text-xs font-bold uppercase tracking-wider text-muted">Company</h5>
+              <ul className="mt-3 space-y-2.5 text-[13px] text-muted">
                 <li><Link href="/login" className="transition-colors hover:text-foreground cursor-pointer">Log in</Link></li>
                 <li><a href="mailto:support@cliptwo.com" className="transition-colors hover:text-foreground cursor-pointer">Contact</a></li>
               </ul>
             </div>
 
             <div>
-              <h5 className="text-[12px] font-bold uppercase tracking-wider text-muted">Legal</h5>
-              <ul className="mt-3 space-y-2 text-[13px] text-muted">
+              <h5 className="text-xs font-bold uppercase tracking-wider text-muted">Legal</h5>
+              <ul className="mt-3 space-y-2.5 text-[13px] text-muted">
                 <li><Link href="/terms" className="transition-colors hover:text-foreground cursor-pointer">Terms</Link></li>
                 <li><Link href="/privacy" className="transition-colors hover:text-foreground cursor-pointer">Privacy</Link></li>
                 <li><Link href="/payout-policy" className="transition-colors hover:text-foreground cursor-pointer">Payout policy</Link></li>
@@ -819,7 +856,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="mt-10 flex flex-col items-start justify-between gap-2 border-t border-border/30 pt-6 text-[12px] text-muted sm:flex-row sm:items-center">
+          <div className="mt-10 flex flex-col items-start justify-between gap-2 border-t border-border/30 pt-6 text-xs text-muted sm:flex-row sm:items-center">
             <p>&copy; {new Date().getFullYear()} cliptwo.</p>
             <p>Made for creators &amp; clippers across India.</p>
           </div>
