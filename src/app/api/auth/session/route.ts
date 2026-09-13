@@ -27,7 +27,8 @@ export async function GET() {
     }
 
     // Fetch the authoritative role from the profiles table.
-    let role: string | null = null;
+    // profiles.role is the SOLE source of truth — never trust user_metadata.
+    let role = "clipper";
     try {
       const { data: profile } = await supabase
         .from("profiles")
@@ -36,24 +37,13 @@ export async function GET() {
         .maybeSingle();
       if (profile?.role) role = profile.role;
     } catch {
-      /* non-fatal — fall back to user_metadata */
-    }
-
-    if (!role) {
-      const meta = (session.user.user_metadata ?? {}) as Record<string, unknown>;
-      if (
-        meta.role === "clipper" ||
-        meta.role === "creator" ||
-        meta.role === "admin"
-      ) {
-        role = meta.role as string;
-      }
+      /* non-fatal — defaults to "clipper" */
     }
 
     return NextResponse.json({
       access_token: session.access_token,
       refresh_token: session.refresh_token,
-      role: role ?? "clipper",
+      role,
     });
   } catch {
     return NextResponse.json(
