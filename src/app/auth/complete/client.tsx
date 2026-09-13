@@ -43,10 +43,10 @@ export default function AuthCompleteClient() {
   useEffect(() => {
     const handleAuth = async () => {
       try {
-        const hash = window.location.hash;
-        const params = new URLSearchParams(hash.substring(1));
-        const accessToken = params.get("access_token");
-        const refreshToken = params.get("refresh_token");
+        // Tokens are passed as URL query parameters by the server callback.
+        const accessToken = searchParams.get("access_token");
+        const refreshToken = searchParams.get("refresh_token");
+        const roleParam = searchParams.get("role");
 
         if (!accessToken || !refreshToken) {
           router.replace("/login?error=oauth_failed");
@@ -77,18 +77,19 @@ export default function AuthCompleteClient() {
         const { data } = await client.auth.getSession();
         const user = data.session?.user;
         const meta = (user?.user_metadata ?? {}) as Record<string, unknown>;
-        const role: string | undefined =
+        const metaRole: string | undefined =
           meta.role === "clipper" || meta.role === "creator" || meta.role === "admin"
             ? (meta.role as string)
             : undefined;
 
-        const desiredRole = searchParams.get("role");
         const storedRole = window.sessionStorage.getItem("cliptwo_oauth_role");
         window.sessionStorage.removeItem("cliptwo_oauth_role");
 
-        const userRole = role ?? desiredRole ?? storedRole ?? "clipper";
+        // Priority: DB role (from callback) > metadata > stored role > default
+        const userRole = roleParam ?? metaRole ?? storedRole ?? "clipper";
 
-        window.history.replaceState({}, "", window.location.pathname);
+        // Clean URL — remove tokens and role from query params
+        window.history.replaceState({}, "", "/auth/complete");
 
         router.replace(
           userRole === "admin"
