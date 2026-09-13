@@ -1073,7 +1073,14 @@ grant execute on function public.update_clip_views(uuid, integer, jsonb) to auth
 -- Stores an immutable snapshot in clip_metrics and updates the clip's
 -- verified_views to the latest verified count.
 --
--- Security: service_role only (backend jobs). The client cannot call this.
+-- SECURITY MODEL:
+--   SECURITY DEFINER — runs as function owner (superuser).
+--   EXECUTE granted to service_role ONLY.
+--   REVOKE from PUBLIC, anon, authenticated (enforced in
+--   phase7a-lock-service-rpcs.sql).
+--   Defense-in-depth: even if privilege boundary is breached, the function
+--   validates clip existence, source, verification_status, and non-negative
+--   views before writing.
 -- ---------------------------------------------------------------------------
 create or replace function public.ingest_clip_metrics(
   p_clip_id uuid,
