@@ -43,12 +43,18 @@ export default function AuthCompleteClient() {
   useEffect(() => {
     const handleAuth = async () => {
       try {
-        // Tokens are passed as URL query parameters by the server callback.
-        const accessToken = searchParams.get("access_token");
-        const refreshToken = searchParams.get("refresh_token");
         const roleParam = searchParams.get("role");
 
-        if (!accessToken || !refreshToken) {
+        // Fetch the session from the server via API.
+        // Tokens are returned in the JSON body over HTTPS — never in the URL.
+        const res = await fetch("/api/auth/session");
+        if (!res.ok) {
+          router.replace("/login?error=oauth_failed");
+          return;
+        }
+
+        const { access_token, refresh_token, role: serverRole } = await res.json();
+        if (!access_token || !refresh_token) {
           router.replace("/login?error=oauth_failed");
           return;
         }
@@ -65,8 +71,8 @@ export default function AuthCompleteClient() {
         });
 
         const { error } = await client.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken,
+          access_token,
+          refresh_token,
         });
 
         if (error) {
@@ -74,22 +80,10 @@ export default function AuthCompleteClient() {
           return;
         }
 
-        const { data } = await client.auth.getSession();
-        const user = data.session?.user;
-        const meta = (user?.user_metadata ?? {}) as Record<string, unknown>;
-        const metaRole: string | undefined =
-          meta.role === "clipper" || meta.role === "creator" || meta.role === "admin"
-            ? (meta.role as string)
-            : undefined;
-
+        // Priority: DB role (from callback/API) > stored role > default
         const storedRole = window.sessionStorage.getItem("cliptwo_oauth_role");
         window.sessionStorage.removeItem("cliptwo_oauth_role");
-
-        // Priority: DB role (from callback) > metadata > stored role > default
-        const userRole = roleParam ?? metaRole ?? storedRole ?? "clipper";
-
-        // Clean URL — remove tokens and role from query params
-        window.history.replaceState({}, "", "/auth/complete");
+        const userRole = serverRole ?? roleParam ?? storedRole ?? "clipper";
 
         router.replace(
           userRole === "admin"
