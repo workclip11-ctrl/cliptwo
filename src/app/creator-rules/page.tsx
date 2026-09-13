@@ -56,7 +56,7 @@ export default function CreatorRulesPage() {
         <p>
           You should review clips within the review window stated in your
           campaign settings. Clips left in pending status for too long may be
-          auto-approved or escalated to admin review.
+          auto-approved or escalated to ClipTwo review.
         </p>
         <p>When rejecting a clip, provide:</p>
         <ul className="list-disc pl-5 mt-2 space-y-1">
@@ -76,7 +76,7 @@ export default function CreatorRulesPage() {
         </p>
         <ul className="list-disc pl-5 mt-2 space-y-1">
           <li>Clips already approved and payable will still be paid from your budget.</li>
-          <li>Pending clips may be rejected at admin discretion.</li>
+          <li>Pending clips may be rejected at ClipTwo discretion.</li>
           <li>Unused budget can be withdrawn at any time.</li>
         </ul>
       </Section>

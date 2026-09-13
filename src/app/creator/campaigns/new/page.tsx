@@ -210,7 +210,7 @@ export default function NewCampaignWizard() {
     const cleanDonts = donts.map((d) => d.trim()).filter(Boolean);
     const cleanReject = rejectionReasons.map((r) => r.trim()).filter(Boolean);
     const approval: CampaignApproval = {
-      afterSubmission: "Manual review by the admin team.",
+      afterSubmission: "Manual review by the ClipTwo team.",
       reviewTime: reviewTime.trim() || undefined,
       criteria: "",
       rejectionReasons: cleanReject,
@@ -310,7 +310,7 @@ export default function NewCampaignWizard() {
       }
 
       // When publishing: create as draft, then show payment screen
-      // The campaign will be published after admin verifies the launch payment
+      // The campaign will be published after ClipTwo verifies the launch payment
       const createdId = await addCampaign(
         buildCampaign({
           sourceAssets: uploadedSourceAssets,

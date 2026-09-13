@@ -74,7 +74,7 @@ const clipperFAQ = [
   },
   {
     q: "When do I get paid?",
-    a: "Earnings move through: Pending → Processing → Paid. Once your clip is approved and the admin initiates payout, the money is sent to your UPI account.",
+    a: "Earnings move through: Pending → Processing → Paid. Once your clip is approved and ClipTwo initiates the payout, the money is sent to your UPI account.",
   },
   {
     q: "What happens if my clip is rejected?",
@@ -105,7 +105,7 @@ const creatorFAQ = [
   },
   {
     q: "How are clips reviewed?",
-    a: "Our admin team reviews each submitted clip and approves or rejects it with a reason. Approved clips go live and start earning. Rejected clips don't earn, and the clipper receives feedback.",
+    a: "The ClipTwo team reviews each submitted clip and approves or rejects it with a reason. Approved clips go live and start earning. Rejected clips don't earn, and the clipper receives feedback.",
   },
   {
     q: "What happens when the budget is exhausted?",

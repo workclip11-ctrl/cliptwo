@@ -37,7 +37,7 @@ export default function PayoutPolicyPage() {
         <p>Earnings move through these stages:</p>
         <ol className="list-decimal pl-5 mt-2 space-y-1">
           <li><strong>Pending</strong> — clip submitted, awaiting review and approval.</li>
-          <li><strong>Processing</strong> — clip approved and payout initiated by admin.</li>
+          <li><strong>Processing</strong> — clip approved and payout initiated by ClipTwo.</li>
           <li><strong>Paid</strong> — payout confirmed and sent to your UPI.</li>
         </ol>
       </Section>

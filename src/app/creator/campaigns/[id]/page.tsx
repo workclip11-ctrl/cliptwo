@@ -398,9 +398,9 @@ export default function CreatorCampaignDetailPage() {
           </p>
           <p className="mt-1 text-[13px] opacity-80">
             {camp.launchPaymentStatus === "submitted"
-              ? "Your campaign will be published after admin verifies your payment."
+              ? "Your campaign will be published after ClipTwo verifies your payment."
               : camp.launchPaymentStatus === "rejected"
-                ? "Contact admin or resubmit payment from the campaign creation page."
+                ? "Contact support or resubmit payment from the campaign creation page."
                 : `Pay ${rup((budget ?? 0) + Math.floor((budget ?? 0) * 0.10))} to publish this campaign.`}
           </p>
         </div>

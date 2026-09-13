@@ -67,7 +67,7 @@ export default function ContentPolicyPage() {
         <ul className="list-disc pl-5 mt-2 space-y-1">
           <li>Rejected during the review process.</li>
           <li>Removed after publication.</li>
-          <li>Flagged for admin review.</li>
+          <li>Flagged for ClipTwo review.</li>
         </ul>
         <p className="mt-2">
           Repeated violations may result in account suspension or permanent ban.

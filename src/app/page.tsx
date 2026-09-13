@@ -34,7 +34,7 @@ const TICKER = ["Find campaigns", "Cut clips", "Post online", "Get paid over UPI
 const TRUST = [
   {
     icon: ShieldCheck,
-    title: "Admin-reviewed clips",
+    title: "ClipTwo-reviewed clips",
     body: "Every clip is reviewed by our team before it's marked approved. No auto-approval, no self-reported metrics — each submission is checked against campaign guidelines.",
   },
   {
@@ -55,7 +55,7 @@ const TRUST = [
   {
     icon: AlertTriangle,
     title: "Fraud protection",
-    body: "Admins review clips for quality and authenticity. Suspicious earnings may be frozen and held for investigation before payout.",
+    body: "ClipTwo reviews clips for quality and authenticity. Suspicious earnings may be frozen and held for investigation before payout.",
   },
 ];
 
@@ -81,7 +81,7 @@ const FAQ_CATEGORIES = [
       },
       {
         q: "When do I get paid?",
-        a: "Earnings move through: Pending → Processing → Paid. Once your clip is approved and the admin initiates payout, the money is sent to your UPI account.",
+        a: "Earnings move through: Pending → Processing → Paid. Once your clip is approved and ClipTwo initiates the payout, the money is sent to your UPI account.",
       },
       {
         q: "What happens if my clip is rejected?",
@@ -110,7 +110,7 @@ const FAQ_CATEGORIES = [
       },
       {
         q: "How are clips reviewed?",
-        a: "Our admin team reviews each submitted clip and approves or rejects it with a reason. Approved clips go live and start earning.",
+        a: "The ClipTwo team reviews each submitted clip and approves or rejects it with a reason. Approved clips go live and start earning.",
       },
       {
         q: "What happens when the budget is exhausted?",
@@ -173,7 +173,7 @@ const CLIPPER_JOURNEY = [
 const CREATOR_JOURNEY = [
   { num: "01", label: "Create a campaign", title: "Set your rate and budget", body: "Pick a CPM, set a total budget, upload your source footage and guidelines. Submit your campaign with the 10% platform fee via UPI — once our team verifies the payment, your campaign goes live.", visual: "launch" },
   { num: "02", label: "Clippers join in", title: "Watch submissions come in", body: "Once verified, your campaign appears on the marketplace. Clippers browse by niche and CPM, claim your brief, and start cutting.", visual: "submissions" },
-  { num: "03", label: "Approve what fits", title: "Admin reviews every clip", body: "Every submitted clip is reviewed by our admin team against your guidelines. Nothing gets paid until admin approval — no auto-approvals, no self-reported metrics.", visual: "review" },
+  { num: "03", label: "Approve what fits", title: "ClipTwo reviews every clip", body: "Every submitted clip is reviewed by the ClipTwo team against your guidelines. Nothing gets paid until ClipTwo approval — no auto-approvals, no self-reported metrics.", visual: "review" },
   { num: "04", label: "Budget tracks views", title: "Spend only on verified performance", body: "Your prepaid budget depletes as clips are approved and views accumulate. Spend goes toward real, verified engagement — nothing speculative.", visual: "budget" },
 ];
 
@@ -587,7 +587,7 @@ export default function Home() {
             </Link>
           </div>
           <div className="mt-6 flex flex-wrap items-center gap-4 text-[13px] text-muted sm:mt-8 sm:gap-5">
-            <span className="flex items-center gap-1.5"><ShieldCheck size={14} className="text-green" /> Admin-reviewed clips</span>
+            <span className="flex items-center gap-1.5"><ShieldCheck size={14} className="text-green" /> ClipTwo-reviewed clips</span>
             <span className="flex items-center gap-1.5"><IndianRupee size={14} className="text-amber" /> UPI-native payouts</span>
           </div>
         </div>
