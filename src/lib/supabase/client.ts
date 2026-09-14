@@ -50,13 +50,18 @@ const storageKey = `cliptwo_auth_${tabId}`;
 // Hybrid storage adapter — proper key-value interface for GoTrueClient.
 //
 // Session data (tokens, user) → sessionStorage (per-tab isolation).
-// PKCE code_verifier → localStorage (shared across tabs).
+// PKCE code_verifier → localStorage with a FIXED key (cross-tab).
 //
-// Why: Supabase's PKCE recovery flow stores the code_verifier when
-// resetPasswordForEmail() is called, but the recovery email link opens
-// in a new tab with a different per-tab storageKey. The verifier must
-// be accessible from any tab for the code exchange to succeed.
+// Why a fixed key: Supabase's PKCE recovery flow stores the code_verifier
+// when resetPasswordForEmail() is called, but the recovery email link opens
+// in a new tab with a different per-tab storageKey. The GoTrue client in
+// the new tab constructs the PKCE lookup key from its OWN storageKey
+// (e.g., "cliptwo_auth_<newTabId>-code-verifier"), which differs from the
+// originating tab's key. By mapping ALL PKCE keys to a single, fixed
+// localStorage key, any tab can find the verifier regardless of which tab
+// initiated the flow.
 // ---------------------------------------------------------------------------
+const FIXED_PKCE_KEY = "cliptwo_pkce_code_verifier";
 const PKCE_VERIFIER_SUFFIX = "-code-verifier";
 
 function isPkceKey(k: string) {
@@ -66,13 +71,13 @@ function isPkceKey(k: string) {
 const hybridStorageAdapter = {
   getItem: async (key: string): Promise<string | null> => {
     if (typeof window === "undefined") return null;
-    if (isPkceKey(key)) return window.localStorage.getItem(key);
+    if (isPkceKey(key)) return window.localStorage.getItem(FIXED_PKCE_KEY);
     return window.sessionStorage.getItem(key);
   },
   setItem: async (key: string, value: string): Promise<void> => {
     if (typeof window === "undefined") return;
     if (isPkceKey(key)) {
-      window.localStorage.setItem(key, value);
+      window.localStorage.setItem(FIXED_PKCE_KEY, value);
     } else {
       window.sessionStorage.setItem(key, value);
     }
@@ -80,7 +85,7 @@ const hybridStorageAdapter = {
   removeItem: async (key: string): Promise<void> => {
     if (typeof window === "undefined") return;
     if (isPkceKey(key)) {
-      window.localStorage.removeItem(key);
+      window.localStorage.removeItem(FIXED_PKCE_KEY);
     } else {
       window.sessionStorage.removeItem(key);
     }
