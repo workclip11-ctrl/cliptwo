@@ -8,51 +8,57 @@ export default function AuthCompleteClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const cleanupRef = useRef<(() => void) | null>(null);
+  const routedRef = useRef(false);
 
   useEffect(() => {
     let active = true;
 
     const run = async () => {
       try {
-        // Supabase's detectSessionInUrl: true (in supabase/client.ts)
-        // automatically processes the ?code= param and exchanges it for
-        // a session. We do NOT call exchangeCodeForSession manually —
-        // that would attempt a double-exchange and fail.
-        //
-        // Check if the session is already available (auto-exchange done).
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        if (session) {
-          if (active) await routeUser(session.user.id);
-          return;
-        }
-
-        // No session yet — the auto-exchange may still be in progress.
-        // Subscribe to auth state changes and wait for SIGNED_IN.
+        // Register the auth-state listener FIRST, before checking
+        // getSession(). This prevents the race condition where
+        // detectSessionInUrl emits SIGNED_IN between getSession()
+        // and onAuthStateChange registration, causing a missed event.
         const {
           data: { subscription },
         } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-          if (!active) return;
+          if (!active || routedRef.current) return;
           if (event === "SIGNED_IN" && newSession) {
+            routedRef.current = true;
             cleanupRef.current?.();
             await routeUser(newSession.user.id);
           }
         });
 
-        // Safety timeout — if no session arrives within 5s, bail out.
+        // Safety timeout — if no session arrives within 8s, bail out.
         const timer = setTimeout(() => {
-          if (active) router.replace("/login?error=oauth_failed");
-        }, 5000);
+          if (active && !routedRef.current) {
+            router.replace("/login?error=oauth_failed");
+          }
+        }, 8000);
 
         cleanupRef.current = () => {
           active = false;
           clearTimeout(timer);
           subscription.unsubscribe();
         };
+
+        // NOW check if the session is already available.
+        // If detectSessionInUrl already completed the exchange,
+        // getSession() returns the session immediately.
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (session && active && !routedRef.current) {
+          routedRef.current = true;
+          cleanupRef.current?.();
+          await routeUser(session.user.id);
+        }
       } catch {
-        if (active) router.replace("/login?error=oauth_failed");
+        if (active && !routedRef.current) {
+          router.replace("/login?error=oauth_failed");
+        }
       }
     };
 
@@ -70,7 +76,7 @@ export default function AuthCompleteClient() {
         /* non-fatal — defaults to "clipper" */
       }
 
-      // Remove the OAuth code from the URL
+      // Remove the OAuth code/state from the URL
       window.history.replaceState({}, "", "/auth/complete");
 
       router.replace(
