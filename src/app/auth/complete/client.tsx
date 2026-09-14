@@ -43,22 +43,17 @@ export default function AuthCompleteClient() {
   useEffect(() => {
     const handleAuth = async () => {
       try {
-        const roleParam = searchParams.get("role");
-
-        // Fetch the session from the server via API.
-        // Tokens are returned in the JSON body over HTTPS — never in the URL.
-        const res = await fetch("/api/auth/session");
-        if (!res.ok) {
+        const code = searchParams.get("code");
+        if (!code) {
           router.replace("/login?error=oauth_failed");
           return;
         }
 
-        const { access_token, refresh_token, role: serverRole } = await res.json();
-        if (!access_token || !refresh_token) {
-          router.replace("/login?error=oauth_failed");
-          return;
-        }
-
+        // Create a per-tab Supabase client with the SAME storageKey and
+        // sessionStorageAdapter as the global client in supabase/client.ts.
+        // The PKCE code_verifier is stored in this tab's sessionStorage
+        // under the per-tab storageKey — it must be found here for the
+        // exchange to succeed.
         const client = createClient(url, key, {
           auth: {
             storageKey,
@@ -70,20 +65,35 @@ export default function AuthCompleteClient() {
           },
         });
 
-        const { error } = await client.auth.setSession({
-          access_token,
-          refresh_token,
-        });
-
+        const { error } = await client.auth.exchangeCodeForSession(code);
         if (error) {
           router.replace("/login?error=oauth_failed");
           return;
         }
 
-        // Priority: DB role (from callback/API) > stored role > default
-        const storedRole = window.sessionStorage.getItem("cliptwo_oauth_role");
-        window.sessionStorage.removeItem("cliptwo_oauth_role");
-        const userRole = serverRole ?? roleParam ?? storedRole ?? "clipper";
+        const {
+          data: { user },
+        } = await client.auth.getUser();
+        if (!user) {
+          router.replace("/login?error=oauth_failed");
+          return;
+        }
+
+        // profiles.role is the SOLE source of truth for authorization.
+        let userRole = "clipper";
+        try {
+          const { data: profile } = await client
+            .from("profiles")
+            .select("role")
+            .eq("id", user.id)
+            .maybeSingle();
+          if (profile?.role) userRole = profile.role;
+        } catch {
+          /* non-fatal — defaults to "clipper" */
+        }
+
+        // Remove the OAuth code from the URL
+        window.history.replaceState({}, "", "/auth/complete");
 
         router.replace(
           userRole === "admin"
