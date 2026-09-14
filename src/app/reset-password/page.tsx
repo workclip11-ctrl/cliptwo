@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { supabase } from "@/lib/supabase/client";
+import { recoveryClient } from "@/lib/supabase/recovery-client";
 
 type Status = "loading" | "ready" | "success" | "error";
 
@@ -26,10 +26,10 @@ export default function ResetPasswordPage() {
       // Supabase's PKCE password recovery sends the user to:
       //   /reset-password?code=<authorization_code>
       //
-      // We must explicitly call exchangeCodeForSession(code) to exchange
-      // the authorization code for a session. The code_verifier was
-      // stored in localStorage (cross-tab) when resetPasswordForEmail()
-      // was called in the originating tab.
+      // We explicitly call exchangeCodeForSession(code) to exchange
+      // the authorization code for a session. The code_verifier is
+      // stored in cookies (via @supabase/ssr recovery client), which
+      // are shared across all tabs on the same domain.
       //
       // After successful exchange, Supabase emits PASSWORD_RECOVERY via
       // onAuthStateChange, which we listen for below.
@@ -40,8 +40,10 @@ export default function ResetPasswordPage() {
 
       if (code) {
         // Exchange the PKCE authorization code for a session.
+        // Uses the recovery client which stores PKCE verifier in cookies
+        // (shared across tabs), so the exchange works in a new tab.
         const { error: exchangeError } =
-          await supabase.auth.exchangeCodeForSession(code);
+          await recoveryClient.auth.exchangeCodeForSession(code);
 
         if (exchangeError) {
           // Surface the actual Supabase error (non-production safe).
@@ -63,7 +65,7 @@ export default function ResetPasswordPage() {
       // This fires after exchangeCodeForSession completes for recovery flows.
       const {
         data: { subscription },
-      } = supabase.auth.onAuthStateChange((event) => {
+      } = recoveryClient.auth.onAuthStateChange((event) => {
         if (!active || settledRef.current) return;
         if (event === "PASSWORD_RECOVERY") {
           settledRef.current = true;
@@ -90,7 +92,7 @@ export default function ResetPasswordPage() {
       // After exchangeCodeForSession, the session should be stored.
       const {
         data: { session },
-      } = await supabase.auth.getSession();
+      } = await recoveryClient.auth.getSession();
 
       if (session && active && !settledRef.current) {
         settledRef.current = true;
@@ -120,7 +122,7 @@ export default function ResetPasswordPage() {
 
     setSubmitting(true);
     try {
-      const { error: updateError } = await supabase.auth.updateUser({
+      const { error: updateError } = await recoveryClient.auth.updateUser({
         password: newPassword,
       });
       if (updateError) {
