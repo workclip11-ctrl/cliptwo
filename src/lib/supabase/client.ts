@@ -20,7 +20,8 @@ export const isSupabaseConfigured = isValidUrl(url);
 //
 // Solution: Use @supabase/supabase-js directly with:
 //   1. A per-tab storageKey → isolates BroadcastChannel per tab
-//   2. A sessionStorage storage adapter → tab-scoped session persistence
+//   2. A hybrid storage adapter → session in sessionStorage (per-tab),
+//      PKCE code_verifier in localStorage (cross-tab, for recovery)
 //   3. persistSession: true → session survives page reload within the tab
 //
 // Server-side auth (middleware, API routes, Server Components) continues to
@@ -46,20 +47,43 @@ const tabId = getTabId();
 // Unique storageKey per tab → unique BroadcastChannel name → no cross-tab events.
 const storageKey = `cliptwo_auth_${tabId}`;
 
-// sessionStorage adapter — proper key-value interface for GoTrueClient.
-// SSR-safe: returns null/no-op when window is unavailable (SSR, static gen).
-const sessionStorageAdapter = {
+// Hybrid storage adapter — proper key-value interface for GoTrueClient.
+//
+// Session data (tokens, user) → sessionStorage (per-tab isolation).
+// PKCE code_verifier → localStorage (shared across tabs).
+//
+// Why: Supabase's PKCE recovery flow stores the code_verifier when
+// resetPasswordForEmail() is called, but the recovery email link opens
+// in a new tab with a different per-tab storageKey. The verifier must
+// be accessible from any tab for the code exchange to succeed.
+// ---------------------------------------------------------------------------
+const PKCE_VERIFIER_SUFFIX = "-code-verifier";
+
+function isPkceKey(k: string) {
+  return k.endsWith(PKCE_VERIFIER_SUFFIX);
+}
+
+const hybridStorageAdapter = {
   getItem: async (key: string): Promise<string | null> => {
     if (typeof window === "undefined") return null;
+    if (isPkceKey(key)) return window.localStorage.getItem(key);
     return window.sessionStorage.getItem(key);
   },
   setItem: async (key: string, value: string): Promise<void> => {
     if (typeof window === "undefined") return;
-    window.sessionStorage.setItem(key, value);
+    if (isPkceKey(key)) {
+      window.localStorage.setItem(key, value);
+    } else {
+      window.sessionStorage.setItem(key, value);
+    }
   },
   removeItem: async (key: string): Promise<void> => {
     if (typeof window === "undefined") return;
-    window.sessionStorage.removeItem(key);
+    if (isPkceKey(key)) {
+      window.localStorage.removeItem(key);
+    } else {
+      window.sessionStorage.removeItem(key);
+    }
   },
 };
 
@@ -69,7 +93,7 @@ export const supabase = createClient(
   {
     auth: {
       storageKey,
-      storage: sessionStorageAdapter,
+      storage: hybridStorageAdapter,
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
