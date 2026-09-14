@@ -286,6 +286,13 @@ function AuthForm() {
                 placeholder="••••••••"
                 className="h-11 w-full rounded-[10px] border border-border/60 bg-card px-4 text-[14px] outline-none transition-colors focus:border-foreground/30"
               />
+              {mode === "signin" && (
+                <div className="mt-1.5 flex justify-end">
+                  <Link href="/forgot-password" className="text-[13px] text-muted transition-colors hover:text-foreground">
+                    Forgot password?
+                  </Link>
+                </div>
+              )}
             </div>
 
             {/* Error */}
