@@ -67,6 +67,11 @@ export default function AuthCompleteClient() {
 
         const { error } = await client.auth.exchangeCodeForSession(code);
         if (error) {
+          console.error("[auth/complete] exchangeCodeForSession failed:", {
+            name: error.name,
+            message: error.message,
+            status: error.status,
+          });
           router.replace("/login?error=oauth_failed");
           return;
         }
