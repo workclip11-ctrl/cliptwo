@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { recoveryClient } from "@/lib/supabase/recovery-client";
+import { supabase } from "@/lib/supabase/client";
 
 type Status = "loading" | "ready" | "success" | "error";
 
@@ -13,91 +13,67 @@ export default function ResetPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const cleanupRef = useRef<(() => void) | null>(null);
   const settledRef = useRef(false);
 
   useEffect(() => {
     let active = true;
 
     const run = async () => {
-      // ----------------------------------------------------------------
-      // PKCE recovery flow — explicit code exchange
-      //
-      // Supabase's PKCE password recovery sends the user to:
-      //   /reset-password?code=<authorization_code>
-      //
-      // We explicitly call exchangeCodeForSession(code) to exchange
-      // the authorization code for a session. The code_verifier is
-      // stored in cookies (via @supabase/ssr recovery client), which
-      // are shared across all tabs on the same domain.
-      //
-      // After successful exchange, Supabase emits PASSWORD_RECOVERY via
-      // onAuthStateChange, which we listen for below.
-      // ----------------------------------------------------------------
-
       const params = new URLSearchParams(window.location.search);
       const code = params.get("code");
+      const flowId = params.get("sb_flow_id");
 
       if (code) {
-        // Exchange the PKCE authorization code for a session.
-        // Uses the recovery client which stores PKCE verifier in cookies
-        // (shared across tabs), so the exchange works in a new tab.
-        const { error: exchangeError } =
-          await recoveryClient.auth.exchangeCodeForSession(code);
+        const res = await fetch("/api/auth/recovery/exchange", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, flowId }),
+        });
 
-        if (exchangeError) {
-          // Surface the actual Supabase error (non-production safe).
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
           if (active && !settledRef.current) {
             settledRef.current = true;
             setStatus("error");
             setError(
-              `Reset link invalid or expired (${exchangeError.message}). Please request a new one.`,
+              `Reset link invalid or expired (${body.error || "unknown error"}). Please request a new one.`,
             );
           }
           return;
         }
 
-        // Clean the code from the URL so it can't be reused.
-        window.history.replaceState({}, "", "/reset-password");
-      }
+        const body = await res.json();
 
-      // Register the auth-state listener to catch PASSWORD_RECOVERY.
-      // This fires after exchangeCodeForSession completes for recovery flows.
-      const {
-        data: { subscription },
-      } = recoveryClient.auth.onAuthStateChange((event) => {
-        if (!active || settledRef.current) return;
-        if (event === "PASSWORD_RECOVERY") {
+        if (body.session?.access_token && body.session?.refresh_token) {
+          await supabase.auth.setSession({
+            access_token: body.session.access_token,
+            refresh_token: body.session.refresh_token,
+          });
+        }
+
+        window.history.replaceState({}, "", "/reset-password");
+
+        if (active && !settledRef.current) {
           settledRef.current = true;
-          cleanupRef.current?.();
           setStatus("ready");
         }
-      });
+        return;
+      }
 
-      // Safety timeout — if no session arrives within 10s, bail out.
-      const timer = setTimeout(() => {
-        if (active && !settledRef.current) {
-          setStatus("error");
-          setError("Invalid or expired reset link. Please request a new one.");
-        }
-      }, 10_000);
-
-      cleanupRef.current = () => {
-        active = false;
-        clearTimeout(timer);
-        subscription.unsubscribe();
-      };
-
-      // Check if a recovery session is already available.
-      // After exchangeCodeForSession, the session should be stored.
       const {
         data: { session },
-      } = await recoveryClient.auth.getSession();
+      } = await supabase.auth.getSession();
 
       if (session && active && !settledRef.current) {
         settledRef.current = true;
-        cleanupRef.current?.();
         setStatus("ready");
+        return;
+      }
+
+      if (active && !settledRef.current) {
+        settledRef.current = true;
+        setStatus("error");
+        setError("Invalid or expired reset link. Please request a new one.");
       }
     };
 
@@ -105,7 +81,6 @@ export default function ResetPasswordPage() {
 
     return () => {
       active = false;
-      cleanupRef.current?.();
     };
   }, []);
 
@@ -122,7 +97,7 @@ export default function ResetPasswordPage() {
 
     setSubmitting(true);
     try {
-      const { error: updateError } = await recoveryClient.auth.updateUser({
+      const { error: updateError } = await supabase.auth.updateUser({
         password: newPassword,
       });
       if (updateError) {

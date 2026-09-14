@@ -4,7 +4,6 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
-import { recoveryClient } from "@/lib/supabase/recovery-client";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -25,11 +24,12 @@ export default function ForgotPasswordPage() {
 
     setLoading(true);
     try {
-      const { error: resetError } =
-        await recoveryClient.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/reset-password`,
-        });
-      if (resetError) {
+      const res = await fetch("/api/auth/recovery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) {
         setError("Something went wrong. Please try again.");
         return;
       }
