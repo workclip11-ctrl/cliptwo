@@ -12,10 +12,12 @@ import { NextResponse } from "next/server";
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
+  const state = searchParams.get("state");
 
   if (code) {
     const redirectTo = new URL("/auth/complete", origin);
     redirectTo.searchParams.set("code", code);
+    if (state) redirectTo.searchParams.set("state", state);
     return NextResponse.redirect(redirectTo);
   }
 
