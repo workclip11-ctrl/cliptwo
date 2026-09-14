@@ -2,39 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
-
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
-
-const TAB_ID_KEY = "cliptwo_tab_id";
-
-function getTabId(): string {
-  if (typeof window === "undefined") return "server";
-  let id = window.sessionStorage.getItem(TAB_ID_KEY);
-  if (!id) {
-    id = crypto.randomUUID();
-    window.sessionStorage.setItem(TAB_ID_KEY, id);
-  }
-  return id;
-}
-
-const storageKey = `cliptwo_auth_${getTabId()}`;
-
-const sessionStorageAdapter = {
-  getItem: async (k: string): Promise<string | null> => {
-    if (typeof window === "undefined") return null;
-    return window.sessionStorage.getItem(k);
-  },
-  setItem: async (k: string, v: string): Promise<void> => {
-    if (typeof window === "undefined") return;
-    window.sessionStorage.setItem(k, v);
-  },
-  removeItem: async (k: string): Promise<void> => {
-    if (typeof window === "undefined") return;
-    window.sessionStorage.removeItem(k);
-  },
-};
+import { supabase } from "@/lib/supabase/client";
 
 export default function AuthCompleteClient() {
   const router = useRouter();
@@ -49,23 +17,12 @@ export default function AuthCompleteClient() {
           return;
         }
 
-        // Create a per-tab Supabase client with the SAME storageKey and
-        // sessionStorageAdapter as the global client in supabase/client.ts.
-        // The PKCE code_verifier is stored in this tab's sessionStorage
-        // under the per-tab storageKey — it must be found here for the
-        // exchange to succeed.
-        const client = createClient(url, key, {
-          auth: {
-            storageKey,
-            storage: sessionStorageAdapter,
-            persistSession: true,
-            autoRefreshToken: true,
-            detectSessionInUrl: false,
-            flowType: "pkce",
-          },
-        });
-
-        const { error } = await client.auth.exchangeCodeForSession(code);
+        // Use the SAME singleton supabase client that started the OAuth
+        // flow in supabase/client.ts. The PKCE code_verifier is stored
+        // in this tab's sessionStorage under that client's storageKey.
+        // A second client — even with the same storageKey — cannot
+        // reliably find the flow state.
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (error) {
           console.error("[auth/complete] exchangeCodeForSession failed:", {
             name: error.name,
@@ -78,7 +35,7 @@ export default function AuthCompleteClient() {
 
         const {
           data: { user },
-        } = await client.auth.getUser();
+        } = await supabase.auth.getUser();
         if (!user) {
           router.replace("/login?error=oauth_failed");
           return;
@@ -87,7 +44,7 @@ export default function AuthCompleteClient() {
         // profiles.role is the SOLE source of truth for authorization.
         let userRole = "clipper";
         try {
-          const { data: profile } = await client
+          const { data: profile } = await supabase
             .from("profiles")
             .select("role")
             .eq("id", user.id)
