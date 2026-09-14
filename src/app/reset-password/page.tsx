@@ -20,9 +20,47 @@ export default function ResetPasswordPage() {
     let active = true;
 
     const run = async () => {
-      // Register the auth-state listener FIRST to avoid race conditions.
-      // Supabase's detectSessionInUrl processes the recovery token from
-      // the URL hash and emits PASSWORD_RECOVERY with a recovery session.
+      // ----------------------------------------------------------------
+      // PKCE recovery flow — explicit code exchange
+      //
+      // Supabase's PKCE password recovery sends the user to:
+      //   /reset-password?code=<authorization_code>
+      //
+      // We must explicitly call exchangeCodeForSession(code) to exchange
+      // the authorization code for a session. The code_verifier was
+      // stored in localStorage (cross-tab) when resetPasswordForEmail()
+      // was called in the originating tab.
+      //
+      // After successful exchange, Supabase emits PASSWORD_RECOVERY via
+      // onAuthStateChange, which we listen for below.
+      // ----------------------------------------------------------------
+
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+
+      if (code) {
+        // Exchange the PKCE authorization code for a session.
+        const { error: exchangeError } =
+          await supabase.auth.exchangeCodeForSession(code);
+
+        if (exchangeError) {
+          // Surface the actual Supabase error (non-production safe).
+          if (active && !settledRef.current) {
+            settledRef.current = true;
+            setStatus("error");
+            setError(
+              `Reset link invalid or expired (${exchangeError.message}). Please request a new one.`,
+            );
+          }
+          return;
+        }
+
+        // Clean the code from the URL so it can't be reused.
+        window.history.replaceState({}, "", "/reset-password");
+      }
+
+      // Register the auth-state listener to catch PASSWORD_RECOVERY.
+      // This fires after exchangeCodeForSession completes for recovery flows.
       const {
         data: { subscription },
       } = supabase.auth.onAuthStateChange((event) => {
@@ -34,12 +72,13 @@ export default function ResetPasswordPage() {
         }
       });
 
+      // Safety timeout — if no session arrives within 10s, bail out.
       const timer = setTimeout(() => {
         if (active && !settledRef.current) {
           setStatus("error");
           setError("Invalid or expired reset link. Please request a new one.");
         }
-      }, 10000);
+      }, 10_000);
 
       cleanupRef.current = () => {
         active = false;
@@ -48,15 +87,12 @@ export default function ResetPasswordPage() {
       };
 
       // Check if a recovery session is already available.
+      // After exchangeCodeForSession, the session should be stored.
       const {
         data: { session },
       } = await supabase.auth.getSession();
 
       if (session && active && !settledRef.current) {
-        // A session exists — but we only want recovery sessions, not
-        // normal login sessions. Supabase sets the recovery session
-        // via the URL hash. If we're on this page with a valid session,
-        // it's a recovery session.
         settledRef.current = true;
         cleanupRef.current?.();
         setStatus("ready");

@@ -63,20 +63,21 @@ const storageKey = `cliptwo_auth_${tabId}`;
 // ---------------------------------------------------------------------------
 const FIXED_PKCE_KEY = "cliptwo_pkce_code_verifier";
 const PKCE_VERIFIER_SUFFIX = "-code-verifier";
+const FLOW_INDEX_SUFFIX = "-flows-code-verifier";
 
-function isPkceKey(k: string) {
-  return k.endsWith(PKCE_VERIFIER_SUFFIX);
+function isPkceVerifierKey(k: string) {
+  return k.endsWith(PKCE_VERIFIER_SUFFIX) && !k.endsWith(FLOW_INDEX_SUFFIX);
 }
 
 const hybridStorageAdapter = {
   getItem: async (key: string): Promise<string | null> => {
     if (typeof window === "undefined") return null;
-    if (isPkceKey(key)) return window.localStorage.getItem(FIXED_PKCE_KEY);
+    if (isPkceVerifierKey(key)) return window.localStorage.getItem(FIXED_PKCE_KEY);
     return window.sessionStorage.getItem(key);
   },
   setItem: async (key: string, value: string): Promise<void> => {
     if (typeof window === "undefined") return;
-    if (isPkceKey(key)) {
+    if (isPkceVerifierKey(key)) {
       window.localStorage.setItem(FIXED_PKCE_KEY, value);
     } else {
       window.sessionStorage.setItem(key, value);
@@ -84,7 +85,7 @@ const hybridStorageAdapter = {
   },
   removeItem: async (key: string): Promise<void> => {
     if (typeof window === "undefined") return;
-    if (isPkceKey(key)) {
+    if (isPkceVerifierKey(key)) {
       window.localStorage.removeItem(FIXED_PKCE_KEY);
     } else {
       window.sessionStorage.removeItem(key);
