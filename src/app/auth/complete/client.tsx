@@ -1,75 +1,93 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 
 export default function AuthCompleteClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const cleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    const handleAuth = async () => {
+    let active = true;
+
+    const run = async () => {
       try {
-        const code = searchParams.get("code");
-        if (!code) {
-          router.replace("/login?error=oauth_failed");
-          return;
-        }
-
-        // Use the SAME singleton supabase client that started the OAuth
-        // flow in supabase/client.ts. The PKCE code_verifier is stored
-        // in this tab's sessionStorage under that client's storageKey.
-        // A second client — even with the same storageKey — cannot
-        // reliably find the flow state.
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (error) {
-          console.error("[auth/complete] exchangeCodeForSession failed:", {
-            name: error.name,
-            message: error.message,
-            status: error.status,
-          });
-          router.replace("/login?error=oauth_failed");
-          return;
-        }
-
+        // Supabase's detectSessionInUrl: true (in supabase/client.ts)
+        // automatically processes the ?code= param and exchanges it for
+        // a session. We do NOT call exchangeCodeForSession manually —
+        // that would attempt a double-exchange and fail.
+        //
+        // Check if the session is already available (auto-exchange done).
         const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (!user) {
-          router.replace("/login?error=oauth_failed");
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (session) {
+          if (active) await routeUser(session.user.id);
           return;
         }
 
-        // profiles.role is the SOLE source of truth for authorization.
-        let userRole = "clipper";
-        try {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("role")
-            .eq("id", user.id)
-            .maybeSingle();
-          if (profile?.role) userRole = profile.role;
-        } catch {
-          /* non-fatal — defaults to "clipper" */
-        }
+        // No session yet — the auto-exchange may still be in progress.
+        // Subscribe to auth state changes and wait for SIGNED_IN.
+        const {
+          data: { subscription },
+        } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+          if (!active) return;
+          if (event === "SIGNED_IN" && newSession) {
+            cleanupRef.current?.();
+            await routeUser(newSession.user.id);
+          }
+        });
 
-        // Remove the OAuth code from the URL
-        window.history.replaceState({}, "", "/auth/complete");
+        // Safety timeout — if no session arrives within 5s, bail out.
+        const timer = setTimeout(() => {
+          if (active) router.replace("/login?error=oauth_failed");
+        }, 5000);
 
-        router.replace(
-          userRole === "admin"
-            ? "/admin"
-            : userRole === "creator"
-              ? "/creator"
-              : "/clipper",
-        );
+        cleanupRef.current = () => {
+          active = false;
+          clearTimeout(timer);
+          subscription.unsubscribe();
+        };
       } catch {
-        router.replace("/login?error=oauth_failed");
+        if (active) router.replace("/login?error=oauth_failed");
       }
     };
 
-    handleAuth();
+    const routeUser = async (userId: string) => {
+      // profiles.role is the SOLE source of truth for authorization.
+      let userRole = "clipper";
+      try {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", userId)
+          .maybeSingle();
+        if (profile?.role) userRole = profile.role;
+      } catch {
+        /* non-fatal — defaults to "clipper" */
+      }
+
+      // Remove the OAuth code from the URL
+      window.history.replaceState({}, "", "/auth/complete");
+
+      router.replace(
+        userRole === "admin"
+          ? "/admin"
+          : userRole === "creator"
+            ? "/creator"
+            : "/clipper",
+      );
+    };
+
+    run();
+
+    return () => {
+      active = false;
+      cleanupRef.current?.();
+    };
   }, [router, searchParams]);
 
   return (
