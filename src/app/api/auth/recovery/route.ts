@@ -57,5 +57,8 @@ export async function POST(request: Request) {
     response.cookies.set(name, value, options as Parameters<typeof response.cookies.set>[2]);
   }
 
+  response.headers.set("x-diag-recovery-cookie-count", String(pendingCookies.length));
+  response.headers.set("x-diag-recovery-cookie-names", pendingCookies.map((c) => c.name).join(","));
+
   return response;
 }

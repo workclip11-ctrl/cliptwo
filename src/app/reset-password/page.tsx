@@ -30,19 +30,28 @@ export default function ResetPasswordPage() {
           body: JSON.stringify({ code, flowId }),
         });
 
+        const diagInfo = [
+          "slot=" + (res.headers.get("x-diag-slot-exists") ?? "?"),
+          "flowId=" + (res.headers.get("x-diag-flow-id-present") ?? "?"),
+          "cookies=" + (res.headers.get("x-diag-exchange-cookie-count") ?? "?"),
+          "names=" + (res.headers.get("x-diag-exchange-cookie-names") ?? "?"),
+        ].join(" | ");
+
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
+          console.log("[DIAG exchange response]", diagInfo, "error:", body.error);
           if (active && !settledRef.current) {
             settledRef.current = true;
             setStatus("error");
             setError(
-              `Reset link invalid or expired (${body.error || "unknown error"}). Please request a new one.`,
+              `Reset link invalid or expired (${body.error || "unknown error"}). Please request a new one. [${diagInfo}]`,
             );
           }
           return;
         }
 
         const body = await res.json();
+        console.log("[DIAG exchange response]", diagInfo, "ok");
 
         if (body.session?.access_token && body.session?.refresh_token) {
           await supabase.auth.setSession({
