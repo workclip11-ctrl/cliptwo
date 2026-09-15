@@ -27,6 +27,7 @@ export default function ResetPasswordPage() {
         const res = await fetch("/api/auth/recovery/exchange", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({ code, flowId }),
         });
 
