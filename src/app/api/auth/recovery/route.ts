@@ -1,11 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
   const { email } = await request.json();
 
   if (!email || typeof email !== "string") {
-    return Response.json({ error: "Email is required." }, { status: 400 });
+    return NextResponse.json({ error: "Email is required." }, { status: 400 });
   }
 
   const cookieStore = await cookies();
@@ -19,13 +20,9 @@ export async function POST(request: Request) {
           return cookieStore.getAll();
         },
         setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options),
-            );
-          } catch {
-            // Called from a Route Handler — safe to ignore; we propagate via response.
-          }
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options),
+          );
         },
       },
     },
@@ -36,8 +33,8 @@ export async function POST(request: Request) {
   });
 
   if (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return Response.json({ ok: true });
+  return NextResponse.json({ ok: true });
 }

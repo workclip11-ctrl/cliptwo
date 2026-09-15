@@ -1,11 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
   const { code, flowId } = await request.json();
 
   if (!code || typeof code !== "string") {
-    return Response.json({ error: "Code is required." }, { status: 400 });
+    return NextResponse.json({ error: "Code is required." }, { status: 400 });
   }
 
   const cookieStore = await cookies();
@@ -19,13 +20,9 @@ export async function POST(request: Request) {
           return cookieStore.getAll();
         },
         setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options),
-            );
-          } catch {
-            // Called from a Route Handler — safe to ignore; we propagate via response.
-          }
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options),
+          );
         },
       },
     },
@@ -36,10 +33,10 @@ export async function POST(request: Request) {
   });
 
   if (error) {
-    return Response.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  return Response.json({
+  return NextResponse.json({
     ok: true,
     session: data.session,
     user: data.user,
