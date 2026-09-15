@@ -11,6 +11,14 @@ export async function POST(request: Request) {
 
   const cookieStore = await cookies();
 
+  // Collect cookies from @supabase/ssr during exchangeCodeForSession() and
+  // apply them to the response explicitly via response.cookies.set().
+  const pendingCookies: {
+    name: string;
+    value: string;
+    options: Record<string, unknown>;
+  }[] = [];
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -20,9 +28,9 @@ export async function POST(request: Request) {
           return cookieStore.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options),
-          );
+          for (const { name, value, options } of cookiesToSet) {
+            pendingCookies.push({ name, value, options });
+          }
         },
       },
     },
@@ -36,9 +44,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  return NextResponse.json({
+  const response = NextResponse.json({
     ok: true,
     session: data.session,
     user: data.user,
   });
+
+  for (const { name, value, options } of pendingCookies) {
+    response.cookies.set(name, value, options as Parameters<typeof response.cookies.set>[2]);
+  }
+
+  return response;
 }
