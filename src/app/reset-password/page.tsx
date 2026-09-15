@@ -19,48 +19,21 @@ export default function ResetPasswordPage() {
     let active = true;
 
     const run = async () => {
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get("code");
-      const flowId = params.get("sb_flow_id");
-
-      if (code) {
-        const res = await fetch("/api/auth/recovery/exchange", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ code, flowId }),
-        });
-
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          if (active && !settledRef.current) {
-            settledRef.current = true;
-            setStatus("error");
-            setError(
-              `Reset link invalid or expired (${body.error || "unknown error"}). Please request a new one.`,
-            );
-          }
-          return;
-        }
-
-        const body = await res.json();
-
-        if (body.session?.access_token && body.session?.refresh_token) {
-          await supabase.auth.setSession({
-            access_token: body.session.access_token,
-            refresh_token: body.session.refresh_token,
-          });
-        }
-
+      // If the middleware redirected here after a failed exchange, it sets
+      // #error=reset_expired in the URL hash.
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      if (hashParams.get("error") === "reset_expired") {
         window.history.replaceState({}, "", "/reset-password");
-
         if (active && !settledRef.current) {
           settledRef.current = true;
-          setStatus("ready");
+          setStatus("error");
+          setError("Reset link invalid or expired. Please request a new one.");
         }
         return;
       }
 
+      // The middleware already exchanged the code for a session server-side
+      // and redirected here without query params. Just check for a session.
       const {
         data: { session },
       } = await supabase.auth.getSession();
