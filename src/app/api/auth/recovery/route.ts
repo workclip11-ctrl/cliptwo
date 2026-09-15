@@ -11,10 +11,8 @@ export async function POST(request: Request) {
 
   const cookieStore = await cookies();
 
-  // Collect cookies from @supabase/ssr during resetPasswordForEmail() and
-  // apply them to the response explicitly via response.cookies.set().
-  // Using cookieStore.set() alone does NOT propagate Set-Cookie headers to
-  // a NextResponse.json() response in Next.js 16.
+  const isSecure = (process.env.NEXT_PUBLIC_APP_URL || "").startsWith("https://");
+
   const pendingCookies: {
     name: string;
     value: string;
@@ -54,11 +52,11 @@ export async function POST(request: Request) {
   const response = NextResponse.json({ ok: true });
 
   for (const { name, value, options } of pendingCookies) {
-    response.cookies.set(name, value, options as Parameters<typeof response.cookies.set>[2]);
+    response.cookies.set(name, value, {
+      ...options,
+      secure: isSecure,
+    } as Parameters<typeof response.cookies.set>[2]);
   }
-
-  response.headers.set("x-diag-recovery-cookie-count", String(pendingCookies.length));
-  response.headers.set("x-diag-recovery-cookie-names", pendingCookies.map((c) => c.name).join(","));
 
   return response;
 }
