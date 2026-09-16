@@ -112,10 +112,10 @@ export function MobileSidebar({
                 key={n.href}
                 href={n.href}
                 onClick={onClose}
-                className={`flex cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-[15px] font-medium transition-colors ${
+                className={`flex cursor-pointer items-center gap-3 rounded-lg border-l-2 px-4 py-3 text-[15px] font-medium transition-colors ${
                   active
-                    ? "bg-accent-soft text-foreground"
-                    : "text-muted hover:bg-accent-soft/60 hover:text-foreground"
+                    ? "border-foreground bg-accent-soft text-foreground font-semibold"
+                    : "border-transparent text-muted hover:bg-accent-soft/60 hover:text-foreground"
                 }`}
               >
                 <n.icon size={18} /> {n.label}

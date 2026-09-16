@@ -83,10 +83,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             <div className="sticky top-20 space-y-6">
               {NAV_GROUPS.map((group) => (
                 <div key={group.label}>
-                  <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-widest text-muted">
+                  <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-widest text-muted">
                     {group.label}
                   </p>
-                  <nav className="flex flex-col gap-0.5">
+                  <nav className="flex flex-col gap-1">
                     {group.items.map((n) => {
                       const active =
                         n.exact
@@ -106,13 +106,13 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                         <Link
                           key={n.href}
                           href={n.href}
-                          className={`flex cursor-pointer items-center gap-2.5 rounded-[8px] px-3 py-2 text-[14px] font-medium transition-colors duration-150 ${
+                          className={`flex cursor-pointer items-center gap-2.5 rounded-lg border-l-2 px-3 py-2.5 text-[15px] font-medium transition-colors duration-150 ${
                             active
-                              ? "bg-foreground text-background"
-                              : "text-muted hover:bg-accent-soft/60 hover:text-foreground"
+                              ? "border-foreground bg-accent-soft text-foreground font-semibold"
+                              : "border-transparent text-muted hover:bg-accent-soft/60 hover:text-foreground"
                           }`}
                         >
-                          <n.icon size={15} /> {n.label}
+                          <n.icon size={18} /> {n.label}
                         </Link>
                       );
                     })}

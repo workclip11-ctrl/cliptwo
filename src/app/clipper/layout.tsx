@@ -60,7 +60,7 @@ export default function ClipperLayout({ children }: { children: ReactNode }) {
 
           {/* Desktop sidebar */}
           <aside className="hidden w-56 shrink-0 lg:block">
-            <div className="sticky top-24 space-y-6">
+            <div className="sticky top-20 space-y-6">
               {GROUPS.map((group) => (
                 <div key={group.label}>
                   <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-widest text-muted">
@@ -76,16 +76,15 @@ export default function ClipperLayout({ children }: { children: ReactNode }) {
                         <Link
                           key={n.href}
                           href={n.href}
-                          className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-[15px] font-medium transition-all duration-150 ${
+                          className={`flex items-center gap-2.5 rounded-lg border-l-2 px-3 py-2.5 text-[15px] font-medium transition-colors duration-150 ${
                             active
-                              ? "bg-foreground text-white shadow-sm"
-                              : "text-muted hover:bg-accent-soft hover:text-foreground"
+                              ? "border-foreground bg-accent-soft text-foreground font-semibold"
+                              : "border-transparent text-muted hover:bg-accent-soft/60 hover:text-foreground"
                           }`}
                         >
                           <n.icon
                             size={18}
                             strokeWidth={active ? 2 : 1.5}
-                            className={active ? "text-white" : ""}
                           />
                           {n.label}
                         </Link>
