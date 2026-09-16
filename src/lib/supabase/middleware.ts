@@ -61,8 +61,14 @@ export async function updateSession(request: NextRequest) {
           }
           return res;
         }
-      } catch {
-        // Exchange failed — fall through to redirect with error.
+
+        console.error("[RESET DIAGNOSTIC]", {
+          message: error.message,
+          code: error.code,
+          status: error.status,
+        });
+      } catch (err) {
+        console.error("[RESET DIAGNOSTIC] exchangeCodeForSession threw:", err instanceof Error ? err.message : String(err));
       }
 
       const errorUrl = request.nextUrl.clone();
