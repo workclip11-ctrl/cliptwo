@@ -66,7 +66,7 @@ export default function ClipperLayout({ children }: { children: ReactNode }) {
                   <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-widest text-muted">
                     {group.label}
                   </p>
-                  <nav className="flex flex-col gap-1">
+                  <nav className="flex flex-col">
                     {group.items.map((n) => {
                       const active = n.exact
                         ? pathname === n.href
@@ -76,16 +76,13 @@ export default function ClipperLayout({ children }: { children: ReactNode }) {
                         <Link
                           key={n.href}
                           href={n.href}
-                          className={`flex items-center gap-2.5 rounded-lg border-l-2 px-3 py-2.5 text-[15px] font-medium transition-colors duration-150 ${
+                          className={`flex items-center gap-2 px-1.5 py-[6px] text-[15px] transition-colors duration-150 ${
                             active
-                              ? "border-foreground bg-accent-soft text-foreground font-semibold"
-                              : "border-transparent text-muted hover:bg-accent-soft/60 hover:text-foreground"
+                              ? "bg-accent-soft text-foreground font-semibold"
+                              : "text-muted hover:text-foreground"
                           }`}
                         >
-                          <n.icon
-                            size={18}
-                            strokeWidth={active ? 2 : 1.5}
-                          />
+                          <n.icon size={18} strokeWidth={active ? 2 : 1.5} />
                           {n.label}
                         </Link>
                       );
