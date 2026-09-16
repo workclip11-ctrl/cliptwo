@@ -923,6 +923,14 @@ begin
     raise exception 'Only the campaign owner can perform this action';
   end if;
 
+  -- Active creator enforcement: suspended/deactivated creators cannot perform mutations
+  if not exists (
+    select 1 from public.profiles
+    where id = v_actor and role = 'creator' and status = 'active'
+  ) then
+    raise exception 'Only active creators can perform campaign actions';
+  end if;
+
   -- Validate state transitions
   case p_action
     when 'pause' then
@@ -1010,7 +1018,13 @@ begin
 
   -- Authorization: campaign owner or admin
   if v_campaign.created_by is not null and v_campaign.created_by = v_actor then
-    null; -- Owner adjusting own campaign
+    -- Active creator enforcement: suspended/deactivated creators cannot adjust budgets
+    if not exists (
+      select 1 from public.profiles
+      where id = v_actor and role = 'creator' and status = 'active'
+    ) then
+      raise exception 'Only active creators can adjust campaign budgets';
+    end if;
   elsif public.is_admin() then
     null; -- Admin adjusting campaign
   else
@@ -1959,26 +1973,61 @@ $$;
 grant execute on function public.update_earning_status(uuid, text, text) to authenticated;
 
 -- ---------------------------------------------------------------------------
--- RPC: Get wallet balance derived from authoritative ledger records.
--- Positive = credit, negative = debit. Never stored, always computed.
+-- RPC: Get wallet balance derived from authoritative financial records.
+-- Available = sum(processing records) - sum(pending/processing payout requests)
+-- processing = finalized earnings available for withdrawal
+-- paid records are excluded from the processing sum automatically, so paid
+-- payout requests must NOT be subtracted (same logic as request_payout).
 -- ---------------------------------------------------------------------------
 create or replace function public.get_wallet_balance(p_user_id uuid)
 returns jsonb
-language sql
+language plpgsql
 security definer
 set search_path = public
 as $$
-  select jsonb_build_object(
+DECLARE
+  v_caller uuid;
+BEGIN
+  v_caller := auth.uid();
+  IF v_caller IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  -- Authorization: user can only query own balance, admins can query any
+  IF v_caller != p_user_id AND NOT public.is_admin() THEN
+    RAISE EXCEPTION 'Not authorized to view this wallet balance';
+  END IF;
+
+  RETURN jsonb_build_object(
     'user_id', p_user_id,
-    'balance', coalesce(sum(amount), 0),
+    'available', coalesce((
+      SELECT sum(fr.net_amount)
+      FROM public.financial_records fr
+      WHERE fr.clipper_id = p_user_id AND fr.status = 'processing'
+    ), 0)
+      - coalesce((
+      SELECT sum(pr.net_amount)
+      FROM public.payout_requests pr
+      WHERE pr.user_id = p_user_id AND pr.status IN ('pending', 'processing')
+    ), 0),
     'currency', 'INR',
-    'total_credits', coalesce(sum(amount) filter (where amount > 0), 0),
-    'total_debits', coalesce(sum(amount) filter (where amount < 0), 0),
-    'entry_count', count(*),
-    'available', coalesce(sum(amount), 0)  -- balance = available (no separate pending bucket in ledger)
-  )
-  from public.wallet_ledger
-  where user_id = p_user_id;
+    'total_earned', coalesce((
+      SELECT sum(fr.net_amount)
+      FROM public.financial_records fr
+      WHERE fr.clipper_id = p_user_id
+    ), 0),
+    'total_paid', coalesce((
+      SELECT sum(fr.net_amount)
+      FROM public.financial_records fr
+      WHERE fr.clipper_id = p_user_id AND fr.status = 'paid'
+    ), 0),
+    'total_requested', coalesce((
+      SELECT sum(pr.net_amount)
+      FROM public.payout_requests pr
+      WHERE pr.user_id = p_user_id AND pr.status IN ('pending', 'processing', 'paid')
+    ), 0)
+  );
+END;
 $$;
 
 grant execute on function public.get_wallet_balance(uuid) to authenticated;

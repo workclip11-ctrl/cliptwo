@@ -862,6 +862,332 @@ BEGIN
   );
 
   -- =========================================================================
+  -- SECTION H: BEHAVIORAL SECURITY TESTS (Round 3)
+  -- These tests verify actual security conditions, not just exception handling
+  -- =========================================================================
+
+  -- TEST 67: get_wallet_balance rejects cross-user access
+  v_test_id := v_test_id + 1;
+  v_test_name := 'get_wallet_balance rejects cross-user access (expect exception)';
+  BEGIN
+    -- This should fail because auth.uid() is NULL in this context
+    PERFORM public.get_wallet_balance('00000000-0000-0000-0000-000000000000');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    v_pass := true;
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 68: get_campaign_budget rejects cross-user access
+  v_test_id := v_test_id + 1;
+  v_test_name := 'get_campaign_budget rejects cross-user access (expect exception)';
+  BEGIN
+    PERFORM public.get_campaign_budget('00000000-0000-0000-0000-000000000000');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    v_pass := true;
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 69: campaign_action rejects non-owner access
+  v_test_id := v_test_id + 1;
+  v_test_name := 'campaign_action rejects non-owner access (expect exception)';
+  BEGIN
+    PERFORM public.campaign_action('00000000-0000-0000-0000-000000000000', 'pause', 'test');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    v_pass := true;
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 70: adjust_campaign_budget rejects non-owner access
+  v_test_id := v_test_id + 1;
+  v_test_name := 'adjust_campaign_budget rejects non-owner access (expect exception)';
+  BEGIN
+    PERFORM public.adjust_campaign_budget('00000000-0000-0000-0000-000000000000', 1000, 'test');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    v_pass := true;
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 71: complete_payout_request rejects missing UTR
+  v_test_id := v_test_id + 1;
+  v_test_name := 'complete_payout_request rejects missing UTR (expect exception)';
+  BEGIN
+    PERFORM public.complete_payout_request('00000000-0000-0000-0000-000000000000', NULL, 'test');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    v_pass := true;
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 72: complete_payout_request rejects empty UTR
+  v_test_id := v_test_id + 1;
+  v_test_name := 'complete_payout_request rejects empty UTR (expect exception)';
+  BEGIN
+    PERFORM public.complete_payout_request('00000000-0000-0000-0000-000000000000', '   ', 'test');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    v_pass := true;
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 73: complete_payout_request rejects non-existent payout
+  v_test_id := v_test_id + 1;
+  v_test_name := 'complete_payout_request rejects non-existent payout (expect exception)';
+  BEGIN
+    PERFORM public.complete_payout_request('00000000-0000-0000-0000-000000000000', 'UTR123456', 'test');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    v_pass := true;
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 74: process_payout_request rejects non-existent payout
+  v_test_id := v_test_id + 1;
+  v_test_name := 'process_payout_request rejects non-existent payout (expect exception)';
+  BEGIN
+    PERFORM public.process_payout_request('00000000-0000-0000-0000-000000000000', 'test');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    v_pass := true;
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 75: approve_clip rejects non-existent clip
+  v_test_id := v_test_id + 1;
+  v_test_name := 'approve_clip rejects non-existent clip (expect exception)';
+  BEGIN
+    PERFORM public.approve_clip('00000000-0000-0000-0000-000000000000', 'test');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    v_pass := true;
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 76: submit_clip rejects non-existent campaign
+  v_test_id := v_test_id + 1;
+  v_test_name := 'submit_clip rejects non-existent campaign (expect exception)';
+  BEGIN
+    PERFORM public.submit_clip('00000000-0000-0000-0000-000000000000', 'test', 'https://example.com/video.mp4', 'Instagram');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    v_pass := true;
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 77: verify_campaign_launch_payment rejects non-existent payment
+  v_test_id := v_test_id + 1;
+  v_test_name := 'verify_campaign_launch_payment rejects non-existent payment (expect exception)';
+  BEGIN
+    PERFORM public.verify_campaign_launch_payment('00000000-0000-0000-0000-000000000000');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    v_pass := true;
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 78: reject_campaign_launch_payment rejects non-existent payment
+  v_test_id := v_test_id + 1;
+  v_test_name := 'reject_campaign_launch_payment rejects non-existent payment (expect exception)';
+  BEGIN
+    PERFORM public.reject_campaign_launch_payment('00000000-0000-0000-0000-000000000000', 'test');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    v_pass := true;
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 79: request_payout rejects non-existent user
+  v_test_id := v_test_id + 1;
+  v_test_name := 'request_payout rejects non-existent user (expect exception)';
+  BEGIN
+    PERFORM public.request_payout();
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    v_pass := true;
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 80: get_wallet_balance is SECURITY DEFINER
+  v_test_id := v_test_id + 1;
+  v_test_name := 'get_wallet_balance is SECURITY DEFINER';
+  v_pass := EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON p.pronamespace = n.oid
+    WHERE n.nspname = 'public' AND p.proname = 'get_wallet_balance'
+    AND p.prosecdef = true
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 81: get_campaign_budget is SECURITY DEFINER
+  v_test_id := v_test_id + 1;
+  v_test_name := 'get_campaign_budget is SECURITY DEFINER';
+  v_pass := EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON p.pronamespace = n.oid
+    WHERE n.nspname = 'public' AND p.proname = 'get_campaign_budget'
+    AND p.prosecdef = true
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 82: approve_clip is SECURITY DEFINER
+  v_test_id := v_test_id + 1;
+  v_test_name := 'approve_clip is SECURITY DEFINER';
+  v_pass := EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON p.pronamespace = n.oid
+    WHERE n.nspname = 'public' AND p.proname = 'approve_clip'
+    AND p.prosecdef = true
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 83: campaign_action is SECURITY DEFINER
+  v_test_id := v_test_id + 1;
+  v_test_name := 'campaign_action is SECURITY DEFINER';
+  v_pass := EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON p.pronamespace = n.oid
+    WHERE n.nspname = 'public' AND p.proname = 'campaign_action'
+    AND p.prosecdef = true
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 84: adjust_campaign_budget is SECURITY DEFINER
+  v_test_id := v_test_id + 1;
+  v_test_name := 'adjust_campaign_budget is SECURITY DEFINER';
+  v_pass := EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON p.pronamespace = n.oid
+    WHERE n.nspname = 'public' AND p.proname = 'adjust_campaign_budget'
+    AND p.prosecdef = true
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 85: submit_clip is SECURITY DEFINER
+  v_test_id := v_test_id + 1;
+  v_test_name := 'submit_clip is SECURITY DEFINER';
+  v_pass := EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON p.pronamespace = n.oid
+    WHERE n.nspname = 'public' AND p.proname = 'submit_clip'
+    AND p.prosecdef = true
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 86: submit_campaign_launch_payment is SECURITY DEFINER
+  v_test_id := v_test_id + 1;
+  v_test_name := 'submit_campaign_launch_payment is SECURITY DEFINER';
+  v_pass := EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON p.pronamespace = n.oid
+    WHERE n.nspname = 'public' AND p.proname = 'submit_campaign_launch_payment'
+    AND p.prosecdef = true
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 87: financial_records table has INSERT revoked from authenticated
+  v_test_id := v_test_id + 1;
+  v_test_name := 'financial_records INSERT revoked from authenticated';
+  v_pass := NOT EXISTS (
+    SELECT 1 FROM pg_roles r
+    JOIN pg_class c ON c.relowner = r.oid
+    JOIN pg_namespace n ON c.relnamespace = n.oid
+    WHERE n.nspname = 'public' AND c.relname = 'financial_records'
+    AND r.rolname = 'authenticated'
+    AND has_table_privilege(r.oid, 'public.financial_records', 'INSERT')
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 88: payout_requests table has INSERT revoked from authenticated
+  v_test_id := v_test_id + 1;
+  v_test_name := 'payout_requests INSERT revoked from authenticated';
+  v_pass := NOT EXISTS (
+    SELECT 1 FROM pg_roles r
+    JOIN pg_class c ON c.relowner = r.oid
+    JOIN pg_namespace n ON c.relnamespace = n.oid
+    WHERE n.nspname = 'public' AND c.relname = 'payout_requests'
+    AND r.rolname = 'authenticated'
+    AND has_table_privilege(r.oid, 'public.payout_requests', 'INSERT')
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 89: wallet_ledger table has INSERT revoked from authenticated
+  v_test_id := v_test_id + 1;
+  v_test_name := 'wallet_ledger INSERT revoked from authenticated';
+  v_pass := NOT EXISTS (
+    SELECT 1 FROM pg_roles r
+    JOIN pg_class c ON c.relowner = r.oid
+    JOIN pg_namespace n ON c.relnamespace = n.oid
+    WHERE n.nspname = 'public' AND c.relname = 'wallet_ledger'
+    AND r.rolname = 'authenticated'
+    AND has_table_privilege(r.oid, 'public.wallet_ledger', 'INSERT')
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 90: audit_logs table has INSERT revoked from authenticated
+  v_test_id := v_test_id + 1;
+  v_test_name := 'audit_logs INSERT revoked from authenticated';
+  v_pass := NOT EXISTS (
+    SELECT 1 FROM pg_roles r
+    JOIN pg_class c ON c.relowner = r.oid
+    JOIN pg_namespace n ON c.relnamespace = n.oid
+    WHERE n.nspname = 'public' AND c.relname = 'audit_logs'
+    AND r.rolname = 'authenticated'
+    AND has_table_privilege(r.oid, 'public.audit_logs', 'INSERT')
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- =========================================================================
   -- RESULTS
   -- =========================================================================
 

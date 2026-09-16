@@ -226,6 +226,14 @@ begin
     raise exception 'Only the campaign owner can perform this action';
   end if;
 
+  -- Active creator enforcement: suspended/deactivated creators cannot perform mutations
+  if not exists (
+    select 1 from public.profiles
+    where id = v_actor and role = 'creator' and status = 'active'
+  ) then
+    raise exception 'Only active creators can perform campaign actions';
+  end if;
+
   -- Validate state transitions
   case p_action
     when 'pause' then

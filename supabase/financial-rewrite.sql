@@ -385,6 +385,12 @@ GRANT EXECUTE ON FUNCTION public.approve_clip(uuid, text) TO authenticated;
 -- RPC: request_payout — Clipper requests a payout of available funds.
 -- Creates a payout_requests record with status=pending.
 -- Uses advisory lock to prevent concurrent payout requests for same user.
+--
+-- IMPORTANT: Financial records REMAIN in 'processing' status. They are
+-- reserved by the payout request via the finance_record_ids array. The
+-- wallet balance formula correctly subtracts pending/processing payout
+-- requests from the processing records sum. Records are marked 'paid'
+-- ONLY in complete_payout_request() when admin confirms actual UPI transfer.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.request_payout()
 RETURNS jsonb
@@ -466,6 +472,7 @@ BEGIN
 
   -- 8. Get the processing finance record IDs that will be covered
   -- Exclude records already referenced by ANY existing payout request
+  -- This prevents double-consumption by ensuring no record is claimed by multiple payouts
   SELECT array_agg(id), coalesce(sum(net_amount), 0)
   INTO v_record_ids, v_record_sum
   FROM public.financial_records
@@ -486,6 +493,8 @@ BEGIN
   END IF;
 
   -- 10. Create payout request (inside advisory lock)
+  --     Financial records REMAIN 'processing' — they are NOT marked 'paid' yet.
+  --     The payout_request reserves them via the balance subtraction formula.
   INSERT INTO public.payout_requests (
     user_id, amount, net_amount, currency, status, method, upi_id,
     finance_record_ids, audit
@@ -501,16 +510,8 @@ BEGIN
   )
   RETURNING id INTO v_payout_id;
 
-  -- 11. Mark referenced financial records as 'paid' (claimed by this payout)
-  UPDATE public.financial_records SET
-    status = 'paid',
-    paid_at = now(),
-    audit = coalesce(audit, '[]'::jsonb) || jsonb_build_object(
-      'action', 'claimed_by_payout',
-      'payout_id', v_payout_id,
-      'at', now()
-    )
-  WHERE id = ANY(v_record_ids);
+  -- IMPORTANT: Financial records stay as 'processing'. They are marked 'paid'
+  -- ONLY in complete_payout_request() when admin confirms actual UPI transfer.
 
   -- Return the payout record
   SELECT to_jsonb(pr.*) INTO v_result
@@ -580,7 +581,9 @@ AS $$
 DECLARE
   v_payout record;
   v_result jsonb;
+  v_record record;
   v_total_payable integer;
+  v_invalid_record record;
 BEGIN
   IF NOT public.is_admin() THEN
     RAISE EXCEPTION 'Only admins can complete payout requests';
@@ -591,7 +594,7 @@ BEGIN
     RAISE EXCEPTION 'Missing permission: payout.complete';
   END IF;
 
-  -- Lock the payout row to prevent concurrent processing
+  -- 1. Lock the payout row to prevent concurrent processing
   SELECT * INTO v_payout
   FROM public.payout_requests
   WHERE id = p_payout_id AND status = 'processing'
@@ -601,21 +604,63 @@ BEGIN
     RAISE EXCEPTION 'Payout request not found or not in processing status';
   END IF;
 
-  -- Require UPI transaction reference before marking as paid
+  -- 2. Require UPI transaction reference before marking as paid
   IF p_payment_reference IS NULL OR trim(p_payment_reference) = '' THEN
     RAISE EXCEPTION 'UPI transaction reference (UTR) is required before marking payout as paid.';
   END IF;
 
-  -- Validate amount consistency: payout amount must equal sum of referenced records
-  SELECT coalesce(sum(net_amount), 0) INTO v_total_payable
-  FROM public.financial_records
-  WHERE id = ANY(v_payout.finance_record_ids);
-
-  IF v_total_payable != v_payout.net_amount THEN
-    RAISE EXCEPTION 'Amount mismatch: payout claims ₹% but records total ₹%', v_payout.net_amount, v_total_payable;
+  -- 3. Require a valid, non-empty finance-record ID list
+  IF v_payout.finance_record_ids IS NULL OR array_length(v_payout.finance_record_ids, 1) = 0 THEN
+    RAISE EXCEPTION 'Payout has no associated financial records';
   END IF;
 
-  -- Mark payout as paid
+  -- 4. Lock and validate ALL referenced financial records atomically
+  -- Check each record for: ownership, status, and no other payout association
+  SELECT fr.id, fr.clipper_id, fr.status, fr.net_amount
+  INTO v_invalid_record
+  FROM public.financial_records fr
+  WHERE fr.id = ANY(v_payout.finance_record_ids)
+    AND (
+      -- Record must belong to the payout user
+      fr.clipper_id != v_payout.user_id
+      -- Record must be in processing state
+      OR fr.status != 'processing'
+      -- Record must not be already referenced by another payout
+      OR EXISTS (
+        SELECT 1 FROM public.payout_requests pr2
+        WHERE pr2.id != p_payout_id
+          AND pr2.status IN ('pending', 'processing', 'paid')
+          AND fr.id = ANY(pr2.finance_record_ids)
+      )
+    )
+  LIMIT 1;
+
+  IF FOUND THEN
+    IF v_invalid_record.clipper_id != v_payout.user_id THEN
+      RAISE EXCEPTION 'Financial record % belongs to user %, not payout user %',
+        v_invalid_record.id, v_invalid_record.clipper_id, v_payout.user_id;
+    ELSIF v_invalid_record.status != 'processing' THEN
+      RAISE EXCEPTION 'Financial record % has status %, expected processing',
+        v_invalid_record.id, v_invalid_record.status;
+    ELSE
+      RAISE EXCEPTION 'Financial record % is already referenced by another payout',
+        v_invalid_record.id;
+    END IF;
+  END IF;
+
+  -- 5. Verify the sum of eligible records exactly equals the payout amount
+  SELECT coalesce(sum(net_amount), 0) INTO v_total_payable
+  FROM public.financial_records
+  WHERE id = ANY(v_payout.finance_record_ids)
+    AND clipper_id = v_payout.user_id
+    AND status = 'processing';
+
+  IF v_total_payable != v_payout.net_amount THEN
+    RAISE EXCEPTION 'Amount mismatch: payout claims ₹% but validated records total ₹%',
+      v_payout.net_amount, v_total_payable;
+  END IF;
+
+  -- 6. Mark payout as paid
   UPDATE public.payout_requests SET
     status = 'paid',
     payment_reference = coalesce(p_payment_reference, payment_reference),
@@ -630,8 +675,7 @@ BEGIN
   WHERE id = p_payout_id AND status = 'processing'
   RETURNING to_jsonb(payout_requests.*) INTO v_result;
 
-  -- Mark referenced financial_records as 'paid' ONLY now,
-  -- when admin confirms actual UPI transfer with UTR.
+  -- 7. Mark ONLY the validated records paid
   UPDATE public.financial_records SET
     status = 'paid',
     paid_at = now(),
@@ -641,7 +685,9 @@ BEGIN
       'payment_reference', p_payment_reference,
       'at', now()
     )
-  WHERE id = ANY(v_payout.finance_record_ids);
+  WHERE id = ANY(v_payout.finance_record_ids)
+    AND clipper_id = v_payout.user_id
+    AND status = 'processing';
 
   RETURN v_result;
 END;
