@@ -14,6 +14,9 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.next({ request });
   }
 
+  const secure =
+    (process.env.NEXT_PUBLIC_APP_URL || "").startsWith("https://");
+
   // --- PKCE password-recovery exchange ---
   // When the user clicks the reset link, the browser navigates to:
   //   /reset-password?code=<authCode>&sb_flow_id=<flowId>
@@ -57,7 +60,10 @@ export async function updateSession(request: NextRequest) {
           redirectUrl.search = "";
           const res = NextResponse.redirect(redirectUrl);
           for (const c of pendingCookies) {
-            res.cookies.set(c.name, c.value, c.options as Parameters<typeof res.cookies.set>[2]);
+            res.cookies.set(c.name, c.value, {
+              ...c.options,
+              secure,
+            } as Parameters<typeof res.cookies.set>[2]);
           }
           return res;
         }
@@ -93,7 +99,7 @@ export async function updateSession(request: NextRequest) {
         );
         response = NextResponse.next({ request });
         cookiesToSet.forEach(({ name, value, options }) =>
-          response.cookies.set(name, value, options),
+          response.cookies.set(name, value, { ...options, secure }),
         );
       },
     },
