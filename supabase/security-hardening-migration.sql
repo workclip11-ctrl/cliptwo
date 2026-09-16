@@ -275,6 +275,17 @@ GRANT EXECUTE ON FUNCTION public.process_payout_request(uuid, text) TO authentic
 -- This is also the PART 3 fix: financial_records are now marked 'paid' ONLY
 -- when the admin confirms UPI payment with UTR, not at request time.
 -- Enhanced with full record ownership validation and concurrency protection.
+--
+-- CONCURRENCY SAFETY:
+-- 1. Acquires the same per-user advisory lock as request_payout() to prevent
+--    races between request creation and completion.
+-- 2. Locks the payout row with FOR UPDATE.
+-- 3. Locks ALL referenced financial_records with FOR UPDATE to prevent
+--    concurrent modification by request_payout() or another complete call.
+-- 4. Validates uniqueness of finance_record_ids (no duplicates).
+-- 5. Validates ownership, status, and no other payout association.
+-- 6. Validates amount matches exactly.
+-- 7. Marks payout and records paid atomically.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.complete_payout_request(
   p_payout_id uuid,
@@ -289,9 +300,10 @@ AS $$
 DECLARE
   v_payout record;
   v_result jsonb;
-  v_record record;
   v_total_payable integer;
   v_invalid_record record;
+  v_record_ids uuid[];
+  v_user_id uuid;
 BEGIN
   IF NOT public.is_admin() THEN
     RAISE EXCEPTION 'Only admins can complete payout requests';
@@ -312,22 +324,46 @@ BEGIN
     RAISE EXCEPTION 'Payout request not found or not in processing status';
   END IF;
 
-  -- 2. Require UPI transaction reference before marking as paid
+  -- 2. Acquire per-user advisory lock to coordinate with request_payout()
+  -- This prevents races between request creation and completion
+  v_user_id := v_payout.user_id;
+  IF NOT pg_try_advisory_xact_lock(
+    ('x' || md5(v_user_id::text))::bit(64)::bigint
+  ) THEN
+    RAISE EXCEPTION 'Another payout operation is in progress for this user. Please try again.';
+  END IF;
+
+  -- 3. Require UPI transaction reference before marking as paid
   IF p_payment_reference IS NULL OR trim(p_payment_reference) = '' THEN
     RAISE EXCEPTION 'UPI transaction reference (UTR) is required before marking payout as paid.';
   END IF;
 
-  -- 3. Require a valid, non-empty finance-record ID list
+  -- 4. Require a valid, non-empty finance-record ID list
   IF v_payout.finance_record_ids IS NULL OR array_length(v_payout.finance_record_ids, 1) = 0 THEN
     RAISE EXCEPTION 'Payout has no associated financial records';
   END IF;
 
-  -- 4. Lock and validate ALL referenced financial records atomically
+  -- 5. Validate uniqueness of finance_record_ids (no duplicates allowed)
+  -- Duplicate IDs would cause ambiguous amount calculation
+  v_record_ids := v_payout.finance_record_ids;
+  IF array_length(v_record_ids, 1) != array_length(array(SELECT DISTINCT unnest FROM unnest(v_record_ids)), 1) THEN
+    RAISE EXCEPTION 'Payout contains duplicate financial record IDs';
+  END IF;
+
+  -- 6. Lock ALL referenced financial_records with FOR UPDATE
+  -- This prevents concurrent modification by request_payout() or another complete call
+  -- We lock them first, then validate in a separate query
+  PERFORM 1
+  FROM public.financial_records fr
+  WHERE fr.id = ANY(v_record_ids)
+  FOR UPDATE;
+
+  -- 7. Validate ALL referenced financial records atomically
   -- Check each record for: ownership, status, and no other payout association
   SELECT fr.id, fr.clipper_id, fr.status, fr.net_amount
   INTO v_invalid_record
   FROM public.financial_records fr
-  WHERE fr.id = ANY(v_payout.finance_record_ids)
+  WHERE fr.id = ANY(v_record_ids)
     AND (
       -- Record must belong to the payout user
       fr.clipper_id != v_payout.user_id
@@ -356,10 +392,10 @@ BEGIN
     END IF;
   END IF;
 
-  -- 5. Verify the sum of eligible records exactly equals the payout amount
+  -- 8. Verify the sum of eligible records exactly equals the payout amount
   SELECT coalesce(sum(net_amount), 0) INTO v_total_payable
   FROM public.financial_records
-  WHERE id = ANY(v_payout.finance_record_ids)
+  WHERE id = ANY(v_record_ids)
     AND clipper_id = v_payout.user_id
     AND status = 'processing';
 
@@ -368,7 +404,7 @@ BEGIN
       v_payout.net_amount, v_total_payable;
   END IF;
 
-  -- 6. Mark payout as paid
+  -- 9. Mark payout as paid
   UPDATE public.payout_requests SET
     status = 'paid',
     payment_reference = coalesce(p_payment_reference, payment_reference),
@@ -383,7 +419,7 @@ BEGIN
   WHERE id = p_payout_id AND status = 'processing'
   RETURNING to_jsonb(payout_requests.*) INTO v_result;
 
-  -- 7. Mark ONLY the validated records paid
+  -- 10. Mark ONLY the validated records paid
   UPDATE public.financial_records SET
     status = 'paid',
     paid_at = now(),
@@ -393,7 +429,7 @@ BEGIN
       'payment_reference', p_payment_reference,
       'at', now()
     )
-  WHERE id = ANY(v_payout.finance_record_ids)
+  WHERE id = ANY(v_record_ids)
     AND clipper_id = v_payout.user_id
     AND status = 'processing';
 
@@ -433,6 +469,7 @@ DECLARE
   v_pending_count integer;
   v_record_ids uuid[];
   v_record_sum integer;
+  v_excluded_ids uuid[];
 BEGIN
   -- 1. Get authenticated user
   v_user_id := auth.uid();
@@ -493,16 +530,21 @@ BEGIN
   END IF;
 
   -- 8. Get the processing finance record IDs that will be covered
-  -- Exclude records already referenced by ANY existing payout request
-  SELECT array_agg(id), coalesce(sum(net_amount), 0)
+  -- First, get record IDs already referenced by existing payout requests (read-only)
+  SELECT coalesce(array_agg(unnest), '{}')
+  INTO v_excluded_ids
+  FROM public.payout_requests,
+  unnest(finance_record_ids)
+  WHERE user_id = v_user_id;
+
+  -- Lock and select eligible records with FOR UPDATE to prevent concurrent modification
+  -- This ensures selected records cannot be changed between selection and payout creation
+  SELECT array_agg(fr.id), coalesce(sum(fr.net_amount), 0)
   INTO v_record_ids, v_record_sum
-  FROM public.financial_records
-  WHERE clipper_id = v_user_id AND status = 'processing'
-    AND id <> ALL(coalesce(
-      (SELECT array_agg(unnest) FROM public.payout_requests,
-       unnest(finance_record_ids) WHERE user_id = v_user_id),
-      '{}'
-    ));
+  FROM public.financial_records fr
+  WHERE fr.clipper_id = v_user_id AND fr.status = 'processing'
+    AND fr.id <> ALL(v_excluded_ids)
+  FOR UPDATE;
 
   -- 9. Validate: payout amount must equal sum of referenced records
   IF v_record_sum != v_balance THEN
@@ -947,6 +989,96 @@ EXCEPTION WHEN undefined_table THEN NULL; END $$;
 DROP POLICY IF EXISTS "audit_logs_delete" ON public.audit_logs;
 CREATE POLICY "audit_logs_delete" ON public.audit_logs
   FOR DELETE USING (false);
+
+
+-- =============================================================================
+-- PART 17: adjust_campaign_budget — lost during deduplication, restored here
+--
+-- Was incorrectly removed from both admin-schema.sql and finance-consolidation.sql
+-- (each comment pointed to the other as authoritative, but neither had the function).
+-- This is the ONLY executable definition. Runs last so cannot be overwritten.
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION public.adjust_campaign_budget(
+  p_campaign_id uuid,
+  p_new_budget numeric,
+  p_reason text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_actor uuid;
+  v_campaign record;
+  v_current_spend numeric;
+  v_old_budget numeric;
+BEGIN
+  v_actor := auth.uid();
+  IF v_actor IS NULL THEN RAISE EXCEPTION 'Not authenticated'; END IF;
+
+  SELECT * INTO v_campaign FROM public.campaigns WHERE id = p_campaign_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Campaign not found'; END IF;
+
+  -- Authorization: campaign owner or admin
+  IF v_campaign.created_by IS NOT NULL AND v_campaign.created_by = v_actor THEN
+    -- Active creator enforcement: suspended/deactivated creators cannot adjust budgets
+    IF NOT EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE id = v_actor AND role = 'creator' AND status = 'active'
+    ) THEN
+      RAISE EXCEPTION 'Only active creators can adjust campaign budgets';
+    END IF;
+  ELSIF public.is_admin() THEN
+    NULL; -- Admin adjusting campaign
+  ELSE
+    RAISE EXCEPTION 'Only the campaign owner or an admin can adjust the budget';
+  END IF;
+
+  -- Validate budget
+  IF p_new_budget < 0 THEN
+    RAISE EXCEPTION 'Budget cannot be negative';
+  END IF;
+
+  -- Calculate current committed spend from financial_records (net_amount)
+  -- reserved = sum of net_amount where status in ('pending','processing')
+  -- (paid records are already consumed by payouts)
+  SELECT coalesce(sum(net_amount), 0) INTO v_current_spend
+  FROM public.financial_records
+  WHERE campaign_id = p_campaign_id AND status IN ('pending', 'processing');
+
+  IF p_new_budget < v_current_spend THEN
+    RAISE EXCEPTION 'Budget (₹%) cannot be lower than committed/spent amount (₹%)', p_new_budget, v_current_spend;
+  END IF;
+
+  v_old_budget := v_campaign.budget;
+
+  UPDATE public.campaigns SET budget = p_new_budget WHERE id = p_campaign_id;
+
+  -- Write audit log
+  INSERT INTO public.audit_logs (
+    id, actor_id, actor, action, entity_type, entity_id, entity_label,
+    before_state, after_state, metadata, idempotency_key
+  ) VALUES (
+    'audit-' || extract(epoch from now())::bigint || '-' || upper(md5(random()::text)),
+    v_actor,
+    coalesce((SELECT email FROM public.profiles WHERE id = v_actor), 'unknown'),
+    'campaign_budget_adjusted',
+    'campaign',
+    p_campaign_id::text,
+    v_campaign.title,
+    jsonb_build_object('budget', v_old_budget),
+    jsonb_build_object('budget', p_new_budget),
+    jsonb_build_object('reason', p_reason, 'old_budget', v_old_budget, 'new_budget', p_new_budget, 'current_spend', v_current_spend, 'actor_type', 'owner'),
+    'budget-' || p_campaign_id::text || '-' || extract(epoch from now())::bigint
+  );
+
+  RETURN jsonb_build_object('success', true, 'budget', p_new_budget, 'previous', v_old_budget);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.adjust_campaign_budget(uuid, numeric, text) TO authenticated;
 
 
 -- =============================================================================

@@ -391,309 +391,44 @@ GRANT EXECUTE ON FUNCTION public.approve_clip(uuid, text) TO authenticated;
 -- wallet balance formula correctly subtracts pending/processing payout
 -- requests from the processing records sum. Records are marked 'paid'
 -- ONLY in complete_payout_request() when admin confirms actual UPI transfer.
+--
+-- SUPERSEDED: This definition is historical/legacy. The authoritative version
+-- is in security-hardening-migration.sql which runs later in execution order.
+-- Do NOT re-execute this definition as it would overwrite the hardened version.
 -- ---------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.request_payout()
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_user_id uuid;
-  v_balance integer;
-  v_upi text;
-  v_payout_id uuid;
-  v_result jsonb;
-  v_pending_count integer;
-  v_record_ids uuid[];
-  v_record_sum integer;
-BEGIN
-  -- 1. Get authenticated user
-  v_user_id := auth.uid();
-  IF v_user_id IS NULL THEN
-    RAISE EXCEPTION 'Not authenticated';
-  END IF;
 
-  -- 2. Advisory lock: serialize payout requests per user
-  -- Prevents two simultaneous requests from both succeeding
-  IF NOT pg_try_advisory_xact_lock(
-    ('x' || md5(v_user_id::text))::bit(64)::bigint
-  ) THEN
-    RAISE EXCEPTION 'Another payout request is being processed. Please try again.';
-  END IF;
-
-  -- 3. Verify active account
-  IF NOT EXISTS (
-    SELECT 1 FROM public.profiles
-    WHERE id = v_user_id AND status = 'active'
-  ) THEN
-    RAISE EXCEPTION 'Account is not active';
-  END IF;
-
-  -- 4. Read verified UPI
-  SELECT upi INTO v_upi
-  FROM public.profiles
-  WHERE id = v_user_id AND status = 'active';
-
-  IF v_upi IS NULL OR trim(v_upi) = '' THEN
-    RAISE EXCEPTION 'No verified UPI ID on file. Add a UPI ID in Settings first.';
-  END IF;
-
-  -- 5. Check no pending/processing payout exists (inside lock)
-  SELECT count(*) INTO v_pending_count
-  FROM public.payout_requests
-  WHERE user_id = v_user_id
-    AND status IN ('pending', 'processing');
-
-  IF v_pending_count > 0 THEN
-    RAISE EXCEPTION 'A payout request is already in progress. Please wait for it to complete.';
-  END IF;
-
-  -- 6. Calculate available balance
-  -- Available = sum(processing records) - sum(pending/processing payout requests)
-  -- processing = finalized earnings available for withdrawal
-  -- paid records are excluded from the processing sum automatically (they are
-  -- no longer status='processing'), so paid payout requests must NOT be
-  -- subtracted — doing so double-counts and permanently bricks the balance.
-  SELECT coalesce(sum(net_amount), 0) INTO v_balance
-  FROM public.financial_records
-  WHERE clipper_id = v_user_id AND status = 'processing';
-
-  v_balance := v_balance - coalesce((
-    SELECT coalesce(sum(net_amount), 0)
-    FROM public.payout_requests
-    WHERE user_id = v_user_id AND status IN ('pending', 'processing')
-  ), 0);
-
-  -- 7. Enforce minimum ₹100 (10000 paise)
-  IF v_balance < 10000 THEN
-    RAISE EXCEPTION 'Minimum withdrawal is ₹100. Current available: ₹%', v_balance / 100;
-  END IF;
-
-  -- 8. Get the processing finance record IDs that will be covered
-  -- Exclude records already referenced by ANY existing payout request
-  -- This prevents double-consumption by ensuring no record is claimed by multiple payouts
-  SELECT array_agg(id), coalesce(sum(net_amount), 0)
-  INTO v_record_ids, v_record_sum
-  FROM public.financial_records
-  WHERE clipper_id = v_user_id AND status = 'processing'
-    AND id <> ALL(coalesce(
-      (SELECT array_agg(unnest) FROM public.payout_requests,
-       unnest(finance_record_ids) WHERE user_id = v_user_id),
-      '{}'
-    ));
-
-  -- 9. Validate: payout amount must equal sum of referenced records
-  IF v_record_sum != v_balance THEN
-    RAISE EXCEPTION 'Balance mismatch: calculated ₹% but records total ₹%', v_balance, v_record_sum;
-  END IF;
-
-  IF v_record_ids IS NULL OR array_length(v_record_ids, 1) = 0 THEN
-    RAISE EXCEPTION 'No eligible financial records for payout';
-  END IF;
-
-  -- 10. Create payout request (inside advisory lock)
-  --     Financial records REMAIN 'processing' — they are NOT marked 'paid' yet.
-  --     The payout_request reserves them via the balance subtraction formula.
-  INSERT INTO public.payout_requests (
-    user_id, amount, net_amount, currency, status, method, upi_id,
-    finance_record_ids, audit
-  ) VALUES (
-    v_user_id, v_balance, v_balance, 'INR', 'pending', 'upi', v_upi,
-    v_record_ids,
-    jsonb_build_object(
-      'action', 'requested',
-      'by', (SELECT email FROM public.profiles WHERE id = v_user_id),
-      'at', now(),
-      'record_count', array_length(v_record_ids, 1)
-    )
-  )
-  RETURNING id INTO v_payout_id;
-
-  -- IMPORTANT: Financial records stay as 'processing'. They are marked 'paid'
-  -- ONLY in complete_payout_request() when admin confirms actual UPI transfer.
-
-  -- Return the payout record
-  SELECT to_jsonb(pr.*) INTO v_result
-  FROM public.payout_requests pr
-  WHERE id = v_payout_id;
-
-  RETURN v_result;
-END;
-$$;
-
-GRANT EXECUTE ON FUNCTION public.request_payout() TO authenticated;
+-- [DEFINITION REMOVED] This function is defined in security-hardening-migration.sql
 
 -- ---------------------------------------------------------------------------
 -- RPC: process_payout_request — Admin marks payout as processing.
 -- pending → processing
+--
+-- SUPERSEDED: This definition is historical/legacy. The authoritative version
+-- is in security-hardening-migration.sql which runs later in execution order.
+-- Do NOT re-execute this definition as it would overwrite the hardened version.
 -- ---------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.process_payout_request(
-  p_payout_id uuid,
-  p_actor text DEFAULT NULL
-)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_result jsonb;
-BEGIN
-  IF NOT public.is_admin() THEN
-    RAISE EXCEPTION 'Only admins can process payout requests';
-  END IF;
 
-  UPDATE public.payout_requests SET
-    status = 'processing',
-    processing_at = now(),
-    audit = coalesce(audit, '[]'::jsonb) || jsonb_build_object(
-      'action', 'processing',
-      'by', coalesce(p_actor, (SELECT email FROM public.profiles WHERE id = auth.uid())),
-      'at', now()
-    )
-  WHERE id = p_payout_id AND status = 'pending'
-  RETURNING to_jsonb(payout_requests.*) INTO v_result;
+-- [DEFINITION REMOVED] This function is defined in security-hardening-migration.sql
 
-  IF v_result IS NULL THEN
-    RAISE EXCEPTION 'Payout request not found or not in pending status';
-  END IF;
-
-  RETURN v_result;
-END;
-$$;
-
-GRANT EXECUTE ON FUNCTION public.process_payout_request(uuid, text) TO authenticated;
-
--- ---------------------------------------------------------------------------
 -- RPC: complete_payout_request — Admin confirms UPI payment. processing → paid.
+--
+-- CONCURRENCY SAFETY:
+-- 1. Acquires the same per-user advisory lock as request_payout() to prevent
+--    races between request creation and completion.
+-- 2. Locks the payout row with FOR UPDATE.
+-- 3. Locks ALL referenced financial_records with FOR UPDATE to prevent
+--    concurrent modification by request_payout() or another complete call.
+-- 4. Validates uniqueness of finance_record_ids (no duplicates).
+-- 5. Validates ownership, status, and no other payout association.
+-- 6. Validates amount matches exactly.
+-- 7. Marks payout and records paid atomically.
+--
+-- SUPERSEDED: This definition is historical/legacy. The authoritative version
+-- is in security-hardening-migration.sql which runs later in execution order.
+-- Do NOT re-execute this definition as it would overwrite the hardened version.
 -- ---------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.complete_payout_request(
-  p_payout_id uuid,
-  p_payment_reference text DEFAULT NULL,
-  p_actor text DEFAULT NULL
-)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_payout record;
-  v_result jsonb;
-  v_record record;
-  v_total_payable integer;
-  v_invalid_record record;
-BEGIN
-  IF NOT public.is_admin() THEN
-    RAISE EXCEPTION 'Only admins can complete payout requests';
-  END IF;
 
-  -- FINE-GRAINED PERMISSION CHECK
-  IF NOT public.admin_has_perm('payout.complete') THEN
-    RAISE EXCEPTION 'Missing permission: payout.complete';
-  END IF;
-
-  -- 1. Lock the payout row to prevent concurrent processing
-  SELECT * INTO v_payout
-  FROM public.payout_requests
-  WHERE id = p_payout_id AND status = 'processing'
-  FOR UPDATE;
-
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'Payout request not found or not in processing status';
-  END IF;
-
-  -- 2. Require UPI transaction reference before marking as paid
-  IF p_payment_reference IS NULL OR trim(p_payment_reference) = '' THEN
-    RAISE EXCEPTION 'UPI transaction reference (UTR) is required before marking payout as paid.';
-  END IF;
-
-  -- 3. Require a valid, non-empty finance-record ID list
-  IF v_payout.finance_record_ids IS NULL OR array_length(v_payout.finance_record_ids, 1) = 0 THEN
-    RAISE EXCEPTION 'Payout has no associated financial records';
-  END IF;
-
-  -- 4. Lock and validate ALL referenced financial records atomically
-  -- Check each record for: ownership, status, and no other payout association
-  SELECT fr.id, fr.clipper_id, fr.status, fr.net_amount
-  INTO v_invalid_record
-  FROM public.financial_records fr
-  WHERE fr.id = ANY(v_payout.finance_record_ids)
-    AND (
-      -- Record must belong to the payout user
-      fr.clipper_id != v_payout.user_id
-      -- Record must be in processing state
-      OR fr.status != 'processing'
-      -- Record must not be already referenced by another payout
-      OR EXISTS (
-        SELECT 1 FROM public.payout_requests pr2
-        WHERE pr2.id != p_payout_id
-          AND pr2.status IN ('pending', 'processing', 'paid')
-          AND fr.id = ANY(pr2.finance_record_ids)
-      )
-    )
-  LIMIT 1;
-
-  IF FOUND THEN
-    IF v_invalid_record.clipper_id != v_payout.user_id THEN
-      RAISE EXCEPTION 'Financial record % belongs to user %, not payout user %',
-        v_invalid_record.id, v_invalid_record.clipper_id, v_payout.user_id;
-    ELSIF v_invalid_record.status != 'processing' THEN
-      RAISE EXCEPTION 'Financial record % has status %, expected processing',
-        v_invalid_record.id, v_invalid_record.status;
-    ELSE
-      RAISE EXCEPTION 'Financial record % is already referenced by another payout',
-        v_invalid_record.id;
-    END IF;
-  END IF;
-
-  -- 5. Verify the sum of eligible records exactly equals the payout amount
-  SELECT coalesce(sum(net_amount), 0) INTO v_total_payable
-  FROM public.financial_records
-  WHERE id = ANY(v_payout.finance_record_ids)
-    AND clipper_id = v_payout.user_id
-    AND status = 'processing';
-
-  IF v_total_payable != v_payout.net_amount THEN
-    RAISE EXCEPTION 'Amount mismatch: payout claims ₹% but validated records total ₹%',
-      v_payout.net_amount, v_total_payable;
-  END IF;
-
-  -- 6. Mark payout as paid
-  UPDATE public.payout_requests SET
-    status = 'paid',
-    payment_reference = coalesce(p_payment_reference, payment_reference),
-    paid_by = auth.uid(),
-    paid_at = now(),
-    audit = coalesce(audit, '[]'::jsonb) || jsonb_build_object(
-      'action', 'paid',
-      'by', coalesce(p_actor, (SELECT email FROM public.profiles WHERE id = auth.uid())),
-      'at', now(),
-      'payment_reference', p_payment_reference
-    )
-  WHERE id = p_payout_id AND status = 'processing'
-  RETURNING to_jsonb(payout_requests.*) INTO v_result;
-
-  -- 7. Mark ONLY the validated records paid
-  UPDATE public.financial_records SET
-    status = 'paid',
-    paid_at = now(),
-    audit = coalesce(audit, '[]'::jsonb) || jsonb_build_object(
-      'action', 'paid_by_payout',
-      'payout_id', p_payout_id,
-      'payment_reference', p_payment_reference,
-      'at', now()
-    )
-  WHERE id = ANY(v_payout.finance_record_ids)
-    AND clipper_id = v_payout.user_id
-    AND status = 'processing';
-
-  RETURN v_result;
-END;
-$$;
-
-GRANT EXECUTE ON FUNCTION public.complete_payout_request(uuid, text, text) TO authenticated;
+-- [DEFINITION REMOVED] This function is defined in security-hardening-migration.sql
 
 -- ---------------------------------------------------------------------------
 -- fail_payout_request REMOVED.
@@ -704,11 +439,19 @@ GRANT EXECUTE ON FUNCTION public.complete_payout_request(uuid, text, text) TO au
 -- ---------------------------------------------------------------------------
 
 -- ---------------------------------------------------------------------------
--- RPC: get_wallet_balance — Derive balance from authoritative financial records.
--- Available = sum(processing records) - sum(pending/processing payout requests)
--- processing = finalized earnings available for withdrawal
--- paid records are excluded from the processing sum automatically, so paid
--- payout requests must NOT be subtracted (same logic as request_payout).
+-- RPC: get_wallet_balance — AUTHORITATIVE DEFINITION
+-- Derive balance from authoritative financial records.
+--
+-- Formula:
+--   available = sum(processing records) - sum(pending/processing payout requests)
+--
+-- IMPORTANT: Do NOT subtract paid payout requests. Paid records are already
+-- excluded from the processing sum (they are no longer status='processing'),
+-- so subtracting paid payouts would double-count and permanently brick the balance.
+--
+-- This is the SINGLE SOURCE OF TRUTH for wallet balance calculation.
+-- Other SQL files (admin-schema.sql) contain the same implementation.
+-- Do NOT create competing definitions in other files.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.get_wallet_balance(p_user_id uuid)
 RETURNS jsonb

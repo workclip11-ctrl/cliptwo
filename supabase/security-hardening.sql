@@ -21,53 +21,12 @@
 -- ===========================================================================
 
 -- ────────────────────────────────────────────────────────────────────────────
--- 1. FIX: get_wallet_balance — add ownership check
--- Any authenticated user could call this with any UUID to see another
--- user's wallet balance. Now: user can only query own balance, admins can query any.
+-- NOTE: get_wallet_balance() is defined AUTHORITATIVELY in financial-rewrite.sql
+-- and admin-schema.sql. Do NOT define it here - that would create a competing
+-- definition with a different formula. The correct formula is:
+--   available = sum(processing records) - sum(pending/processing payout requests)
+-- NOT: sum(processing records) - sum(pending/processing/paid payout requests)
 -- ────────────────────────────────────────────────────────────────────────────
-CREATE OR REPLACE FUNCTION public.get_wallet_balance(p_user_id uuid)
-RETURNS jsonb
-LANGUAGE sql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT CASE
-    WHEN auth.uid() = p_user_id OR public.is_admin() THEN
-      jsonb_build_object(
-        'user_id', p_user_id,
-        'available', coalesce((
-          SELECT sum(fr.net_amount)
-          FROM public.financial_records fr
-          WHERE fr.clipper_id = p_user_id AND fr.status = 'processing'
-        ), 0)
-          - coalesce((
-          SELECT sum(pr.net_amount)
-          FROM public.payout_requests pr
-          WHERE pr.user_id = p_user_id AND pr.status IN ('pending', 'processing', 'paid')
-        ), 0),
-        'currency', 'INR',
-        'total_earned', coalesce((
-          SELECT sum(fr.net_amount)
-          FROM public.financial_records fr
-          WHERE fr.clipper_id = p_user_id
-        ), 0),
-        'total_paid', coalesce((
-          SELECT sum(fr.net_amount)
-          FROM public.financial_records fr
-          WHERE fr.clipper_id = p_user_id AND fr.status = 'paid'
-        ), 0),
-        'total_requested', coalesce((
-          SELECT sum(pr.net_amount)
-          FROM public.payout_requests pr
-          WHERE pr.user_id = p_user_id AND pr.status IN ('pending', 'processing', 'paid')
-        ), 0)
-      )
-    ELSE
-      jsonb_build_object('error', 'Unauthorized', 'available', 0)
-  END;
-$$;
-
-GRANT EXECUTE ON FUNCTION public.get_wallet_balance(uuid) TO authenticated;
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 2. FIX: get_clipper_finance_records — add ownership check

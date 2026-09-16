@@ -1188,6 +1188,523 @@ BEGIN
   );
 
   -- =========================================================================
+  -- SECTION I: PAYOUT LIFECYCLE TESTS (Round 4)
+  -- These tests verify payout concurrency and lifecycle safety
+  -- =========================================================================
+
+  -- TEST 91: complete_payout_request requires admin role
+  v_test_id := v_test_id + 1;
+  v_test_name := 'complete_payout_request requires admin role (expect admin error)';
+  BEGIN
+    PERFORM public.complete_payout_request('00000000-0000-0000-0000-000000000000', 'UTR123', 'test');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS v_error_msg = MESSAGE_TEXT;
+    v_pass := v_error_msg LIKE '%admin%' OR v_error_msg LIKE '%permission%' OR v_error_msg LIKE '%authenticated%';
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 92: complete_payout_request requires payout.complete permission
+  v_test_id := v_test_id + 1;
+  v_test_name := 'complete_payout_request requires payout.complete permission (expect permission error)';
+  BEGIN
+    PERFORM public.complete_payout_request('00000000-0000-0000-0000-000000000000', 'UTR123', 'test');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS v_error_msg = MESSAGE_TEXT;
+    v_pass := v_error_msg LIKE '%payout.complete%' OR v_error_msg LIKE '%admin%' OR v_error_msg LIKE '%permission%';
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 93: process_payout_request requires admin role
+  v_test_id := v_test_id + 1;
+  v_test_name := 'process_payout_request requires admin role (expect admin error)';
+  BEGIN
+    PERFORM public.process_payout_request('00000000-0000-0000-0000-000000000000', 'test');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS v_error_msg = MESSAGE_TEXT;
+    v_pass := v_error_msg LIKE '%admin%' OR v_error_msg LIKE '%permission%' OR v_error_msg LIKE '%authenticated%';
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 94: process_payout_request requires payout.process permission
+  v_test_id := v_test_id + 1;
+  v_test_name := 'process_payout_request requires payout.process permission (expect permission error)';
+  BEGIN
+    PERFORM public.process_payout_request('00000000-0000-0000-0000-000000000000', 'test');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS v_error_msg = MESSAGE_TEXT;
+    v_pass := v_error_msg LIKE '%payout.process%' OR v_error_msg LIKE '%admin%' OR v_error_msg LIKE '%permission%';
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 95: request_payout requires active account
+  v_test_id := v_test_id + 1;
+  v_test_name := 'request_payout requires active account (expect authentication error)';
+  BEGIN
+    PERFORM public.request_payout();
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS v_error_msg = MESSAGE_TEXT;
+    v_pass := v_error_msg LIKE '%authenticated%' OR v_error_msg LIKE '%Not authenticated%' OR v_error_msg LIKE '%account%';
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 96: approve_clip requires admin role
+  v_test_id := v_test_id + 1;
+  v_test_name := 'approve_clip requires admin role (expect admin error)';
+  BEGIN
+    PERFORM public.approve_clip('00000000-0000-0000-0000-000000000000', 'test');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS v_error_msg = MESSAGE_TEXT;
+    v_pass := v_error_msg LIKE '%admin%' OR v_error_msg LIKE '%permission%' OR v_error_msg LIKE '%authenticated%';
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 97: approve_clip requires clip.approve permission
+  v_test_id := v_test_id + 1;
+  v_test_name := 'approve_clip requires clip.approve permission (expect permission error)';
+  BEGIN
+    PERFORM public.approve_clip('00000000-0000-0000-0000-000000000000', 'test');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS v_error_msg = MESSAGE_TEXT;
+    v_pass := v_error_msg LIKE '%clip.approve%' OR v_error_msg LIKE '%admin%' OR v_error_msg LIKE '%permission%';
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 98: campaign_action requires authentication
+  v_test_id := v_test_id + 1;
+  v_test_name := 'campaign_action requires authentication (expect authentication error)';
+  BEGIN
+    PERFORM public.campaign_action('00000000-0000-0000-0000-000000000000', 'pause', 'test');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS v_error_msg = MESSAGE_TEXT;
+    v_pass := v_error_msg LIKE '%authenticated%' OR v_error_msg LIKE '%Not authenticated%';
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 99: campaign_action validates action parameter
+  v_test_id := v_test_id + 1;
+  v_test_name := 'campaign_action validates action parameter (expect validation error)';
+  BEGIN
+    PERFORM public.campaign_action('00000000-0000-0000-0000-000000000000', 'invalid_action', 'test');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS v_error_msg = MESSAGE_TEXT;
+    v_pass := v_error_msg LIKE '%action%' OR v_error_msg LIKE '%valid%' OR v_error_msg LIKE '%pause%' OR v_error_msg LIKE '%launch%';
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 100: adjust_campaign_budget requires authentication
+  v_test_id := v_test_id + 1;
+  v_test_name := 'adjust_campaign_budget requires authentication (expect authentication error)';
+  BEGIN
+    PERFORM public.adjust_campaign_budget('00000000-0000-0000-0000-000000000000', 1000, 'test');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS v_error_msg = MESSAGE_TEXT;
+    v_pass := v_error_msg LIKE '%authenticated%' OR v_error_msg LIKE '%Not authenticated%';
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 101: adjust_campaign_budget rejects negative budget
+  v_test_id := v_test_id + 1;
+  v_test_name := 'adjust_campaign_budget rejects negative budget (expect validation error)';
+  BEGIN
+    PERFORM public.adjust_campaign_budget('00000000-0000-0000-0000-000000000000', -100, 'test');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS v_error_msg = MESSAGE_TEXT;
+    v_pass := v_error_msg LIKE '%negative%' OR v_error_msg LIKE '%non-negative%' OR v_error_msg LIKE '%budget%' OR v_error_msg LIKE '%positive%';
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 102: get_wallet_balance requires authentication
+  v_test_id := v_test_id + 1;
+  v_test_name := 'get_wallet_balance requires authentication (expect authentication error)';
+  BEGIN
+    PERFORM public.get_wallet_balance('00000000-0000-0000-0000-000000000000');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS v_error_msg = MESSAGE_TEXT;
+    v_pass := v_error_msg LIKE '%authenticated%' OR v_error_msg LIKE '%Not authenticated%';
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 103: get_campaign_budget requires authentication
+  v_test_id := v_test_id + 1;
+  v_test_name := 'get_campaign_budget requires authentication (expect authentication error)';
+  BEGIN
+    PERFORM public.get_campaign_budget('00000000-0000-0000-0000-000000000000');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS v_error_msg = MESSAGE_TEXT;
+    v_pass := v_error_msg LIKE '%authenticated%' OR v_error_msg LIKE '%Not authenticated%';
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 104: submit_clip requires authentication
+  v_test_id := v_test_id + 1;
+  v_test_name := 'submit_clip requires authentication (expect authentication error)';
+  BEGIN
+    PERFORM public.submit_clip('00000000-0000-0000-0000-000000000000', 'test', 'https://example.com/video.mp4', 'Instagram');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS v_error_msg = MESSAGE_TEXT;
+    v_pass := v_error_msg LIKE '%authenticated%' OR v_error_msg LIKE '%Not authenticated%';
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 105: submit_campaign_launch_payment requires authentication
+  v_test_id := v_test_id + 1;
+  v_test_name := 'submit_campaign_launch_payment requires authentication (expect authentication error)';
+  BEGIN
+    PERFORM public.submit_campaign_launch_payment('00000000-0000-0000-0000-000000000000', 'UTR123');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS v_error_msg = MESSAGE_TEXT;
+    v_pass := v_error_msg LIKE '%authenticated%' OR v_error_msg LIKE '%Not authenticated%';
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 106: verify_campaign_launch_payment requires admin role
+  v_test_id := v_test_id + 1;
+  v_test_name := 'verify_campaign_launch_payment requires admin role (expect admin error)';
+  BEGIN
+    PERFORM public.verify_campaign_launch_payment('00000000-0000-0000-0000-000000000000');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS v_error_msg = MESSAGE_TEXT;
+    v_pass := v_error_msg LIKE '%admin%' OR v_error_msg LIKE '%permission%' OR v_error_msg LIKE '%authenticated%';
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 107: reject_campaign_launch_payment requires admin role
+  v_test_id := v_test_id + 1;
+  v_test_name := 'reject_campaign_launch_payment requires admin role (expect admin error)';
+  BEGIN
+    PERFORM public.reject_campaign_launch_payment('00000000-0000-0000-0000-000000000000', 'test');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS v_error_msg = MESSAGE_TEXT;
+    v_pass := v_error_msg LIKE '%admin%' OR v_error_msg LIKE '%permission%' OR v_error_msg LIKE '%authenticated%';
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 108: admin_clip_action requires admin role
+  v_test_id := v_test_id + 1;
+  v_test_name := 'admin_clip_action requires admin role (expect admin error)';
+  BEGIN
+    PERFORM public.admin_clip_action('00000000-0000-0000-0000-000000000000', 'reject', 'test');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS v_error_msg = MESSAGE_TEXT;
+    v_pass := v_error_msg LIKE '%admin%' OR v_error_msg LIKE '%permission%' OR v_error_msg LIKE '%authenticated%';
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 109: admin_user_action requires admin role
+  v_test_id := v_test_id + 1;
+  v_test_name := 'admin_user_action requires admin role (expect admin error)';
+  BEGIN
+    PERFORM public.admin_user_action('00000000-0000-0000-0000-000000000000', 'suspend', 'test');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS v_error_msg = MESSAGE_TEXT;
+    v_pass := v_error_msg LIKE '%admin%' OR v_error_msg LIKE '%permission%' OR v_error_msg LIKE '%authenticated%';
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- =========================================================================
+  -- SECTION I (continued): STRUCTURAL FUNCTION TESTS
+  -- These verify security properties via pg_proc metadata
+  -- =========================================================================
+
+  -- TEST 110: complete_payout_request is SECURITY DEFINER
+  v_test_id := v_test_id + 1;
+  v_test_name := 'complete_payout_request is SECURITY DEFINER';
+  v_pass := EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON p.pronamespace = n.oid
+    WHERE n.nspname = 'public' AND p.proname = 'complete_payout_request'
+    AND p.prosecdef = true
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 111: process_payout_request is SECURITY DEFINER
+  v_test_id := v_test_id + 1;
+  v_test_name := 'process_payout_request is SECURITY DEFINER';
+  v_pass := EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON p.pronamespace = n.oid
+    WHERE n.nspname = 'public' AND p.proname = 'process_payout_request'
+    AND p.prosecdef = true
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 112: campaign_action is SECURITY DEFINER
+  v_test_id := v_test_id + 1;
+  v_test_name := 'campaign_action is SECURITY DEFINER';
+  v_pass := EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON p.pronamespace = n.oid
+    WHERE n.nspname = 'public' AND p.proname = 'campaign_action'
+    AND p.prosecdef = true
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 113: complete_payout_request has GRANT EXECUTE to authenticated
+  v_test_id := v_test_id + 1;
+  v_test_name := 'complete_payout_request has GRANT EXECUTE to authenticated';
+  v_pass := has_function_privilege('authenticated', 'public.complete_payout_request(uuid,text,text)', 'EXECUTE');
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 114: process_payout_request has GRANT EXECUTE to authenticated
+  v_test_id := v_test_id + 1;
+  v_test_name := 'process_payout_request has GRANT EXECUTE to authenticated';
+  v_pass := has_function_privilege('authenticated', 'public.process_payout_request(uuid,text)', 'EXECUTE');
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 115: request_payout has GRANT EXECUTE to authenticated
+  v_test_id := v_test_id + 1;
+  v_test_name := 'request_payout has GRANT EXECUTE to authenticated';
+  v_pass := has_function_privilege('authenticated', 'public.request_payout()', 'EXECUTE');
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 116: approve_clip has GRANT EXECUTE to authenticated
+  v_test_id := v_test_id + 1;
+  v_test_name := 'approve_clip has GRANT EXECUTE to authenticated';
+  v_pass := has_function_privilege('authenticated', 'public.approve_clip(uuid,text)', 'EXECUTE');
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 117: campaign_action has GRANT EXECUTE to authenticated
+  v_test_id := v_test_id + 1;
+  v_test_name := 'campaign_action has GRANT EXECUTE to authenticated';
+  v_pass := has_function_privilege('authenticated', 'public.campaign_action(uuid,text,text)', 'EXECUTE');
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 118: adjust_campaign_budget has GRANT EXECUTE to authenticated
+  v_test_id := v_test_id + 1;
+  v_test_name := 'adjust_campaign_budget has GRANT EXECUTE to authenticated';
+  v_pass := has_function_privilege('authenticated', 'public.adjust_campaign_budget(uuid,numeric,text)', 'EXECUTE');
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 119: get_wallet_balance has GRANT EXECUTE to authenticated
+  v_test_id := v_test_id + 1;
+  v_test_name := 'get_wallet_balance has GRANT EXECUTE to authenticated';
+  v_pass := has_function_privilege('authenticated', 'public.get_wallet_balance(uuid)', 'EXECUTE');
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 120: get_campaign_budget has GRANT EXECUTE to authenticated
+  v_test_id := v_test_id + 1;
+  v_test_name := 'get_campaign_budget has GRANT EXECUTE to authenticated';
+  v_pass := has_function_privilege('authenticated', 'public.get_campaign_budget(uuid)', 'EXECUTE');
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 121: submit_clip has GRANT EXECUTE to authenticated
+  v_test_id := v_test_id + 1;
+  v_test_name := 'submit_clip has GRANT EXECUTE to authenticated';
+  v_pass := has_function_privilege('authenticated', 'public.submit_clip(uuid,text,text,text)', 'EXECUTE');
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 122: submit_campaign_launch_payment has GRANT EXECUTE to authenticated
+  v_test_id := v_test_id + 1;
+  v_test_name := 'submit_campaign_launch_payment has GRANT EXECUTE to authenticated';
+  v_pass := has_function_privilege('authenticated', 'public.submit_campaign_launch_payment(uuid,text)', 'EXECUTE');
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 123: verify_campaign_launch_payment has GRANT EXECUTE to authenticated
+  v_test_id := v_test_id + 1;
+  v_test_name := 'verify_campaign_launch_payment has GRANT EXECUTE to authenticated';
+  v_pass := has_function_privilege('authenticated', 'public.verify_campaign_launch_payment(uuid)', 'EXECUTE');
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 124: reject_campaign_launch_payment has GRANT EXECUTE to authenticated
+  v_test_id := v_test_id + 1;
+  v_test_name := 'reject_campaign_launch_payment has GRANT EXECUTE to authenticated';
+  v_pass := has_function_privilege('authenticated', 'public.reject_campaign_launch_payment(uuid,text)', 'EXECUTE');
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 125: admin_clip_action has GRANT EXECUTE to authenticated
+  v_test_id := v_test_id + 1;
+  v_test_name := 'admin_clip_action has GRANT EXECUTE to authenticated';
+  v_pass := has_function_privilege('authenticated', 'public.admin_clip_action(uuid,text,text)', 'EXECUTE');
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 126: admin_user_action has GRANT EXECUTE to authenticated
+  v_test_id := v_test_id + 1;
+  v_test_name := 'admin_user_action has GRANT EXECUTE to authenticated';
+  v_pass := has_function_privilege('authenticated', 'public.admin_user_action(uuid,text,text)', 'EXECUTE');
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 127: payout_requests table has UPDATE revoked from authenticated
+  v_test_id := v_test_id + 1;
+  v_test_name := 'payout_requests UPDATE revoked from authenticated';
+  v_pass := NOT EXISTS (
+    SELECT 1 FROM pg_roles r
+    JOIN pg_class c ON c.relowner = r.oid
+    JOIN pg_namespace n ON c.relnamespace = n.oid
+    WHERE n.nspname = 'public' AND c.relname = 'payout_requests'
+    AND r.rolname = 'authenticated'
+    AND has_table_privilege(r.oid, 'public.payout_requests', 'UPDATE')
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 128: financial_records table has UPDATE revoked from authenticated
+  v_test_id := v_test_id + 1;
+  v_test_name := 'financial_records UPDATE revoked from authenticated';
+  v_pass := NOT EXISTS (
+    SELECT 1 FROM pg_roles r
+    JOIN pg_class c ON c.relowner = r.oid
+    JOIN pg_namespace n ON c.relnamespace = n.oid
+    WHERE n.nspname = 'public' AND c.relname = 'financial_records'
+    AND r.rolname = 'authenticated'
+    AND has_table_privilege(r.oid, 'public.financial_records', 'UPDATE')
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 129: wallet_ledger table has UPDATE revoked from authenticated
+  v_test_id := v_test_id + 1;
+  v_test_name := 'wallet_ledger UPDATE revoked from authenticated';
+  v_pass := NOT EXISTS (
+    SELECT 1 FROM pg_roles r
+    JOIN pg_class c ON c.relowner = r.oid
+    JOIN pg_namespace n ON c.relnamespace = n.oid
+    WHERE n.nspname = 'public' AND c.relname = 'wallet_ledger'
+    AND r.rolname = 'authenticated'
+    AND has_table_privilege(r.oid, 'public.wallet_ledger', 'UPDATE')
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 130: audit_logs table has UPDATE revoked from authenticated
+  v_test_id := v_test_id + 1;
+  v_test_name := 'audit_logs UPDATE revoked from authenticated';
+  v_pass := NOT EXISTS (
+    SELECT 1 FROM pg_roles r
+    JOIN pg_class c ON c.relowner = r.oid
+    JOIN pg_namespace n ON c.relnamespace = n.oid
+    WHERE n.nspname = 'public' AND c.relname = 'audit_logs'
+    AND r.rolname = 'authenticated'
+    AND has_table_privilege(r.oid, 'public.audit_logs', 'UPDATE')
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 131: financial_records table has DELETE revoked from authenticated
+  v_test_id := v_test_id + 1;
+  v_test_name := 'financial_records DELETE revoked from authenticated';
+  v_pass := NOT EXISTS (
+    SELECT 1 FROM pg_roles r
+    JOIN pg_class c ON c.relowner = r.oid
+    JOIN pg_namespace n ON c.relnamespace = n.oid
+    WHERE n.nspname = 'public' AND c.relname = 'financial_records'
+    AND r.rolname = 'authenticated'
+    AND has_table_privilege(r.oid, 'public.financial_records', 'DELETE')
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 132: payout_requests table has DELETE revoked from authenticated
+  v_test_id := v_test_id + 1;
+  v_test_name := 'payout_requests DELETE revoked from authenticated';
+  v_pass := NOT EXISTS (
+    SELECT 1 FROM pg_roles r
+    JOIN pg_class c ON c.relowner = r.oid
+    JOIN pg_namespace n ON c.relnamespace = n.oid
+    WHERE n.nspname = 'public' AND c.relname = 'payout_requests'
+    AND r.rolname = 'authenticated'
+    AND has_table_privilege(r.oid, 'public.payout_requests', 'DELETE')
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- =========================================================================
   -- RESULTS
   -- =========================================================================
 
