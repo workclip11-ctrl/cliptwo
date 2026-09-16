@@ -73,8 +73,9 @@ export function AdjustBudgetModal({
           not spend beyond its configured budget.
         </p>
 
-        <label className="mt-4 block text-sm font-medium">New budget (₹)</label>
+        <label htmlFor="adjust-budget" className="mt-4 block text-sm font-medium">New budget (₹)</label>
         <input
+          id="adjust-budget"
           type="number"
           min={0}
           value={budget}

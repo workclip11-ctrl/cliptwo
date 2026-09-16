@@ -64,7 +64,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           {/* Mobile hamburger */}
           <button
             onClick={() => setSidebarOpen(true)}
-            className="fixed bottom-4 left-4 z-30 flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-accent text-white shadow-lg hover:opacity-90 sm:hidden"
+            className="fixed bottom-4 left-4 z-30 flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-accent text-white shadow-lg hover:opacity-90 lg:hidden"
             aria-label="Open navigation"
           >
             <Menu size={20} />
@@ -79,7 +79,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           />
 
           {/* Desktop sidebar */}
-          <aside className="hidden w-56 shrink-0 sm:block">
+          <aside className="hidden w-56 shrink-0 lg:block">
             <div className="sticky top-20 space-y-6">
               {NAV_GROUPS.map((group) => (
                 <div key={group.label}>

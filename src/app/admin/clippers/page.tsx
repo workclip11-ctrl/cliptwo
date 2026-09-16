@@ -214,8 +214,8 @@ export default function AdminClippers() {
                     <p className="truncate text-[13px] text-muted">@{p.username}</p>
                   </div>
                 </div>
-                <span className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-[12px] font-medium ${p.status === "suspended" ? "bg-red/10 text-red" : "bg-green/10 text-green"}`}>
-                  {p.status === "suspended" ? "Suspended" : "Active"}
+                <span className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-[12px] font-medium ${p.status === "suspended" ? "bg-red/10 text-red" : p.status === "deactivated" ? "bg-muted/10 text-muted" : "bg-green/10 text-green"}`}>
+                  {p.status === "suspended" ? "Suspended" : p.status === "deactivated" ? "Deactivated" : "Active"}
                 </span>
               </div>
               <div className="mt-3 grid grid-cols-3 gap-2 text-[13px]">
@@ -266,12 +266,14 @@ export default function AdminClippers() {
                 return (
                   <tr
                     key={p.id}
-                    onClick={() => setSelectedId(p.id)}
-                    className="cursor-pointer transition-colors hover:bg-accent-soft/50"
+                    className="transition-colors hover:bg-accent-soft/50"
                   >
                     {/* Clipper */}
                     <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setSelectedId(p.id)}
+                        className="flex w-full items-center gap-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+                      >
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-[13px] font-semibold text-foreground">
                           {(p.name ?? p.username ?? "?").slice(0, 1).toUpperCase()}
                         </div>
@@ -286,7 +288,7 @@ export default function AdminClippers() {
                           </div>
                           <p className="truncate text-[13px] text-muted">@{p.username}</p>
                         </div>
-                      </div>
+                      </button>
                     </td>
 
                     {/* Social accounts */}
@@ -352,10 +354,12 @@ export default function AdminClippers() {
                         className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[12px] font-medium ${
                           p.status === "suspended"
                             ? "bg-red/10 text-red"
-                            : "bg-green/10 text-green"
+                            : p.status === "deactivated"
+                              ? "bg-muted/10 text-muted"
+                              : "bg-green/10 text-green"
                         }`}
                       >
-                        {p.status === "suspended" ? "Suspended" : "Active"}
+                        {p.status === "suspended" ? "Suspended" : p.status === "deactivated" ? "Deactivated" : "Active"}
                       </span>
                     </td>
 
@@ -476,10 +480,12 @@ function ClipperDrawer({
                 className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-[12px] font-medium ${
                   suspended
                     ? "bg-red/10 text-red"
-                    : "bg-green/10 text-green"
+                    : profile.status === "deactivated"
+                      ? "bg-muted/10 text-muted"
+                      : "bg-green/10 text-green"
                 }`}
               >
-                {suspended ? "Suspended" : "Active"}
+                {suspended ? "Suspended" : profile.status === "deactivated" ? "Deactivated" : "Active"}
               </span>
               {profile.verified && (
                 <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-green/10 px-2.5 py-0.5 text-[12px] font-medium text-green">

@@ -48,7 +48,7 @@ export default function AdminPayoutsPage() {
   const [q, setQ] = useState("");
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [completingId, setCompletingId] = useState<string | null>(null);
-  const [utrInput, setUtrInput] = useState("");
+  const [utrInputs, setUtrInputs] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
 
   const actor = user?.email ?? user?.name ?? "Admin";
@@ -93,15 +93,20 @@ export default function AdminPayoutsPage() {
   };
 
   const handleComplete = async (payout: PayoutRequest) => {
-    if (!utrInput.trim()) {
+    const input = utrInputs[payout.id] ?? "";
+    if (!input.trim()) {
       setError("UPI Transaction Reference (UTR) is required. Record the actual UPI transfer before confirming.");
       return;
     }
     setCompletingId(payout.id);
     setError(null);
     try {
-      await completePayoutRequest(payout.id, utrInput.trim(), actor);
-      setUtrInput("");
+      await completePayoutRequest(payout.id, input.trim(), actor);
+      setUtrInputs((prev) => {
+        const next = { ...prev };
+        delete next[payout.id];
+        return next;
+      });
     } catch {
       setError("Failed to complete payout. Check console for details.");
     } finally {
@@ -232,15 +237,15 @@ export default function AdminPayoutsPage() {
               {payout.status === "processing" && (
                 <div className="mt-3 space-y-2">
                   <input
-                    value={completingId === payout.id ? utrInput : ""}
-                    onChange={(e) => { setCompletingId(payout.id); setUtrInput(e.target.value); }}
+                    value={utrInputs[payout.id] ?? ""}
+                    onChange={(e) => { setCompletingId(payout.id); setUtrInputs((prev) => ({ ...prev, [payout.id]: e.target.value })); }}
                     onFocus={() => setCompletingId(payout.id)}
                     placeholder="Enter UPI UTR"
                     className="h-10 w-full rounded-[8px] border border-border/60 bg-background px-3.5 font-mono text-[14px] outline-none transition-colors focus:border-foreground/30"
                   />
                   <button
                     onClick={() => handleComplete(payout)}
-                    disabled={isCompleting || !utrInput.trim()}
+                    disabled={isCompleting || !(utrInputs[payout.id] ?? "").trim()}
                     className="inline-flex h-10 w-full cursor-pointer items-center justify-center gap-1.5 rounded-[8px] bg-green px-4 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {isCompleting ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={13} />}
@@ -357,10 +362,10 @@ export default function AdminPayoutsPage() {
                         <div className="flex flex-col items-end gap-2">
                           <div className="flex items-center gap-2">
                             <input
-                              value={completingId === payout.id ? utrInput : ""}
+                              value={utrInputs[payout.id] ?? ""}
                               onChange={(e) => {
                                 setCompletingId(payout.id);
-                                setUtrInput(e.target.value);
+                                setUtrInputs((prev) => ({ ...prev, [payout.id]: e.target.value }));
                               }}
                               onFocus={() => setCompletingId(payout.id)}
                               placeholder="Enter UPI UTR"
@@ -368,7 +373,7 @@ export default function AdminPayoutsPage() {
                             />
                             <button
                               onClick={() => handleComplete(payout)}
-                              disabled={isCompleting || !utrInput.trim()}
+                              disabled={isCompleting || !(utrInputs[payout.id] ?? "").trim()}
                               className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[8px] bg-green px-4 text-[14px] font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               {isCompleting ? (

@@ -113,8 +113,8 @@ export default function TermsPage() {
         <h2 className="text-xl font-semibold tracking-tight">10. Contact</h2>
         <p>
           Questions about these Terms? Email{" "}
-          <a href="mailto:support@cliptwo.com" className="text-accent hover:underline">
-            support@cliptwo.com
+          <a href="mailto:support@cliptwo.in" className="text-accent hover:underline">
+            support@cliptwo.in
           </a>
           .
         </p>

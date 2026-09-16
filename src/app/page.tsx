@@ -772,7 +772,7 @@ export default function Home() {
             Can&apos;t find what you&apos;re looking for? Reach out to our support team and we&apos;ll get back to you.
           </p>
           <a
-            href="mailto:support@cliptwo.com"
+            href="mailto:support@cliptwo.in"
             className="mt-5 inline-flex h-10 items-center gap-2 rounded-[8px] bg-foreground px-5 text-sm font-medium text-background transition-opacity hover:opacity-90 cursor-pointer"
           >
             Contact Support
@@ -819,7 +819,7 @@ export default function Home() {
               </p>
               <div className="mt-4 flex items-center gap-2">
                 {(["Instagram", "YouTube"] as const).map((p) => (
-                  <span key={p} className="flex h-8 w-8 items-center justify-center rounded-[8px] border border-border/40 bg-background text-muted transition-colors hover:bg-accent-soft cursor-pointer">
+                  <span key={p} className="flex h-8 w-8 items-center justify-center rounded-[8px] border border-border/40 bg-background text-muted">
                     <PlatformIcon p={p} size={15} />
                   </span>
                 ))}
@@ -840,7 +840,7 @@ export default function Home() {
               <h5 className="text-xs font-bold uppercase tracking-wider text-muted">Company</h5>
               <ul className="mt-3 space-y-2.5 text-[13px] text-muted">
                 <li><Link href="/login" className="transition-colors hover:text-foreground cursor-pointer">Log in</Link></li>
-                <li><a href="mailto:support@cliptwo.com" className="transition-colors hover:text-foreground cursor-pointer">Contact</a></li>
+                <li><a href="mailto:support@cliptwo.in" className="transition-colors hover:text-foreground cursor-pointer">Contact</a></li>
               </ul>
             </div>
 

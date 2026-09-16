@@ -11,13 +11,6 @@ import { rup } from "@/lib/format";
 import { useFocusTrap } from "@/lib/use-focus-trap";
 import type { Campaign } from "@/lib/types";
 
-const GRADIENTS = [
-  "from-sky-500/25 to-indigo-500/25",
-  "from-rose-500/25 to-orange-500/25",
-  "from-emerald-500/25 to-teal-500/25",
-  "from-violet-500/25 to-fuchsia-500/25",
-];
-
 export function CampaignModal({
   campaign,
   onClose,
@@ -29,7 +22,7 @@ export function CampaignModal({
   const { isSignedIn, user } = useAuth();
   const { campaigns, clips, addClip } = useStore();
   const [submitOpen, setSubmitOpen] = useState(false);
-  const { containerRef, onKeyDown } = useFocusTrap(true);
+  const { containerRef, onKeyDown } = useFocusTrap(!!campaign);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -41,7 +34,6 @@ export function CampaignModal({
 
   if (!campaign) return null;
 
-  const index = Math.max(0, campaigns.findIndex((c) => c.id === campaign.id));
   const clippersIn = new Set(
     clips.filter((k) => k.campaignId === campaign.id).map((k) => k.clipper),
   ).size;
@@ -60,10 +52,17 @@ export function CampaignModal({
         className="flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border bg-card"
         onClick={(e) => e.stopPropagation()}
       >
-        <div
-          className={`relative flex h-36 items-center justify-center bg-gradient-to-br ${GRADIENTS[index % GRADIENTS.length]} text-foreground/70`}
-        >
-          <PlatformIcon p={campaign.platform} size={40} />
+        <div className="relative flex h-36 items-center justify-center overflow-hidden bg-accent-soft">
+          {campaign.thumbnails?.[0] ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={campaign.thumbnails[0]}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <PlatformIcon p={campaign.platform} size={40} />
+          )}
           <button
             onClick={onClose}
             aria-label="Close"
@@ -90,7 +89,7 @@ export function CampaignModal({
 
           <div className="mt-4 grid grid-cols-3 gap-3 text-center">
             <div className="rounded-xl border bg-background p-3">
-              <p className="font-mono text-sm font-medium">{campaign.daysLeft}d</p>
+              <p className="font-mono text-sm font-medium">{campaign.daysLeft != null ? `${campaign.daysLeft}d` : "—"}</p>
               <p className="text-xs text-muted">left</p>
             </div>
             <div className="rounded-xl border bg-background p-3">

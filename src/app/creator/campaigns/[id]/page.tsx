@@ -228,7 +228,14 @@ export default function CreatorCampaignDetailPage() {
       <section className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-10">
         {/* Thumbnail — visual anchor */}
         <div className="shrink-0 overflow-hidden rounded-[12px] bg-accent-soft lg:w-[420px]">
-          {camp.thumbnails?.[0] ? (
+          {resolvedThumbnails[0] ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={resolvedThumbnails[0]}
+              alt="Campaign thumbnail"
+              className="aspect-video w-full object-cover"
+            />
+          ) : camp.thumbnails?.[0] ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img
               src={camp.thumbnails[0]}

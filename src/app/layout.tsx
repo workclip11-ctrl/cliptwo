@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://cliptwo.com"),
+  metadataBase: new URL("https://cliptwo.in"),
   title: "cliptwo — clip long videos into shorts",
   description:
     "A two-sided marketplace connecting creators with clippers who turn long videos into shorts.",

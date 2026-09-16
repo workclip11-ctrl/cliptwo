@@ -60,8 +60,8 @@ export default function RefundPolicyPage() {
         <h2 className="text-xl font-semibold tracking-tight">How to Request a Refund</h2>
         <ol className="list-decimal pl-5 space-y-1">
           <li>Contact support at{" "}
-            <a href="mailto:support@cliptwo.com" className="text-accent hover:underline">
-              support@cliptwo.com
+            <a href="mailto:support@cliptwo.in" className="text-accent hover:underline">
+              support@cliptwo.in
             </a>.
           </li>
           <li>Include your account email, campaign/clip ID, and reason for the refund request.</li>

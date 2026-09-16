@@ -16,6 +16,9 @@ export async function updateSession(request: NextRequest) {
 
   let response = NextResponse.next({ request });
 
+  const secure =
+    (process.env.NEXT_PUBLIC_APP_URL || "").startsWith("https://");
+
   const supabase = createServerClient(url as string, key as string, {
     cookies: {
       getAll() {
@@ -27,7 +30,7 @@ export async function updateSession(request: NextRequest) {
         );
         response = NextResponse.next({ request });
         cookiesToSet.forEach(({ name, value, options }) =>
-          response.cookies.set(name, value, options),
+          response.cookies.set(name, value, { ...options, secure }),
         );
       },
     },

@@ -34,10 +34,10 @@ export function PolicyPage({
             provides a general overview of ClipTwo&apos;s policies. It is not
             legal advice. For questions about your specific situation, contact{" "}
             <a
-              href="mailto:support@cliptwo.com"
+              href="mailto:support@cliptwo.in"
               className="text-accent hover:underline"
             >
-              support@cliptwo.com
+              support@cliptwo.in
             </a>
             .
           </p>

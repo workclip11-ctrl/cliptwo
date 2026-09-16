@@ -190,7 +190,7 @@ export default function FAQPage() {
             Our team is happy to help.
           </p>
           <a
-            href="mailto:support@cliptwo.com"
+            href="mailto:support@cliptwo.in"
             className="mt-4 inline-flex h-10 items-center gap-2 rounded-lg bg-foreground px-5 text-[13px] font-medium text-background transition-opacity hover:opacity-90 cursor-pointer"
           >
             Contact support

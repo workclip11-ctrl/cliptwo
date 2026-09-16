@@ -8,7 +8,11 @@ import { isStoragePath, resolveAssetUrl } from "@/lib/private-assets";
 import { useFocusTrap } from "@/lib/use-focus-trap";
 import type { Campaign, CampaignRights, Platform } from "@/lib/types";
 
-const PLATFORM_OPTIONS: Platform[] = ["Instagram", "YouTube", "Kick"];
+const PLATFORM_OPTIONS: { value: Platform; disabled?: boolean }[] = [
+  { value: "Instagram" },
+  { value: "YouTube" },
+  { value: "Kick", disabled: true },
+];
 
 const CATEGORIES = [
   "Tech",
@@ -294,16 +298,20 @@ export function EditCampaignModal({
             <div className="flex gap-2">
               {PLATFORM_OPTIONS.map((p) => (
                 <button
-                  key={p}
+                  key={p.value}
                   type="button"
-                  onClick={() => togglePlatform(p)}
+                  disabled={p.disabled}
+                  onClick={() => !p.disabled && togglePlatform(p.value)}
                   className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${
-                    platforms.includes(p)
-                      ? "border-foreground bg-accent-soft"
-                      : "text-muted hover:border-foreground/30"
+                    p.disabled
+                      ? "cursor-not-allowed border-border/40 text-muted/50"
+                      : platforms.includes(p.value)
+                        ? "border-foreground bg-accent-soft"
+                        : "text-muted hover:border-foreground/30"
                   }`}
                 >
-                  {p}
+                  {p.value}
+                  {p.disabled && <span className="text-[11px] text-muted/50"> (coming soon)</span>}
                 </button>
               ))}
             </div>

@@ -20,16 +20,17 @@
 -- ────────────────────────────────────────────────────────────────────────────
 
 -- Backfill campaigns.created_by where NULL
+-- Uses specific exceptions to avoid silently swallowing real errors.
 DO $$ BEGIN
   UPDATE public.campaigns SET created_by = '00000000-0000-0000-0000-000000000099'
   WHERE created_by IS NULL;
-EXCEPTION WHEN OTHERS THEN NULL; END $$;;
+EXCEPTION WHEN undefined_table THEN NULL; WHEN undefined_column THEN NULL; END $$;
 
 -- Backfill clips.user_id where NULL
 DO $$ BEGIN
   UPDATE public.clips SET user_id = '00000000-0000-0000-0000-000000000099'
   WHERE user_id IS NULL;
-EXCEPTION WHEN OTHERS THEN NULL; END $$;;
+EXCEPTION WHEN undefined_table THEN NULL; WHEN undefined_column THEN NULL; END $$;
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- HELPER: check if a column exists on a table
@@ -60,7 +61,7 @@ DO $$ BEGIN
   ALTER TABLE public.profiles VALIDATE CONSTRAINT profiles_role_check;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE profiles_role_check failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   ALTER TABLE public.profiles ADD CONSTRAINT profiles_status_check
@@ -71,7 +72,7 @@ DO $$ BEGIN
   ALTER TABLE public.profiles VALIDATE CONSTRAINT profiles_status_check;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE profiles_status_check failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 -- ── campaigns ───────────────────────────────────────────────────────────────
 DO $$ BEGIN
@@ -83,7 +84,7 @@ DO $$ BEGIN
   ALTER TABLE public.campaigns VALIDATE CONSTRAINT campaigns_status_check;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE campaigns_status_check failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   ALTER TABLE public.campaigns ADD CONSTRAINT campaigns_payout_nonneg
@@ -94,7 +95,7 @@ DO $$ BEGIN
   ALTER TABLE public.campaigns VALIDATE CONSTRAINT campaigns_payout_nonneg;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE campaigns_payout_nonneg failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   ALTER TABLE public.campaigns ADD CONSTRAINT campaigns_budget_nonneg
@@ -105,7 +106,7 @@ DO $$ BEGIN
   ALTER TABLE public.campaigns VALIDATE CONSTRAINT campaigns_budget_nonneg;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE campaigns_budget_nonneg failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   ALTER TABLE public.campaigns ADD CONSTRAINT campaigns_spent_nonneg
@@ -116,7 +117,7 @@ DO $$ BEGIN
   ALTER TABLE public.campaigns VALIDATE CONSTRAINT campaigns_spent_nonneg;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE campaigns_spent_nonneg failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   ALTER TABLE public.campaigns ADD CONSTRAINT campaigns_days_left_nonneg
@@ -127,7 +128,7 @@ DO $$ BEGIN
   ALTER TABLE public.campaigns VALIDATE CONSTRAINT campaigns_days_left_nonneg;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE campaigns_days_left_nonneg failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   ALTER TABLE public.campaigns ADD CONSTRAINT campaigns_max_payout_nonneg
@@ -138,7 +139,7 @@ DO $$ BEGIN
   ALTER TABLE public.campaigns VALIDATE CONSTRAINT campaigns_max_payout_nonneg;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE campaigns_max_payout_nonneg failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   ALTER TABLE public.campaigns ADD CONSTRAINT campaigns_spend_cap_nonneg
@@ -149,7 +150,7 @@ DO $$ BEGIN
   ALTER TABLE public.campaigns VALIDATE CONSTRAINT campaigns_spend_cap_nonneg;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE campaigns_spend_cap_nonneg failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 -- campaigns.created_by NOT NULL
 DO $$ BEGIN
@@ -161,7 +162,7 @@ DO $$ BEGIN
   ALTER TABLE public.campaigns VALIDATE CONSTRAINT campaigns_created_by_not_null;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE campaigns_created_by_not_null failed — backfill created_by on campaigns first';
-END $$;;
+END $;
 
 -- ── clips ───────────────────────────────────────────────────────────────────
 DO $$ BEGIN
@@ -173,7 +174,7 @@ DO $$ BEGIN
   ALTER TABLE public.clips VALIDATE CONSTRAINT clips_status_check;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE clips_status_check failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   ALTER TABLE public.clips ADD CONSTRAINT clips_views_nonneg
@@ -184,7 +185,7 @@ DO $$ BEGIN
   ALTER TABLE public.clips VALIDATE CONSTRAINT clips_views_nonneg;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE clips_views_nonneg failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 -- clips.verified_views (only if column exists)
 DO $$ BEGIN
@@ -200,7 +201,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE clips_verified_views_nonneg failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   IF _col_exists('clips', 'locked_cpm') THEN
@@ -215,7 +216,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE clips_locked_cpm_nonneg failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   IF _col_exists('clips', 'locked_max_payout') THEN
@@ -230,7 +231,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE clips_locked_max_payout_nonneg failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 -- clips.user_id NOT NULL
 DO $$ BEGIN
@@ -242,7 +243,7 @@ DO $$ BEGIN
   ALTER TABLE public.clips VALIDATE CONSTRAINT clips_user_id_not_null;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE clips_user_id_not_null failed — backfill user_id on clips first';
-END $$;;
+END $;
 
 -- clips.txn_id unique (only if column exists)
 DO $$ BEGIN
@@ -258,7 +259,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE clips_txn_id_unique failed — deduplicate txn_id values first';
-END $$;;
+END $;
 
 -- ── clip_metrics (only if table exists) ─────────────────────────────────────
 DO $$ BEGIN
@@ -274,7 +275,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE clip_metrics_source_check failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='clip_metrics') THEN
@@ -289,7 +290,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE clip_metrics_verification_check failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='clip_metrics') THEN
@@ -304,7 +305,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE clip_metrics_views_nonneg failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='clip_metrics') THEN
@@ -319,7 +320,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE clip_metrics_likes_nonneg failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='clip_metrics') THEN
@@ -334,7 +335,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE clip_metrics_comments_nonneg failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='clip_metrics') THEN
@@ -349,7 +350,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE clip_metrics_shares_nonneg failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 -- ── metrics_sync_jobs (only if table exists) ────────────────────────────────
 DO $$ BEGIN
@@ -365,7 +366,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE metrics_sync_jobs_status_check failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='metrics_sync_jobs') THEN
@@ -380,7 +381,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE metrics_sync_jobs_captured_nonneg failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 -- ── social_accounts ─────────────────────────────────────────────────────────
 DO $$ BEGIN
@@ -396,7 +397,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE social_accounts_status_check failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='social_accounts') THEN
@@ -411,7 +412,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE social_accounts_user_platform_unique failed — deduplicate social accounts first';
-END $$;;
+END $;
 
 -- ── social_connections ──────────────────────────────────────────────────────
 DO $$ BEGIN
@@ -427,7 +428,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE social_connections_account_unique failed — deduplicate connections first';
-END $$;;
+END $;
 
 -- ── earnings (only if table exists) ─────────────────────────────────────────
 DO $$ BEGIN
@@ -443,7 +444,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE earnings_status_check failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='earnings') THEN
@@ -458,7 +459,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE earnings_locked_cpm_nonneg failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='earnings') THEN
@@ -473,7 +474,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE earnings_verified_views_nonneg failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='earnings') THEN
@@ -488,7 +489,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE earnings_gross_nonneg failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='earnings') THEN
@@ -503,7 +504,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE earnings_platform_fee_nonneg failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='earnings') THEN
@@ -518,7 +519,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE earnings_net_nonneg failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='earnings') THEN
@@ -533,7 +534,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE earnings_creator_fee_nonneg failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='earnings') THEN
@@ -548,7 +549,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE earnings_clip_unique failed — deduplicate earnings first';
-END $$;;
+END $;
 
 -- ── payouts (only if table exists) ──────────────────────────────────────────
 DO $$ BEGIN
@@ -564,7 +565,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE payouts_amount_nonneg failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='payouts') THEN
@@ -579,7 +580,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE payouts_net_amount_nonneg failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='payouts') THEN
@@ -594,7 +595,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE payouts_retry_count failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 -- ── financial_records ──────────────────────────────────────────────────────
 DO $$ BEGIN
@@ -610,7 +611,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE financial_records_status_check failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='financial_records') THEN
@@ -625,7 +626,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE financial_records_gross_nonneg failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='financial_records') THEN
@@ -640,7 +641,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE financial_records_fee_nonneg failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='financial_records') THEN
@@ -655,7 +656,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE financial_records_net_nonneg failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 -- Unique: one financial record per clip
 DO $$ BEGIN
@@ -681,7 +682,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE payout_requests_status_check failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='payout_requests') THEN
@@ -696,7 +697,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE payout_requests_amount_nonneg failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 -- ── wallet_ledger ──────────────────────────────────────────────────────────
 -- NOTE: wallet_ledger amounts CAN be negative (debit entries store negative
@@ -723,7 +724,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE campaigns_platform_check failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 -- clips.platform: valid platform values
 DO $$ BEGIN
@@ -739,7 +740,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE clips_platform_check failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 -- social_accounts.platform: valid platform values
 DO $$ BEGIN
@@ -755,7 +756,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE social_accounts_platform_check failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 -- social_connections.platform: valid platform values
 DO $$ BEGIN
@@ -771,7 +772,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE social_connections_platform_check failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 -- clip_metrics.platform: valid platform values
 DO $$ BEGIN
@@ -787,7 +788,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'VALIDATE clip_metrics_platform_check failed — fix offending rows and re-run';
-END $$;;
+END $;
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- CLEANUP: drop helper function

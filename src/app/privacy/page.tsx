@@ -75,8 +75,8 @@ export default function PrivacyPage() {
         </ul>
         <p className="mt-2">
           To exercise these rights, contact{" "}
-          <a href="mailto:support@cliptwo.com" className="text-accent hover:underline">
-            support@cliptwo.com
+          <a href="mailto:support@cliptwo.in" className="text-accent hover:underline">
+            support@cliptwo.in
           </a>
           .
         </p>

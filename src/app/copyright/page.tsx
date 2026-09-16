@@ -56,8 +56,8 @@ export default function CopyrightPage() {
         <p>
           If you believe your copyrighted work has been used on ClipTwo without
           authorization, please send a takedown request to{" "}
-          <a href="mailto:copyright@cliptwo.com" className="text-accent hover:underline">
-            copyright@cliptwo.com
+          <a href="mailto:copyright@cliptwo.in" className="text-accent hover:underline">
+            copyright@cliptwo.in
           </a>{" "}
           with:
         </p>

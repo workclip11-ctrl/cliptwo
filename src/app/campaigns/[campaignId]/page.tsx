@@ -216,7 +216,7 @@ export default function CampaignDetailPage() {
               ) : null}
               <div>
                 <p className={`font-medium ${isUrgent ? "text-amber" : ""}`}>
-                  {campaign.daysLeft}d left
+                  {campaign.daysLeft != null ? `${campaign.daysLeft}d left` : "—"}
                 </p>
                 <p className="text-xs text-muted">
                   {campaign.endDate ? `Ends ${campaign.endDate}` : "Deadline"}
@@ -468,7 +468,7 @@ export default function CampaignDetailPage() {
               label="Days remaining"
               value={
                 <span className="inline-flex items-center gap-1">
-                  <Clock size={13} className="text-muted" /> {campaign.daysLeft ?? "—"}d
+                  <Clock size={13} className="text-muted" /> {campaign.daysLeft != null ? `${campaign.daysLeft}d` : "—"}
                 </span>
               }
             />

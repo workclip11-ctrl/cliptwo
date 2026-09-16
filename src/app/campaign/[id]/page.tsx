@@ -14,18 +14,6 @@ import { rup, fmtViews, clipEarnings } from "@/lib/format";
 import { campaignSpent } from "@/lib/finance";
 import type { Platform } from "@/lib/types";
 
-const GRADIENTS = [
-  "from-sky-500/25 to-indigo-500/25",
-  "from-rose-500/25 to-orange-500/25",
-  "from-emerald-500/25 to-teal-500/25",
-  "from-violet-500/25 to-fuchsia-500/25",
-];
-function gradientFor(id: string) {
-  let h = 0;
-  for (const ch of id) h = (h + ch.charCodeAt(0)) % GRADIENTS.length;
-  return GRADIENTS[h];
-}
-
 export default function CampaignDetail() {
   const params = useParams<{ id: string }>();
   const id = params.id as string;
@@ -99,7 +87,7 @@ export default function CampaignDetail() {
               className="h-full w-full object-cover"
             />
           ) : (
-            <div className={`flex h-full items-center justify-center bg-gradient-to-br ${gradientFor(campaign.id)}`}>
+            <div className="flex h-full items-center justify-center">
               <PlatformIcon p={campaign.platform} size={42} />
             </div>
           )}
@@ -166,7 +154,7 @@ export default function CampaignDetail() {
           </div>
           <div className="rounded-xl border bg-card p-4">
             <p className="text-[12px] text-muted">Time left</p>
-            <p className="mt-1.5 font-mono text-[18px] font-semibold">{campaign.daysLeft}d</p>
+            <p className="mt-1.5 font-mono text-[18px] font-semibold">{campaign.daysLeft != null ? `${campaign.daysLeft}d` : "—"}</p>
             <p className="mt-0.5 text-[11px] text-muted">to join</p>
           </div>
         </div>

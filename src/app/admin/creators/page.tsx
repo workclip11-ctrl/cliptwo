@@ -198,8 +198,8 @@ export default function AdminCreators() {
                     <p className="truncate text-[13px] text-muted">{p.company ?? "—"}</p>
                   </div>
                 </div>
-                <span className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-[12px] font-medium ${p.status === "suspended" ? "bg-red/10 text-red" : "bg-green/10 text-green"}`}>
-                  {p.status === "suspended" ? "Suspended" : "Active"}
+                <span className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-[12px] font-medium ${p.status === "suspended" ? "bg-red/10 text-red" : p.status === "deactivated" ? "bg-muted/10 text-muted" : "bg-green/10 text-green"}`}>
+                  {p.status === "suspended" ? "Suspended" : p.status === "deactivated" ? "Deactivated" : "Active"}
                 </span>
               </div>
               <div className="mt-3 grid grid-cols-3 gap-2 text-[13px]">
@@ -251,12 +251,14 @@ export default function AdminCreators() {
                 return (
                   <tr
                     key={p.id}
-                    onClick={() => setSelectedId(p.id)}
-                    className="cursor-pointer transition-colors hover:bg-accent-soft/50"
+                    className="transition-colors hover:bg-accent-soft/50"
                   >
                     {/* Creator */}
                     <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setSelectedId(p.id)}
+                        className="flex w-full items-center gap-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+                      >
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-[13px] font-semibold text-foreground">
                           {(p.name ?? "?").slice(0, 1).toUpperCase()}
                         </div>
@@ -264,7 +266,7 @@ export default function AdminCreators() {
                         {p.verified && (
                           <BadgeCheck size={14} className="shrink-0 text-green" />
                         )}
-                      </div>
+                      </button>
                     </td>
 
                     {/* Company / brand */}
@@ -322,10 +324,12 @@ export default function AdminCreators() {
                         className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[12px] font-medium ${
                           p.status === "suspended"
                             ? "bg-red/10 text-red"
-                            : "bg-green/10 text-green"
+                            : p.status === "deactivated"
+                              ? "bg-muted/10 text-muted"
+                              : "bg-green/10 text-green"
                         }`}
                       >
-                        {p.status === "suspended" ? "Suspended" : "Active"}
+                        {p.status === "suspended" ? "Suspended" : p.status === "deactivated" ? "Deactivated" : "Active"}
                       </span>
                     </td>
 

@@ -98,8 +98,8 @@ export default function CommunityGuidelinesPage() {
         <p>
           If you believe a moderation action was taken in error, you may appeal
           by contacting{" "}
-          <a href="mailto:trust@cliptwo.com" className="text-accent hover:underline">
-            trust@cliptwo.com
+          <a href="mailto:trust@cliptwo.in" className="text-accent hover:underline">
+            trust@cliptwo.in
           </a>{" "}
           with:
         </p>
@@ -119,8 +119,8 @@ export default function CommunityGuidelinesPage() {
         <h2 className="text-xl font-semibold tracking-tight">Reporting</h2>
         <p>
           To report a violation, email{" "}
-          <a href="mailto:trust@cliptwo.com" className="text-accent hover:underline">
-            trust@cliptwo.com
+          <a href="mailto:trust@cliptwo.in" className="text-accent hover:underline">
+            trust@cliptwo.in
           </a>{" "}
           with a description of the issue. All reports are confidential.
         </p>

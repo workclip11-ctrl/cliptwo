@@ -24,6 +24,9 @@ const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
 function statusLabel(c: Campaign): string {
   if (c.status === "open" && c.launchPaymentStatus === "verified")
     return "Published";
+  if (c.status === "near_budget" && c.launchPaymentStatus === "verified")
+    return "Near Budget";
+  if (c.status === "budget_reached") return "Budget Reached";
   if (c.status === "draft" && c.launchPaymentStatus === "submitted")
     return "Payment pending";
   if (c.status === "draft" && c.launchPaymentStatus === "rejected")
@@ -31,12 +34,17 @@ function statusLabel(c: Campaign): string {
   if (c.status === "draft") return "Payment required";
   if (c.status === "paused") return "Paused";
   if (c.status === "open") return "Open";
+  if (c.status === "archived") return "Archived";
   return "Closed";
 }
 
 function statusColor(c: Campaign): string {
   if (c.status === "open" && c.launchPaymentStatus === "verified")
     return "bg-green/10 text-green border-green/20";
+  if (c.status === "near_budget" && c.launchPaymentStatus === "verified")
+    return "bg-amber/10 text-amber border-amber/20";
+  if (c.status === "budget_reached")
+    return "bg-red/10 text-red border-red/20";
   if (c.status === "draft" && c.launchPaymentStatus === "submitted")
     return "bg-amber/10 text-amber border-amber/20";
   if (c.status === "draft" && c.launchPaymentStatus === "rejected")
@@ -44,6 +52,7 @@ function statusColor(c: Campaign): string {
   if (c.status === "draft") return "bg-amber/10 text-amber border-amber/20";
   if (c.status === "paused") return "bg-muted/10 text-muted border-muted/20";
   if (c.status === "open") return "bg-green/10 text-green border-green/20";
+  if (c.status === "archived") return "bg-muted/10 text-muted border-muted/20";
   return "bg-muted/10 text-muted border-muted/20";
 }
 
@@ -82,6 +91,7 @@ export default function CreatorCampaignsPage() {
       list = list.filter(
         (c) =>
           c.status === "open" ||
+          c.status === "near_budget" ||
           c.status === "paused" ||
           (c.status === "draft" && c.launchPaymentStatus !== "rejected"),
       );
@@ -96,7 +106,9 @@ export default function CreatorCampaignsPage() {
     return list;
   }, [myCampaigns, query, statusFilter]);
 
-  const activeCampaigns = myCampaigns.filter((c) => c.status === "open");
+  const activeCampaigns = myCampaigns.filter(
+    (c) => c.status === "open" || c.status === "near_budget",
+  );
   const draftCampaigns = myCampaigns.filter((c) => c.status === "draft");
 
   return (
@@ -297,8 +309,16 @@ function CampaignRow({
 
   return (
     <div
+      role="button"
+      tabIndex={0}
       onClick={onOpen}
-      className="group cursor-pointer rounded-[12px] border bg-card transition-all duration-150 hover:border-foreground/10 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+      className="group cursor-pointer rounded-[12px] border bg-card transition-all duration-150 hover:border-foreground/10 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
     >
       <div className="flex gap-4 p-5 sm:gap-5 sm:p-6">
         {/* ── Thumbnail ──────────────────────────── */}
@@ -384,10 +404,10 @@ function CampaignRow({
               {pendingN > 0 && (
                 <span className="text-amber">{pendingN} pending</span>
               )}
-              <span>{c.daysLeft}d left</span>
+              <span>{c.daysLeft != null ? `${c.daysLeft}d left` : "—"}</span>
             </div>
 
-            {c.status === "open" && (
+            {(c.status === "open" || c.status === "near_budget") && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();

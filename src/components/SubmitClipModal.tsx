@@ -94,8 +94,9 @@ export function SubmitClipModal({
           </div>
         )}
 
-        <label className="mt-4 block text-sm font-medium">Video URL</label>
+        <label htmlFor="clip-video-url" className="mt-4 block text-sm font-medium">Video URL</label>
         <input
+          id="clip-video-url"
           value={videoUrl}
           onChange={(e) => {
             setVideoUrl(e.target.value);
@@ -105,8 +106,9 @@ export function SubmitClipModal({
           className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
         />
 
-        <label className="mt-4 block text-sm font-medium">Caption</label>
+        <label htmlFor="clip-caption" className="mt-4 block text-sm font-medium">Caption</label>
         <textarea
+          id="clip-caption"
           value={caption}
           onChange={(e) => setCaption(e.target.value)}
           rows={3}

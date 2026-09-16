@@ -80,8 +80,8 @@ export default function ContentPolicyPage() {
         <p>
           If you encounter content that violates these rules, please report it
           to{" "}
-          <a href="mailto:trust@cliptwo.com" className="text-accent hover:underline">
-            trust@cliptwo.com
+          <a href="mailto:trust@cliptwo.in" className="text-accent hover:underline">
+            trust@cliptwo.in
           </a>{" "}
           with a description of the violation and any supporting evidence.
         </p>
