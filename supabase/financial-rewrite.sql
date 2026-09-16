@@ -260,6 +260,11 @@ BEGIN
     RAISE EXCEPTION 'Only admins can approve clips';
   END IF;
 
+  -- FINE-GRAINED PERMISSION CHECK
+  IF NOT public.admin_has_perm('clip.approve') THEN
+    RAISE EXCEPTION 'Missing permission: clip.approve';
+  END IF;
+
   -- Get clip
   SELECT * INTO v_clip FROM public.clips WHERE id = p_clip_id;
   IF NOT FOUND THEN RAISE EXCEPTION 'Clip not found'; END IF;
@@ -575,14 +580,22 @@ AS $$
 DECLARE
   v_payout record;
   v_result jsonb;
+  v_total_payable integer;
 BEGIN
   IF NOT public.is_admin() THEN
     RAISE EXCEPTION 'Only admins can complete payout requests';
   END IF;
 
+  -- FINE-GRAINED PERMISSION CHECK
+  IF NOT public.admin_has_perm('payout.complete') THEN
+    RAISE EXCEPTION 'Missing permission: payout.complete';
+  END IF;
+
+  -- Lock the payout row to prevent concurrent processing
   SELECT * INTO v_payout
   FROM public.payout_requests
-  WHERE id = p_payout_id AND status = 'processing';
+  WHERE id = p_payout_id AND status = 'processing'
+  FOR UPDATE;
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Payout request not found or not in processing status';
@@ -590,7 +603,16 @@ BEGIN
 
   -- Require UPI transaction reference before marking as paid
   IF p_payment_reference IS NULL OR trim(p_payment_reference) = '' THEN
-    RAISE EXCEPTION 'UPI transaction reference (UTR) is required before marking payout as paid. Record the actual UPI transfer reference before confirming payment.';
+    RAISE EXCEPTION 'UPI transaction reference (UTR) is required before marking payout as paid.';
+  END IF;
+
+  -- Validate amount consistency: payout amount must equal sum of referenced records
+  SELECT coalesce(sum(net_amount), 0) INTO v_total_payable
+  FROM public.financial_records
+  WHERE id = ANY(v_payout.finance_record_ids);
+
+  IF v_total_payable != v_payout.net_amount THEN
+    RAISE EXCEPTION 'Amount mismatch: payout claims ₹% but records total ₹%', v_payout.net_amount, v_total_payable;
   END IF;
 
   -- Mark payout as paid
@@ -607,6 +629,19 @@ BEGIN
     )
   WHERE id = p_payout_id AND status = 'processing'
   RETURNING to_jsonb(payout_requests.*) INTO v_result;
+
+  -- Mark referenced financial_records as 'paid' ONLY now,
+  -- when admin confirms actual UPI transfer with UTR.
+  UPDATE public.financial_records SET
+    status = 'paid',
+    paid_at = now(),
+    audit = coalesce(audit, '[]'::jsonb) || jsonb_build_object(
+      'action', 'paid_by_payout',
+      'payout_id', p_payout_id,
+      'payment_reference', p_payment_reference,
+      'at', now()
+    )
+  WHERE id = ANY(v_payout.finance_record_ids);
 
   RETURN v_result;
 END;
@@ -631,11 +666,24 @@ GRANT EXECUTE ON FUNCTION public.complete_payout_request(uuid, text, text) TO au
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.get_wallet_balance(p_user_id uuid)
 RETURNS jsonb
-LANGUAGE sql
+LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT jsonb_build_object(
+DECLARE
+  v_caller uuid;
+BEGIN
+  v_caller := auth.uid();
+  IF v_caller IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  -- Authorization: user can only query own balance, admins can query any
+  IF v_caller != p_user_id AND NOT public.is_admin() THEN
+    RAISE EXCEPTION 'Not authorized to view this wallet balance';
+  END IF;
+
+  RETURN jsonb_build_object(
     'user_id', p_user_id,
     'available', coalesce((
       SELECT sum(fr.net_amount)
@@ -664,6 +712,7 @@ AS $$
       WHERE pr.user_id = p_user_id AND pr.status IN ('pending', 'processing', 'paid')
     ), 0)
   );
+END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.get_wallet_balance(uuid) TO authenticated;
@@ -746,13 +795,32 @@ GRANT EXECUTE ON FUNCTION public.get_all_payout_requests(text, integer, integer)
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.get_campaign_budget(p_campaign_id uuid)
 RETURNS jsonb
-LANGUAGE sql
+LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT jsonb_build_object(
+DECLARE
+  v_caller uuid;
+  v_campaign record;
+BEGIN
+  v_caller := auth.uid();
+  IF v_caller IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  -- Authorization: caller must be campaign creator or admin
+  SELECT * INTO v_campaign FROM public.campaigns WHERE id = p_campaign_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Campaign not found';
+  END IF;
+
+  IF NOT public.is_admin() AND v_campaign.creator_id != v_caller THEN
+    RAISE EXCEPTION 'Not authorized to view this campaign budget';
+  END IF;
+
+  RETURN jsonb_build_object(
     'campaign_id', p_campaign_id,
-    'total', coalesce(c.budget, 0),
+    'total', coalesce(v_campaign.budget, 0),
     'spent', coalesce((
       SELECT sum(fr.gross_amount)
       FROM public.financial_records fr
@@ -764,16 +832,15 @@ AS $$
       WHERE fr.campaign_id = p_campaign_id AND fr.status IN ('pending', 'processing')
     ), 0),
     'remaining', greatest(0,
-      coalesce(c.budget, 0) * 100
+      coalesce(v_campaign.budget, 0) * 100
       - coalesce((
         SELECT sum(fr.gross_amount)
         FROM public.financial_records fr
         WHERE fr.campaign_id = p_campaign_id AND fr.status IN ('paid', 'pending', 'processing')
       ), 0)
     )
-  )
-  FROM public.campaigns c
-  WHERE c.id = p_campaign_id;
+  );
+END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.get_campaign_budget(uuid) TO authenticated;

@@ -37,6 +37,14 @@ function validateRedirectPath(path: string): string {
   if (!path.startsWith("/")) {
     return "/clipper/accounts";
   }
+  // Block backslash-based path traversal attempts
+  if (path.includes("\\")) {
+    return "/clipper/accounts";
+  }
+  // Block null bytes and other control characters
+  if (/[\x00-\x1f\x7f]/.test(path)) {
+    return "/clipper/accounts";
+  }
   return path;
 }
 

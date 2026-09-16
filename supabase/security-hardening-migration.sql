@@ -8,16 +8,22 @@
 -- Addresses:
 --   PART 2:  Admin fine-grained permission checks on all admin RPCs
 --   PART 3:  Payout lifecycle fix (records not marked paid until UTR confirmed)
---   PART 4:  get_wallet_balance already correct (no change needed)
+--   PART 4:  get_wallet_balance authorization check (self or admin)
 --   PART 5:  Campaign launch payment RPCs — add admin_has_perm checks
 --   PART 6:  Account enforcement on profile reads
 --   PART 7:  Notifications — restrict INSERT to admin/system only
 --   PART 8:  Audit logs — append-only trigger enforcement
---   PART 9:  OAuth redirect — validateRedirectPath already correct (no change)
+--   PART 9:  OAuth redirect — validateRedirectPath hardened (backslash, control chars)
 --   PART 10: Storage — campaign-assets RLS already correct (no change)
---   PART 11: Token key validation already correct (no change)
+--   PART 11: Token key validation — exact 64-hex-char regex enforced
 --   PART 14: Fix EXCEPTION WHEN OTHERS THEN NULL silent failures
 --   PART 15: Verify service-only RPC regression protection
+--   Round 2: approve_clip requires clip.approve permission
+--   Round 2: get_campaign_budget requires authorization (campaign owner or admin)
+--   Round 2: complete_payout_request adds SELECT FOR UPDATE + amount consistency
+--   Round 2: submit_campaign_launch_payment requires active creator status
+--   Round 2: enforce_profile_field_permissions uses fine-grained admin_has_perm()
+--   Round 2: Regression test suite strengthened (66 tests total)
 --
 -- Safety: All functions use CREATE OR REPLACE. All constraints use
 --         IF NOT EXISTS / exception handling. Safe to re-run.
@@ -277,6 +283,7 @@ AS $$
 DECLARE
   v_payout record;
   v_result jsonb;
+  v_total_payable integer;
 BEGIN
   IF NOT public.is_admin() THEN
     RAISE EXCEPTION 'Only admins can complete payout requests';
@@ -287,9 +294,11 @@ BEGIN
     RAISE EXCEPTION 'Missing permission: payout.complete';
   END IF;
 
+  -- Lock the payout row to prevent concurrent processing
   SELECT * INTO v_payout
   FROM public.payout_requests
-  WHERE id = p_payout_id AND status = 'processing';
+  WHERE id = p_payout_id AND status = 'processing'
+  FOR UPDATE;
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Payout request not found or not in processing status';
@@ -298,6 +307,15 @@ BEGIN
   -- Require UPI transaction reference before marking as paid
   IF p_payment_reference IS NULL OR trim(p_payment_reference) = '' THEN
     RAISE EXCEPTION 'UPI transaction reference (UTR) is required before marking payout as paid.';
+  END IF;
+
+  -- Validate amount consistency: payout amount must equal sum of referenced records
+  SELECT coalesce(sum(net_amount), 0) INTO v_total_payable
+  FROM public.financial_records
+  WHERE id = ANY(v_payout.finance_record_ids);
+
+  IF v_total_payable != v_payout.net_amount THEN
+    RAISE EXCEPTION 'Amount mismatch: payout claims ₹% but records total ₹%', v_payout.net_amount, v_total_payable;
   END IF;
 
   -- Mark payout as paid

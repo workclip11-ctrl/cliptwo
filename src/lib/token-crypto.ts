@@ -15,8 +15,15 @@ const TAG_LENGTH = 16;
 
 function getKey(): Buffer {
   const raw = process.env.SOCIAL_TOKEN_KEY;
-  if (raw && raw.length >= 64) {
-    return Buffer.from(raw.slice(0, 64), "hex");
+  if (raw) {
+    // Validate exact 64-hex-char format (32 bytes)
+    if (!/^[0-9a-fA-F]{64}$/.test(raw)) {
+      throw new Error(
+        "[token-crypto] SOCIAL_TOKEN_KEY must be exactly 64 hex characters (32 bytes). " +
+          "Got " + raw.length + " characters.",
+      );
+    }
+    return Buffer.from(raw, "hex");
   }
   // In production, fail closed if key is missing
   if (process.env.NODE_ENV === "production") {

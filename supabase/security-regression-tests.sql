@@ -741,6 +741,127 @@ BEGIN
   );
 
   -- =========================================================================
+  -- SECTION G: BEHAVIORAL SECURITY TESTS (Round 2)
+  -- =========================================================================
+
+  -- TEST 58: approve_clip rejects non-admin callers
+  v_test_id := v_test_id + 1;
+  v_test_name := 'approve_clip rejects non-admin (expect exception)';
+  BEGIN
+    PERFORM public.approve_clip('00000000-0000-0000-0000-000000000000', 'test');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    v_pass := true;
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 59: get_campaign_budget is SECURITY DEFINER
+  v_test_id := v_test_id + 1;
+  v_test_name := 'get_campaign_budget is SECURITY DEFINER';
+  v_pass := EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON p.pronamespace = n.oid
+    WHERE n.nspname = 'public' AND p.proname = 'get_campaign_budget'
+    AND p.prosecdef = true
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 60: get_wallet_balance is SECURITY DEFINER
+  v_test_id := v_test_id + 1;
+  v_test_name := 'get_wallet_balance is SECURITY DEFINER';
+  v_pass := EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON p.pronamespace = n.oid
+    WHERE n.nspname = 'public' AND p.proname = 'get_wallet_balance'
+    AND p.prosecdef = true
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 61: complete_payout_request has permission check
+  v_test_id := v_test_id + 1;
+  v_test_name := 'complete_payout_request rejects non-admin (expect exception)';
+  BEGIN
+    PERFORM public.complete_payout_request('00000000-0000-0000-0000-000000000000', 'UTR-TEST', 'test');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    v_pass := true;
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 62: process_payout_request has permission check
+  v_test_id := v_test_id + 1;
+  v_test_name := 'process_payout_request rejects non-admin (expect exception)';
+  BEGIN
+    PERFORM public.process_payout_request('00000000-0000-0000-0000-000000000000', 'test');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    v_pass := true;
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 63: admin_clip_action has permission check
+  v_test_id := v_test_id + 1;
+  v_test_name := 'admin_clip_action rejects non-admin (expect exception)';
+  BEGIN
+    PERFORM public.admin_clip_action('00000000-0000-0000-0000-000000000000', 'reject', 'test');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    v_pass := true;
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 64: admin_user_action has permission check
+  v_test_id := v_test_id + 1;
+  v_test_name := 'admin_user_action rejects non-admin (expect exception)';
+  BEGIN
+    PERFORM public.admin_user_action('00000000-0000-0000-0000-000000000000', 'suspend', 'test');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    v_pass := true;
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 65: verify_campaign_launch_payment has permission check
+  v_test_id := v_test_id + 1;
+  v_test_name := 'verify_campaign_launch_payment rejects non-admin (expect exception)';
+  BEGIN
+    PERFORM public.verify_campaign_launch_payment('00000000-0000-0000-0000-000000000000');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    v_pass := true;
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 66: reject_campaign_launch_payment has permission check
+  v_test_id := v_test_id + 1;
+  v_test_name := 'reject_campaign_launch_payment rejects non-admin (expect exception)';
+  BEGIN
+    PERFORM public.reject_campaign_launch_payment('00000000-0000-0000-0000-000000000000', 'test');
+    v_pass := false;
+  EXCEPTION WHEN OTHERS THEN
+    v_pass := true;
+  END;
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- =========================================================================
   -- RESULTS
   -- =========================================================================
 

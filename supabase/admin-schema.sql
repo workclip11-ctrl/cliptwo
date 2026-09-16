@@ -193,8 +193,8 @@ security definer
 set search_path = public
 as $$
 begin
-  -- Admins can change anything (skip checks)
-  if public.is_admin() then
+  -- Service-role (auth.uid() is NULL) — trusted server operations, skip checks.
+  if auth.uid() is null then
     return NEW;
   end if;
 
@@ -228,6 +228,41 @@ begin
   end if;
   if (OLD.audit IS DISTINCT FROM NEW.audit) then
     raise exception 'Only admins can change audit';
+  end if;
+
+  -- Admins: fine-grained permission checks for sensitive fields
+  if public.is_admin() then
+    -- Role changes require user.manage permission
+    if (OLD.role IS DISTINCT FROM NEW.role) then
+      if not public.admin_has_perm('user.manage') then
+        raise exception 'Missing permission: user.manage';
+      end if;
+    end if;
+    -- Status changes require user.manage permission
+    if (OLD.status IS DISTINCT FROM NEW.status) then
+      if not public.admin_has_perm('user.manage') then
+        raise exception 'Missing permission: user.manage';
+      end if;
+    end if;
+    -- Verification changes require clipper.verify permission
+    if (OLD.verified IS DISTINCT FROM NEW.verified) or (OLD.verified_at IS DISTINCT FROM NEW.verified_at) then
+      if not public.admin_has_perm('clipper.verify') then
+        raise exception 'Missing permission: clipper.verify';
+      end if;
+    end if;
+    -- Risk flag changes require clipper.risk permission
+    if (OLD.risk_flag IS DISTINCT FROM NEW.risk_flag) or (OLD.risk_note IS DISTINCT FROM NEW.risk_note) then
+      if not public.admin_has_perm('clipper.risk') then
+        raise exception 'Missing permission: clipper.risk';
+      end if;
+    end if;
+    -- Admin notes require clipper.notes permission
+    if (OLD.admin_notes IS DISTINCT FROM NEW.admin_notes) then
+      if not public.admin_has_perm('clipper.notes') then
+        raise exception 'Missing permission: clipper.notes';
+      end if;
+    end if;
+    return NEW;
   end if;
 
   return NEW;

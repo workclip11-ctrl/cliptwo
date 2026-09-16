@@ -145,6 +145,14 @@ BEGIN
     RAISE EXCEPTION 'Not authenticated';
   END IF;
 
+  -- Verify active creator status
+  IF NOT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = v_creator_id AND role = 'creator' AND status = 'active'
+  ) THEN
+    RAISE EXCEPTION 'Only active creators can submit campaign payments';
+  END IF;
+
   -- Validate UTR
   IF p_utr_reference IS NULL OR length(trim(p_utr_reference)) = 0 THEN
     RAISE EXCEPTION 'UTR reference is required';
