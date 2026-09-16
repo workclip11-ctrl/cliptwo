@@ -542,9 +542,9 @@ export default function Home() {
   }, [campaigns, featuredIds]);
 
   return (
-    <main className="min-h-screen overflow-x-hidden">
+    <main className="min-h-screen">
       {/* ── Header ── */}
-      <header className="sticky top-0 z-40 border-b border-border/40 bg-background">
+      <header className="sticky top-0 z-50 border-b border-border/40 bg-background">
         <div className="mx-auto flex max-w-[1200px] items-center justify-between px-5 py-3 sm:px-6 lg:py-3.5">
           <Link href="/" className="flex items-center gap-2.5 font-bold tracking-tight cursor-pointer">
             <img src="/cliptwo-logo.png" alt="ClipTwo" className="h-7 w-7 rounded-[8px] object-contain" />
