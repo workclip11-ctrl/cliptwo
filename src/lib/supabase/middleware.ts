@@ -14,78 +14,6 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.next({ request });
   }
 
-  const secure =
-    (process.env.NEXT_PUBLIC_APP_URL || "").startsWith("https://");
-
-  // --- PKCE password-recovery exchange ---
-  // When the user clicks the reset link, the browser navigates to:
-  //   /reset-password?code=<authCode>&sb_flow_id=<flowId>
-  // We intercept this GET, exchange the code for a session server-side
-  // (where the PKCE verifier cookies are guaranteed to be sent), then
-  // redirect to /reset-password without query params.
-  const pathname = request.nextUrl.pathname;
-  if (pathname === "/reset-password") {
-    const code = request.nextUrl.searchParams.get("code");
-    const flowId = request.nextUrl.searchParams.get("sb_flow_id");
-
-    if (code && flowId) {
-      const pendingCookies: {
-        name: string;
-        value: string;
-        options?: Record<string, unknown>;
-      }[] = [];
-
-      const supabase = createServerClient(url as string, key as string, {
-        cookies: {
-          getAll() {
-            return request.cookies.getAll();
-          },
-          setAll(cookiesToSet) {
-            for (const c of cookiesToSet) {
-              request.cookies.set(c.name, c.value);
-              pendingCookies.push(c);
-            }
-          },
-        },
-      });
-
-      try {
-        const { error } = await supabase.auth.exchangeCodeForSession(code, {
-          flowId,
-        });
-
-        if (!error) {
-          const redirectUrl = request.nextUrl.clone();
-          redirectUrl.pathname = "/reset-password";
-          redirectUrl.search = "";
-          const res = NextResponse.redirect(redirectUrl);
-          for (const c of pendingCookies) {
-            res.cookies.set(c.name, c.value, {
-              ...c.options,
-              secure,
-            } as Parameters<typeof res.cookies.set>[2]);
-          }
-          return res;
-        }
-
-        console.error("[RESET DIAGNOSTIC]", {
-          message: error.message,
-          code: error.code,
-          status: error.status,
-        });
-      } catch (err) {
-        console.error("[RESET DIAGNOSTIC] exchangeCodeForSession threw:", err instanceof Error ? err.message : String(err));
-      }
-
-      const errorUrl = request.nextUrl.clone();
-      errorUrl.pathname = "/reset-password";
-      errorUrl.search = "";
-      errorUrl.hash = "error=reset_expired";
-      return NextResponse.redirect(errorUrl);
-    }
-  }
-
-  // --- Normal session refresh for all other routes ---
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(url as string, key as string, {
@@ -99,7 +27,7 @@ export async function updateSession(request: NextRequest) {
         );
         response = NextResponse.next({ request });
         cookiesToSet.forEach(({ name, value, options }) =>
-          response.cookies.set(name, value, { ...options, secure }),
+          response.cookies.set(name, value, options),
         );
       },
     },

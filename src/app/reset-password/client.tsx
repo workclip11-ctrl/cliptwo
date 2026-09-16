@@ -1,64 +1,62 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { supabase } from "@/lib/supabase/client";
-import type { Session } from "@supabase/supabase-js";
+import { recoveryClient } from "@/lib/supabase/recovery-client";
 
 type Status = "loading" | "ready" | "success" | "error";
 
-export default function ResetPasswordClient({
-  session,
-}: {
-  session: Session;
-}) {
+export default function ResetPasswordClient() {
   const [status, setStatus] = useState<Status>("loading");
+  const [error, setError] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const settledRef = useRef(false);
 
   useEffect(() => {
     let active = true;
 
-    const run = async () => {
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      if (hashParams.get("error") === "reset_expired") {
-        window.history.replaceState({}, "", "/reset-password");
-        if (active && !settledRef.current) {
-          settledRef.current = true;
-          setStatus("error");
-          setError("Reset link invalid or expired. Please request a new one.");
-        }
-        return;
-      }
+    // Handle password recovery via implicit flow.
+    // The Supabase client auto-detects the token in the URL hash and fires
+    // PASSWORD_RECOVERY when the user arrives from the reset email link.
+    const {
+      data: { subscription },
+    } = recoveryClient.auth.onAuthStateChange((event, session) => {
+      if (!active) return;
 
-      const { error: sessionError } = await supabase.auth.setSession(session);
-      if (sessionError) {
-        if (active && !settledRef.current) {
-          settledRef.current = true;
-          setStatus("error");
-          setError(
-            "Could not verify reset link. Please request a new one.",
-          );
-        }
-        return;
-      }
-
-      if (active && !settledRef.current) {
-        settledRef.current = true;
+      if (event === "PASSWORD_RECOVERY" && session) {
         setStatus("ready");
+        return;
       }
-    };
 
-    run();
+      // If the client already has a session from automatic URL processing
+      // (e.g. INITIAL_SESSION fires with the recovery session), treat it
+      // as a valid recovery session if no other status has been set.
+      if (event === "INITIAL_SESSION" && session && status === "loading") {
+        setStatus("ready");
+        return;
+      }
+    });
+
+    // Also check if the client already has a session (e.g. token was
+    // processed before the listener was registered).
+    recoveryClient.auth.getSession().then(({ data: { session } }) => {
+      if (!active) return;
+      if (session && status === "loading") {
+        setStatus("ready");
+      } else if (!session && status === "loading") {
+        // No session and no recovery event — link is invalid or expired.
+        setStatus("error");
+        setError("Invalid or expired reset link. Please request a new one.");
+      }
+    });
 
     return () => {
       active = false;
+      subscription.unsubscribe();
     };
-  }, [session]);
+  }, [status]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -73,7 +71,7 @@ export default function ResetPasswordClient({
 
     setSubmitting(true);
     try {
-      const { error: updateError } = await supabase.auth.updateUser({
+      const { error: updateError } = await recoveryClient.auth.updateUser({
         password: newPassword,
       });
       if (updateError) {
@@ -84,6 +82,8 @@ export default function ResetPasswordClient({
         );
         return;
       }
+      // Sign out the recovery client so the recovery session is not left active.
+      await recoveryClient.auth.signOut();
       setStatus("success");
     } catch {
       setError("Failed to update password. Please try again.");
