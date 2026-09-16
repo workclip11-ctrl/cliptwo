@@ -58,5 +58,10 @@ export async function POST(request: Request) {
     } as Parameters<typeof response.cookies.set>[2]);
   }
 
+  console.log("[RECOVERY COOKIE DIAGNOSTIC]", {
+    count: pendingCookies.length,
+    names: pendingCookies.map(({ name }) => name),
+  });
+
   return response;
 }
