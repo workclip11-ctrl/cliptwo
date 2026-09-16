@@ -128,7 +128,7 @@ const paymentFAQ = [
   },
   {
     q: "What is the minimum payout?",
-    a: "The minimum payout threshold is ₹500. Amounts below the threshold roll over to the next payout cycle.",
+    a: "The minimum payout threshold is ₹100. Amounts below the threshold roll over to the next payout cycle.",
   },
   {
     q: "How long do payouts take?",

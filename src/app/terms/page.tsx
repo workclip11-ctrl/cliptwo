@@ -68,7 +68,7 @@ export default function TermsPage() {
           for details.
         </p>
         <p>
-          Payouts are processed weekly via UPI. The minimum payout threshold is ₹500. A 10% platform fee applies.
+          Payouts are processed weekly via UPI. The minimum payout threshold is ₹100. A 10% platform fee applies.
         </p>
       </Section>
 

@@ -13,6 +13,7 @@ import { PlatformIcon } from "@/components/PlatformIcon";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import { financeOf } from "@/lib/finance";
 import { rup, fmtViews, clipEarnings } from "@/lib/format";
 
 import type { Clip } from "@/lib/types";
@@ -55,6 +56,7 @@ export default function ClipperSubmissionsPage() {
   }
 
   const myClips = clips.filter((k) => k.userId && k.userId === user?.id);
+  const myFinanceRecords = financeRecords.filter((r) => r.clipperId === user?.id);
 
   const counts = TABS.reduce<Record<string, number>>((acc, t) => {
     acc[t.key] =
@@ -78,9 +80,7 @@ export default function ClipperSubmissionsPage() {
   const totalEarnedNet = myClips
     .filter((k) => k.status === "approved" || k.status === "held")
     .reduce((s, k) => s + netOf(k), 0);
-  const totalPaidNet = myClips
-    .filter((_k) => false)
-    .reduce((s, _k) => s + netOf(_k), 0);
+  const totalPaidNet = financeOf(myFinanceRecords, (r) => r.status === "paid").paid / 100;
   const pendingReview = myClips.filter((k) => k.status === "pending").length;
 
   const emptyMessages: Record<TabKey, { heading: string; body: string }> = {

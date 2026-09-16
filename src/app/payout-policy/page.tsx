@@ -63,7 +63,7 @@ export default function PayoutPolicyPage() {
       <Section>
         <h2 className="text-xl font-semibold tracking-tight">Payout Timing</h2>
         <p>
-          Payouts are processed weekly. The minimum payout threshold is ₹500.
+          Payouts are processed weekly. The minimum payout threshold is ₹100.
         </p>
         <p>
           Once a payout is initiated, it typically takes 3–5 business days to
