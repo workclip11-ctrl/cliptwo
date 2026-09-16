@@ -16,6 +16,14 @@ export default function ResetPasswordClient() {
 
   useEffect(() => {
     let active = true;
+    let settled = false;
+
+    function settle(next: Status, msg?: string) {
+      if (!active || settled) return;
+      settled = true;
+      setStatus(next);
+      if (msg) setError(msg);
+    }
 
     // Handle password recovery via implicit flow.
     // The Supabase client auto-detects the token in the URL hash and fires
@@ -23,32 +31,21 @@ export default function ResetPasswordClient() {
     const {
       data: { subscription },
     } = recoveryClient.auth.onAuthStateChange((event, session) => {
-      if (!active) return;
-
       if (event === "PASSWORD_RECOVERY" && session) {
-        setStatus("ready");
-        return;
-      }
-
-      // If the client already has a session from automatic URL processing
-      // (e.g. INITIAL_SESSION fires with the recovery session), treat it
-      // as a valid recovery session if no other status has been set.
-      if (event === "INITIAL_SESSION" && session && status === "loading") {
-        setStatus("ready");
-        return;
+        settle("ready");
       }
     });
 
-    // Also check if the client already has a session (e.g. token was
-    // processed before the listener was registered).
+    // Check if the client already has a session (e.g. token was processed
+    // before the listener was registered, or INITIAL_SESSION already fired).
     recoveryClient.auth.getSession().then(({ data: { session } }) => {
-      if (!active) return;
-      if (session && status === "loading") {
-        setStatus("ready");
-      } else if (!session && status === "loading") {
-        // No session and no recovery event — link is invalid or expired.
-        setStatus("error");
-        setError("Invalid or expired reset link. Please request a new one.");
+      if (session) {
+        settle("ready");
+      } else {
+        settle(
+          "error",
+          "Invalid or expired reset link. Please request a new one.",
+        );
       }
     });
 
@@ -56,7 +53,7 @@ export default function ResetPasswordClient() {
       active = false;
       subscription.unsubscribe();
     };
-  }, [status]);
+  }, []);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
