@@ -333,13 +333,26 @@ SELECT public.create_campaign(
 DO $$
 DECLARE
   v_id uuid := 'a0000000-0000-0000-0000-000000000009'::uuid;
-  v_count integer;
+  v_exists boolean;
 BEGIN
   PERFORM public.delete_campaign(v_id);
 
+  -- Campaign should be gone (proves delete succeeded)
+  SELECT EXISTS(SELECT 1 FROM public.campaigns WHERE id = v_id) INTO v_exists;
+  ASSERT v_exists = false, 'TEST 9 FAIL: campaign should be deleted';
+END $$;
+
+-- Verify audit log as admin (creator can't read audit_logs due to RLS)
+SELECT set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
+SELECT set_config('role', 'authenticated', true);
+
+DO $$
+DECLARE
+  v_count integer;
+BEGIN
   SELECT count(*) INTO v_count
   FROM public.audit_logs
-  WHERE entity_id = v_id::text
+  WHERE entity_id = 'a0000000-0000-0000-0000-000000000009'::text
     AND action = 'campaign_delete';
 
   ASSERT v_count = 1, 'TEST 9 FAIL: expected 1 audit log entry, got ' || v_count;
