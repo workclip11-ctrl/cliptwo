@@ -18,6 +18,17 @@ import { financeOf, campaignSpent } from "@/lib/finance";
 import { seriesByDay } from "@/lib/analytics";
 import type { Campaign, Clip, Platform } from "@/lib/types";
 
+function timeAgo(ts: number): string {
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
 export default function CreatorPage() {
   const { campaigns, clips, addCampaign, financeRecords } = useStore();
   const { user } = useAuth();
@@ -212,8 +223,8 @@ export default function CreatorPage() {
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    <span className="font-mono text-[12px] tabular-nums text-muted">
-                      {fmtViews(k.verifiedViews ?? 0)}
+                    <span className="text-[11px] text-muted">
+                      {timeAgo(k.submittedAt)}
                     </span>
                     {k.platform && (
                       <PlatformIcon p={k.platform} size={12} />
@@ -238,9 +249,23 @@ export default function CreatorPage() {
       <div className="grid gap-8 lg:grid-cols-2">
         {/* Best performing content */}
         <section>
-          <h2 className="mb-4 text-[17px] font-bold tracking-tight">
-            Best performing content
-          </h2>
+          <div className="mb-4 flex items-baseline justify-between">
+            <h2 className="text-[17px] font-bold tracking-tight">
+              Best performing content
+            </h2>
+            {topClips.length > 0 && (
+              <Link
+                href="/creator/analytics"
+                className="group inline-flex items-center gap-1 text-[13px] font-medium text-muted transition-colors hover:text-foreground"
+              >
+                View all analytics
+                <ArrowRight
+                  size={13}
+                  className="transition-transform duration-200 group-hover:translate-x-0.5"
+                />
+              </Link>
+            )}
+          </div>
           {topClips.length === 0 ? (
             <div className="rounded-[14px] border border-dashed bg-card py-12 text-center">
               <p className="text-[15px] font-medium">No earned clips yet</p>

@@ -28,10 +28,8 @@ const NAV = [
   { href: "/clipper/settings", label: "Settings", icon: Settings },
 ];
 
-const GROUPS = [
-  { label: "", items: NAV.slice(0, 3) },
-  { label: "Account", items: NAV.slice(3, 6) },
-  { label: "Analytics", items: [{ href: "/clipper/wallet", label: "Performance", icon: BarChart3 }] },
+const ANALYTICS_NAV = [
+  { href: "/clipper/wallet", label: "Performance", icon: BarChart3 },
 ];
 
 export default function ClipperLayout({ children }: { children: ReactNode }) {
@@ -63,37 +61,56 @@ export default function ClipperLayout({ children }: { children: ReactNode }) {
           {/* Desktop sidebar */}
           <aside className="hidden w-56 shrink-0 lg:block">
             <div className="sticky top-20 space-y-6">
-              {GROUPS.map((group) => (
-                <div key={group.label || "_root"}>
-                  {group.label && (
-                    <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-widest text-muted">
-                      {group.label}
-                    </p>
-                  )}
-                  <nav className="flex flex-col">
-                    {group.items.map((n) => {
-                      const active = n.exact
-                        ? pathname === n.href
-                        : pathname === n.href ||
-                          pathname.startsWith(n.href + "/");
-                      return (
-                        <Link
-                          key={n.href}
-                          href={n.href}
-                          className={`flex items-center gap-2 rounded-[10px] px-2.5 py-[6px] text-[15px] transition-colors duration-150 ${
-                            active
-                              ? "bg-accent-soft text-foreground font-semibold"
-                              : "text-muted hover:text-foreground"
-                          }`}
-                        >
-                          <n.icon size={18} strokeWidth={active ? 2 : 1.5} />
-                          {n.label}
-                        </Link>
-                      );
-                    })}
-                  </nav>
-                </div>
-              ))}
+              <nav className="flex flex-col">
+                {NAV.map((n) => {
+                  const active = n.exact
+                    ? pathname === n.href
+                    : pathname === n.href ||
+                      pathname.startsWith(n.href + "/");
+                  return (
+                    <Link
+                      key={n.href}
+                      href={n.href}
+                      className={`flex items-center gap-2 rounded-[10px] px-2.5 py-[6px] text-[15px] transition-colors duration-150 ${
+                        active
+                          ? "bg-accent-soft text-foreground font-semibold"
+                          : "text-muted hover:text-foreground"
+                      }`}
+                    >
+                      <n.icon size={18} strokeWidth={active ? 2 : 1.5} />
+                      {n.label}
+                    </Link>
+                  );
+                })}
+              </nav>
+
+              <div>
+                <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-widest text-muted">
+                  Analytics
+                </p>
+                <nav className="flex flex-col">
+                  {ANALYTICS_NAV.map((n) => {
+                    const active =
+                      pathname === n.href ||
+                      pathname.startsWith(n.href + "/");
+                    return (
+                      <Link
+                        key={n.href}
+                        href={n.href}
+                        className={`flex items-center gap-2 rounded-[10px] px-2.5 py-[6px] text-[15px] transition-colors duration-150 ${
+                          active
+                            ? "bg-accent-soft text-foreground font-semibold"
+                            : "text-muted hover:text-foreground"
+                        }`}
+                      >
+                        <n.icon size={18} strokeWidth={active ? 2 : 1.5} />
+                        {n.label}
+                      </Link>
+                    );
+                  })}
+                </nav>
+              </div>
+
               <div className="border-t border-border/60 pt-4">
                 <Link
                   href="/login"

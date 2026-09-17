@@ -20,25 +20,18 @@ import { TopBar } from "@/components/TopBar";
 import { AdminGuard } from "@/components/AdminGuard";
 import { MobileSidebar } from "@/components/MobileSidebar";
 
-const NAV_GROUPS = [
-  {
-    label: "",
-    items: [
-      { href: "/admin", label: "Dashboard", icon: LayoutGrid, exact: true },
-      { href: "/admin/clippers", label: "Users", icon: Users },
-      { href: "/admin/creators", label: "Creators", icon: Users },
-      { href: "/admin/campaigns", label: "Campaigns", icon: Megaphone },
-      { href: "/admin/clips", label: "Submissions", icon: Film },
-      { href: "/admin/payouts", label: "Payouts", icon: Banknote },
-      { href: "/admin/risk", label: "Disputes", icon: ShieldAlert },
-      { href: "/admin/audit", label: "Analytics", icon: BarChart3 },
-      { href: "/admin/website", label: "Finance", icon: Banknote },
-      { href: "/admin/backend", label: "Settings", icon: Settings },
-    ],
-  },
+const NAV = [
+  { href: "/admin", label: "Dashboard", icon: LayoutGrid, exact: true },
+  { href: "/admin/clippers", label: "Users", icon: Users },
+  { href: "/admin/creators", label: "Creators", icon: Users },
+  { href: "/admin/campaigns", label: "Campaigns", icon: Megaphone },
+  { href: "/admin/clips", label: "Submissions", icon: Film },
+  { href: "/admin/payouts", label: "Payouts", icon: Banknote },
+  { href: "/admin/risk", label: "Disputes", icon: ShieldAlert },
+  { href: "/admin/audit", label: "Analytics", icon: BarChart3 },
+  { href: "/admin/website", label: "Finance", icon: Banknote },
+  { href: "/admin/backend", label: "Settings", icon: Settings },
 ];
-
-const NAV = NAV_GROUPS.flatMap((g) => g.items);
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -69,45 +62,36 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           {/* Desktop sidebar */}
           <aside className="hidden w-56 shrink-0 lg:block">
             <div className="sticky top-20 space-y-6">
-              {NAV_GROUPS.map((group) => (
-                <div key={group.label || "_root"}>
-                  {group.label && (
-                    <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-widest text-muted">
-                      {group.label}
-                    </p>
-                  )}
-                  <nav className="flex flex-col">
-                    {group.items.map((n) => {
-                      const active =
-                        n.exact
-                          ? pathname === n.href
-                          : pathname === n.href ||
-                            (pathname.startsWith(n.href + "/") &&
-                              !NAV.some(
-                                (other) =>
-                                  other.href !== n.href &&
-                                  !other.exact &&
-                                  other.href.startsWith(n.href + "/") &&
-                                  (pathname === other.href ||
-                                    pathname.startsWith(other.href + "/")),
-                              ));
-                      return (
-                        <Link
-                          key={n.href}
-                          href={n.href}
-                          className={`flex cursor-pointer items-center gap-2 rounded-[10px] px-2.5 py-[6px] text-[15px] transition-colors duration-150 ${
-                            active
-                              ? "bg-accent-soft text-foreground font-semibold"
-                              : "text-muted hover:text-foreground"
-                          }`}
-                        >
-                          <n.icon size={18} /> {n.label}
-                        </Link>
-                      );
-                    })}
-                  </nav>
-                </div>
-              ))}
+              <nav className="flex flex-col">
+                {NAV.map((n) => {
+                  const active = n.exact
+                    ? pathname === n.href
+                    : pathname === n.href ||
+                      (pathname.startsWith(n.href + "/") &&
+                        !NAV.some(
+                          (other) =>
+                            other.href !== n.href &&
+                            !other.exact &&
+                            other.href.startsWith(n.href + "/") &&
+                            (pathname === other.href ||
+                              pathname.startsWith(other.href + "/")),
+                        ));
+                  return (
+                    <Link
+                      key={n.href}
+                      href={n.href}
+                      className={`flex cursor-pointer items-center gap-2 rounded-[10px] px-2.5 py-[6px] text-[15px] transition-colors duration-150 ${
+                        active
+                          ? "bg-accent-soft text-foreground font-semibold"
+                          : "text-muted hover:text-foreground"
+                      }`}
+                    >
+                      <n.icon size={18} /> {n.label}
+                    </Link>
+                  );
+                })}
+              </nav>
+
               <div className="border-t border-border/60 pt-4">
                 <Link
                   href="/login"

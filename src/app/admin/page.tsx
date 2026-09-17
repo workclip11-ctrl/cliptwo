@@ -140,57 +140,51 @@ export default function AdminDashboard() {
             href="/admin/clips?filter=pending"
             className="group rounded-[14px] border border-border/40 bg-card p-5 transition-colors duration-150 hover:border-foreground/20"
           >
-            <div className="flex items-center justify-between">
-              <p className="text-[12px] font-medium text-muted">
-                Awaiting review
-              </p>
-              <ArrowRight
-                size={14}
-                className="text-muted transition-transform duration-200 group-hover:translate-x-0.5"
-              />
-            </div>
+            <p className="text-[12px] font-medium text-muted">
+              Awaiting review
+            </p>
             <p className="mt-3 font-mono text-[24px] font-bold tracking-tight">
               {pendingCount}
             </p>
             <p className="mt-1 text-[12px] text-muted">Clips</p>
+            <div className="mt-3 flex items-center gap-1 text-[12px] font-medium text-muted group-hover:text-foreground transition-colors">
+              View queue
+              <ArrowRight size={12} className="transition-transform duration-200 group-hover:translate-x-0.5" />
+            </div>
           </Link>
 
           <Link
             href="/admin/clips?filter=payable"
             className="group rounded-[14px] border border-border/40 bg-card p-5 transition-colors duration-150 hover:border-foreground/20"
           >
-            <div className="flex items-center justify-between">
-              <p className="text-[12px] font-medium text-muted">
-                Outstanding payable
-              </p>
-              <ArrowRight
-                size={14}
-                className="text-muted transition-transform duration-200 group-hover:translate-x-0.5"
-              />
-            </div>
+            <p className="text-[12px] font-medium text-muted">
+              Outstanding payable
+            </p>
             <p className="mt-3 font-mono text-[24px] font-bold tracking-tight text-amber">
               {rup(payable)}
             </p>
             <p className="mt-1 text-[12px] text-muted">To clippers</p>
+            <div className="mt-3 flex items-center gap-1 text-[12px] font-medium text-muted group-hover:text-foreground transition-colors">
+              View queue
+              <ArrowRight size={12} className="transition-transform duration-200 group-hover:translate-x-0.5" />
+            </div>
           </Link>
 
           <Link
             href="/admin/clips?filter=paid"
             className="group rounded-[14px] border border-border/40 bg-card p-5 transition-colors duration-150 hover:border-foreground/20"
           >
-            <div className="flex items-center justify-between">
-              <p className="text-[12px] font-medium text-muted">
-                Released to clippers
-              </p>
-              <ArrowRight
-                size={14}
-                className="text-muted transition-transform duration-200 group-hover:translate-x-0.5"
-              />
-            </div>
+            <p className="text-[12px] font-medium text-muted">
+              Released to clippers
+            </p>
             <p className="mt-3 font-mono text-[24px] font-bold tracking-tight text-green">
               {rup(paidOut)}
             </p>
             <p className="mt-1 text-[12px] text-muted">This month</p>
+            <div className="mt-3 flex items-center gap-1 text-[12px] font-medium text-muted group-hover:text-foreground transition-colors">
+              View details
+              <ArrowRight size={12} className="transition-transform duration-200 group-hover:translate-x-0.5" />
+            </div>
           </Link>
         </div>
       </section>
