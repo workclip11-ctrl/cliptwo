@@ -3,12 +3,17 @@
 -- ===========================================================================
 -- Run in Supabase SQL Editor to verify creator hard-delete enforcement.
 --
+-- IMPORTANT: Run tests ONE AT A TIME (select a single test block, then Run).
+-- BEGIN/ROLLBACK isolation may not work when the entire file is sent as one
+-- query in the Supabase SQL Editor.
+--
 -- Test UUIDs (must exist in auth.users + profiles):
 --   Creator: e92427b0-254e-44cc-b2df-be83792c8a94
 --   Other:   11111111-1111-1111-1111-111111111111
 --   Admin:   f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd
 --
--- Tests use BEGIN/ROLLBACK so no data is persisted.
+-- Each test uses a deterministic UUID for its campaign to avoid SELECT
+-- ambiguity from stale data in the database.
 -- ===========================================================================
 
 -- ===========================================================================
@@ -23,22 +28,17 @@ SELECT public.create_campaign(
   'Brief'::text,
   'YouTube'::text,
   50::numeric,
-  'Test Creator'::text
+  'Test Creator'::text,
+  'a0000000-0000-0000-0000-000000000001'::uuid
 );
 
 DO $$
 DECLARE
-  v_id uuid;
   v_exists boolean;
 BEGIN
-  SELECT id INTO v_id
-  FROM public.campaigns
-  WHERE title = 'Delete Test 1 - Draft'
-    AND created_by = 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid;
+  PERFORM public.delete_campaign('a0000000-0000-0000-0000-000000000001'::uuid);
 
-  PERFORM public.delete_campaign(v_id);
-
-  SELECT EXISTS(SELECT 1 FROM public.campaigns WHERE id = v_id) INTO v_exists;
+  SELECT EXISTS(SELECT 1 FROM public.campaigns WHERE id = 'a0000000-0000-0000-0000-000000000001'::uuid) INTO v_exists;
   ASSERT v_exists = false, 'TEST 1 FAIL: campaign should be deleted';
 END $$;
 
@@ -57,19 +57,15 @@ SELECT public.create_campaign(
   'Brief'::text,
   'YouTube'::text,
   50::numeric,
-  'Test Creator'::text
+  'Test Creator'::text,
+  'a0000000-0000-0000-0000-000000000002'::uuid
 );
 
 DO $$
 DECLARE
-  v_id uuid;
+  v_id uuid := 'a0000000-0000-0000-0000-000000000002'::uuid;
   v_exists boolean;
 BEGIN
-  SELECT id INTO v_id
-  FROM public.campaigns
-  WHERE title = 'Delete Test 2 - Closed'
-    AND created_by = 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid;
-
   -- Must publish first: submit payment, then admin verifies
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-2');
   PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
@@ -103,20 +99,15 @@ SELECT public.create_campaign(
   'Brief'::text,
   'YouTube'::text,
   50::numeric,
-  'Test Creator'::text
+  'Test Creator'::text,
+  'a0000000-0000-0000-0000-000000000003'::uuid
 );
 
 DO $$
 DECLARE
-  v_id uuid;
+  v_id uuid := 'a0000000-0000-0000-0000-000000000003'::uuid;
   v_err text;
 BEGIN
-  SELECT id INTO v_id
-  FROM public.campaigns
-  WHERE title = 'Delete Test 3 - Open'
-    AND created_by = 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid;
-
-  -- Publish it: submit payment, admin verifies, then publish
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-3');
   PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
@@ -151,20 +142,15 @@ SELECT public.create_campaign(
   'Brief'::text,
   'YouTube'::text,
   50::numeric,
-  'Test Creator'::text
+  'Test Creator'::text,
+  'a0000000-0000-0000-0000-000000000004'::uuid
 );
 
 DO $$
 DECLARE
-  v_id uuid;
+  v_id uuid := 'a0000000-0000-0000-0000-000000000004'::uuid;
   v_err text;
 BEGIN
-  SELECT id INTO v_id
-  FROM public.campaigns
-  WHERE title = 'Delete Test 4 - Near Budget'
-    AND created_by = 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid;
-
-  -- Set to near_budget
   UPDATE public.campaigns SET status = 'near_budget' WHERE id = v_id;
 
   BEGIN
@@ -191,20 +177,15 @@ SELECT public.create_campaign(
   'Brief'::text,
   'YouTube'::text,
   50::numeric,
-  'Test Creator'::text
+  'Test Creator'::text,
+  'a0000000-0000-0000-0000-000000000005'::uuid
 );
 
 DO $$
 DECLARE
-  v_id uuid;
+  v_id uuid := 'a0000000-0000-0000-0000-000000000005'::uuid;
   v_err text;
 BEGIN
-  SELECT id INTO v_id
-  FROM public.campaigns
-  WHERE title = 'Delete Test 5 - Wrong Owner'
-    AND created_by = 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid;
-
-  -- Switch to different user
   PERFORM set_config('request.jwt.claims', '{"sub": "11111111-1111-1111-1111-111111111111", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
 
@@ -262,20 +243,15 @@ SELECT public.create_campaign(
   'Brief'::text,
   'YouTube'::text,
   50::numeric,
-  'Test Creator'::text
+  'Test Creator'::text,
+  'a0000000-0000-0000-0000-000000000007'::uuid
 );
 
 DO $$
 DECLARE
-  v_id uuid;
+  v_id uuid := 'a0000000-0000-0000-0000-000000000007'::uuid;
   v_err text;
 BEGIN
-  SELECT id INTO v_id
-  FROM public.campaigns
-  WHERE title = 'Delete Test 7 - Admin Delete'
-    AND created_by = 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid;
-
-  -- Switch to admin user who is NOT the owner
   PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
 
@@ -303,27 +279,21 @@ SELECT public.create_campaign(
   'Brief'::text,
   'YouTube'::text,
   50::numeric,
-  'Test Creator'::text
+  'Test Creator'::text,
+  'a0000000-0000-0000-0000-000000000008'::uuid
 );
 
 DO $$
 DECLARE
-  v_id uuid;
+  v_id uuid := 'a0000000-0000-0000-0000-000000000008'::uuid;
   v_err text;
 BEGIN
-  SELECT id INTO v_id
-  FROM public.campaigns
-  WHERE title = 'Delete Test 8 - Verified Payment'
-    AND created_by = 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid;
-
-  -- Submit + verify payment but stay draft (don't publish)
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-8');
   PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
   PERFORM public.verify_campaign_launch_payment(
     (SELECT id FROM public.campaign_launch_payments WHERE campaign_id = v_id)
   );
-  -- Switch back to creator
   PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
 
@@ -351,19 +321,15 @@ SELECT public.create_campaign(
   'Brief'::text,
   'YouTube'::text,
   50::numeric,
-  'Test Creator'::text
+  'Test Creator'::text,
+  'a0000000-0000-0000-0000-000000000009'::uuid
 );
 
 DO $$
 DECLARE
-  v_id uuid;
+  v_id uuid := 'a0000000-0000-0000-0000-000000000009'::uuid;
   v_count integer;
 BEGIN
-  SELECT id INTO v_id
-  FROM public.campaigns
-  WHERE title = 'Delete Test 9 - Audit Log'
-    AND created_by = 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid;
-
   PERFORM public.delete_campaign(v_id);
 
   SELECT count(*) INTO v_count
@@ -389,25 +355,15 @@ SELECT public.create_campaign(
   'Brief'::text,
   'YouTube'::text,
   50::numeric,
-  'Test Creator'::text
+  'Test Creator'::text,
+  'a0000000-0000-0000-0000-000000000010'::uuid
 );
 
 DO $$
 DECLARE
-  v_id uuid;
+  v_id uuid := 'a0000000-0000-0000-0000-000000000010'::uuid;
   v_clips integer;
-  v_payment text;
 BEGIN
-  SELECT id INTO v_id
-  FROM public.campaigns
-  WHERE title = 'Delete Test 10 - Cascade'
-    AND created_by = 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid;
-
-  -- Safety: ensure campaign is in expected state
-  SELECT launch_payment_status INTO v_payment FROM public.campaigns WHERE id = v_id;
-  ASSERT v_payment = 'pending', 'TEST 10 FAIL: expected pending payment, got ' || v_payment;
-
-  -- Insert a fake clip + financial record
   INSERT INTO public.clips (id, campaign_id, creator_id, clippers, title, source, platform, status, submitted_at)
   VALUES (gen_random_uuid(), v_id, 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '[]'::jsonb, 'Test Clip', 'manual', 'YouTube', 'approved', now());
 
