@@ -15,6 +15,8 @@ import { useAuth } from "@/lib/auth";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { rup, fmtViews } from "@/lib/format";
 import { financeOf, campaignSpent } from "@/lib/finance";
+import { seriesByDay } from "@/lib/analytics";
+import { TimeSeriesChart } from "@/components/charts";
 import type { Campaign } from "@/lib/types";
 
 export default function ClipperPage() {
@@ -36,12 +38,13 @@ export default function ClipperPage() {
   const pending = fin.pending / 100;
   const approvedCount = fin.totalCount;
   const pendingCount = fin.pendingCount;
-  const maxViews = Math.max(1, ...myClips.map((k) => k.verifiedViews ?? 0));
+  const verifiedViews = myClips.reduce(
+    (s, k) => s + (k.verifiedViews ?? 0),
+    0,
+  );
   const displayedCampaigns = openCampaigns.slice(0, 4);
 
-  const sortedClips = [...myClips].sort(
-    (a, b) => (b.verifiedViews ?? 0) - (a.verifiedViews ?? 0),
-  );
+  const viewsSeries = seriesByDay(myClips, (k) => k.verifiedViews ?? 0);
 
   return (
     <div className="mx-auto max-w-[1120px] space-y-12 px-5 py-10 sm:px-8">
@@ -283,63 +286,26 @@ export default function ClipperPage() {
             </p>
           </div>
         ) : (
-          <div className="space-y-0 divide-y divide-border/50">
-            {sortedClips.slice(0, 5).map((k, i) => {
-              const camp = campaigns.find((c) => c.id === k.campaignId);
-              const pct = ((k.verifiedViews ?? 0) / maxViews) * 100;
-              const thumb = camp?.thumbnails?.[0];
-              const finRec = financeRecords.find((r) => r.clipId === k.id);
-              const earning = (finRec?.netAmount ?? 0) / 100;
-              return (
-                <div key={k.id} className="flex items-center gap-3.5 py-3 sm:gap-4">
-                  <div className="h-10 w-14 shrink-0 overflow-hidden rounded-[10px] bg-accent-soft">
-                    {thumb ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={thumb}
-                        alt=""
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center">
-                        <ImageIcon size={14} className="text-muted/30" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="truncate text-[15px] font-medium text-foreground">
-                        {camp?.title ?? "Clip"}
-                      </span>
-                      <div className="flex shrink-0 items-center gap-4 sm:gap-5">
-                        <span className="font-mono text-[13px] font-medium text-muted">
-                          {k.verifiedViews ? fmtViews(k.verifiedViews) : "0"}
-                          {" views"}
-                        </span>
-                        {earning > 0 && (
-                          <span className="font-mono text-[13px] font-medium text-muted">
-                            {rup(earning)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="mt-2.5 h-[6px] w-full overflow-hidden rounded-full bg-accent-soft">
-                      <div
-                        className={`h-full rounded-full transition-all duration-700 ease-out ${
-                          k.status === "approved"
-                            ? "bg-foreground"
-                            : "bg-border"
-                        }`}
-                        style={{
-                          width: `${Math.max(pct, 3)}%`,
-                          transitionDelay: `${i * 100}ms`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="rounded-[14px] border bg-card p-5 sm:p-6">
+            {/* Summary metrics */}
+            <div className="mb-5 flex flex-wrap gap-x-10 gap-y-3">
+              <div>
+                <p className="text-[13px] text-muted">Total views</p>
+                <p className="mt-1 font-mono text-[20px] font-bold tracking-tight">
+                  {fmtViews(verifiedViews)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[13px] text-muted">Total earnings</p>
+                <p className="mt-1 font-mono text-[20px] font-bold tracking-tight">
+                  {rup(earnings)}
+                </p>
+              </div>
+            </div>
+            {/* Chart */}
+            <div className="h-[180px] w-full">
+              <TimeSeriesChart data={viewsSeries} format={fmtViews} />
+            </div>
           </div>
         )}
       </section>
