@@ -1,10 +1,13 @@
 -- ===========================================================================
--- TEST DATA CLEANUP — campaign-assets test data
+-- TEST DATA CLEANUP — campaign-assets test data (all generations)
 -- ===========================================================================
--- WARNING: This script cleans ONLY the 10 known test campaigns and the
--- insert_test_storage_object() helper function created by:
+-- WARNING: This script cleans ALL known test campaigns from all versions of:
 --   supabase/campaign-assets-test-setup.sql
 --   supabase/campaign-assets-security-tests.sql
+--
+-- Legacy names (Gen 1):  Asset Test A/B/C/D/F/G/H, E Draft, E Unverified, E Closed
+-- Legacy names (Gen 2):  Asset Test A-1/B-1/C-1/D-1/F-1/G-1/H-1, E Draft-1, E Unverified-1, E Closed-1
+-- Current names (Gen 3): TA-Private/TB-Private/TC-Private/TD-Private/TE-Draft/TE-Unverified/TE-Closed/TF-Private/TG-Private/TH-Public
 --
 -- It does NOT touch real user data, real campaigns, or production tables/RLS.
 --
@@ -15,15 +18,24 @@
 -- Run in Supabase SQL Editor (superuser).
 -- Step 1: Diagnostic queries (read-only) — review results first.
 -- Step 2: Database cleanup (SQL) — campaigns + function only.
--- Step 3: Storage cleanup (manual) — delete objects listed in Step 2d.
+-- Step 3: Storage cleanup (manual) — delete objects listed in Step 3.
 -- ===========================================================================
 
 -- ===================== STEP 1: DIAGNOSTIC (READ-ONLY) =====================
 
--- 1a. Find test campaigns by title
+-- 1a. Find ALL test campaigns (all generations)
 SELECT id, title, status, launch_payment_status, created_by, created_at, budget
 FROM public.campaigns
 WHERE title IN (
+  -- Gen 1: original names
+  'Asset Test A','Asset Test B','Asset Test C','Asset Test D',
+  'Asset Test F','Asset Test G','Asset Test H',
+  'E Draft','E Unverified','E Closed',
+  -- Gen 2: suffixed names
+  'Asset Test A-1','Asset Test B-1','Asset Test C-1','Asset Test D-1',
+  'Asset Test F-1','Asset Test G-1','Asset Test H-1',
+  'E Draft-1','E Unverified-1','E Closed-1',
+  -- Gen 3: current names
   'TA-Private','TB-Private','TC-Private','TD-Private',
   'TE-Draft','TE-Unverified','TE-Closed',
   'TF-Private','TG-Private','TH-Public'
@@ -34,6 +46,12 @@ ORDER BY title;
 SELECT count(*) AS test_campaign_count
 FROM public.campaigns
 WHERE title IN (
+  'Asset Test A','Asset Test B','Asset Test C','Asset Test D',
+  'Asset Test F','Asset Test G','Asset Test H',
+  'E Draft','E Unverified','E Closed',
+  'Asset Test A-1','Asset Test B-1','Asset Test C-1','Asset Test D-1',
+  'Asset Test F-1','Asset Test G-1','Asset Test H-1',
+  'E Draft-1','E Unverified-1','E Closed-1',
   'TA-Private','TB-Private','TC-Private','TD-Private',
   'TE-Draft','TE-Unverified','TE-Closed',
   'TF-Private','TG-Private','TH-Public'
@@ -44,6 +62,12 @@ SELECT c.id AS clip_id, c.campaign_id, c.clipper, c.status, camp.title
 FROM public.clips c
 JOIN public.campaigns camp ON camp.id = c.campaign_id
 WHERE camp.title IN (
+  'Asset Test A','Asset Test B','Asset Test C','Asset Test D',
+  'Asset Test F','Asset Test G','Asset Test H',
+  'E Draft','E Unverified','E Closed',
+  'Asset Test A-1','Asset Test B-1','Asset Test C-1','Asset Test D-1',
+  'Asset Test F-1','Asset Test G-1','Asset Test H-1',
+  'E Draft-1','E Unverified-1','E Closed-1',
   'TA-Private','TB-Private','TC-Private','TD-Private',
   'TE-Draft','TE-Unverified','TE-Closed',
   'TF-Private','TG-Private','TH-Public'
@@ -54,6 +78,12 @@ SELECT fr.id, fr.campaign_id, fr.clip_id, fr.status, camp.title
 FROM public.financial_records fr
 JOIN public.campaigns camp ON camp.id = fr.campaign_id
 WHERE camp.title IN (
+  'Asset Test A','Asset Test B','Asset Test C','Asset Test D',
+  'Asset Test F','Asset Test G','Asset Test H',
+  'E Draft','E Unverified','E Closed',
+  'Asset Test A-1','Asset Test B-1','Asset Test C-1','Asset Test D-1',
+  'Asset Test F-1','Asset Test G-1','Asset Test H-1',
+  'E Draft-1','E Unverified-1','E Closed-1',
   'TA-Private','TB-Private','TC-Private','TD-Private',
   'TE-Draft','TE-Unverified','TE-Closed',
   'TF-Private','TG-Private','TH-Public'
@@ -64,6 +94,12 @@ SELECT clp.id, clp.campaign_id, clp.payment_status, camp.title
 FROM public.campaign_launch_payments clp
 JOIN public.campaigns camp ON camp.id = clp.campaign_id
 WHERE camp.title IN (
+  'Asset Test A','Asset Test B','Asset Test C','Asset Test D',
+  'Asset Test F','Asset Test G','Asset Test H',
+  'E Draft','E Unverified','E Closed',
+  'Asset Test A-1','Asset Test B-1','Asset Test C-1','Asset Test D-1',
+  'Asset Test F-1','Asset Test G-1','Asset Test H-1',
+  'E Draft-1','E Unverified-1','E Closed-1',
   'TA-Private','TB-Private','TC-Private','TD-Private',
   'TE-Draft','TE-Unverified','TE-Closed',
   'TF-Private','TG-Private','TH-Public'
@@ -74,6 +110,12 @@ SELECT cm.id, cm.campaign_id, cm.clip_id, cm.platform, camp.title
 FROM public.clip_metrics cm
 JOIN public.campaigns camp ON camp.id = cm.campaign_id
 WHERE camp.title IN (
+  'Asset Test A','Asset Test B','Asset Test C','Asset Test D',
+  'Asset Test F','Asset Test G','Asset Test H',
+  'E Draft','E Unverified','E Closed',
+  'Asset Test A-1','Asset Test B-1','Asset Test C-1','Asset Test D-1',
+  'Asset Test F-1','Asset Test G-1','Asset Test H-1',
+  'E Draft-1','E Unverified-1','E Closed-1',
   'TA-Private','TB-Private','TC-Private','TD-Private',
   'TE-Draft','TE-Unverified','TE-Closed',
   'TF-Private','TG-Private','TH-Public'
@@ -84,6 +126,12 @@ SELECT msj.id, msj.campaign_id, msj.clip_id, msj.status, camp.title
 FROM public.metrics_sync_jobs msj
 JOIN public.campaigns camp ON camp.id = msj.campaign_id
 WHERE camp.title IN (
+  'Asset Test A','Asset Test B','Asset Test C','Asset Test D',
+  'Asset Test F','Asset Test G','Asset Test H',
+  'E Draft','E Unverified','E Closed',
+  'Asset Test A-1','Asset Test B-1','Asset Test C-1','Asset Test D-1',
+  'Asset Test F-1','Asset Test G-1','Asset Test H-1',
+  'E Draft-1','E Unverified-1','E Closed-1',
   'TA-Private','TB-Private','TC-Private','TD-Private',
   'TE-Draft','TE-Unverified','TE-Closed',
   'TF-Private','TG-Private','TH-Public'
@@ -115,6 +163,12 @@ SELECT al.id, al.action, al.entity_id, al.timestamp
 FROM public.audit_logs al
 JOIN public.campaigns camp ON camp.id::text = al.entity_id
 WHERE camp.title IN (
+  'Asset Test A','Asset Test B','Asset Test C','Asset Test D',
+  'Asset Test F','Asset Test G','Asset Test H',
+  'E Draft','E Unverified','E Closed',
+  'Asset Test A-1','Asset Test B-1','Asset Test C-1','Asset Test D-1',
+  'Asset Test F-1','Asset Test G-1','Asset Test H-1',
+  'E Draft-1','E Unverified-1','E Closed-1',
   'TA-Private','TB-Private','TC-Private','TD-Private',
   'TE-Draft','TE-Unverified','TE-Closed',
   'TF-Private','TG-Private','TH-Public'
@@ -135,6 +189,12 @@ BEGIN;
 -- 2a. Delete test campaigns (cascades to all child tables)
 DELETE FROM public.campaigns
 WHERE title IN (
+  'Asset Test A','Asset Test B','Asset Test C','Asset Test D',
+  'Asset Test F','Asset Test G','Asset Test H',
+  'E Draft','E Unverified','E Closed',
+  'Asset Test A-1','Asset Test B-1','Asset Test C-1','Asset Test D-1',
+  'Asset Test F-1','Asset Test G-1','Asset Test H-1',
+  'E Draft-1','E Unverified-1','E Closed-1',
   'TA-Private','TB-Private','TC-Private','TD-Private',
   'TE-Draft','TE-Unverified','TE-Closed',
   'TF-Private','TG-Private','TH-Public'
@@ -147,6 +207,12 @@ DROP FUNCTION IF EXISTS public.insert_test_storage_object(text, uuid);
 SELECT count(*) AS remaining_test_campaigns
 FROM public.campaigns
 WHERE title IN (
+  'Asset Test A','Asset Test B','Asset Test C','Asset Test D',
+  'Asset Test F','Asset Test G','Asset Test H',
+  'E Draft','E Unverified','E Closed',
+  'Asset Test A-1','Asset Test B-1','Asset Test C-1','Asset Test D-1',
+  'Asset Test F-1','Asset Test G-1','Asset Test H-1',
+  'E Draft-1','E Unverified-1','E Closed-1',
   'TA-Private','TB-Private','TC-Private','TD-Private',
   'TE-Draft','TE-Unverified','TE-Closed',
   'TF-Private','TG-Private','TH-Public'

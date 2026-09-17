@@ -21,8 +21,14 @@
 -- ===================== STEP 1: RUN campaign-assets-security.sql FIRST =====================
 
 -- ===================== STEP 2: SETUP DATA =====================
--- Cleanup previous test data
+-- Cleanup previous test data (all generations)
 DELETE FROM public.campaigns WHERE title IN (
+  'Asset Test A','Asset Test B','Asset Test C','Asset Test D',
+  'Asset Test F','Asset Test G','Asset Test H',
+  'E Draft','E Unverified','E Closed',
+  'Asset Test A-1','Asset Test B-1','Asset Test C-1','Asset Test D-1',
+  'Asset Test F-1','Asset Test G-1','Asset Test H-1',
+  'E Draft-1','E Unverified-1','E Closed-1',
   'TA-Private','TB-Private','TC-Private','TD-Private',
   'TE-Draft','TE-Unverified','TE-Closed',
   'TF-Private','TG-Private','TH-Public'
@@ -149,6 +155,12 @@ ALTER TABLE public.campaigns ENABLE ROW LEVEL SECURITY;
 
 -- Delete test campaigns (cascades to all child tables)
 DELETE FROM public.campaigns WHERE title IN (
+  'Asset Test A','Asset Test B','Asset Test C','Asset Test D',
+  'Asset Test F','Asset Test G','Asset Test H',
+  'E Draft','E Unverified','E Closed',
+  'Asset Test A-1','Asset Test B-1','Asset Test C-1','Asset Test D-1',
+  'Asset Test F-1','Asset Test G-1','Asset Test H-1',
+  'E Draft-1','E Unverified-1','E Closed-1',
   'TA-Private','TB-Private','TC-Private','TD-Private',
   'TE-Draft','TE-Unverified','TE-Closed',
   'TF-Private','TG-Private','TH-Public'
@@ -161,6 +173,12 @@ DROP FUNCTION IF EXISTS public.insert_test_storage_object(text, uuid);
 SELECT count(*) AS remaining_test_campaigns
 FROM public.campaigns
 WHERE title IN (
+  'Asset Test A','Asset Test B','Asset Test C','Asset Test D',
+  'Asset Test F','Asset Test G','Asset Test H',
+  'E Draft','E Unverified','E Closed',
+  'Asset Test A-1','Asset Test B-1','Asset Test C-1','Asset Test D-1',
+  'Asset Test F-1','Asset Test G-1','Asset Test H-1',
+  'E Draft-1','E Unverified-1','E Closed-1',
   'TA-Private','TB-Private','TC-Private','TD-Private',
   'TE-Draft','TE-Unverified','TE-Closed',
   'TF-Private','TG-Private','TH-Public'
