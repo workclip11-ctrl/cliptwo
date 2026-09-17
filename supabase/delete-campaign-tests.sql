@@ -70,7 +70,9 @@ BEGIN
   WHERE title = 'Delete Test 2 - Closed'
     AND created_by = 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid;
 
-  -- Close it first
+  -- Must publish first (requires verified payment)
+  UPDATE public.campaigns SET launch_payment_status = 'verified' WHERE id = v_id;
+  PERFORM public.campaign_action(v_id, 'publish', 'Publish for close+delete test');
   PERFORM public.campaign_action(v_id, 'close', 'Close for delete test');
 
   PERFORM public.delete_campaign(v_id);
