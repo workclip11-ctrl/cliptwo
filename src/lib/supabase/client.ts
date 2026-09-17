@@ -93,17 +93,26 @@ const hybridStorageAdapter = {
   },
 };
 
-export const supabase = createClient(
-  isSupabaseConfigured ? (url as string) : "https://placeholder.supabase.co",
-  isSupabaseConfigured ? (key as string) : "placeholder-anon-key",
-  {
-    auth: {
-      storageKey,
-      storage: hybridStorageAdapter,
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-      flowType: "pkce",
-    },
-  },
-);
+export const supabase = isSupabaseConfigured
+  ? createClient(url as string, key as string, {
+      auth: {
+        storageKey,
+        storage: hybridStorageAdapter,
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        flowType: "pkce",
+      },
+    })
+  // When Supabase is not configured, create a client with invalid credentials.
+  // All operations are gated by isSupabaseConfigured checks.
+  : createClient("https://invalid.supabase.co", "invalid-key", {
+      auth: {
+        storageKey,
+        storage: hybridStorageAdapter,
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        flowType: "pkce",
+      },
+    });

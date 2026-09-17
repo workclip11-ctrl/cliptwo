@@ -131,7 +131,7 @@ export default function AdminBackend() {
             <div className="rounded-xl border border-amber/20 bg-amber/5 px-5 py-4 text-[13px] text-amber">
               Set <code className="font-mono">NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
               <code className="font-mono">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> to enable
-              live data. The app currently runs on seed data.
+              live data. The app requires Supabase to function.
             </div>
           )}
         </div>
