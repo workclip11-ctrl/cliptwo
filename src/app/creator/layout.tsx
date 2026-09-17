@@ -20,7 +20,7 @@ import { MobileSidebar } from "@/components/MobileSidebar";
 
 const NAV = [
   { href: "/creator", label: "Dashboard", icon: LayoutGrid, exact: true },
-  { href: "/creator/campaigns", label: "My Campaigns", icon: Megaphone },
+  { href: "/creator/campaigns", label: "Campaigns", icon: Megaphone },
   { href: "/creator/submissions", label: "Submissions", icon: Film },
   { href: "/creator/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/creator/wallet", label: "Wallet", icon: Wallet },

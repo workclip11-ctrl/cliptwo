@@ -11,7 +11,6 @@ import {
   Wallet,
   Settings,
   Link2,
-  BarChart3,
   Menu,
   LogOut,
 } from "lucide-react";
@@ -21,15 +20,11 @@ import { MobileSidebar } from "@/components/MobileSidebar";
 
 const NAV = [
   { href: "/clipper", label: "Dashboard", icon: LayoutGrid, exact: true },
-  { href: "/clipper/submissions", label: "Submissions", icon: Film },
   { href: "/clipper/campaigns", label: "Campaigns", icon: Megaphone },
+  { href: "/clipper/submissions", label: "My Submissions", icon: Film },
   { href: "/clipper/wallet", label: "Wallet", icon: Wallet },
   { href: "/clipper/accounts", label: "Connected accounts", icon: Link2 },
   { href: "/clipper/settings", label: "Settings", icon: Settings },
-];
-
-const ANALYTICS_NAV = [
-  { href: "/clipper/wallet", label: "Performance", icon: BarChart3 },
 ];
 
 export default function ClipperLayout({ children }: { children: ReactNode }) {
@@ -83,33 +78,6 @@ export default function ClipperLayout({ children }: { children: ReactNode }) {
                   );
                 })}
               </nav>
-
-              <div>
-                <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-widest text-muted">
-                  Analytics
-                </p>
-                <nav className="flex flex-col">
-                  {ANALYTICS_NAV.map((n) => {
-                    const active =
-                      pathname === n.href ||
-                      pathname.startsWith(n.href + "/");
-                    return (
-                      <Link
-                        key={n.href}
-                        href={n.href}
-                        className={`flex items-center gap-2 rounded-[10px] px-2.5 py-[6px] text-[15px] transition-colors duration-150 ${
-                          active
-                            ? "bg-accent-soft text-foreground font-semibold"
-                            : "text-muted hover:text-foreground"
-                        }`}
-                      >
-                        <n.icon size={18} strokeWidth={active ? 2 : 1.5} />
-                        {n.label}
-                      </Link>
-                    );
-                  })}
-                </nav>
-              </div>
 
               <div className="border-t border-border/60 pt-4">
                 <Link

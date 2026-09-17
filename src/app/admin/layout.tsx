@@ -9,10 +9,12 @@ import {
   Users,
   Film,
   Megaphone,
-  Banknote,
+  Globe,
+  Server,
   ShieldAlert,
-  BarChart3,
-  Settings,
+  History,
+  Banknote,
+  CreditCard,
   Menu,
   LogOut,
 } from "lucide-react";
@@ -22,15 +24,16 @@ import { MobileSidebar } from "@/components/MobileSidebar";
 
 const NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutGrid, exact: true },
-  { href: "/admin/clippers", label: "Users", icon: Users },
+  { href: "/admin/clippers", label: "Clippers", icon: Users },
   { href: "/admin/creators", label: "Creators", icon: Users },
   { href: "/admin/campaigns", label: "Campaigns", icon: Megaphone },
-  { href: "/admin/clips", label: "Submissions", icon: Film },
+  { href: "/admin/campaigns/payments", label: "Campaign Payments", icon: CreditCard },
+  { href: "/admin/clips", label: "Review & payouts", icon: Film },
   { href: "/admin/payouts", label: "Payouts", icon: Banknote },
-  { href: "/admin/risk", label: "Disputes", icon: ShieldAlert },
-  { href: "/admin/audit", label: "Analytics", icon: BarChart3 },
-  { href: "/admin/website", label: "Finance", icon: Banknote },
-  { href: "/admin/backend", label: "Settings", icon: Settings },
+  { href: "/admin/risk", label: "Risk", icon: ShieldAlert },
+  { href: "/admin/audit", label: "Audit Log", icon: History },
+  { href: "/admin/website", label: "Website", icon: Globe },
+  { href: "/admin/backend", label: "Backend", icon: Server },
 ];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
