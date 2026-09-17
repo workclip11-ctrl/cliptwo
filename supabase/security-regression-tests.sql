@@ -432,7 +432,7 @@ BEGIN
     JOIN pg_namespace n ON c.relnamespace = n.oid
     WHERE n.nspname = 'public' AND c.relname = 'audit_logs'
     AND t.tgname = 'trg_prevent_audit_update'
-    AND NOT t.tgisdisabled
+    AND NOT t.tgisinternal
   );
   v_results := v_results || jsonb_build_object(
     'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
@@ -447,7 +447,7 @@ BEGIN
     JOIN pg_namespace n ON c.relnamespace = n.oid
     WHERE n.nspname = 'public' AND c.relname = 'audit_logs'
     AND t.tgname = 'trg_prevent_audit_delete'
-    AND NOT t.tgisdisabled
+    AND NOT t.tgisinternal
   );
   v_results := v_results || jsonb_build_object(
     'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
@@ -689,7 +689,7 @@ BEGIN
     JOIN pg_namespace n ON c.relnamespace = n.oid
     WHERE n.nspname = 'public' AND c.relname = 'campaigns'
     AND t.tgname = 'trg_enforce_campaign_budget_lock'
-    AND NOT t.tgisdisabled
+    AND NOT t.tgisinternal
   );
   v_results := v_results || jsonb_build_object(
     'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
@@ -704,7 +704,7 @@ BEGIN
     JOIN pg_namespace n ON c.relnamespace = n.oid
     WHERE n.nspname = 'public' AND c.relname = 'campaigns'
     AND t.tgname = 'prevent_created_by_update'
-    AND NOT t.tgisdisabled
+    AND NOT t.tgisinternal
   );
   v_results := v_results || jsonb_build_object(
     'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
@@ -719,7 +719,7 @@ BEGIN
     JOIN pg_namespace n ON c.relnamespace = n.oid
     WHERE n.nspname = 'public' AND c.relname = 'campaigns'
     AND t.tgname = 'set_created_by'
-    AND NOT t.tgisdisabled
+    AND NOT t.tgisinternal
   );
   v_results := v_results || jsonb_build_object(
     'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
@@ -734,7 +734,7 @@ BEGIN
     JOIN pg_namespace n ON c.relnamespace = n.oid
     WHERE n.nspname = 'public' AND c.relname = 'profiles'
     AND t.tgname = 'enforce_profile_fields'
-    AND NOT t.tgisdisabled
+    AND NOT t.tgisinternal
   );
   v_results := v_results || jsonb_build_object(
     'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
