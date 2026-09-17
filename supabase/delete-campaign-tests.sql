@@ -116,6 +116,10 @@ BEGIN
     (SELECT id FROM public.campaign_launch_payments WHERE campaign_id = v_id)
   );
 
+  -- Switch back to creator (owner) before delete attempt
+  PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+  PERFORM set_config('role', 'authenticated', true);
+
   BEGIN
     PERFORM public.delete_campaign(v_id);
     ASSERT false, 'TEST 3 FAIL: should have raised exception';
@@ -293,6 +297,9 @@ BEGIN
   PERFORM public.verify_campaign_launch_payment(
     (SELECT id FROM public.campaign_launch_payments WHERE campaign_id = v_id)
   );
+  -- Switch back to creator (owner) before delete attempt
+  PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+  PERFORM set_config('role', 'authenticated', true);
 
   BEGIN
     PERFORM public.delete_campaign(v_id);
