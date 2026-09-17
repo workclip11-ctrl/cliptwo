@@ -382,8 +382,8 @@ DECLARE
   v_id uuid := 'a0000000-0000-0000-0000-000000000010'::uuid;
   v_clips integer;
 BEGIN
-  INSERT INTO public.clips (id, campaign_id, user_id, clippers, title, source, platform, status, submitted_at)
-  VALUES (gen_random_uuid(), v_id, 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, '[]'::jsonb, 'Test Clip', 'manual', 'YouTube', 'approved', now());
+  INSERT INTO public.clips (id, campaign_id, user_id, clipper, caption, video_url, platform, status, submitted_at)
+  VALUES (gen_random_uuid(), v_id, 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, 'Test Clipper', 'Test Caption', 'https://example.com/clip.mp4', 'YouTube', 'approved', now());
 
   PERFORM public.delete_campaign(v_id);
 
