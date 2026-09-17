@@ -81,7 +81,7 @@ BEGIN
   v_test_id := v_test_id + 1;
   v_test_name := 'admin_clip_action rejects non-admin (expect exception)';
   BEGIN
-    PERFORM public.admin_clip_action('00000000-0000-0000-0000-000000000000', 'reject', 'test');
+    PERFORM public.admin_clip_action('00000000-0000-0000-0000-000000000000', 'reject', 'test', null);
     v_pass := false; -- should not reach here
   EXCEPTION WHEN OTHERS THEN
     v_pass := true; -- expected: raises exception for non-admin
@@ -94,7 +94,7 @@ BEGIN
   v_test_id := v_test_id + 1;
   v_test_name := 'admin_user_action rejects non-admin (expect exception)';
   BEGIN
-    PERFORM public.admin_user_action('00000000-0000-0000-0000-000000000000', 'suspend', 'test');
+    PERFORM public.admin_user_action('00000000-0000-0000-0000-000000000000', 'suspend', 'test', null);
     v_pass := false;
   EXCEPTION WHEN OTHERS THEN
     v_pass := true;
@@ -813,7 +813,7 @@ BEGIN
   v_test_id := v_test_id + 1;
   v_test_name := 'admin_clip_action rejects non-admin (expect exception)';
   BEGIN
-    PERFORM public.admin_clip_action('00000000-0000-0000-0000-000000000000', 'reject', 'test');
+    PERFORM public.admin_clip_action('00000000-0000-0000-0000-000000000000', 'reject', 'test', null);
     v_pass := false;
   EXCEPTION WHEN OTHERS THEN
     v_pass := true;
@@ -826,7 +826,7 @@ BEGIN
   v_test_id := v_test_id + 1;
   v_test_name := 'admin_user_action rejects non-admin (expect exception)';
   BEGIN
-    PERFORM public.admin_user_action('00000000-0000-0000-0000-000000000000', 'suspend', 'test');
+    PERFORM public.admin_user_action('00000000-0000-0000-0000-000000000000', 'suspend', 'test', null);
     v_pass := false;
   EXCEPTION WHEN OTHERS THEN
     v_pass := true;
@@ -1434,7 +1434,7 @@ BEGIN
   v_test_id := v_test_id + 1;
   v_test_name := 'admin_clip_action requires admin role (expect admin error)';
   BEGIN
-    PERFORM public.admin_clip_action('00000000-0000-0000-0000-000000000000', 'reject', 'test');
+    PERFORM public.admin_clip_action('00000000-0000-0000-0000-000000000000', 'reject', 'test', null);
     v_pass := false;
   EXCEPTION WHEN OTHERS THEN
     GET STACKED DIAGNOSTICS v_error_msg = MESSAGE_TEXT;
@@ -1448,7 +1448,7 @@ BEGIN
   v_test_id := v_test_id + 1;
   v_test_name := 'admin_user_action requires admin role (expect admin error)';
   BEGIN
-    PERFORM public.admin_user_action('00000000-0000-0000-0000-000000000000', 'suspend', 'test');
+    PERFORM public.admin_user_action('00000000-0000-0000-0000-000000000000', 'suspend', 'test', null);
     v_pass := false;
   EXCEPTION WHEN OTHERS THEN
     GET STACKED DIAGNOSTICS v_error_msg = MESSAGE_TEXT;
@@ -1601,7 +1601,7 @@ BEGIN
   -- TEST 125: admin_clip_action has GRANT EXECUTE to authenticated
   v_test_id := v_test_id + 1;
   v_test_name := 'admin_clip_action has GRANT EXECUTE to authenticated';
-  v_pass := has_function_privilege('authenticated', 'public.admin_clip_action(uuid,text,text)', 'EXECUTE');
+  v_pass := has_function_privilege('authenticated', 'public.admin_clip_action(uuid,text,text,text)', 'EXECUTE');
   v_results := v_results || jsonb_build_object(
     'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
   );
@@ -1609,7 +1609,7 @@ BEGIN
   -- TEST 126: admin_user_action has GRANT EXECUTE to authenticated
   v_test_id := v_test_id + 1;
   v_test_name := 'admin_user_action has GRANT EXECUTE to authenticated';
-  v_pass := has_function_privilege('authenticated', 'public.admin_user_action(uuid,text,text)', 'EXECUTE');
+  v_pass := has_function_privilege('authenticated', 'public.admin_user_action(uuid,text,text,text)', 'EXECUTE');
   v_results := v_results || jsonb_build_object(
     'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
   );
