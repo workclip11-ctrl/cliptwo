@@ -70,9 +70,16 @@ BEGIN
   WHERE title = 'Delete Test 2 - Closed'
     AND created_by = 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid;
 
-  -- Must publish first (requires verified payment)
-  UPDATE public.campaigns SET launch_payment_status = 'verified' WHERE id = v_id;
-  PERFORM public.campaign_action(v_id, 'publish', 'Publish for close+delete test');
+  -- Must publish first: submit payment, then admin verifies
+  PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-2');
+  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
+  PERFORM set_config('role', 'authenticated', true);
+  PERFORM public.verify_campaign_launch_payment(
+    (SELECT id FROM public.campaign_launch_payments WHERE campaign_id = v_id)
+  );
+  -- Switch back to creator
+  PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+  PERFORM set_config('role', 'authenticated', true);
   PERFORM public.campaign_action(v_id, 'close', 'Close for delete test');
 
   PERFORM public.delete_campaign(v_id);
@@ -109,8 +116,15 @@ BEGIN
   WHERE title = 'Delete Test 3 - Open'
     AND created_by = 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid;
 
-  -- Publish it (requires verified payment — set it first)
-  UPDATE public.campaigns SET launch_payment_status = 'verified' WHERE id = v_id;
+  -- Publish it: submit payment, admin verifies, then publish
+  PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-3');
+  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
+  PERFORM set_config('role', 'authenticated', true);
+  PERFORM public.verify_campaign_launch_payment(
+    (SELECT id FROM public.campaign_launch_payments WHERE campaign_id = v_id)
+  );
+  PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+  PERFORM set_config('role', 'authenticated', true);
   PERFORM public.campaign_action(v_id, 'publish', 'Publish for delete test');
 
   BEGIN
@@ -240,7 +254,7 @@ ROLLBACK;
 -- TEST 7: Admin cannot delete via delete_campaign (owner-only)
 -- ===========================================================================
 BEGIN;
-SELECT set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
+SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
 SELECT set_config('role', 'authenticated', true);
 
 SELECT public.create_campaign(
@@ -259,13 +273,9 @@ BEGIN
   SELECT id INTO v_id
   FROM public.campaigns
   WHERE title = 'Delete Test 7 - Admin Delete'
-    AND created_by = 'f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd'::uuid;
+    AND created_by = 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid;
 
-  -- Switch to creator user who owns the campaign
-  PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
-
-  -- Now admin user (f1d9d01c) is not the owner — should fail
+  -- Switch to admin user who is NOT the owner
   PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
 
@@ -306,8 +316,16 @@ BEGIN
   WHERE title = 'Delete Test 8 - Verified Payment'
     AND created_by = 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid;
 
-  -- Set verified payment but keep draft status
-  UPDATE public.campaigns SET launch_payment_status = 'verified' WHERE id = v_id;
+  -- Submit + verify payment but stay draft (don't publish)
+  PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-8');
+  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
+  PERFORM set_config('role', 'authenticated', true);
+  PERFORM public.verify_campaign_launch_payment(
+    (SELECT id FROM public.campaign_launch_payments WHERE campaign_id = v_id)
+  );
+  -- Switch back to creator
+  PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+  PERFORM set_config('role', 'authenticated', true);
 
   BEGIN
     PERFORM public.delete_campaign(v_id);
