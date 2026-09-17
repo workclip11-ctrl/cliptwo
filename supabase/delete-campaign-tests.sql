@@ -108,15 +108,13 @@ DECLARE
   v_id uuid := 'a0000000-0000-0000-0000-000000000003'::uuid;
   v_err text;
 BEGIN
+  -- verify_campaign_launch_payment already sets status='open'
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-3');
   PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
   PERFORM public.verify_campaign_launch_payment(
     (SELECT id FROM public.campaign_launch_payments WHERE campaign_id = v_id)
   );
-  PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
-  PERFORM public.campaign_action(v_id, 'publish', 'Publish for delete test');
 
   BEGIN
     PERFORM public.delete_campaign(v_id);
@@ -288,16 +286,13 @@ DECLARE
   v_id uuid := 'a0000000-0000-0000-0000-000000000008'::uuid;
   v_err text;
 BEGIN
+  -- verify_campaign_launch_payment already sets status='open'
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-TEST-8');
   PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
   PERFORM public.verify_campaign_launch_payment(
     (SELECT id FROM public.campaign_launch_payments WHERE campaign_id = v_id)
   );
-  -- Must publish (open) for the payment safety check to apply
-  PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
-  PERFORM public.campaign_action(v_id, 'publish', 'Publish for delete test');
 
   BEGIN
     PERFORM public.delete_campaign(v_id);
