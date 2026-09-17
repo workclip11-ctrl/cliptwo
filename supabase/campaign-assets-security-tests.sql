@@ -1,6 +1,13 @@
 -- ===========================================================================
--- Campaign Assets Security Regression Tests
+-- FOR ISOLATED TESTING ONLY — DO NOT RUN IN PRODUCTION
 -- ===========================================================================
+-- Campaign Assets Security Regression Tests
+--
+-- WARNING: This script creates 10 fake campaigns and a SECURITY DEFINER
+-- helper function (insert_test_storage_object) in the database.
+-- The CLEANUP section at the end removes campaigns and drops the function.
+-- Storage objects must be deleted manually via Dashboard/Storage API.
+--
 -- Tests private file access security model via SELECT policies.
 -- Run the SETUP section first, then run each test in a NEW query tab.
 --
@@ -136,8 +143,29 @@ SELECT current_user AS running_as, count(*) AS result FROM storage.objects WHERE
 ROLLBACK;
 
 -- ===================== CLEANUP =====================
+-- Re-enable triggers/RLS in case tests left them disabled
+ALTER TABLE public.campaigns ENABLE TRIGGER set_created_by;
+ALTER TABLE public.campaigns ENABLE ROW LEVEL SECURITY;
+
+-- Delete test campaigns (cascades to all child tables)
 DELETE FROM public.campaigns WHERE title IN (
   'TA-Private','TB-Private','TC-Private','TD-Private',
   'TE-Draft','TE-Unverified','TE-Closed',
   'TF-Private','TG-Private','TH-Public'
 );
+
+-- Drop the test helper function
+DROP FUNCTION IF EXISTS public.insert_test_storage_object(text, uuid);
+
+-- Verify: should return 0
+SELECT count(*) AS remaining_test_campaigns
+FROM public.campaigns
+WHERE title IN (
+  'TA-Private','TB-Private','TC-Private','TD-Private',
+  'TE-Draft','TE-Unverified','TE-Closed',
+  'TF-Private','TG-Private','TH-Public'
+);
+
+-- NOTE: Test storage objects (10 files) still exist in the campaign-assets bucket.
+-- Delete them manually: Supabase Dashboard → Storage → campaign-assets → delete
+-- any folder containing "test-" in its name.

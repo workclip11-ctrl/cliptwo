@@ -1,7 +1,18 @@
 -- ===========================================================================
--- Campaign Assets Security - Data Setup
+-- FOR ISOLATED TESTING ONLY — DO NOT RUN IN PRODUCTION
 -- ===========================================================================
+-- Campaign Assets Security - Data Setup
+--
+-- WARNING: This script creates 10 fake campaigns and 10 storage objects
+-- in the database. It also creates a SECURITY DEFINER helper function
+-- (insert_test_storage_object) that must be dropped after testing.
+--
 -- Run this ONCE to set up test data. Then run tests separately.
+-- ALWAYS run the CLEANUP section at the end after tests complete.
+--
+-- Storage objects CANNOT be deleted via SQL (Supabase blocks direct
+-- storage.objects DELETE). After cleanup, manually delete test objects
+-- from Supabase Dashboard → Storage → campaign-assets (search for "test-").
 --
 -- UUIDs:
 --   Creator A: e92427b0-254e-44cc-b2df-be83792c8a94
@@ -68,3 +79,38 @@ SELECT name, array_length(storage.foldername(name), 1) AS folder_depth
 FROM storage.objects
 WHERE bucket_id = 'campaign-assets' AND name LIKE '%/test-%'
 ORDER BY name;
+
+
+-- ===========================================================================
+-- CLEANUP — Run after tests complete
+-- ===========================================================================
+-- Drops test campaigns (cascades to clips, financial_records, etc.)
+-- and removes the test helper function.
+-- Storage objects must be deleted manually via Dashboard/Storage API.
+
+-- Re-enable triggers/RLS in case setup left them disabled
+ALTER TABLE public.campaigns ENABLE TRIGGER set_created_by;
+ALTER TABLE public.campaigns ENABLE ROW LEVEL SECURITY;
+
+-- Delete test campaigns (cascades to all child tables)
+DELETE FROM public.campaigns WHERE title IN (
+  'TA-Private','TB-Private','TC-Private','TD-Private',
+  'TE-Draft','TE-Unverified','TE-Closed',
+  'TF-Private','TG-Private','TH-Public'
+);
+
+-- Drop the test helper function
+DROP FUNCTION IF EXISTS public.insert_test_storage_object(text, uuid);
+
+-- Verify: should return 0
+SELECT count(*) AS remaining_test_campaigns
+FROM public.campaigns
+WHERE title IN (
+  'TA-Private','TB-Private','TC-Private','TD-Private',
+  'TE-Draft','TE-Unverified','TE-Closed',
+  'TF-Private','TG-Private','TH-Public'
+);
+
+-- NOTE: Test storage objects (10 files) still exist in the campaign-assets bucket.
+-- Delete them manually: Supabase Dashboard → Storage → campaign-assets → delete
+-- any folder containing "test-" in its name.

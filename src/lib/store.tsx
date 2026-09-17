@@ -375,6 +375,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // Load saved state from localStorage on client mount
   useEffect(() => {
     if (isSupabaseConfigured) {
+      // Remove stale legacy localStorage from local dev fallback
+      try { localStorage.removeItem("cliptwo_local_state"); } catch { /* ignore */ }
       loadedRef.current = true;
       return;
     }
