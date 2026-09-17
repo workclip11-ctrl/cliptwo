@@ -44,16 +44,14 @@ export default function ClipperPage() {
   );
 
   return (
-    <div className="mx-auto max-w-[1120px] space-y-8 px-5 py-10 sm:px-8">
-      {/* ─────────────────────────────────────────────
-          1. WELCOME / ACTION HEADER
-      ───────────────────────────────────────────── */}
+    <div className="mx-auto max-w-[1120px] space-y-12 px-5 py-10 sm:px-8">
+      {/* ── Header ──────────────────────────────────────── */}
       <section className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-[24px] font-bold leading-tight tracking-tight sm:text-[28px]">
+          <h1 className="text-[28px] font-bold leading-tight tracking-tight sm:text-[32px]">
             Welcome back, @{user?.name ?? user?.email ?? "clipper"}
           </h1>
-          <p className="mt-2 max-w-lg text-[14px] leading-relaxed text-muted sm:text-[15px]">
+          <p className="mt-2 max-w-lg text-[15px] leading-relaxed text-muted">
             Find campaigns worth clipping and turn views into earnings.
           </p>
         </div>
@@ -69,12 +67,10 @@ export default function ClipperPage() {
         </Link>
       </section>
 
-      {/* ─────────────────────────────────────────────
-          2. EARNINGS OVERVIEW
-      ───────────────────────────────────────────── */}
+      {/* ── Earnings overview ───────────────────────────── */}
       <section>
-        <div className="rounded-xl border bg-card px-4 py-5 sm:px-8 sm:py-7">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+        <div className="rounded-[14px] border bg-card px-5 py-6 sm:px-8 sm:py-7">
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
             {/* Total earnings — dominant */}
             <div>
               <p className="text-[13px] font-medium text-muted">
@@ -90,7 +86,7 @@ export default function ClipperPage() {
               )}
             </div>
 
-            {/* Breakdown — typography-based, no boxes */}
+            {/* Breakdown */}
             <div className="flex flex-wrap gap-x-6 gap-y-3 sm:gap-x-10 sm:gap-y-4">
               <Link
                 href="/clipper/wallet"
@@ -133,9 +129,7 @@ export default function ClipperPage() {
         </div>
       </section>
 
-      {/* ─────────────────────────────────────────────
-          3. CAMPAIGNS WORTH CLIPPING
-      ───────────────────────────────────────────── */}
+      {/* ── Campaigns worth clipping ────────────────────── */}
       <section>
         <div className="mb-6 flex items-baseline justify-between">
           <div>
@@ -175,9 +169,7 @@ export default function ClipperPage() {
         )}
       </section>
 
-      {/* ─────────────────────────────────────────────
-          4. MY CLIPS
-      ───────────────────────────────────────────── */}
+      {/* ── My clips ────────────────────────────────────── */}
       <section>
         <div className="mb-5 flex items-baseline justify-between">
           <h2 className="text-[20px] font-bold tracking-tight">My clips</h2>
@@ -211,7 +203,7 @@ export default function ClipperPage() {
                   className="group flex items-center gap-4 py-3.5 transition-colors duration-150 sm:gap-5"
                 >
                   {/* Thumbnail */}
-                  <div className="h-[52px] w-[80px] shrink-0 overflow-hidden rounded-lg bg-accent-soft">
+                  <div className="h-[52px] w-[80px] shrink-0 overflow-hidden rounded-[10px] bg-accent-soft">
                     {thumb ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img
@@ -278,15 +270,13 @@ export default function ClipperPage() {
         )}
       </section>
 
-      {/* ─────────────────────────────────────────────
-          5. PERFORMANCE
-      ───────────────────────────────────────────── */}
+      {/* ── Performance ─────────────────────────────────── */}
       <section>
         <h2 className="mb-5 text-[20px] font-bold tracking-tight">
           Performance
         </h2>
         {myClips.length === 0 ? (
-          <div className="rounded-xl border border-dashed bg-card py-12 text-center">
+          <div className="rounded-[14px] border border-dashed bg-card py-12 text-center">
             <p className="text-[15px] font-medium">No performance data yet</p>
             <p className="mt-1.5 text-[13px] text-muted">
               Submit your first clip to start tracking views.
@@ -302,7 +292,7 @@ export default function ClipperPage() {
               const earning = (finRec?.netAmount ?? 0) / 100;
               return (
                 <div key={k.id} className="flex items-center gap-3.5 py-3 sm:gap-4">
-                  <div className="h-10 w-14 shrink-0 overflow-hidden rounded-lg bg-accent-soft">
+                  <div className="h-10 w-14 shrink-0 overflow-hidden rounded-[10px] bg-accent-soft">
                     {thumb ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img
@@ -354,9 +344,7 @@ export default function ClipperPage() {
         )}
       </section>
 
-      {/* ─────────────────────────────────────────────
-          6. QUICK ACTION AREA
-      ───────────────────────────────────────────── */}
+      {/* ── Quick actions ───────────────────────────────── */}
       <section className="border-t border-border/60 pt-8">
         <div className="flex flex-col gap-6 sm:flex-row sm:gap-10">
           {/* Connected Accounts */}
@@ -365,7 +353,7 @@ export default function ClipperPage() {
               Connected accounts
             </h3>
             {myAccounts.length === 0 ? (
-              <div className="flex items-center justify-between rounded-lg border border-dashed px-4 py-3">
+              <div className="flex items-center justify-between rounded-[10px] border border-dashed px-4 py-3">
                 <span className="text-[13px] text-muted">
                   No accounts connected
                 </span>
@@ -381,7 +369,7 @@ export default function ClipperPage() {
                 {myAccounts.map((a) => (
                   <div
                     key={a.id}
-                    className="flex items-center justify-between rounded-lg px-3 py-2 transition-colors duration-150 hover:bg-accent-soft/50"
+                    className="flex items-center justify-between rounded-[10px] px-3 py-2 transition-colors duration-150 hover:bg-accent-soft/50"
                   >
                     <span className="flex items-center gap-2">
                       <PlatformIcon p={a.platform} size={14} />
@@ -410,7 +398,7 @@ export default function ClipperPage() {
                 ))}
                 <Link
                   href="/clipper/accounts"
-                  className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-[13px] font-medium transition-colors duration-150 hover:bg-accent-soft"
+                  className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-[10px] border px-3 py-2 text-[13px] font-medium transition-colors duration-150 hover:bg-accent-soft"
                 >
                   Manage accounts <ArrowRight size={11} />
                 </Link>
@@ -433,7 +421,7 @@ export default function ClipperPage() {
             </div>
             <Link
               href="/clipper/wallet"
-              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-[13px] font-medium transition-colors duration-150 hover:bg-accent-soft"
+              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-[10px] border px-3 py-2 text-[13px] font-medium transition-colors duration-150 hover:bg-accent-soft"
             >
               View wallet <ArrowRight size={11} />
             </Link>
@@ -445,7 +433,7 @@ export default function ClipperPage() {
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
-   Campaign Card — large, premium, media-first
+   Campaign Card
    ──────────────────────────────────────────────────────────────────────────── */
 
 function CampaignCardLarge({
@@ -465,7 +453,7 @@ function CampaignCardLarge({
   ).size;
 
   return (
-    <div className="group relative flex flex-col overflow-hidden rounded-xl border bg-card transition-all duration-200 hover:border-foreground/12 hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
+    <div className="group relative flex flex-col overflow-hidden rounded-[14px] border bg-card transition-all duration-200 hover:border-foreground/12 hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)]">
       {/* Thumbnail */}
       <div className="relative aspect-[16/9] w-full overflow-hidden bg-accent-soft">
         {thumb ? (
@@ -480,14 +468,14 @@ function CampaignCardLarge({
             <PlatformIcon p={campaign.platform} size={28} />
           </div>
         )}
-        {/* Platform badge — only one */}
+        {/* Platform badge */}
         <div className="absolute left-3 top-3 z-10">
-          <span className="inline-flex items-center gap-1.5 rounded-lg bg-card/90 px-3 py-1.5 text-[12px] font-medium text-foreground shadow-sm backdrop-blur">
+          <span className="inline-flex items-center gap-1.5 rounded-[10px] bg-card/90 px-3 py-1.5 text-[12px] font-medium text-foreground shadow-sm backdrop-blur">
             <PlatformIcon p={campaign.platform} size={13} />
             {campaign.platform}
           </span>
         </div>
-        {/* Save — independent button, not nested in Link */}
+        {/* Save button */}
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -499,7 +487,7 @@ function CampaignCardLarge({
         >
           <HeartIcon saved={isSaved} />
         </button>
-        {/* Link overlay — covers entire thumbnail */}
+        {/* Link overlay */}
         <Link
           href={`/campaigns/${campaign.id}`}
           aria-label={campaign.title}
@@ -509,13 +497,12 @@ function CampaignCardLarge({
 
       {/* Content */}
       <div className="flex flex-1 flex-col p-5">
-        {/* Title + creator */}
         <h3 className="line-clamp-2 text-[17px] font-semibold leading-snug group-hover:underline underline-offset-2">
           {campaign.title}
         </h3>
         <p className="mt-1.5 text-[14px] text-muted">by {campaign.creator}</p>
 
-        {/* Payout — dominant */}
+        {/* Payout */}
         <div className="mt-4 flex items-baseline gap-1.5">
           <span className="font-mono text-[22px] font-bold tracking-tight">
             {rup(campaign.payout)}
@@ -528,11 +515,10 @@ function CampaignCardLarge({
           <span>
             {remaining > 0 ? `${rup(remaining)} left` : "Flexible budget"}
           </span>
-          <span className="text-border">·</span>
+          <span className="text-border">&middot;</span>
           <span>{campaign.daysLeft}d left</span>
         </div>
 
-        {/* Spacer */}
         <div className="flex-1" />
 
         {/* CTA */}
@@ -554,7 +540,7 @@ function CampaignCardLarge({
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
-   Heart Icon — simple, no library needed
+   Heart Icon
    ──────────────────────────────────────────────────────────────────────────── */
 
 function HeartIcon({ saved }: { saved: boolean }) {
@@ -581,7 +567,7 @@ function HeartIcon({ saved }: { saved: boolean }) {
 
 function EmptyCampaigns({ onBrowse }: { onBrowse: () => void }) {
   return (
-    <div className="rounded-xl border border-dashed bg-card px-6 py-14 text-center">
+    <div className="rounded-[14px] border border-dashed bg-card px-6 py-14 text-center">
       <Megaphone className="mx-auto text-muted" size={28} strokeWidth={1.5} />
       <p className="mt-5 text-[17px] font-medium">
         No campaigns available right now
@@ -601,7 +587,7 @@ function EmptyCampaigns({ onBrowse }: { onBrowse: () => void }) {
 
 function EmptySubmissions({ onBrowse }: { onBrowse: () => void }) {
   return (
-    <div className="rounded-xl border border-dashed bg-card px-6 py-14 text-center">
+    <div className="rounded-[14px] border border-dashed bg-card px-6 py-14 text-center">
       <Film className="mx-auto text-muted" size={28} strokeWidth={1.5} />
       <p className="mt-5 text-[17px] font-medium">No clips yet</p>
       <p className="mt-1.5 text-[13px] text-muted">

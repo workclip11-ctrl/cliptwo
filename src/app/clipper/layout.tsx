@@ -76,7 +76,7 @@ export default function ClipperLayout({ children }: { children: ReactNode }) {
                         <Link
                           key={n.href}
                           href={n.href}
-                          className={`flex items-center gap-2 px-1.5 py-[6px] text-[15px] transition-colors duration-150 ${
+                          className={`flex items-center gap-2 rounded-[10px] px-2.5 py-[6px] text-[15px] transition-colors duration-150 ${
                             active
                               ? "bg-accent-soft text-foreground font-semibold"
                               : "text-muted hover:text-foreground"

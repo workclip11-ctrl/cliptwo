@@ -8,6 +8,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { StatusPill } from "@/components/StatusPill";
+import { PlatformIcon } from "@/components/PlatformIcon";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
@@ -89,54 +90,66 @@ export default function AdminDashboard() {
     .slice(0, 5);
 
   return (
-    <div className="space-y-12">
+    <div className="mx-auto max-w-[1120px] space-y-12 px-5 py-10 sm:px-8">
       {/* ── Header ──────────────────────────────────────── */}
-      <div>
-        <h1 className="text-[28px] font-bold tracking-tight sm:text-[30px]">
+      <section>
+        <h1 className="text-[28px] font-bold leading-tight tracking-tight sm:text-[32px]">
           Operations
         </h1>
-        <p className="mt-2 text-[15px] text-muted">
+        <p className="mt-2 max-w-lg text-[15px] leading-relaxed text-muted">
           ClipTwo activity, review queues, payouts, and campaign health.
         </p>
-      </div>
+      </section>
 
-      {/* ── Primary metric + supporting ─────────────────── */}
+      {/* ── Primary metric ──────────────────────────────── */}
       <section>
-        <p className="mb-2 text-[13px] font-medium text-muted">
-          Pending review
-        </p>
-        <p className="font-mono text-[36px] font-bold tracking-tight leading-none">
-          {pendingCount}
-        </p>
-        <p className="mt-2 text-[14px] text-muted">
-          Clips awaiting an approve / reject decision
-        </p>
+        <div className="rounded-[14px] border bg-card px-5 py-6 sm:px-8 sm:py-7">
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-[13px] font-medium text-muted">
+                Pending review
+              </p>
+              <p className="mt-2 font-mono text-[32px] font-bold leading-none tracking-tight">
+                {pendingCount}
+              </p>
+              <p className="mt-1.5 text-[13px] text-muted">
+                Clips awaiting an approve / reject decision
+              </p>
+            </div>
 
-        <div className="mt-6 flex flex-wrap items-baseline gap-x-8 gap-y-2 text-[14px]">
-          <span>
-            <span className="text-muted">Clippers </span>
-            <span className="font-medium">{clippers.length}</span>
-          </span>
-          <span>
-            <span className="text-muted">Creators </span>
-            <span className="font-medium">{creators.length}</span>
-          </span>
-          <span>
-            <span className="text-muted">Paid out </span>
-            <span className="font-medium">{rup(paidOut)}</span>
-          </span>
+            <div className="flex flex-wrap gap-x-10 gap-y-4">
+              <div className="min-w-[100px]">
+                <p className="text-[13px] text-muted">Clippers</p>
+                <p className="mt-1 font-mono text-lg font-bold">
+                  {clippers.length}
+                </p>
+              </div>
+              <div className="min-w-[100px]">
+                <p className="text-[13px] text-muted">Creators</p>
+                <p className="mt-1 font-mono text-lg font-bold">
+                  {creators.length}
+                </p>
+              </div>
+              <div className="min-w-[100px]">
+                <p className="text-[13px] text-muted">Paid out</p>
+                <p className="mt-1 font-mono text-lg font-bold text-green">
+                  {rup(paidOut)}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* ── Review + payout queues ──────────────────────── */}
+      {/* ── Action queues ───────────────────────────────── */}
       <section>
-        <h2 className="mb-5 text-[18px] font-bold tracking-tight">
+        <h2 className="mb-5 text-[20px] font-bold tracking-tight">
           Action queues
         </h2>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-3">
           <Link
             href="/admin/clips?filter=pending"
-            className="group cursor-pointer rounded-[12px] border border-border/40 bg-card p-5 transition-colors duration-150 hover:border-foreground/20"
+            className="group rounded-[14px] border border-border/40 bg-card p-5 transition-colors duration-150 hover:border-foreground/20"
           >
             <div className="flex items-center justify-between">
               <p className="text-[13px] font-medium text-muted">
@@ -147,7 +160,7 @@ export default function AdminDashboard() {
                 className="text-muted transition-transform duration-200 group-hover:translate-x-0.5"
               />
             </div>
-            <p className="mt-2 font-mono text-[24px] font-bold tracking-tight">
+            <p className="mt-3 font-mono text-[24px] font-bold tracking-tight">
               {pendingCount}
             </p>
             <p className="mt-1 text-[13px] text-muted">
@@ -157,7 +170,7 @@ export default function AdminDashboard() {
 
           <Link
             href="/admin/clips?filter=payable"
-            className="group cursor-pointer rounded-[12px] border border-border/40 bg-card p-5 transition-colors duration-150 hover:border-foreground/20"
+            className="group rounded-[14px] border border-border/40 bg-card p-5 transition-colors duration-150 hover:border-foreground/20"
           >
             <div className="flex items-center justify-between">
               <p className="text-[13px] font-medium text-muted">
@@ -168,7 +181,7 @@ export default function AdminDashboard() {
                 className="text-muted transition-transform duration-200 group-hover:translate-x-0.5"
               />
             </div>
-            <p className="mt-2 font-mono text-[24px] font-bold tracking-tight text-amber">
+            <p className="mt-3 font-mono text-[24px] font-bold tracking-tight text-amber">
               {rup(payable)}
             </p>
             <p className="mt-1 text-[13px] text-muted">
@@ -178,7 +191,7 @@ export default function AdminDashboard() {
 
           <Link
             href="/admin/clips?filter=paid"
-            className="group cursor-pointer rounded-[12px] border border-border/40 bg-card p-5 transition-colors duration-150 hover:border-foreground/20"
+            className="group rounded-[14px] border border-border/40 bg-card p-5 transition-colors duration-150 hover:border-foreground/20"
           >
             <div className="flex items-center justify-between">
               <p className="text-[13px] font-medium text-muted">
@@ -189,7 +202,7 @@ export default function AdminDashboard() {
                 className="text-muted transition-transform duration-200 group-hover:translate-x-0.5"
               />
             </div>
-            <p className="mt-2 font-mono text-[24px] font-bold tracking-tight text-green">
+            <p className="mt-3 font-mono text-[24px] font-bold tracking-tight text-green">
               {rup(paidOut)}
             </p>
             <p className="mt-1 text-[13px] text-muted">
@@ -201,7 +214,7 @@ export default function AdminDashboard() {
 
       {/* ── Metrics sync ────────────────────────────────── */}
       <section>
-        <div className="rounded-[12px] border border-border/40 bg-card px-5 py-4">
+        <div className="rounded-[14px] border border-border/40 bg-card px-5 py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-[14px] font-medium">Metrics sync</p>
@@ -212,24 +225,24 @@ export default function AdminDashboard() {
             <button
               onClick={triggerSync}
               disabled={syncing}
-              className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[8px] border border-border/60 px-3.5 text-[13px] font-medium text-muted transition-colors duration-150 hover:border-foreground/20 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 sm:h-11"
+              className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[10px] border border-border/60 px-3.5 text-[13px] font-medium text-muted transition-colors duration-150 hover:border-foreground/20 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 sm:h-11"
             >
               {syncing ? (
                 <Loader2 size={13} className="animate-spin" />
               ) : (
                 <RefreshCw size={13} />
               )}
-              {syncing ? "Syncing…" : "Sync now"}
+              {syncing ? "Syncing\u2026" : "Sync now"}
             </button>
           </div>
           {syncResult && (
-            <div className="mt-3 rounded-[8px] border border-border/40 bg-background px-4 py-3 text-[13px]">
+            <div className="mt-3 rounded-[10px] border border-border/40 bg-background px-4 py-3 text-[13px]">
               <p>
                 Processed{" "}
                 <span className="font-mono font-medium">
                   {syncResult.processed}
                 </span>{" "}
-                clips —{" "}
+                clips &mdash;{" "}
                 <span className="font-mono text-green">
                   {syncResult.synced} updated
                 </span>
@@ -252,10 +265,10 @@ export default function AdminDashboard() {
 
       {/* ── Clip status + operational info ───────────────── */}
       <section>
-        <h2 className="mb-5 text-[18px] font-bold tracking-tight">
-          Clip status
+        <h2 className="mb-5 text-[20px] font-bold tracking-tight">
+          Platform overview
         </h2>
-        <div className="rounded-[12px] border border-border/40 bg-card p-5">
+        <div className="rounded-[14px] border border-border/40 bg-card p-5 sm:p-6">
           {/* Status breakdown */}
           <div className="flex flex-wrap gap-x-8 gap-y-3 text-[14px]">
             <span>
@@ -276,7 +289,6 @@ export default function AdminDashboard() {
             </span>
           </div>
 
-          {/* Divider */}
           <div className="my-4 border-t border-border/40" />
 
           {/* Operational info */}
@@ -308,15 +320,19 @@ export default function AdminDashboard() {
       {/* ── Recent clips ────────────────────────────────── */}
       <section>
         <div className="mb-5 flex items-baseline justify-between">
-          <h2 className="text-[18px] font-bold tracking-tight">Recent clips</h2>
+          <h2 className="text-[20px] font-bold tracking-tight">Recent clips</h2>
           <Link
             href="/admin/clips"
-            className="cursor-pointer text-[13px] font-medium text-muted transition-colors hover:text-foreground"
+            className="group inline-flex items-center gap-1.5 text-[13px] font-medium text-muted transition-colors hover:text-foreground"
           >
             View all
+            <ArrowRight
+              size={13}
+              className="transition-transform duration-200 group-hover:translate-x-0.5"
+            />
           </Link>
         </div>
-        <div className="divide-y divide-border/40 rounded-[12px] border border-border/40 bg-card">
+        <div className="divide-y divide-border/40 rounded-[14px] border border-border/40 bg-card">
           {recentClips.length === 0 ? (
             <p className="px-5 py-8 text-center text-[14px] text-muted">
               No clips yet.
@@ -324,12 +340,33 @@ export default function AdminDashboard() {
           ) : (
             recentClips.map((k) => {
               const c = campaigns.find((x) => x.id === k.campaignId);
+              const thumb = c?.thumbnails?.[0];
               return (
                 <div
                   key={k.id}
-                  className="flex items-center justify-between px-5 py-3.5"
+                  className="flex items-center gap-4 px-5 py-3.5"
                 >
-                  <div className="min-w-0">
+                  {/* Thumbnail */}
+                  <div className="h-10 w-14 shrink-0 overflow-hidden rounded-[10px] bg-accent-soft">
+                    {thumb ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={thumb}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <PlatformIcon
+                          p={k.platform ?? "Instagram"}
+                          size={14}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Info */}
+                  <div className="min-w-0 flex-1">
                     <p className="truncate text-[14px] font-medium">
                       @{k.clipper}
                     </p>
@@ -337,6 +374,8 @@ export default function AdminDashboard() {
                       {c?.title ?? "Campaign"}
                     </p>
                   </div>
+
+                  {/* Metrics */}
                   <div className="flex items-center gap-3">
                     <span className="font-mono text-[13px] tabular-nums">
                       {fmtViews(k.verifiedViews ?? 0)}
@@ -353,17 +392,21 @@ export default function AdminDashboard() {
       {/* ── Recent campaigns ────────────────────────────── */}
       <section>
         <div className="mb-5 flex items-baseline justify-between">
-          <h2 className="text-[18px] font-bold tracking-tight">
+          <h2 className="text-[20px] font-bold tracking-tight">
             Recent campaigns
           </h2>
           <Link
             href="/admin/campaigns"
-            className="cursor-pointer text-[13px] font-medium text-muted transition-colors hover:text-foreground"
+            className="group inline-flex items-center gap-1.5 text-[13px] font-medium text-muted transition-colors hover:text-foreground"
           >
             View all
+            <ArrowRight
+              size={13}
+              className="transition-transform duration-200 group-hover:translate-x-0.5"
+            />
           </Link>
         </div>
-        <div className="divide-y divide-border/40 rounded-[12px] border border-border/40 bg-card">
+        <div className="divide-y divide-border/40 rounded-[14px] border border-border/40 bg-card">
           {recentCampaigns.length === 0 ? (
             <p className="px-5 py-8 text-center text-[14px] text-muted">
               No campaigns yet.
@@ -372,12 +415,30 @@ export default function AdminDashboard() {
             recentCampaigns.map((c) => (
               <div
                 key={c.id}
-                className="flex items-center justify-between px-5 py-3.5"
+                className="flex items-center gap-4 px-5 py-3.5"
               >
-                <div className="min-w-0">
+                {/* Thumbnail */}
+                <div className="h-10 w-14 shrink-0 overflow-hidden rounded-[10px] bg-accent-soft">
+                  {c.thumbnails?.[0] ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={c.thumbnails[0]}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center">
+                      <PlatformIcon p={c.platform} size={14} />
+                    </div>
+                  )}
+                </div>
+
+                {/* Info */}
+                <div className="min-w-0 flex-1">
                   <p className="truncate text-[14px] font-medium">{c.title}</p>
                   <p className="truncate text-[13px] text-muted">{c.creator}</p>
                 </div>
+
                 <StatusPill status={c.status} />
               </div>
             ))

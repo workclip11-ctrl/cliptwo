@@ -46,8 +46,8 @@ export default function CreatorPage() {
     .slice(0, 5);
 
   return (
-    <div className="mx-auto max-w-[1120px] space-y-8 px-5 py-10 sm:px-8">
-      {/* ── Header / Action Area ────────────────────────── */}
+    <div className="mx-auto max-w-[1120px] space-y-12 px-5 py-10 sm:px-8">
+      {/* ── Header ──────────────────────────────────────── */}
       <section className="flex flex-wrap items-end justify-between gap-6">
         <div>
           <h1 className="text-[28px] font-bold leading-tight tracking-tight sm:text-[32px]">
@@ -79,9 +79,9 @@ export default function CreatorPage() {
         </div>
       </section>
 
-      {/* ── Campaign Overview ───────────────────────────── */}
+      {/* ── Campaign overview ───────────────────────────── */}
       <section>
-        <div className="rounded-[12px] border bg-card px-6 py-6 sm:px-8 sm:py-7">
+        <div className="rounded-[14px] border bg-card px-5 py-6 sm:px-8 sm:py-7">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
             {/* Dominant: active campaigns */}
             <div>
@@ -125,7 +125,7 @@ export default function CreatorPage() {
         </div>
       </section>
 
-      {/* ── Recent Campaigns + Pending Review ────────────── */}
+      {/* ── Recent campaigns + pending review ────────────── */}
       <div className="grid gap-10 lg:grid-cols-2">
         {/* Recent campaigns */}
         <section>
@@ -157,7 +157,7 @@ export default function CreatorPage() {
               />
             ))}
             {myCampaigns.length === 0 && (
-              <div className="rounded-[12px] border border-dashed bg-card py-12 text-center">
+              <div className="rounded-[14px] border border-dashed bg-card py-12 text-center">
                 <p className="text-[16px] font-medium">No campaigns yet</p>
                 <p className="mt-2 text-[14px] text-muted">
                   Create your first campaign to start receiving clips.
@@ -203,7 +203,7 @@ export default function CreatorPage() {
                   className="group flex items-center gap-3.5 py-3.5 transition-colors duration-150 sm:gap-4"
                 >
                   {/* Thumbnail */}
-                  <div className="h-10 w-14 shrink-0 overflow-hidden rounded-lg bg-accent-soft">
+                  <div className="h-10 w-14 shrink-0 overflow-hidden rounded-[10px] bg-accent-soft">
                     {thumb ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img
@@ -216,7 +216,6 @@ export default function CreatorPage() {
                         <PlatformIcon
                           p={k.platform ?? "Instagram"}
                           size={14}
-
                         />
                       </div>
                     )}
@@ -242,7 +241,7 @@ export default function CreatorPage() {
               );
             })}
             {pending.length === 0 && (
-              <div className="rounded-[12px] border border-dashed bg-card py-12 text-center">
+              <div className="rounded-[14px] border border-dashed bg-card py-12 text-center">
                 <p className="text-[16px] font-medium">
                   Nothing pending
                 </p>
@@ -255,13 +254,13 @@ export default function CreatorPage() {
         </section>
       </div>
 
-      {/* ── Top Clips / Performance ──────────────────────── */}
+      {/* ── Best performing content ──────────────────────── */}
       <section>
         <h2 className="mb-5 text-[20px] font-bold tracking-tight">
           Best performing content
         </h2>
         {topClips.length === 0 ? (
-          <div className="rounded-[12px] border border-dashed bg-card py-12 text-center">
+          <div className="rounded-[14px] border border-dashed bg-card py-12 text-center">
             <p className="text-[16px] font-medium">No earned clips yet</p>
             <p className="mt-2 text-[14px] text-muted">
               Approved clips will appear here.
@@ -286,7 +285,7 @@ export default function CreatorPage() {
                   </span>
 
                   {/* Thumbnail */}
-                  <div className="h-10 w-14 shrink-0 overflow-hidden rounded-lg bg-accent-soft">
+                  <div className="h-10 w-14 shrink-0 overflow-hidden rounded-[10px] bg-accent-soft">
                     {thumb ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img
@@ -299,7 +298,6 @@ export default function CreatorPage() {
                         <PlatformIcon
                           p={k.platform ?? "Instagram"}
                           size={14}
-
                         />
                       </div>
                     )}
@@ -337,12 +335,12 @@ export default function CreatorPage() {
         )}
       </section>
 
-      {/* ── Payout / Spend Summary ───────────────────────── */}
+      {/* ── Spend summary ────────────────────────────────── */}
       <section>
         <h2 className="mb-5 text-[20px] font-bold tracking-tight">
           Spend summary
         </h2>
-        <div className="rounded-[12px] border bg-card px-6 py-6 sm:px-8">
+        <div className="rounded-[14px] border bg-card px-5 py-6 sm:px-8">
           <div className="flex flex-wrap gap-x-12 gap-y-6">
             <div>
               <p className="text-[13px] text-muted">Total earned</p>
@@ -426,7 +424,7 @@ export default function CreatorPage() {
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
-   Campaign Row — compact media/project object
+   Campaign Row
    ──────────────────────────────────────────────────────────────────────────── */
 
 function CampaignRow({
@@ -453,12 +451,12 @@ function CampaignRow({
     <button
       type="button"
       onClick={onOpen}
-      className={`group flex w-full items-center gap-4 rounded-[12px] border bg-card p-4 text-left transition-all duration-150 hover:border-foreground/12 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)] sm:p-5 ${
+      className={`group flex w-full items-center gap-4 rounded-[14px] border bg-card p-4 text-left transition-all duration-150 hover:border-foreground/12 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)] sm:p-5 ${
         isArchived ? "opacity-60" : ""
       }`}
     >
       {/* Thumbnail */}
-      <div className="h-[52px] w-[80px] shrink-0 overflow-hidden rounded-lg bg-accent-soft">
+      <div className="h-[52px] w-[80px] shrink-0 overflow-hidden rounded-[10px] bg-accent-soft">
         {thumb ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
@@ -492,7 +490,7 @@ function CampaignRow({
           </span>
         </div>
         <p className="mt-1 text-[13px] text-muted">
-          {c.niche} · {c.platform}
+          {c.niche} &middot; {c.platform}
         </p>
 
         {/* Budget bar */}
@@ -505,13 +503,13 @@ function CampaignRow({
               />
             </div>
             <p className="mt-1 text-[12px] text-muted">
-              {campClips.length} clips · {c.daysLeft}d left · {rup(spent)}{" "}
+              {campClips.length} clips &middot; {c.daysLeft}d left &middot; {rup(spent)}{" "}
               spent
             </p>
           </div>
         ) : (
           <p className="mt-2 text-[12px] text-muted">
-            {campClips.length} clips · {c.daysLeft}d left
+            {campClips.length} clips &middot; {c.daysLeft}d left
           </p>
         )}
       </div>
@@ -563,7 +561,7 @@ function CampaignDetailModal({
           <div className="min-w-0">
             <h3 className="text-[18px] font-semibold">{campaign.title}</h3>
             <p className="mt-0.5 text-[13px] text-muted">
-              {campaign.creator} · {campaign.niche} · {campaign.platform}
+              {campaign.creator} &middot; {campaign.niche} &middot; {campaign.platform}
             </p>
           </div>
           <span
@@ -583,7 +581,7 @@ function CampaignDetailModal({
             <img
               src={campaign.thumbnails[0]}
               alt=""
-              className="mt-3 h-24 w-40 rounded-lg border object-cover"
+              className="mt-3 h-24 w-40 rounded-[10px] border object-cover"
             />
           )}
 
