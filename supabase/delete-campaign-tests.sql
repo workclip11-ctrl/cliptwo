@@ -396,12 +396,16 @@ DO $$
 DECLARE
   v_id uuid;
   v_clips integer;
-  v_records integer;
+  v_payment text;
 BEGIN
   SELECT id INTO v_id
   FROM public.campaigns
   WHERE title = 'Delete Test 10 - Cascade'
     AND created_by = 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid;
+
+  -- Safety: ensure campaign is in expected state
+  SELECT launch_payment_status INTO v_payment FROM public.campaigns WHERE id = v_id;
+  ASSERT v_payment = 'pending', 'TEST 10 FAIL: expected pending payment, got ' || v_payment;
 
   -- Insert a fake clip + financial record
   INSERT INTO public.clips (id, campaign_id, creator_id, clippers, title, source, platform, status, submitted_at)
