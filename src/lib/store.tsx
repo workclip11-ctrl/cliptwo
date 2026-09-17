@@ -74,6 +74,7 @@ interface StoreActions {
   publishCampaign: (id: string, reason?: string) => Promise<void>;
   adjustBudget: (id: string, newBudget: number, reason?: string) => Promise<void>;
   deleteCampaign: (id: string) => void;
+  hardDeleteCampaign: (id: string) => Promise<void>;
   updateCampaign: (
     id: string,
     patch: Partial<Campaign>,
@@ -1081,6 +1082,35 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               ? { ...c, status: "archived" as const, archived_at: new Date().toISOString(), archived_by: me?.id }
               : c,
           ),
+        }));
+      },
+
+      hardDeleteCampaign: async (id) => {
+        const me = await getCurrentUser();
+        if (!me) {
+          setState((s) => ({ ...s, lastError: "Not authenticated" }));
+          return;
+        }
+        if (!isSupabaseConfigured) {
+          // Local dev: remove from state
+          setState((s) => ({
+            ...s,
+            campaigns: s.campaigns.filter((c) => c.id !== id),
+          }));
+          return;
+        }
+        const { error } = await supabase.rpc("delete_campaign", {
+          p_campaign_id: id,
+        });
+        if (error) {
+          console.error("RPC delete_campaign failed:", error.message);
+          setState((s) => ({ ...s, lastError: `Failed to delete campaign: ${error.message}` }));
+          return;
+        }
+        // Remove from local state
+        setState((s) => ({
+          ...s,
+          campaigns: s.campaigns.filter((c) => c.id !== id),
         }));
       },
 

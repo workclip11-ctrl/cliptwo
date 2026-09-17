@@ -294,5 +294,77 @@ $$;
 grant execute on function public.campaign_action(uuid, text, text) to authenticated;
 
 -- ============================================================================
+-- DELETE CAMPAIGN — Creator hard-delete for draft/closed campaigns only
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION public.delete_campaign(
+  p_campaign_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_actor uuid;
+  v_campaign record;
+begin
+  v_actor := auth.uid();
+  if v_actor is null then raise exception 'Not authenticated'; end if;
+
+  select * into v_campaign from public.campaigns where id = p_campaign_id;
+  if not found then raise exception 'Campaign not found'; end if;
+
+  -- Authorization: only the campaign owner can delete
+  if v_campaign.created_by is null or v_campaign.created_by != v_actor then
+    raise exception 'Only the campaign owner can delete this campaign';
+  end if;
+
+  -- Active creator enforcement
+  if not exists (
+    select 1 from public.profiles
+    where id = v_actor and role = 'creator' and status = 'active'
+  ) then
+    raise exception 'Only active creators can delete campaigns';
+  end if;
+
+  -- Status restriction: only draft or closed
+  if v_campaign.status not in ('draft', 'closed') then
+    raise exception 'Can only delete a draft or closed campaign (current: %)', v_campaign.status;
+  end if;
+
+  -- Payment safety: reject if launch payment was verified
+  if v_campaign.launch_payment_status = 'verified' then
+    raise exception 'Cannot delete a campaign with a verified launch payment. Archive it instead.';
+  end if;
+
+  -- Perform hard delete (child records cascade via FK)
+  delete from public.campaigns where id = p_campaign_id;
+
+  -- Write audit log directly (security definer bypasses RLS)
+  insert into public.audit_logs (
+    id, actor_id, actor, action, entity_type, entity_id, entity_label,
+    before_state, after_state, metadata, idempotency_key
+  ) values (
+    'audit-' || extract(epoch from now())::bigint || '-' || upper(md5(random()::text)),
+    v_actor,
+    coalesce((select email from public.profiles where id = v_actor), 'unknown'),
+    'campaign_delete',
+    'campaign',
+    p_campaign_id::text,
+    v_campaign.title,
+    jsonb_build_object('status', v_campaign.status, 'title', v_campaign.title),
+    null,
+    jsonb_build_object('action', 'delete', 'actor_type', 'owner'),
+    'campaign-' || p_campaign_id::text || '-delete-' || extract(epoch from now())::bigint
+  );
+
+  return jsonb_build_object('success', true, 'action', 'delete', 'campaign_id', p_campaign_id);
+end;
+$$;
+
+grant execute on function public.delete_campaign(uuid) to authenticated;
+
+-- ============================================================================
 -- END PHASE 1
 -- ============================================================================

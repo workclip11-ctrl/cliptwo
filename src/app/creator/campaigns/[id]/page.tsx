@@ -19,6 +19,7 @@ import {
   Send,
   Calendar,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
@@ -72,6 +73,7 @@ export default function CreatorCampaignDetailPage() {
     reopenCampaign,
     publishCampaign,
     adjustBudget,
+    hardDeleteCampaign,
   } = useStore();
   const { user } = useAuth();
   const [editing, setEditing] = useState(false);
@@ -81,6 +83,7 @@ export default function CreatorCampaignDetailPage() {
   const [ending, setEnding] = useState(false);
   const [reopening, setReopening] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [resolvedSourceAssets, setResolvedSourceAssets] = useState<CampaignSourceAsset[]>([]);
   const [resolvedBrandAssets, setResolvedBrandAssets] = useState<CampaignSourceAsset[]>([]);
   const [resolvedThumbnails, setResolvedThumbnails] = useState<string[]>([]);
@@ -212,6 +215,16 @@ export default function CreatorCampaignDetailPage() {
     publishCampaign(camp.id, "Published by creator").finally(() =>
       setPublishing(false),
     );
+  };
+  const handleDelete = () => {
+    if (
+      !confirm(
+        "Permanently delete this campaign? This action cannot be undone.",
+      )
+    )
+      return;
+    setDeleting(true);
+    hardDeleteCampaign(camp.id).finally(() => setDeleting(false));
   };
 
   return (
@@ -387,6 +400,22 @@ export default function CreatorCampaignDetailPage() {
               <Ban size={16} />
             )}{" "}
             End
+          </button>
+        )}
+
+        {/* Delete — only for draft or closed */}
+        {(isDraft || isClosed) && (
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="inline-flex h-10 items-center gap-2 rounded-[10px] border border-red/30 px-4 text-[13px] font-medium text-red transition-colors duration-150 hover:bg-red/5 disabled:opacity-50 disabled:cursor-not-allowed sm:h-11 sm:px-5 sm:text-[14px]"
+          >
+            {deleting ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Trash2 size={16} />
+            )}{" "}
+            Delete
           </button>
         )}
       </section>
