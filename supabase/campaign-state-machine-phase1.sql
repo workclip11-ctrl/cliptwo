@@ -328,14 +328,14 @@ begin
     raise exception 'Only active creators can delete campaigns';
   end if;
 
-  -- Status restriction: only draft or closed
-  if v_campaign.status not in ('draft', 'closed') then
-    raise exception 'Can only delete a draft or closed campaign (current: %)', v_campaign.status;
-  end if;
-
   -- Payment safety: reject if launch payment was verified AND campaign is still open
   if v_campaign.status = 'open' and v_campaign.launch_payment_status = 'verified' then
     raise exception 'Cannot delete an open campaign with a verified launch payment. Close it first or archive it.';
+  end if;
+
+  -- Status restriction: only draft or closed
+  if v_campaign.status not in ('draft', 'closed') then
+    raise exception 'Can only delete a draft or closed campaign (current: %)', v_campaign.status;
   end if;
 
   -- Perform hard delete (child records cascade via FK)

@@ -301,6 +301,7 @@ BEGIN
   PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
 
+  -- Campaign is open+verified. Payment check fires first.
   BEGIN
     PERFORM public.delete_campaign(v_id);
     ASSERT false, 'TEST 8 FAIL: should have raised exception';
