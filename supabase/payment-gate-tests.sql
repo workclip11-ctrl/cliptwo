@@ -100,9 +100,15 @@ BEGIN
   PERFORM set_config('role', 'authenticated', true);
   PERFORM public.campaign_action(v_id, 'pause');
 
-  -- Now set payment to submitted (unpaid) and try resume
-  UPDATE public.campaign_launch_payments SET payment_status = 'submitted' WHERE campaign_id = v_id;
-  UPDATE public.campaigns SET launch_payment_status = 'submitted' WHERE id = v_id;
+  -- Reject payment via admin RPC (sets payment_status='rejected')
+  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
+  PERFORM set_config('role', 'authenticated', true);
+  PERFORM public.reject_campaign_launch_payment(
+    (SELECT id FROM public.campaign_launch_payments WHERE campaign_id = v_id),
+    'Test unpaid resume'
+  );
+  PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+  PERFORM set_config('role', 'authenticated', true);
 
   BEGIN
     PERFORM public.campaign_action(v_id, 'resume');
@@ -179,8 +185,15 @@ BEGIN
   PERFORM set_config('role', 'authenticated', true);
   PERFORM public.campaign_action(v_id, 'close');
 
-  -- Set payment to pending (unpaid) and try reopen
-  UPDATE public.campaigns SET launch_payment_status = 'pending' WHERE id = v_id;
+  -- Reject payment via admin RPC (sets payment_status='rejected')
+  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
+  PERFORM set_config('role', 'authenticated', true);
+  PERFORM public.reject_campaign_launch_payment(
+    (SELECT id FROM public.campaign_launch_payments WHERE campaign_id = v_id),
+    'Test unpaid reopen'
+  );
+  PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+  PERFORM set_config('role', 'authenticated', true);
 
   BEGIN
     PERFORM public.campaign_action(v_id, 'reopen');
