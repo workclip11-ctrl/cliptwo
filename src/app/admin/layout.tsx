@@ -9,13 +9,12 @@ import {
   Users,
   Film,
   Megaphone,
-  Globe,
-  Server,
-  ShieldAlert,
-  History,
   Banknote,
-  CreditCard,
+  ShieldAlert,
+  BarChart3,
+  Settings,
   Menu,
+  LogOut,
 } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
 import { AdminGuard } from "@/components/AdminGuard";
@@ -23,29 +22,18 @@ import { MobileSidebar } from "@/components/MobileSidebar";
 
 const NAV_GROUPS = [
   {
-    label: "Operations",
+    label: "",
     items: [
       { href: "/admin", label: "Dashboard", icon: LayoutGrid, exact: true },
-      { href: "/admin/clips", label: "Review & payouts", icon: Film },
-      { href: "/admin/payouts", label: "Payouts", icon: Banknote },
-      { href: "/admin/campaigns", label: "Campaigns", icon: Megaphone },
-      { href: "/admin/campaigns/payments", label: "Campaign Payments", icon: CreditCard },
-    ],
-  },
-  {
-    label: "People",
-    items: [
-      { href: "/admin/clippers", label: "Clippers", icon: Users },
+      { href: "/admin/clippers", label: "Users", icon: Users },
       { href: "/admin/creators", label: "Creators", icon: Users },
-    ],
-  },
-  {
-    label: "System",
-    items: [
-      { href: "/admin/website", label: "Website", icon: Globe },
-      { href: "/admin/backend", label: "Backend", icon: Server },
-      { href: "/admin/risk", label: "Risk", icon: ShieldAlert },
-      { href: "/admin/audit", label: "Audit Log", icon: History },
+      { href: "/admin/campaigns", label: "Campaigns", icon: Megaphone },
+      { href: "/admin/clips", label: "Submissions", icon: Film },
+      { href: "/admin/payouts", label: "Payouts", icon: Banknote },
+      { href: "/admin/risk", label: "Disputes", icon: ShieldAlert },
+      { href: "/admin/audit", label: "Analytics", icon: BarChart3 },
+      { href: "/admin/website", label: "Finance", icon: Banknote },
+      { href: "/admin/backend", label: "Settings", icon: Settings },
     ],
   },
 ];
@@ -82,10 +70,12 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           <aside className="hidden w-56 shrink-0 lg:block">
             <div className="sticky top-20 space-y-6">
               {NAV_GROUPS.map((group) => (
-                <div key={group.label}>
-                  <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-widest text-muted">
-                    {group.label}
-                  </p>
+                <div key={group.label || "_root"}>
+                  {group.label && (
+                    <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-widest text-muted">
+                      {group.label}
+                    </p>
+                  )}
                   <nav className="flex flex-col">
                     {group.items.map((n) => {
                       const active =
@@ -118,6 +108,15 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                   </nav>
                 </div>
               ))}
+              <div className="border-t border-border/60 pt-4">
+                <Link
+                  href="/login"
+                  className="flex items-center gap-2 rounded-[10px] px-2.5 py-[6px] text-[15px] text-red transition-colors duration-150 hover:bg-red/5"
+                >
+                  <LogOut size={18} strokeWidth={1.5} />
+                  Log Out
+                </Link>
+              </div>
             </div>
           </aside>
           <div className="min-w-0 flex-1">{children}</div>

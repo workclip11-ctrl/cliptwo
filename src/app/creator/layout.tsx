@@ -12,6 +12,7 @@ import {
   Settings,
   BarChart3,
   Menu,
+  LogOut,
 } from "lucide-react";
 import { TopBar } from "@/components/TopBar";
 import { AuthGuard } from "@/components/AuthGuard";
@@ -19,17 +20,16 @@ import { MobileSidebar } from "@/components/MobileSidebar";
 
 const NAV = [
   { href: "/creator", label: "Dashboard", icon: LayoutGrid, exact: true },
-  { href: "/creator/campaigns", label: "Campaigns", icon: Megaphone },
-  { href: "/creator/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/creator/campaigns", label: "My Campaigns", icon: Megaphone },
   { href: "/creator/submissions", label: "Submissions", icon: Film },
+  { href: "/creator/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/creator/wallet", label: "Wallet", icon: Wallet },
   { href: "/creator/settings", label: "Settings", icon: Settings },
 ];
 
 const GROUPS = [
-  { label: "Work", items: NAV.slice(0, 4) },
-  { label: "Money", items: NAV.slice(4, 5) },
-  { label: "Account", items: NAV.slice(5, 6) },
+  { label: "", items: NAV.slice(0, 4) },
+  { label: "Account", items: NAV.slice(4, 6) },
 ];
 
 export default function CreatorLayout({ children }: { children: ReactNode }) {
@@ -62,10 +62,12 @@ export default function CreatorLayout({ children }: { children: ReactNode }) {
           <aside className="hidden w-56 shrink-0 lg:block">
             <div className="sticky top-20 space-y-6">
               {GROUPS.map((group) => (
-                <div key={group.label}>
-                  <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-widest text-muted">
-                    {group.label}
-                  </p>
+                <div key={group.label || "_root"}>
+                  {group.label && (
+                    <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-widest text-muted">
+                      {group.label}
+                    </p>
+                  )}
                   <nav className="flex flex-col">
                     {group.items.map((n) => {
                       const active = n.exact
@@ -90,6 +92,15 @@ export default function CreatorLayout({ children }: { children: ReactNode }) {
                   </nav>
                 </div>
               ))}
+              <div className="border-t border-border/60 pt-4">
+                <Link
+                  href="/login"
+                  className="flex items-center gap-2 rounded-[10px] px-2.5 py-[6px] text-[15px] text-red transition-colors duration-150 hover:bg-red/5"
+                >
+                  <LogOut size={18} strokeWidth={1.5} />
+                  Log Out
+                </Link>
+              </div>
             </div>
           </aside>
           <div className="min-w-0 flex-1">{children}</div>

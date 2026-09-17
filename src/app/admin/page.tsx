@@ -6,6 +6,10 @@ import {
   RefreshCw,
   Loader2,
   ArrowRight,
+  FileText,
+  Users,
+  AlertTriangle,
+  HeadphonesIcon,
 } from "lucide-react";
 import { StatusPill } from "@/components/StatusPill";
 import { PlatformIcon } from "@/components/PlatformIcon";
@@ -83,67 +87,52 @@ export default function AdminDashboard() {
 
   const recentClips = [...clips]
     .sort((a, b) => b.submittedAt - a.submittedAt)
-    .slice(0, 5);
+    .slice(0, 4);
   const recentCampaigns = [...campaigns]
     .sort((a, b) => b.createdAt - a.createdAt)
-    .slice(0, 5);
+    .slice(0, 4);
 
   return (
     <div className="mx-auto max-w-[1120px] space-y-10 px-5 py-10 sm:px-8">
-      {/* ── Header ──────────────────────────────────────── */}
+      {/* ── Welcome ─────────────────────────────────────── */}
       <section>
         <h1 className="text-[30px] font-bold leading-tight tracking-tight sm:text-[34px]">
           Welcome back, Admin! &#x1F44B;
         </h1>
-        <p className="mt-2 max-w-lg text-[15px] leading-relaxed text-muted">
+        <p className="mt-2 max-w-lg text-[14px] leading-relaxed text-muted">
           Here&apos;s what&apos;s happening on ClipTwo today.
         </p>
       </section>
 
-      {/* ── Overview — 4 metric cards ───────────────────── */}
+      {/* ── Overview ────────────────────────────────────── */}
       <section>
-        <h2 className="mb-4 text-[18px] font-bold tracking-tight">Overview</h2>
+        <h2 className="mb-4 text-[17px] font-bold tracking-tight">Overview</h2>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <div className="rounded-[14px] border bg-card p-5">
-            <p className="text-[12px] font-medium text-muted">Total users</p>
-            <p className="mt-2 font-mono text-[22px] font-bold leading-none tracking-tight">
-              {profiles.length}
-            </p>
-            <p className="mt-1.5 text-[11px] text-muted">
-              {clippers.length} clippers &middot; {creators.length} creators
-            </p>
-          </div>
-          <div className="rounded-[14px] border bg-card p-5">
-            <p className="text-[12px] font-medium text-muted">Total clips</p>
-            <p className="mt-2 font-mono text-[22px] font-bold leading-none tracking-tight">
-              {approvedCount}
-            </p>
-            <p className="mt-1.5 text-[11px] text-muted">
-              {pendingCount} pending
-            </p>
-          </div>
-          <div className="rounded-[14px] border bg-card p-5">
-            <p className="text-[12px] font-medium text-muted">Total revenue</p>
-            <p className="mt-2 font-mono text-[22px] font-bold leading-none tracking-tight">
-              {rup(totalEarned)}
-            </p>
-            <p className="mt-1.5 text-[11px] text-muted">all time</p>
-          </div>
-          <div className="rounded-[14px] border bg-card p-5">
-            <p className="text-[12px] font-medium text-muted">Paid out</p>
-            <p className="mt-2 font-mono text-[22px] font-bold leading-none tracking-tight text-green">
-              {rup(paidOut)}
-            </p>
-            <p className="mt-1.5 text-[11px] text-muted">
-              {paidCount} clips paid
-            </p>
-          </div>
+          <MetricCard
+            label="Total Users"
+            value={String(profiles.length)}
+            sub={`${clippers.length} clippers &middot; ${creators.length} creators`}
+          />
+          <MetricCard
+            label="Total Creators"
+            value={String(creators.length)}
+          />
+          <MetricCard
+            label="Total Clips"
+            value={String(approvedCount)}
+            sub={`${pendingCount} pending`}
+          />
+          <MetricCard
+            label="Total Revenue"
+            value={rup(totalEarned)}
+            sub="all time"
+          />
         </div>
       </section>
 
-      {/* ── Action queues — 3 cards ─────────────────────── */}
+      {/* ── Action queues ───────────────────────────────── */}
       <section>
-        <h2 className="mb-4 text-[18px] font-bold tracking-tight">
+        <h2 className="mb-4 text-[17px] font-bold tracking-tight">
           Action queues
         </h2>
         <div className="grid gap-4 sm:grid-cols-3">
@@ -163,7 +152,7 @@ export default function AdminDashboard() {
             <p className="mt-3 font-mono text-[24px] font-bold tracking-tight">
               {pendingCount}
             </p>
-            <p className="mt-1 text-[12px] text-muted">clips</p>
+            <p className="mt-1 text-[12px] text-muted">Clips</p>
           </Link>
 
           <Link
@@ -182,7 +171,7 @@ export default function AdminDashboard() {
             <p className="mt-3 font-mono text-[24px] font-bold tracking-tight text-amber">
               {rup(payable)}
             </p>
-            <p className="mt-1 text-[12px] text-muted">to clippers</p>
+            <p className="mt-1 text-[12px] text-muted">To clippers</p>
           </Link>
 
           <Link
@@ -201,16 +190,16 @@ export default function AdminDashboard() {
             <p className="mt-3 font-mono text-[24px] font-bold tracking-tight text-green">
               {rup(paidOut)}
             </p>
-            <p className="mt-1 text-[12px] text-muted">this month</p>
+            <p className="mt-1 text-[12px] text-muted">This month</p>
           </Link>
         </div>
       </section>
 
-      {/* ── Metrics sync + Clip status — side by side ────── */}
+      {/* ── Metrics sync + Clip status ──────────────────── */}
       <div className="grid gap-8 lg:grid-cols-2">
         {/* Metrics sync */}
         <section>
-          <h2 className="mb-4 text-[18px] font-bold tracking-tight">
+          <h2 className="mb-4 text-[17px] font-bold tracking-tight">
             Metrics sync
           </h2>
           <div className="rounded-[14px] border border-border/40 bg-card p-5">
@@ -224,7 +213,7 @@ export default function AdminDashboard() {
               <button
                 onClick={triggerSync}
                 disabled={syncing}
-                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-[10px] border border-border/60 px-3.5 text-[12px] font-medium text-muted transition-colors duration-150 hover:border-foreground/20 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-[8px] border border-border/60 px-3.5 text-[12px] font-medium text-muted transition-colors duration-150 hover:border-foreground/20 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {syncing ? (
                   <Loader2 size={12} className="animate-spin" />
@@ -259,12 +248,26 @@ export default function AdminDashboard() {
                 </p>
               </div>
             )}
+            <div className="mt-4 border-t border-border/40 pt-3">
+              <div className="flex items-center justify-between text-[12px]">
+                <span className="text-muted">Campaigns</span>
+                <span className="font-mono font-medium">
+                  {campaigns.length} ({openCampaigns.length} open)
+                </span>
+              </div>
+              <div className="mt-2 flex items-center justify-between text-[12px]">
+                <span className="text-muted">Budget used</span>
+                <span className="font-mono font-medium">
+                  {rup(totalSpent)} / {rup(totalBudget)}
+                </span>
+              </div>
+            </div>
           </div>
         </section>
 
         {/* Clip status */}
         <section>
-          <h2 className="mb-4 text-[18px] font-bold tracking-tight">
+          <h2 className="mb-4 text-[17px] font-bold tracking-tight">
             Clip status
           </h2>
           <div className="rounded-[14px] border border-border/40 bg-card p-5">
@@ -285,7 +288,7 @@ export default function AdminDashboard() {
               </div>
               <div className="flex items-center justify-between text-[13px]">
                 <span className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-border" />
+                  <span className="h-2 w-2 rounded-full bg-muted" />
                   Paid
                 </span>
                 <span className="font-mono font-semibold">{paidCount}</span>
@@ -299,34 +302,32 @@ export default function AdminDashboard() {
               </div>
             </div>
             <div className="mt-4 border-t border-border/40 pt-3">
-              <div className="flex items-center justify-between text-[13px]">
-                <span className="text-muted">Campaigns</span>
-                <span className="font-mono font-medium">
-                  {campaigns.length} ({openCampaigns.length} open)
-                </span>
-              </div>
-              <div className="mt-2 flex items-center justify-between text-[13px]">
-                <span className="text-muted">Budget used</span>
-                <span className="font-mono font-medium">
-                  {rup(totalSpent)} / {rup(totalBudget)}
-                </span>
-              </div>
+              <Link
+                href="/admin/clips"
+                className="group flex items-center justify-between text-[13px] transition-colors hover:text-foreground"
+              >
+                <span className="text-muted">View all clips</span>
+                <ArrowRight
+                  size={13}
+                  className="text-muted transition-transform duration-200 group-hover:translate-x-0.5"
+                />
+              </Link>
             </div>
           </div>
         </section>
       </div>
 
-      {/* ── Recent clips + Recent campaigns — side by side ─ */}
+      {/* ── Recent clips + Recent campaigns ─────────────── */}
       <div className="grid gap-8 lg:grid-cols-2">
         {/* Recent clips */}
         <section>
           <div className="mb-4 flex items-baseline justify-between">
-            <h2 className="text-[18px] font-bold tracking-tight">
+            <h2 className="text-[17px] font-bold tracking-tight">
               Recent clips
             </h2>
             <Link
               href="/admin/clips"
-              className="group inline-flex items-center gap-1.5 text-[13px] font-medium text-muted transition-colors hover:text-foreground"
+              className="group inline-flex items-center gap-1 text-[13px] font-medium text-muted transition-colors hover:text-foreground"
             >
               View all
               <ArrowRight
@@ -390,12 +391,12 @@ export default function AdminDashboard() {
         {/* Recent campaigns */}
         <section>
           <div className="mb-4 flex items-baseline justify-between">
-            <h2 className="text-[18px] font-bold tracking-tight">
+            <h2 className="text-[17px] font-bold tracking-tight">
               Recent campaigns
             </h2>
             <Link
               href="/admin/campaigns"
-              className="group inline-flex items-center gap-1.5 text-[13px] font-medium text-muted transition-colors hover:text-foreground"
+              className="group inline-flex items-center gap-1 text-[13px] font-medium text-muted transition-colors hover:text-foreground"
             >
               View all
               <ArrowRight
@@ -444,6 +445,89 @@ export default function AdminDashboard() {
           </div>
         </section>
       </div>
+
+      {/* ── System overview ─────────────────────────────── */}
+      <section>
+        <h2 className="mb-4 text-[17px] font-bold tracking-tight">
+          System overview
+        </h2>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="rounded-[14px] border bg-card p-4">
+            <div className="flex items-center gap-2">
+              <FileText size={16} className="text-muted" />
+              <p className="text-[12px] font-medium text-muted">
+                Content Management
+              </p>
+            </div>
+            <p className="mt-2 font-mono text-[20px] font-bold tracking-tight">
+              {clips.length}
+            </p>
+          </div>
+          <div className="rounded-[14px] border bg-card p-4">
+            <div className="flex items-center gap-2">
+              <Users size={16} className="text-muted" />
+              <p className="text-[12px] font-medium text-muted">
+                Creator Reports
+              </p>
+            </div>
+            <p className="mt-2 font-mono text-[20px] font-bold tracking-tight">
+              {creators.length}
+            </p>
+          </div>
+          <div className="rounded-[14px] border bg-card p-4">
+            <div className="flex items-center gap-2">
+              <AlertTriangle size={16} className="text-muted" />
+              <p className="text-[12px] font-medium text-muted">
+                Open disputes
+              </p>
+            </div>
+            <p className="mt-2 font-mono text-[20px] font-bold tracking-tight">
+              0
+            </p>
+          </div>
+          <div className="rounded-[14px] border bg-card p-4">
+            <div className="flex items-center gap-2">
+              <HeadphonesIcon size={16} className="text-muted" />
+              <p className="text-[12px] font-medium text-muted">
+                Support tickets
+              </p>
+            </div>
+            <p className="mt-2 font-mono text-[20px] font-bold tracking-tight">
+              0
+            </p>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Metric Card
+   ──────────────────────────────────────────────────────────────────────────── */
+
+function MetricCard({
+  label,
+  value,
+  sub,
+  valueClass,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  valueClass?: string;
+}) {
+  return (
+    <div className="rounded-[14px] border bg-card p-4">
+      <p className="text-[12px] font-medium text-muted">{label}</p>
+      <p
+        className={`mt-2 font-mono text-[20px] font-bold leading-none tracking-tight ${valueClass ?? ""}`}
+      >
+        {value}
+      </p>
+      {sub && (
+        <p className="mt-1.5 text-[11px] text-muted">{sub}</p>
+      )}
     </div>
   );
 }

@@ -4,8 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   Plus,
-  BarChart3,
   ArrowRight,
+  BarChart3,
+  Wallet,
 } from "lucide-react";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { NewCampaignModal } from "@/components/NewCampaignModal";
@@ -14,6 +15,7 @@ import { useAuth } from "@/lib/auth";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { rup, fmtViews } from "@/lib/format";
 import { financeOf, campaignSpent } from "@/lib/finance";
+import { seriesByDay } from "@/lib/analytics";
 import type { Campaign, Clip, Platform } from "@/lib/types";
 
 export default function CreatorPage() {
@@ -33,11 +35,14 @@ export default function CreatorPage() {
   const pendingCount = fin.pendingCount;
   const totalSpent = fin.paid / 100;
   const totalEarned = fin.total / 100;
-  const outstanding = fin.pending / 100;
   const totalViews = received.reduce(
     (s, k) => s + (k.verifiedViews ?? 0),
     0,
   );
+  const avgCPM =
+    totalViews > 0 && totalEarned > 0
+      ? totalEarned / (totalViews / 1000)
+      : 0;
 
   const topClips = [...received]
     .filter((k) => k.status === "approved" || k.status === "held")
@@ -48,74 +53,74 @@ export default function CreatorPage() {
     )
     .slice(0, 5);
 
+  const spendSeries = seriesByDay(
+    received.filter((k) => k.status === "approved"),
+    (k) => {
+      const rec = financeRecords.find((r) => r.clipId === k.id);
+      return (rec?.netAmount ?? 0) / 100;
+    },
+  );
+
   return (
     <div className="mx-auto max-w-[1120px] space-y-10 px-5 py-10 sm:px-8">
-      {/* ── Header ──────────────────────────────────────── */}
+      {/* ── Welcome ─────────────────────────────────────── */}
       <section className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-[30px] font-bold leading-tight tracking-tight sm:text-[34px]">
-            Welcome back, {user?.name ?? user?.email ?? "Creator"} &#x1F680;
+            Welcome back, {user?.name ?? user?.email ?? "Creator"}! &#x1F680;
           </h1>
-          <p className="mt-2 max-w-lg text-[15px] leading-relaxed text-muted">
+          <p className="mt-2 max-w-lg text-[14px] leading-relaxed text-muted">
             Track your campaigns and see how your content is performing.
           </p>
         </div>
         <Link
           href="/creator/campaigns/new"
-          className="group inline-flex items-center gap-2 rounded-[10px] bg-accent px-5 py-2.5 text-[14px] font-medium text-white transition-all duration-200 hover:bg-foreground/90 active:scale-[0.98] sm:px-6 sm:py-3 sm:text-[15px]"
+          className="group inline-flex items-center gap-2 rounded-[10px] bg-foreground px-5 py-2.5 text-[14px] font-medium text-white transition-all duration-200 hover:bg-foreground/90 active:scale-[0.98]"
         >
           <Plus size={16} />
           Create campaign
         </Link>
       </section>
 
-      {/* ── Campaign overview — 4 metric cards ──────────── */}
+      {/* ── Campaign overview ───────────────────────────── */}
       <section>
-        <h2 className="mb-4 text-[18px] font-bold tracking-tight">
+        <h2 className="mb-4 text-[17px] font-bold tracking-tight">
           Campaign overview
         </h2>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <div className="rounded-[14px] border bg-card p-5">
-            <p className="text-[12px] font-medium text-muted">Total spend</p>
-            <p className="mt-2 font-mono text-[22px] font-bold leading-none tracking-tight">
-              {rup(totalSpent)}
-            </p>
-          </div>
-          <div className="rounded-[14px] border bg-card p-5">
-            <p className="text-[12px] font-medium text-muted">Total clips</p>
-            <p className="mt-2 font-mono text-[22px] font-bold leading-none tracking-tight">
-              {received.length}
-            </p>
-          </div>
-          <div className="rounded-[14px] border bg-card p-5">
-            <p className="text-[12px] font-medium text-muted">Total views</p>
-            <p className="mt-2 font-mono text-[22px] font-bold leading-none tracking-tight">
-              {fmtViews(totalViews)}
-            </p>
-          </div>
-          <div className="rounded-[14px] border bg-card p-5">
-            <p className="text-[12px] font-medium text-muted">Pending review</p>
-            <p
-              className={`mt-2 font-mono text-[22px] font-bold leading-none tracking-tight ${pendingCount > 0 ? "text-amber" : ""}`}
-            >
-              {pendingCount}
-            </p>
-          </div>
+          <MetricCard
+            label="Total Spend"
+            value={rup(totalSpent)}
+            sub="across all campaigns"
+          />
+          <MetricCard
+            label="Total Clips"
+            value={String(received.length)}
+            sub={`${pendingCount} pending review`}
+          />
+          <MetricCard
+            label="Total Views"
+            value={fmtViews(totalViews)}
+          />
+          <MetricCard
+            label="Avg. CPM"
+            value={avgCPM > 0 ? rup(avgCPM) : "\u2014"}
+          />
         </div>
       </section>
 
-      {/* ── Recent campaigns + Pending review — side by side */}
+      {/* ── Recent campaigns + Pending review ───────────── */}
       <div className="grid gap-8 lg:grid-cols-2">
         {/* Recent campaigns */}
         <section>
           <div className="mb-4 flex items-baseline justify-between">
-            <h2 className="text-[18px] font-bold tracking-tight">
+            <h2 className="text-[17px] font-bold tracking-tight">
               Recent campaigns
             </h2>
             {myCampaigns.length > 0 && (
               <Link
                 href="/creator/campaigns"
-                className="group inline-flex items-center gap-1.5 text-[13px] font-medium text-muted transition-colors duration-150 hover:text-foreground"
+                className="group inline-flex items-center gap-1 text-[13px] font-medium text-muted transition-colors hover:text-foreground"
               >
                 View all
                 <ArrowRight
@@ -125,7 +130,7 @@ export default function CreatorPage() {
               </Link>
             )}
           </div>
-          <div className="space-y-3">
+          <div className="space-y-0 divide-y divide-border/50 rounded-[14px] border bg-card">
             {myCampaigns.slice(0, 4).map((c) => (
               <CampaignRow
                 key={c.id}
@@ -136,16 +141,16 @@ export default function CreatorPage() {
               />
             ))}
             {myCampaigns.length === 0 && (
-              <div className="rounded-[14px] border border-dashed bg-card py-12 text-center">
-                <p className="text-[16px] font-medium">No campaigns yet</p>
-                <p className="mt-2 text-[14px] text-muted">
+              <div className="py-12 text-center">
+                <p className="text-[15px] font-medium">No campaigns yet</p>
+                <p className="mt-1.5 text-[13px] text-muted">
                   Create your first campaign to start receiving clips.
                 </p>
                 <Link
                   href="/creator/campaigns/new"
-                  className="mt-5 inline-flex h-11 items-center gap-2 rounded-[10px] bg-accent px-5 text-[14px] font-medium text-white transition-all duration-150 hover:bg-foreground/90"
+                  className="mt-4 inline-flex items-center gap-2 rounded-[10px] bg-foreground px-5 py-2.5 text-[13px] font-medium text-white transition-all duration-150 hover:bg-foreground/90"
                 >
-                  <Plus size={16} /> Create campaign
+                  <Plus size={14} /> Create campaign
                 </Link>
               </div>
             )}
@@ -155,13 +160,13 @@ export default function CreatorPage() {
         {/* Pending review */}
         <section>
           <div className="mb-4 flex items-baseline justify-between">
-            <h2 className="text-[18px] font-bold tracking-tight">
+            <h2 className="text-[17px] font-bold tracking-tight">
               Pending review
             </h2>
             {pending.length > 0 && (
               <Link
                 href="/creator/submissions"
-                className="group inline-flex items-center gap-1.5 text-[13px] font-medium text-muted transition-colors duration-150 hover:text-foreground"
+                className="group inline-flex items-center gap-1 text-[13px] font-medium text-muted transition-colors hover:text-foreground"
               >
                 View all
                 <ArrowRight
@@ -171,7 +176,7 @@ export default function CreatorPage() {
               </Link>
             )}
           </div>
-          <div className="space-y-0 divide-y divide-border/50">
+          <div className="space-y-0 divide-y divide-border/50 rounded-[14px] border bg-card">
             {pending.slice(0, 5).map((k) => {
               const camp = campaigns.find((c) => c.id === k.campaignId);
               const thumb = camp?.thumbnails?.[0];
@@ -179,9 +184,9 @@ export default function CreatorPage() {
                 <Link
                   key={k.id}
                   href={`/clip/${k.id}`}
-                  className="group flex items-center gap-3.5 py-3 transition-colors duration-150 sm:gap-4"
+                  className="group flex items-center gap-3.5 px-4 py-3 transition-colors duration-150"
                 >
-                  <div className="h-10 w-14 shrink-0 overflow-hidden rounded-[10px] bg-accent-soft">
+                  <div className="h-9 w-12 shrink-0 overflow-hidden rounded-[8px] bg-accent-soft">
                     {thumb ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img
@@ -193,31 +198,34 @@ export default function CreatorPage() {
                       <div className="flex h-full w-full items-center justify-center">
                         <PlatformIcon
                           p={k.platform ?? "Instagram"}
-                          size={14}
+                          size={12}
                         />
                       </div>
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[14px] font-medium group-hover:underline underline-offset-2">
+                    <p className="truncate text-[13px] font-medium group-hover:underline underline-offset-2">
                       @{k.clipper}
                     </p>
-                    <p className="mt-0.5 truncate text-[13px] text-muted">
+                    <p className="mt-0.5 truncate text-[12px] text-muted">
                       {camp?.title}
                     </p>
                   </div>
-                  <div className="shrink-0">
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="font-mono text-[12px] tabular-nums text-muted">
+                      {fmtViews(k.verifiedViews ?? 0)}
+                    </span>
                     {k.platform && (
-                      <PlatformIcon p={k.platform} size={14} />
+                      <PlatformIcon p={k.platform} size={12} />
                     )}
                   </div>
                 </Link>
               );
             })}
             {pending.length === 0 && (
-              <div className="rounded-[14px] border border-dashed bg-card py-12 text-center">
-                <p className="text-[16px] font-medium">Nothing pending</p>
-                <p className="mt-2 text-[14px] text-muted">
+              <div className="py-12 text-center">
+                <p className="text-[15px] font-medium">Nothing pending</p>
+                <p className="mt-1.5 text-[13px] text-muted">
                   All clips reviewed.
                 </p>
               </div>
@@ -226,23 +234,23 @@ export default function CreatorPage() {
         </section>
       </div>
 
-      {/* ── Best performing content + Spend — side by side ─ */}
+      {/* ── Best performing + Spend summary ─────────────── */}
       <div className="grid gap-8 lg:grid-cols-2">
         {/* Best performing content */}
         <section>
-          <h2 className="mb-4 text-[18px] font-bold tracking-tight">
+          <h2 className="mb-4 text-[17px] font-bold tracking-tight">
             Best performing content
           </h2>
           {topClips.length === 0 ? (
             <div className="rounded-[14px] border border-dashed bg-card py-12 text-center">
-              <p className="text-[16px] font-medium">No earned clips yet</p>
-              <p className="mt-2 text-[14px] text-muted">
+              <p className="text-[15px] font-medium">No earned clips yet</p>
+              <p className="mt-1.5 text-[13px] text-muted">
                 Approved clips will appear here.
               </p>
             </div>
           ) : (
-            <div className="space-y-0 divide-y divide-border/50">
-              {topClips.map((k, i) => {
+            <div className="space-y-0 divide-y divide-border/50 rounded-[14px] border bg-card">
+              {topClips.map((k) => {
                 const camp = campaigns.find((c) => c.id === k.campaignId);
                 const finRec = financeRecords.find((r) => r.clipId === k.id);
                 const earned = (finRec?.netAmount ?? 0) / 100;
@@ -251,12 +259,9 @@ export default function CreatorPage() {
                   <Link
                     key={k.id}
                     href={`/clip/${k.id}`}
-                    className="group flex items-center gap-3.5 py-3 transition-colors duration-150 sm:gap-4"
+                    className="group flex items-center gap-3.5 px-4 py-3 transition-colors duration-150"
                   >
-                    <span className="w-5 shrink-0 text-right text-[13px] font-medium text-muted">
-                      {i + 1}
-                    </span>
-                    <div className="h-10 w-14 shrink-0 overflow-hidden rounded-[10px] bg-accent-soft">
+                    <div className="h-9 w-12 shrink-0 overflow-hidden rounded-[8px] bg-accent-soft">
                       {thumb ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img
@@ -268,32 +273,24 @@ export default function CreatorPage() {
                         <div className="flex h-full w-full items-center justify-center">
                           <PlatformIcon
                             p={k.platform ?? "Instagram"}
-                            size={14}
+                            size={12}
                           />
                         </div>
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[14px] font-medium group-hover:underline underline-offset-2">
+                      <p className="truncate text-[13px] font-medium group-hover:underline underline-offset-2">
                         @{k.clipper}
                       </p>
-                      <p className="mt-0.5 truncate text-[13px] text-muted">
-                        {camp?.title}
+                      <p className="mt-0.5 truncate text-[12px] text-muted">
+                        {fmtViews(k.verifiedViews ?? 0)} views
                       </p>
                     </div>
-                    <div className="flex shrink-0 items-center gap-3 sm:gap-5">
-                      <div className="text-right">
-                        <p className="font-mono text-[14px] font-bold">
-                          {fmtViews(k.verifiedViews ?? 0)}
-                        </p>
-                        <p className="text-[10px] text-muted">views</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-mono text-[14px] font-bold">
-                          {rup(earned)}
-                        </p>
-                        <p className="text-[10px] text-muted">earned</p>
-                      </div>
+                    <div className="shrink-0 text-right">
+                      <p className="font-mono text-[13px] font-bold">
+                        {rup(earned)}
+                      </p>
+                      <p className="text-[10px] text-muted">earned</p>
                     </div>
                   </Link>
                 );
@@ -304,53 +301,64 @@ export default function CreatorPage() {
 
         {/* Spend summary */}
         <section>
-          <h2 className="mb-4 text-[18px] font-bold tracking-tight">
+          <h2 className="mb-4 text-[17px] font-bold tracking-tight">
             Spend summary
           </h2>
-          <div className="rounded-[14px] border bg-card p-5 sm:p-6">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-[13px] text-muted">Total earned</span>
-                <span className="font-mono text-[18px] font-bold tracking-tight">
-                  {rup(totalEarned)}
-                </span>
-              </div>
-              <div className="border-t border-border/40" />
-              <div className="flex items-center justify-between">
-                <span className="text-[13px] text-muted">Paid out</span>
-                <span className="font-mono text-[18px] font-bold tracking-tight text-green">
-                  {rup(totalSpent)}
-                </span>
-              </div>
-              <div className="border-t border-border/40" />
-              <div className="flex items-center justify-between">
-                <span className="text-[13px] text-muted">Outstanding</span>
-                <span
-                  className={`font-mono text-[18px] font-bold tracking-tight ${outstanding > 0 ? "text-amber" : ""}`}
-                >
-                  {rup(outstanding)}
-                </span>
-              </div>
+          <div className="rounded-[14px] border bg-card p-5">
+            <div className="mb-1 text-[12px] text-muted">Total spent</div>
+            <div className="font-mono text-[22px] font-bold tracking-tight">
+              {rup(totalSpent)}
             </div>
-          </div>
 
-          {/* Quick actions */}
-          <div className="mt-5 flex flex-wrap gap-2">
-            <Link
-              href="/creator/analytics"
-              className="inline-flex items-center gap-1.5 rounded-[10px] border bg-card px-4 py-2.5 text-[13px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground"
-            >
-              <BarChart3 size={14} /> View analytics
-            </Link>
-            <button
-              onClick={() => setOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-[10px] border bg-card px-4 py-2.5 text-[13px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground"
-            >
-              Quick add
-            </button>
+            {spendSeries.length > 0 ? (
+              <div className="mt-5">
+                <SpendBarChart data={spendSeries} />
+              </div>
+            ) : (
+              <div className="mt-5 flex h-[100px] items-center justify-center rounded-[10px] border border-dashed text-[13px] text-muted">
+                No spend data yet
+              </div>
+            )}
           </div>
         </section>
       </div>
+
+      {/* ── Quick actions ───────────────────────────────── */}
+      <section>
+        <h2 className="mb-3 text-[17px] font-bold tracking-tight">
+          Quick actions
+        </h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Link
+            href="/creator/campaigns/new"
+            className="flex items-center gap-3 rounded-[14px] border bg-card px-4 py-3.5 transition-colors hover:bg-accent-soft/50"
+          >
+            <Plus size={16} className="text-muted" />
+            <span className="text-[13px] font-medium">Create campaign</span>
+          </Link>
+          <Link
+            href="/creator/analytics"
+            className="flex items-center gap-3 rounded-[14px] border bg-card px-4 py-3.5 transition-colors hover:bg-accent-soft/50"
+          >
+            <BarChart3 size={16} className="text-muted" />
+            <span className="text-[13px] font-medium">View analytics</span>
+          </Link>
+          <Link
+            href="/creator/campaigns"
+            className="flex items-center gap-3 rounded-[14px] border bg-card px-4 py-3.5 transition-colors hover:bg-accent-soft/50"
+          >
+            <BarChart3 size={16} className="text-muted" />
+            <span className="text-[13px] font-medium">Manage budget</span>
+          </Link>
+          <Link
+            href="/creator/wallet"
+            className="flex items-center gap-3 rounded-[14px] border bg-card px-4 py-3.5 transition-colors hover:bg-accent-soft/50"
+          >
+            <Wallet size={16} className="text-muted" />
+            <span className="text-[13px] font-medium">Payouts</span>
+          </Link>
+        </div>
+      </section>
 
       {/* ── Modals ──────────────────────────────────────── */}
       {open && (
@@ -410,6 +418,82 @@ export default function CreatorPage() {
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
+   Metric Card
+   ──────────────────────────────────────────────────────────────────────────── */
+
+function MetricCard({
+  label,
+  value,
+  sub,
+  valueClass,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  valueClass?: string;
+}) {
+  return (
+    <div className="rounded-[14px] border bg-card p-4">
+      <p className="text-[12px] font-medium text-muted">{label}</p>
+      <p
+        className={`mt-2 font-mono text-[20px] font-bold leading-none tracking-tight ${valueClass ?? ""}`}
+      >
+        {value}
+      </p>
+      {sub && (
+        <p className="mt-1.5 text-[11px] text-muted">{sub}</p>
+      )}
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Spend Bar Chart (SVG)
+   ──────────────────────────────────────────────────────────────────────────── */
+
+function SpendBarChart({
+  data,
+}: {
+  data: Array<{ label: string; value: number }>;
+}) {
+  const max = Math.max(...data.map((d) => d.value), 1);
+  const barW = Math.max(4, Math.floor(400 / data.length) - 2);
+
+  return (
+    <div>
+      <svg
+        viewBox="0 0 400 100"
+        preserveAspectRatio="none"
+        className="h-[100px] w-full"
+        role="img"
+        aria-label="Spend chart"
+      >
+        {data.map((d, i) => {
+          const barH = (d.value / max) * 80;
+          const x = i * (barW + 2);
+          const y = 100 - barH;
+          return (
+            <rect
+              key={d.label}
+              x={x}
+              y={y}
+              width={barW}
+              height={barH}
+              rx={2}
+              className="fill-foreground/15"
+            />
+          );
+        })}
+      </svg>
+      <div className="mt-1.5 flex items-center justify-between text-[10px] text-muted">
+        <span>{data[0]?.label}</span>
+        <span>{data[data.length - 1]?.label}</span>
+      </div>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
    Campaign Row
    ──────────────────────────────────────────────────────────────────────────── */
 
@@ -434,32 +518,32 @@ function CampaignRow({
     <button
       type="button"
       onClick={onOpen}
-      className={`group flex w-full items-center gap-4 rounded-[14px] border bg-card p-4 text-left transition-all duration-150 hover:border-foreground/12 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)] sm:p-5 ${
+      className={`group flex w-full items-center gap-3.5 px-4 py-3 text-left transition-colors duration-150 hover:bg-accent-soft/30 ${
         isArchived ? "opacity-60" : ""
       }`}
     >
-      <div className="h-[52px] w-[80px] shrink-0 overflow-hidden rounded-[10px] bg-accent-soft">
+      <div className="h-9 w-12 shrink-0 overflow-hidden rounded-[8px] bg-accent-soft">
         {thumb ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
             src={thumb}
             alt=""
-            className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+            className="h-full w-full object-cover"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
-            <PlatformIcon p={c.platform} size={18} />
+            <PlatformIcon p={c.platform} size={14} />
           </div>
         )}
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2.5">
-          <p className="truncate text-[15px] font-semibold group-hover:underline underline-offset-2">
+        <div className="flex items-center gap-2">
+          <p className="truncate text-[13px] font-medium group-hover:underline underline-offset-2">
             {c.title}
           </p>
           <span
-            className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${
+            className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium ${
               isArchived
                 ? "border-amber-500/20 bg-amber-500/10 text-amber-600"
                 : isOpen
@@ -470,17 +554,13 @@ function CampaignRow({
             {isArchived ? "Archived" : isOpen ? "Open" : "Closed"}
           </span>
         </div>
-        <p className="mt-1 text-[13px] text-muted">
-          {c.niche} &middot; {c.platform}
-        </p>
-        <p className="mt-1 text-[12px] text-muted">
-          {campClips.length} clips &middot; {c.daysLeft}d left &middot;{" "}
-          {rup(spent)} spent
+        <p className="mt-0.5 text-[12px] text-muted">
+          {campClips.length} clips &middot; {rup(spent)} spent
         </p>
       </div>
 
       <ArrowRight
-        size={16}
+        size={14}
         className="shrink-0 text-muted/40 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-muted"
       />
     </button>
