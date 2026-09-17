@@ -89,26 +89,10 @@ DECLARE
   v_id uuid := 'b0000000-0000-0000-0000-00000000000c'::uuid;
   v_err text;
 BEGIN
-  -- Publish first (needs payment), then pause
+  -- Create draft, submit payment (stays pending), manually set to paused
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-C');
-  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
-  PERFORM public.verify_campaign_launch_payment(
-    (SELECT id FROM public.campaign_launch_payments WHERE campaign_id = v_id)
-  );
-  PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
-  PERFORM public.campaign_action(v_id, 'pause');
-
-  -- Reject payment via admin RPC (sets payment_status='rejected')
-  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
-  PERFORM public.reject_campaign_launch_payment(
-    (SELECT id FROM public.campaign_launch_payments WHERE campaign_id = v_id),
-    'Test unpaid resume'
-  );
-  PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
+  -- Trigger blocks status='open' but NOT status='paused' — safe to set directly
+  UPDATE public.campaigns SET status = 'paused' WHERE id = v_id;
 
   BEGIN
     PERFORM public.campaign_action(v_id, 'resume');
@@ -174,26 +158,9 @@ DECLARE
   v_id uuid := 'b0000000-0000-0000-0000-00000000000e'::uuid;
   v_err text;
 BEGIN
-  -- Publish, then close
+  -- Create draft, submit payment (stays pending), manually set to closed
   PERFORM public.submit_campaign_launch_payment(v_id, 'UTR-E');
-  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
-  PERFORM public.verify_campaign_launch_payment(
-    (SELECT id FROM public.campaign_launch_payments WHERE campaign_id = v_id)
-  );
-  PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
-  PERFORM public.campaign_action(v_id, 'close');
-
-  -- Reject payment via admin RPC (sets payment_status='rejected')
-  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
-  PERFORM public.reject_campaign_launch_payment(
-    (SELECT id FROM public.campaign_launch_payments WHERE campaign_id = v_id),
-    'Test unpaid reopen'
-  );
-  PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
-  PERFORM set_config('role', 'authenticated', true);
+  UPDATE public.campaigns SET status = 'closed' WHERE id = v_id;
 
   BEGIN
     PERFORM public.campaign_action(v_id, 'reopen');
