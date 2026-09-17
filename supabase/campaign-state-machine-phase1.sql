@@ -245,6 +245,9 @@ begin
       if v_campaign.status != 'paused' then
         raise exception 'Can only resume a paused campaign (current: %)', v_campaign.status;
       end if;
+      if v_campaign.launch_payment_status is distinct from 'verified' then
+        raise exception 'Cannot resume: launch payment has not been verified (current payment status: %)', v_campaign.launch_payment_status;
+      end if;
       v_new_status := 'open';
     when 'close' then
       if v_campaign.status not in ('open', 'paused') then
@@ -254,6 +257,9 @@ begin
     when 'reopen' then
       if v_campaign.status != 'closed' then
         raise exception 'Can only reopen a closed campaign (current: %)', v_campaign.status;
+      end if;
+      if v_campaign.launch_payment_status is distinct from 'verified' then
+        raise exception 'Cannot reopen: launch payment has not been verified (current payment status: %)', v_campaign.launch_payment_status;
       end if;
       v_new_status := 'open';
     when 'publish' then
