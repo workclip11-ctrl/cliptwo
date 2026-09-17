@@ -1082,5 +1082,160 @@ GRANT EXECUTE ON FUNCTION public.adjust_campaign_budget(uuid, numeric, text) TO 
 
 
 -- =============================================================================
+-- PART 18: Protect social_connections token columns (defense-in-depth)
+--
+-- RLS already blocks authenticated INSERT/UPDATE (dropped in security-hardening.sql),
+-- but this trigger adds a second layer: even if a policy were accidentally
+-- re-created, authenticated users cannot modify backend-managed OAuth token fields.
+-- Follows the same pattern as enforce_social_account_field_permissions() on
+-- social_accounts (admin-schema.sql).
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION public.enforce_social_connection_token_protection()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  -- Service-role (auth.uid() is NULL) — trusted server operations, skip checks.
+  -- The OAuth callback, disconnect, and metrics routes use service-role for
+  -- trusted writes. These are server-side only and never reachable from the browser.
+  IF auth.uid() IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  -- Admins can change anything (skip checks)
+  IF public.is_admin() THEN
+    RETURN NEW;
+  END IF;
+
+  -- Non-admins: block changes to backend-managed token fields.
+  -- These columns are written exclusively by the backend via service_role.
+  IF (OLD.access_token_enc IS DISTINCT FROM NEW.access_token_enc) THEN
+    RAISE EXCEPTION 'Cannot modify access_token_enc directly';
+  END IF;
+  IF (OLD.refresh_token_enc IS DISTINCT FROM NEW.refresh_token_enc) THEN
+    RAISE EXCEPTION 'Cannot modify refresh_token_enc directly';
+  END IF;
+  IF (OLD.expires_at IS DISTINCT FROM NEW.expires_at) THEN
+    RAISE EXCEPTION 'Cannot modify expires_at directly';
+  END IF;
+  IF (OLD.scope IS DISTINCT FROM NEW.scope) THEN
+    RAISE EXCEPTION 'Cannot modify scope directly';
+  END IF;
+  IF (OLD.provider_meta IS DISTINCT FROM NEW.provider_meta) THEN
+    RAISE EXCEPTION 'Cannot modify provider_meta directly';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS enforce_social_connection_tokens ON public.social_connections;
+CREATE TRIGGER enforce_social_connection_tokens
+  BEFORE UPDATE ON public.social_connections
+  FOR EACH ROW
+  EXECUTE FUNCTION public.enforce_social_connection_token_protection();
+
+
+-- =============================================================================
+-- PART 19: ingest_clip_metrics — prevent verified_views regression
+--
+-- The original definition in admin-schema.sql unconditionally overwrites
+-- clips.verified_views with the new API value. If a later sync returns a lower
+-- count (due to API corrections, deduplication, etc.), verified_views would
+-- regress. For earnings integrity, verified_views must be monotonically
+-- non-decreasing: NULL → value, value → higher value, value → same value.
+-- This REPLACE overrides the admin-schema.sql definition (runs last).
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION public.ingest_clip_metrics(
+  p_clip_id uuid,
+  p_views integer,
+  p_likes integer DEFAULT 0,
+  p_comments integer DEFAULT 0,
+  p_shares integer DEFAULT 0,
+  p_source text DEFAULT 'platform_api',
+  p_verification_status text DEFAULT 'verified'
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_clip record;
+  v_metric_id uuid;
+  v_metric jsonb;
+  v_finalized jsonb;
+BEGIN
+  -- Get clip
+  SELECT * INTO v_clip FROM public.clips WHERE id = p_clip_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Clip not found: %', p_clip_id;
+  END IF;
+
+  -- Validate source
+  IF p_source NOT IN ('platform_api', 'manual', 'mock', 'admin_override') THEN
+    RAISE EXCEPTION 'Invalid source: %', p_source;
+  END IF;
+
+  -- Validate verification_status
+  IF p_verification_status NOT IN ('pending', 'verified', 'failed', 'disputed') THEN
+    RAISE EXCEPTION 'Invalid verification_status: %', p_verification_status;
+  END IF;
+
+  -- Validate views are non-negative
+  IF p_views < 0 THEN
+    RAISE EXCEPTION 'Views cannot be negative: %', p_views;
+  END IF;
+
+  -- Insert immutable metric snapshot (historical record, never modified)
+  INSERT INTO public.clip_metrics (
+    clip_id, campaign_id, platform, views, likes, comments, shares,
+    source, verification_status, captured_at
+  ) VALUES (
+    p_clip_id, v_clip.campaign_id, v_clip.platform,
+    p_views, p_likes, p_comments, p_shares,
+    p_source, p_verification_status, now()
+  )
+  RETURNING id INTO v_metric_id;
+
+  -- Only update verified_views if the metric is verified
+  IF p_verification_status = 'verified' THEN
+    -- VERIFIED VIEWS REGRESSION GUARD: only update if NULL or new value is higher.
+    -- This prevents a lower API response from reducing an already-recorded count.
+    UPDATE public.clips SET
+      verified_views = CASE
+        WHEN v_clip.verified_views IS NULL THEN p_views
+        WHEN p_views > v_clip.verified_views THEN p_views
+        ELSE v_clip.verified_views
+      END,
+      updated_at = now()
+    WHERE id = p_clip_id;
+
+    -- AUTO-FINALIZE: If clip is approved and has a pending financial record,
+    -- move the earning from pending → processing now that verified views > 0.
+    -- If verified_views is still 0, the record remains pending.
+    IF p_views > 0 AND v_clip.status = 'approved' THEN
+      v_finalized := public.finalize_clip_earning(p_clip_id);
+      -- v_finalized is null if no pending record or no views; that's fine.
+    END IF;
+  END IF;
+
+  -- Return the created metric
+  SELECT to_jsonb(cm.*) INTO v_metric
+  FROM public.clip_metrics cm
+  WHERE id = v_metric_id;
+
+  RETURN v_metric;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.ingest_clip_metrics(uuid, integer, integer, integer, integer, text, text) TO service_role;
+
+
+-- =============================================================================
 -- DONE
 -- =============================================================================

@@ -14,7 +14,7 @@ The following SQL files must be applied in order. Later files may override earli
 6. **campaign-state-machine-phase1.sql** - Campaign lifecycle (create_campaign, campaign_action)
 7. **campaign-launch-payments.sql** - Launch payment RPCs (submit_campaign_launch_payment, submit_clip)
 8. **campaign-budget-lock.sql** - Budget lock triggers
-9. **security-hardening-migration.sql** - AUTHORITATIVE security RPCs (request_payout, complete_payout_request, process_payout_request, admin_clip_action, admin_user_action, verify_campaign_launch_payment, reject_campaign_launch_payment)
+9. **security-hardening-migration.sql** - AUTHORITATIVE security RPCs (request_payout, complete_payout_request, process_payout_request, admin_clip_action, admin_user_action, verify_campaign_launch_payment, reject_campaign_launch_payment, adjust_campaign_budget, ingest_clip_metrics, enforce_social_connection_token_protection trigger)
 10. **security-regression-tests.sql** - Regression test suite
 
 ### Important Notes
@@ -83,3 +83,5 @@ All mutations must go through SECURITY DEFINER RPCs.
 | `verify_campaign_launch_payment` | security-hardening-migration.sql | Admin + permission check |
 | `reject_campaign_launch_payment` | security-hardening-migration.sql | Admin + permission check |
 | `create_campaign` | campaign-state-machine-phase1.sql | Active creator check |
+| `ingest_clip_metrics` | security-hardening-migration.sql | With verified_views regression guard |
+| `enforce_social_connection_token_protection` | security-hardening-migration.sql | Trigger protecting OAuth token columns |

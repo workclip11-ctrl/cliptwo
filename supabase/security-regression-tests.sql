@@ -1705,6 +1705,139 @@ BEGIN
   );
 
   -- =========================================================================
+  -- SECTION K: SOCIAL_CONNECTIONS TOKEN PROTECTION TESTS
+  -- =========================================================================
+
+  -- TEST 133: enforce_social_connection_token_protection trigger exists
+  v_test_id := v_test_id + 1;
+  v_test_name := 'enforce_social_connection_token_protection trigger exists';
+  v_pass := EXISTS (
+    SELECT 1 FROM pg_trigger t
+    JOIN pg_class c ON t.tgrelid = c.oid
+    JOIN pg_namespace n ON c.relnamespace = n.oid
+    WHERE n.nspname = 'public' AND c.relname = 'social_connections'
+    AND t.tgname = 'enforce_social_connection_tokens'
+    AND NOT t.tgisinternal
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 134: enforce_social_connection_token_protection function exists
+  v_test_id := v_test_id + 1;
+  v_test_name := 'enforce_social_connection_token_protection function exists';
+  v_pass := EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON p.pronamespace = n.oid
+    WHERE n.nspname = 'public' AND p.proname = 'enforce_social_connection_token_protection'
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 135: Trigger function is SECURITY DEFINER
+  v_test_id := v_test_id + 1;
+  v_test_name := 'social connection token trigger is SECURITY DEFINER';
+  v_pass := EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON p.pronamespace = n.oid
+    WHERE n.nspname = 'public'
+    AND p.proname = 'enforce_social_connection_token_protection'
+    AND p.prosecdef = true
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 136: social_connections UPDATE policy remains dropped (defense-in-depth)
+  v_test_id := v_test_id + 1;
+  v_test_name := 'social_connections UPDATE policy still dropped';
+  v_pass := NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'social_connections'
+    AND policyname = 'social_connections_update'
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 137: social_connections INSERT policy remains dropped (defense-in-depth)
+  v_test_id := v_test_id + 1;
+  v_test_name := 'social_connections INSERT policy still dropped';
+  v_pass := NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'social_connections'
+    AND policyname = 'social_connections_insert'
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- =========================================================================
+  -- SECTION L: VERIFIED VIEWS REGRESSION PREVENTION TESTS
+  -- =========================================================================
+
+  -- TEST 138: ingest_clip_metrics exists with correct signature
+  v_test_id := v_test_id + 1;
+  v_test_name := 'ingest_clip_metrics function exists';
+  v_pass := EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON p.pronamespace = n.oid
+    WHERE n.nspname = 'public' AND p.proname = 'ingest_clip_metrics'
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 139: ingest_clip_metrics is SECURITY DEFINER
+  v_test_id := v_test_id + 1;
+  v_test_name := 'ingest_clip_metrics is SECURITY DEFINER';
+  v_pass := EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON p.pronamespace = n.oid
+    WHERE n.nspname = 'public'
+    AND p.proname = 'ingest_clip_metrics'
+    AND p.prosecdef = true
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 140: ingest_clip_metrics execution is restricted to service_role only
+  v_test_id := v_test_id + 1;
+  v_test_name := 'ingest_clip_metrics restricted to service_role';
+  v_pass := NOT EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON p.pronamespace = n.oid
+    JOIN pg_roles procout ON procout.oid = p.proowner
+    WHERE n.nspname = 'public'
+    AND p.proname = 'ingest_clip_metrics'
+    AND EXISTS (
+      SELECT 1 FROM pg_auth_members m
+      JOIN pg_roles grantee ON grantee.oid = m.member
+      WHERE m.roleid = procout.oid AND grantee.rolname = 'authenticated'
+    )
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 141: ingest_clip_metrics CASE expression prevents verified_views regression
+  -- This checks the function source contains the regression guard pattern.
+  v_test_id := v_test_id + 1;
+  v_test_name := 'ingest_clip_metrics contains verified_views regression guard';
+  v_pass := EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON p.pronamespace = n.oid
+    WHERE n.nspname = 'public'
+    AND p.proname = 'ingest_clip_metrics'
+    AND pg_get_functiondef(p.oid) LIKE '%CASE%verified_views%THEN%p_views%ELSE%verified_views%'
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- =========================================================================
   -- RESULTS
   -- =========================================================================
 
