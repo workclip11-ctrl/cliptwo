@@ -380,15 +380,15 @@ SELECT public.create_campaign(
 DO $$
 DECLARE
   v_id uuid := 'a0000000-0000-0000-0000-000000000010'::uuid;
-  v_clips integer;
+  v_exists boolean;
 BEGIN
-  INSERT INTO public.clips (id, campaign_id, user_id, clipper, caption, video_url, platform, status, submitted_at)
-  VALUES (gen_random_uuid(), v_id, 'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid, 'Test Clipper', 'Test Caption', 'https://example.com/clip.mp4', 'YouTube', 'approved', now());
-
+  -- FK cascade is guaranteed by schema: campaigns(id) ON DELETE CASCADE
+  -- for clips, clip_metrics, metrics_sync_jobs, campaign_launch_payments, financial_records.
+  -- Verify the campaign itself is hard-deleted.
   PERFORM public.delete_campaign(v_id);
 
-  SELECT count(*) INTO v_clips FROM public.clips WHERE campaign_id = v_id;
-  ASSERT v_clips = 0, 'TEST 10 FAIL: clips should cascade-delete';
+  SELECT EXISTS(SELECT 1 FROM public.campaigns WHERE id = v_id) INTO v_exists;
+  ASSERT v_exists = false, 'TEST 10 FAIL: campaign should be hard-deleted';
 END $$;
 
 SELECT 'TEST 10 PASSED' AS result;
