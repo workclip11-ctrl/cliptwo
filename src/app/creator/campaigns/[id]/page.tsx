@@ -32,6 +32,7 @@ import { TopClipsTable } from "@/components/TopClipsTable";
 import { TimeSeriesChart } from "@/components/charts";
 import { EditCampaignModal } from "@/components/EditCampaignModal";
 import { AdjustBudgetModal } from "@/components/AdjustBudgetModal";
+import { LaunchPaymentModal } from "@/components/LaunchPaymentModal";
 import { isStoragePath, resolveAssetUrls, resolveThumbnailUrls } from "@/lib/private-assets";
 import type { CampaignSourceAsset } from "@/lib/types";
 
@@ -84,6 +85,7 @@ export default function CreatorCampaignDetailPage() {
   const [reopening, setReopening] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [resolvedSourceAssets, setResolvedSourceAssets] = useState<CampaignSourceAsset[]>([]);
   const [resolvedBrandAssets, setResolvedBrandAssets] = useState<CampaignSourceAsset[]>([]);
   const [resolvedThumbnails, setResolvedThumbnails] = useState<string[]>([]);
@@ -205,16 +207,20 @@ export default function CreatorCampaignDetailPage() {
     );
   };
   const handlePublish = () => {
-    if (
-      !confirm(
-        "Publish this campaign? It will become live and visible to clippers.",
+    if (camp.launchPaymentStatus === "verified") {
+      if (
+        !confirm(
+          "Publish this campaign? It will become live and visible to clippers.",
+        )
       )
-    )
-      return;
-    setPublishing(true);
-    publishCampaign(camp.id, "Published by creator").finally(() =>
-      setPublishing(false),
-    );
+        return;
+      setPublishing(true);
+      publishCampaign(camp.id, "Published by creator").finally(() =>
+        setPublishing(false),
+      );
+    } else {
+      setShowPaymentModal(true);
+    }
   };
   const handleDelete = () => {
     if (
@@ -1046,6 +1052,13 @@ export default function CreatorCampaignDetailPage() {
             handleBudget(b, note);
             setAdjusting(false);
           }}
+        />
+      )}
+      {showPaymentModal && (
+        <LaunchPaymentModal
+          campaign={camp}
+          onClose={() => setShowPaymentModal(false)}
+          onPaymentSubmitted={() => setShowPaymentModal(false)}
         />
       )}
     </div>
