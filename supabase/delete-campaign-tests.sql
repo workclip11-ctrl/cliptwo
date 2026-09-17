@@ -294,15 +294,17 @@ BEGIN
   PERFORM public.verify_campaign_launch_payment(
     (SELECT id FROM public.campaign_launch_payments WHERE campaign_id = v_id)
   );
+  -- Must publish (open) for the payment safety check to apply
   PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
   PERFORM set_config('role', 'authenticated', true);
+  PERFORM public.campaign_action(v_id, 'publish', 'Publish for delete test');
 
   BEGIN
     PERFORM public.delete_campaign(v_id);
     ASSERT false, 'TEST 8 FAIL: should have raised exception';
   EXCEPTION WHEN OTHERS THEN
     v_err := SQLERRM;
-    ASSERT v_err LIKE '%verified launch payment%', 'TEST 8 FAIL: unexpected error: ' || v_err;
+    ASSERT v_err LIKE '%open campaign with a verified launch payment%', 'TEST 8 FAIL: unexpected error: ' || v_err;
   END;
 END $$;
 

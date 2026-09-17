@@ -333,9 +333,9 @@ begin
     raise exception 'Can only delete a draft or closed campaign (current: %)', v_campaign.status;
   end if;
 
-  -- Payment safety: reject if launch payment was verified
-  if v_campaign.launch_payment_status = 'verified' then
-    raise exception 'Cannot delete a campaign with a verified launch payment. Archive it instead.';
+  -- Payment safety: reject if launch payment was verified AND campaign is still open
+  if v_campaign.status = 'open' and v_campaign.launch_payment_status = 'verified' then
+    raise exception 'Cannot delete an open campaign with a verified launch payment. Close it first or archive it.';
   end if;
 
   -- Perform hard delete (child records cascade via FK)
