@@ -34,7 +34,10 @@ export default function CreatorPage() {
   const totalSpent = fin.paid / 100;
   const totalEarned = fin.total / 100;
   const outstanding = fin.pending / 100;
-  const activeCount = myCampaigns.filter((c) => c.status === "open").length;
+  const totalViews = received.reduce(
+    (s, k) => s + (k.verifiedViews ?? 0),
+    0,
+  );
 
   const topClips = [...received]
     .filter((k) => k.status === "approved" || k.status === "held")
@@ -46,91 +49,67 @@ export default function CreatorPage() {
     .slice(0, 5);
 
   return (
-    <div className="mx-auto max-w-[1120px] space-y-12 px-5 py-10 sm:px-8">
+    <div className="mx-auto max-w-[1120px] space-y-10 px-5 py-10 sm:px-8">
       {/* ── Header ──────────────────────────────────────── */}
-      <section className="flex flex-wrap items-end justify-between gap-6">
+      <section className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-[28px] font-bold leading-tight tracking-tight sm:text-[32px]">
-            {user?.name ?? user?.email ?? "Creator"}
+          <h1 className="text-[30px] font-bold leading-tight tracking-tight sm:text-[34px]">
+            Welcome back, {user?.name ?? user?.email ?? "Creator"} &#x1F680;
           </h1>
           <p className="mt-2 max-w-lg text-[15px] leading-relaxed text-muted">
-            Manage campaigns, review clips, and track spend.
+            Track your campaigns and see how your content is performing.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Link
-            href="/creator/analytics"
-            className="inline-flex h-10 items-center gap-2 rounded-[10px] border bg-card px-4 text-[13px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground sm:h-11 sm:px-5 sm:text-[14px]"
-          >
-            <BarChart3 size={16} /> Analytics
-          </Link>
-          <button
-            onClick={() => setOpen(true)}
-            className="inline-flex h-10 items-center gap-2 rounded-[10px] border bg-card px-4 text-[13px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground sm:h-11 sm:px-5 sm:text-[14px]"
-          >
-            Quick add
-          </button>
-          <Link
-            href="/creator/campaigns/new"
-            className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-accent px-4 text-[13px] font-medium text-white transition-all duration-150 hover:bg-foreground/90 active:scale-[0.98] sm:h-11 sm:px-5 sm:text-[14px]"
-          >
-            <Plus size={16} /> Create campaign
-          </Link>
-        </div>
+        <Link
+          href="/creator/campaigns/new"
+          className="group inline-flex items-center gap-2 rounded-[10px] bg-accent px-5 py-2.5 text-[14px] font-medium text-white transition-all duration-200 hover:bg-foreground/90 active:scale-[0.98] sm:px-6 sm:py-3 sm:text-[15px]"
+        >
+          <Plus size={16} />
+          Create campaign
+        </Link>
       </section>
 
-      {/* ── Campaign overview ───────────────────────────── */}
+      {/* ── Campaign overview — 4 metric cards ──────────── */}
       <section>
-        <div className="rounded-[14px] border bg-card px-5 py-6 sm:px-8 sm:py-7">
-          <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-            {/* Dominant: active campaigns */}
-            <div>
-              <p className="text-[13px] font-medium text-muted">
-                Active campaigns
-              </p>
-              <p className="mt-2 font-mono text-[28px] font-bold leading-none tracking-tight">
-                {activeCount}
-              </p>
-              {activeCount > 0 && (
-                <p className="mt-1.5 text-[13px] text-muted">
-                  currently running
-                </p>
-              )}
-            </div>
-
-            {/* Supporting metrics */}
-            <div className="flex flex-wrap gap-x-10 gap-y-4">
-              <div className="min-w-[100px]">
-                <p className="text-[13px] text-muted">Clips received</p>
-                <p className="mt-1 font-mono text-lg font-bold">
-                  {received.length}
-                </p>
-              </div>
-              <div className="min-w-[100px]">
-                <p className="text-[13px] text-muted">Pending review</p>
-                <p
-                  className={`mt-1 font-mono text-lg font-bold ${pendingCount > 0 ? "text-amber" : ""}`}
-                >
-                  {pendingCount}
-                </p>
-              </div>
-              <div className="min-w-[100px]">
-                <p className="text-[13px] text-muted">Paid out</p>
-                <p className="mt-1 font-mono text-lg font-bold text-green">
-                  {rup(totalSpent)}
-                </p>
-              </div>
-            </div>
+        <h2 className="mb-4 text-[18px] font-bold tracking-tight">
+          Campaign overview
+        </h2>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="rounded-[14px] border bg-card p-5">
+            <p className="text-[12px] font-medium text-muted">Total spend</p>
+            <p className="mt-2 font-mono text-[22px] font-bold leading-none tracking-tight">
+              {rup(totalSpent)}
+            </p>
+          </div>
+          <div className="rounded-[14px] border bg-card p-5">
+            <p className="text-[12px] font-medium text-muted">Total clips</p>
+            <p className="mt-2 font-mono text-[22px] font-bold leading-none tracking-tight">
+              {received.length}
+            </p>
+          </div>
+          <div className="rounded-[14px] border bg-card p-5">
+            <p className="text-[12px] font-medium text-muted">Total views</p>
+            <p className="mt-2 font-mono text-[22px] font-bold leading-none tracking-tight">
+              {fmtViews(totalViews)}
+            </p>
+          </div>
+          <div className="rounded-[14px] border bg-card p-5">
+            <p className="text-[12px] font-medium text-muted">Pending review</p>
+            <p
+              className={`mt-2 font-mono text-[22px] font-bold leading-none tracking-tight ${pendingCount > 0 ? "text-amber" : ""}`}
+            >
+              {pendingCount}
+            </p>
           </div>
         </div>
       </section>
 
-      {/* ── Recent campaigns + pending review ────────────── */}
-      <div className="grid gap-10 lg:grid-cols-2">
+      {/* ── Recent campaigns + Pending review — side by side */}
+      <div className="grid gap-8 lg:grid-cols-2">
         {/* Recent campaigns */}
         <section>
-          <div className="mb-5 flex items-baseline justify-between">
-            <h2 className="text-[20px] font-bold tracking-tight">
+          <div className="mb-4 flex items-baseline justify-between">
+            <h2 className="text-[18px] font-bold tracking-tight">
               Recent campaigns
             </h2>
             {myCampaigns.length > 0 && (
@@ -175,8 +154,8 @@ export default function CreatorPage() {
 
         {/* Pending review */}
         <section>
-          <div className="mb-5 flex items-baseline justify-between">
-            <h2 className="text-[20px] font-bold tracking-tight">
+          <div className="mb-4 flex items-baseline justify-between">
+            <h2 className="text-[18px] font-bold tracking-tight">
               Pending review
             </h2>
             {pending.length > 0 && (
@@ -200,9 +179,8 @@ export default function CreatorPage() {
                 <Link
                   key={k.id}
                   href={`/clip/${k.id}`}
-                  className="group flex items-center gap-3.5 py-3.5 transition-colors duration-150 sm:gap-4"
+                  className="group flex items-center gap-3.5 py-3 transition-colors duration-150 sm:gap-4"
                 >
-                  {/* Thumbnail */}
                   <div className="h-10 w-14 shrink-0 overflow-hidden rounded-[10px] bg-accent-soft">
                     {thumb ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
@@ -220,8 +198,6 @@ export default function CreatorPage() {
                       </div>
                     )}
                   </div>
-
-                  {/* Info */}
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[14px] font-medium group-hover:underline underline-offset-2">
                       @{k.clipper}
@@ -230,8 +206,6 @@ export default function CreatorPage() {
                       {camp?.title}
                     </p>
                   </div>
-
-                  {/* Platform */}
                   <div className="shrink-0">
                     {k.platform && (
                       <PlatformIcon p={k.platform} size={14} />
@@ -242,9 +216,7 @@ export default function CreatorPage() {
             })}
             {pending.length === 0 && (
               <div className="rounded-[14px] border border-dashed bg-card py-12 text-center">
-                <p className="text-[16px] font-medium">
-                  Nothing pending
-                </p>
+                <p className="text-[16px] font-medium">Nothing pending</p>
                 <p className="mt-2 text-[14px] text-muted">
                   All clips reviewed.
                 </p>
@@ -254,117 +226,131 @@ export default function CreatorPage() {
         </section>
       </div>
 
-      {/* ── Best performing content ──────────────────────── */}
-      <section>
-        <h2 className="mb-5 text-[20px] font-bold tracking-tight">
-          Best performing content
-        </h2>
-        {topClips.length === 0 ? (
-          <div className="rounded-[14px] border border-dashed bg-card py-12 text-center">
-            <p className="text-[16px] font-medium">No earned clips yet</p>
-            <p className="mt-2 text-[14px] text-muted">
-              Approved clips will appear here.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-0 divide-y divide-border/50">
-            {topClips.map((k, i) => {
-              const camp = campaigns.find((c) => c.id === k.campaignId);
-              const finRec = financeRecords.find((r) => r.clipId === k.id);
-              const earned = (finRec?.netAmount ?? 0) / 100;
-              const thumb = camp?.thumbnails?.[0];
-              return (
-                <Link
-                  key={k.id}
-                  href={`/clip/${k.id}`}
-                  className="group flex items-center gap-4 py-3.5 transition-colors duration-150 sm:gap-5"
-                >
-                  {/* Rank */}
-                  <span className="w-5 shrink-0 text-right text-[13px] font-medium text-muted">
-                    {i + 1}
-                  </span>
-
-                  {/* Thumbnail */}
-                  <div className="h-10 w-14 shrink-0 overflow-hidden rounded-[10px] bg-accent-soft">
-                    {thumb ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={thumb}
-                        alt=""
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center">
-                        <PlatformIcon
-                          p={k.platform ?? "Instagram"}
-                          size={14}
+      {/* ── Best performing content + Spend — side by side ─ */}
+      <div className="grid gap-8 lg:grid-cols-2">
+        {/* Best performing content */}
+        <section>
+          <h2 className="mb-4 text-[18px] font-bold tracking-tight">
+            Best performing content
+          </h2>
+          {topClips.length === 0 ? (
+            <div className="rounded-[14px] border border-dashed bg-card py-12 text-center">
+              <p className="text-[16px] font-medium">No earned clips yet</p>
+              <p className="mt-2 text-[14px] text-muted">
+                Approved clips will appear here.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-0 divide-y divide-border/50">
+              {topClips.map((k, i) => {
+                const camp = campaigns.find((c) => c.id === k.campaignId);
+                const finRec = financeRecords.find((r) => r.clipId === k.id);
+                const earned = (finRec?.netAmount ?? 0) / 100;
+                const thumb = camp?.thumbnails?.[0];
+                return (
+                  <Link
+                    key={k.id}
+                    href={`/clip/${k.id}`}
+                    className="group flex items-center gap-3.5 py-3 transition-colors duration-150 sm:gap-4"
+                  >
+                    <span className="w-5 shrink-0 text-right text-[13px] font-medium text-muted">
+                      {i + 1}
+                    </span>
+                    <div className="h-10 w-14 shrink-0 overflow-hidden rounded-[10px] bg-accent-soft">
+                      {thumb ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={thumb}
+                          alt=""
+                          className="h-full w-full object-cover"
                         />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center">
+                          <PlatformIcon
+                            p={k.platform ?? "Instagram"}
+                            size={14}
+                          />
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[14px] font-medium group-hover:underline underline-offset-2">
+                        @{k.clipper}
+                      </p>
+                      <p className="mt-0.5 truncate text-[13px] text-muted">
+                        {camp?.title}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3 sm:gap-5">
+                      <div className="text-right">
+                        <p className="font-mono text-[14px] font-bold">
+                          {fmtViews(k.verifiedViews ?? 0)}
+                        </p>
+                        <p className="text-[10px] text-muted">views</p>
                       </div>
-                    )}
-                  </div>
-
-                  {/* Info */}
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[14px] font-medium group-hover:underline underline-offset-2">
-                      @{k.clipper}
-                    </p>
-                    <p className="mt-0.5 truncate text-[13px] text-muted">
-                      {camp?.title}
-                    </p>
-                  </div>
-
-                  {/* Metrics */}
-                  <div className="flex shrink-0 items-center gap-3 sm:gap-6">
-                    <div className="text-right">
-                      <p className="font-mono text-[14px] font-bold sm:text-[15px]">
-                        {fmtViews(k.verifiedViews ?? 0)}
-                      </p>
-                      <p className="text-[11px] text-muted">views</p>
+                      <div className="text-right">
+                        <p className="font-mono text-[14px] font-bold">
+                          {rup(earned)}
+                        </p>
+                        <p className="text-[10px] text-muted">earned</p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-mono text-[14px] font-bold sm:text-[15px]">
-                        {rup(earned)}
-                      </p>
-                      <p className="text-[11px] text-muted">earned</p>
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </section>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </section>
 
-      {/* ── Spend summary ────────────────────────────────── */}
-      <section>
-        <h2 className="mb-5 text-[20px] font-bold tracking-tight">
-          Spend summary
-        </h2>
-        <div className="rounded-[14px] border bg-card px-5 py-6 sm:px-8">
-          <div className="flex flex-wrap gap-x-12 gap-y-6">
-            <div>
-              <p className="text-[13px] text-muted">Total earned</p>
-              <p className="mt-1.5 font-mono text-[20px] font-bold tracking-tight">
-                {rup(totalEarned)}
-              </p>
-            </div>
-            <div>
-              <p className="text-[13px] text-muted">Paid out</p>
-              <p className="mt-1.5 font-mono text-[20px] font-bold tracking-tight text-green">
-                {rup(totalSpent)}
-              </p>
-            </div>
-            <div>
-              <p className="text-[13px] text-muted">Outstanding</p>
-              <p
-                className={`mt-1.5 font-mono text-[20px] font-bold tracking-tight ${outstanding > 0 ? "text-amber" : ""}`}
-              >
-                {rup(outstanding)}
-              </p>
+        {/* Spend summary */}
+        <section>
+          <h2 className="mb-4 text-[18px] font-bold tracking-tight">
+            Spend summary
+          </h2>
+          <div className="rounded-[14px] border bg-card p-5 sm:p-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-[13px] text-muted">Total earned</span>
+                <span className="font-mono text-[18px] font-bold tracking-tight">
+                  {rup(totalEarned)}
+                </span>
+              </div>
+              <div className="border-t border-border/40" />
+              <div className="flex items-center justify-between">
+                <span className="text-[13px] text-muted">Paid out</span>
+                <span className="font-mono text-[18px] font-bold tracking-tight text-green">
+                  {rup(totalSpent)}
+                </span>
+              </div>
+              <div className="border-t border-border/40" />
+              <div className="flex items-center justify-between">
+                <span className="text-[13px] text-muted">Outstanding</span>
+                <span
+                  className={`font-mono text-[18px] font-bold tracking-tight ${outstanding > 0 ? "text-amber" : ""}`}
+                >
+                  {rup(outstanding)}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+
+          {/* Quick actions */}
+          <div className="mt-5 flex flex-wrap gap-2">
+            <Link
+              href="/creator/analytics"
+              className="inline-flex items-center gap-1.5 rounded-[10px] border bg-card px-4 py-2.5 text-[13px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground"
+            >
+              <BarChart3 size={14} /> View analytics
+            </Link>
+            <button
+              onClick={() => setOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-[10px] border bg-card px-4 py-2.5 text-[13px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground"
+            >
+              Quick add
+            </button>
+          </div>
+        </section>
+      </div>
 
       {/* ── Modals ──────────────────────────────────────── */}
       {open && (
@@ -440,9 +426,6 @@ function CampaignRow({
 }) {
   const campClips = clips.filter((k) => k.campaignId === c.id);
   const spent = campaignSpent(c, financeRecords);
-  const pct = c.budget
-    ? Math.min(100, Math.round((spent / c.budget) * 100))
-    : 0;
   const isOpen = c.status === "open";
   const isArchived = c.status === "archived";
   const thumb = c.thumbnails?.[0];
@@ -455,7 +438,6 @@ function CampaignRow({
         isArchived ? "opacity-60" : ""
       }`}
     >
-      {/* Thumbnail */}
       <div className="h-[52px] w-[80px] shrink-0 overflow-hidden rounded-[10px] bg-accent-soft">
         {thumb ? (
           /* eslint-disable-next-line @next/next/no-img-element */
@@ -471,7 +453,6 @@ function CampaignRow({
         )}
       </div>
 
-      {/* Info */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2.5">
           <p className="truncate text-[15px] font-semibold group-hover:underline underline-offset-2">
@@ -492,29 +473,12 @@ function CampaignRow({
         <p className="mt-1 text-[13px] text-muted">
           {c.niche} &middot; {c.platform}
         </p>
-
-        {/* Budget bar */}
-        {c.budget ? (
-          <div className="mt-2.5">
-            <div className="h-[4px] w-full max-w-[200px] overflow-hidden rounded-full bg-accent-soft">
-              <div
-                className="h-full rounded-full bg-foreground"
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-            <p className="mt-1 text-[12px] text-muted">
-              {campClips.length} clips &middot; {c.daysLeft}d left &middot; {rup(spent)}{" "}
-              spent
-            </p>
-          </div>
-        ) : (
-          <p className="mt-2 text-[12px] text-muted">
-            {campClips.length} clips &middot; {c.daysLeft}d left
-          </p>
-        )}
+        <p className="mt-1 text-[12px] text-muted">
+          {campClips.length} clips &middot; {c.daysLeft}d left &middot;{" "}
+          {rup(spent)} spent
+        </p>
       </div>
 
-      {/* Arrow */}
       <ArrowRight
         size={16}
         className="shrink-0 text-muted/40 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-muted"
@@ -561,7 +525,8 @@ function CampaignDetailModal({
           <div className="min-w-0">
             <h3 className="text-[18px] font-semibold">{campaign.title}</h3>
             <p className="mt-0.5 text-[13px] text-muted">
-              {campaign.creator} &middot; {campaign.niche} &middot; {campaign.platform}
+              {campaign.creator} &middot; {campaign.niche} &middot;{" "}
+              {campaign.platform}
             </p>
           </div>
           <span

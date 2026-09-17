@@ -42,17 +42,17 @@ export default function ClipperPage() {
     (s, k) => s + (k.verifiedViews ?? 0),
     0,
   );
-  const displayedCampaigns = openCampaigns.slice(0, 4);
+  const displayedCampaigns = openCampaigns.slice(0, 3);
 
   const viewsSeries = seriesByDay(myClips, (k) => k.verifiedViews ?? 0);
 
   return (
-    <div className="mx-auto max-w-[1120px] space-y-12 px-5 py-10 sm:px-8">
+    <div className="mx-auto max-w-[1120px] space-y-10 px-5 py-10 sm:px-8">
       {/* ── Header ──────────────────────────────────────── */}
       <section className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-[28px] font-bold leading-tight tracking-tight sm:text-[32px]">
-            Welcome back, @{user?.name ?? user?.email ?? "clipper"}
+          <h1 className="text-[30px] font-bold leading-tight tracking-tight sm:text-[34px]">
+            Welcome back, @{user?.name ?? user?.email ?? "clipper"} &#x1F44B;
           </h1>
           <p className="mt-2 max-w-lg text-[15px] leading-relaxed text-muted">
             Find campaigns worth clipping and turn views into earnings.
@@ -70,73 +70,40 @@ export default function ClipperPage() {
         </Link>
       </section>
 
-      {/* ── Earnings overview ───────────────────────────── */}
+      {/* ── Earnings overview — 4 metric cards ──────────── */}
       <section>
-        <div className="rounded-[14px] border bg-card px-5 py-6 sm:px-8 sm:py-7">
-          <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-            {/* Total earnings — dominant */}
-            <div>
-              <p className="text-[13px] font-medium text-muted">
-                Total earnings
-              </p>
-              <p className="mt-2 font-mono text-[28px] font-bold leading-none tracking-tight">
-                {rup(earnings)}
-              </p>
-              {earnings > 0 && (
-                <p className="mt-1.5 text-[13px] text-muted">
-                  from approved clips
-                </p>
-              )}
-            </div>
-
-            {/* Breakdown */}
-            <div className="flex flex-wrap gap-x-6 gap-y-3 sm:gap-x-10 sm:gap-y-4">
-              <Link
-                href="/clipper/wallet"
-                className={`min-w-[100px] transition-colors duration-150 hover:opacity-80 ${available > 0 ? "cursor-pointer" : "cursor-default"}`}
-              >
-                <p className="text-[13px] text-muted">Available</p>
-                <p
-                  className={`mt-1 font-mono text-lg font-bold ${available > 0 ? "text-green" : ""}`}
-                >
-                  {rup(available)}
-                </p>
-              </Link>
-              <div className="min-w-[100px]">
-                <p className="text-[13px] text-muted">Pending</p>
-                <p
-                  className={`mt-1 font-mono text-lg font-bold ${pending > 0 ? "text-amber" : ""}`}
-                >
-                  {rup(pending)}
-                </p>
-              </div>
-              <div className="min-w-[80px]">
-                <p className="text-[13px] text-muted">Submitted</p>
-                <p className="mt-1 font-mono text-lg font-bold">
-                  {myClips.length}
-                </p>
-              </div>
-              <div className="min-w-[80px]">
-                <p className="text-[13px] text-muted">Approved</p>
-                <p className="mt-1 font-mono text-lg font-bold">
-                  {approvedCount}
-                </p>
-                {pendingCount > 0 && (
-                  <p className="mt-0.5 text-[11px] text-muted">
-                    {pendingCount} awaiting review
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
+        <h2 className="mb-4 text-[18px] font-bold tracking-tight">
+          Earnings overview
+        </h2>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <MetricCard
+            label="Total earnings"
+            value={rup(earnings)}
+            sub={earnings > 0 ? "from approved clips" : undefined}
+          />
+          <MetricCard
+            label="Available"
+            value={rup(available)}
+            valueClass={available > 0 ? "text-green" : undefined}
+          />
+          <MetricCard
+            label="Pending"
+            value={rup(pending)}
+            valueClass={pending > 0 ? "text-amber" : undefined}
+          />
+          <MetricCard
+            label="Approved clips"
+            value={String(approvedCount)}
+            sub={pendingCount > 0 ? `${pendingCount} awaiting review` : undefined}
+          />
         </div>
       </section>
 
-      {/* ── Campaigns worth clipping ────────────────────── */}
+      {/* ── Campaigns worth clipping — 3-col grid ───────── */}
       <section>
-        <div className="mb-6 flex items-baseline justify-between">
+        <div className="mb-5 flex items-baseline justify-between">
           <div>
-            <h2 className="text-[20px] font-bold tracking-tight">
+            <h2 className="text-[18px] font-bold tracking-tight">
               Campaigns worth clipping
             </h2>
             <p className="mt-1 text-[13px] text-muted">
@@ -160,7 +127,7 @@ export default function ClipperPage() {
         {displayedCampaigns.length === 0 ? (
           <EmptyCampaigns onBrowse={() => router.push("/clipper/campaigns")} />
         ) : (
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {displayedCampaigns.map((c) => (
               <CampaignCardLarge
                 key={c.id}
@@ -172,228 +139,238 @@ export default function ClipperPage() {
         )}
       </section>
 
-      {/* ── My clips ────────────────────────────────────── */}
-      <section>
-        <div className="mb-5 flex items-baseline justify-between">
-          <h2 className="text-[20px] font-bold tracking-tight">My clips</h2>
-          {myClips.length > 0 && (
-            <Link
-              href="/clipper/submissions"
-              className="group inline-flex items-center gap-1.5 text-[13px] font-medium text-muted transition-colors duration-150 hover:text-foreground"
-            >
-              View all
-              <ArrowRight
-                size={13}
-                className="transition-transform duration-200 group-hover:translate-x-0.5"
-              />
-            </Link>
-          )}
-        </div>
-
-        {myClips.length === 0 ? (
-          <EmptySubmissions onBrowse={() => router.push("/clipper/campaigns")} />
-        ) : (
-          <div className="space-y-0 divide-y divide-border/50">
-            {myClips.slice(0, 6).map((k) => {
-              const camp = campaigns.find((c) => c.id === k.campaignId);
-              const finRec = financeRecords.find((r) => r.clipId === k.id);
-              const earning = (finRec?.netAmount ?? 0) / 100;
-              const thumb = camp?.thumbnails?.[0];
-              return (
-                <Link
-                  key={k.id}
-                  href={`/clip/${k.id}`}
-                  className="group flex items-center gap-4 py-3.5 transition-colors duration-150 sm:gap-5"
-                >
-                  {/* Thumbnail */}
-                  <div className="h-[52px] w-[80px] shrink-0 overflow-hidden rounded-[10px] bg-accent-soft">
-                    {thumb ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={thumb}
-                        alt=""
-                        className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center">
-                        <ImageIcon size={16} className="text-muted/30" />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Info */}
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[15px] font-semibold leading-snug group-hover:underline underline-offset-2">
-                      {camp?.title ?? "Campaign"}
-                    </p>
-                    <p className="mt-1 flex items-center gap-2 text-[13px] text-muted">
-                      {k.platform && (
-                        <PlatformIcon p={k.platform} size={13} />
-                      )}
-                      <span className="truncate max-w-[200px]">
-                        {k.caption}
-                      </span>
-                      <span className="shrink-0 text-[12px]">
-                        {new Date(k.submittedAt).toLocaleDateString("en-IN", {
-                          day: "numeric",
-                          month: "short",
-                        })}
-                      </span>
-                    </p>
-                  </div>
-
-                  {/* Desktop metrics */}
-                  <div className="hidden shrink-0 items-center gap-7 sm:flex">
-                    <div className="text-right">
-                      <p className="font-mono text-[15px] font-semibold">
-                        {k.verifiedViews ? fmtViews(k.verifiedViews) : "—"}
-                      </p>
-                      <p className="text-[11px] text-muted">views</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-mono text-[15px] font-semibold">
-                        {earning > 0 ? rup(earning) : "—"}
-                      </p>
-                      <p className="text-[11px] text-muted">earned</p>
-                    </div>
-                    <StatusPill status={k.status} />
-                  </div>
-
-                  {/* Mobile metrics */}
-                  <div className="flex shrink-0 items-center gap-2.5 sm:hidden">
-                    <span className="font-mono text-[13px] font-medium text-muted">
-                      {k.verifiedViews ? fmtViews(k.verifiedViews) : "—"}
-                    </span>
-                    <StatusPill status={k.status} />
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* ── Performance ─────────────────────────────────── */}
-      <section>
-        <h2 className="mb-5 text-[20px] font-bold tracking-tight">
-          Performance
-        </h2>
-        {myClips.length === 0 ? (
-          <div className="rounded-[14px] border border-dashed bg-card py-12 text-center">
-            <p className="text-[15px] font-medium">No performance data yet</p>
-            <p className="mt-1.5 text-[13px] text-muted">
-              Submit your first clip to start tracking views.
-            </p>
-          </div>
-        ) : (
-          <div className="rounded-[14px] border bg-card p-5 sm:p-6">
-            {/* Summary metrics */}
-            <div className="mb-5 flex flex-wrap gap-x-10 gap-y-3">
-              <div>
-                <p className="text-[13px] text-muted">Total views</p>
-                <p className="mt-1 font-mono text-[20px] font-bold tracking-tight">
-                  {fmtViews(verifiedViews)}
-                </p>
-              </div>
-              <div>
-                <p className="text-[13px] text-muted">Total earnings</p>
-                <p className="mt-1 font-mono text-[20px] font-bold tracking-tight">
-                  {rup(earnings)}
-                </p>
-              </div>
-            </div>
-            {/* Chart */}
-            <div className="h-[180px] w-full">
-              <TimeSeriesChart data={viewsSeries} format={fmtViews} />
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* ── Quick actions ───────────────────────────────── */}
-      <section className="border-t border-border/60 pt-8">
-        <div className="flex flex-col gap-6 sm:flex-row sm:gap-10">
-          {/* Connected Accounts */}
-          <div className="min-w-0 flex-1">
-            <h3 className="mb-3 text-[13px] font-semibold text-foreground">
-              Connected accounts
-            </h3>
-            {myAccounts.length === 0 ? (
-              <div className="flex items-center justify-between rounded-[10px] border border-dashed px-4 py-3">
-                <span className="text-[13px] text-muted">
-                  No accounts connected
-                </span>
-                <Link
-                  href="/clipper/accounts"
-                  className="inline-flex items-center gap-1 text-[13px] font-medium text-foreground hover:underline"
-                >
-                  Connect <ArrowRight size={12} />
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-0.5">
-                {myAccounts.map((a) => (
-                  <div
-                    key={a.id}
-                    className="flex items-center justify-between rounded-[10px] px-3 py-2 transition-colors duration-150 hover:bg-accent-soft/50"
-                  >
-                    <span className="flex items-center gap-2">
-                      <PlatformIcon p={a.platform} size={14} />
-                      <span className="text-[13px] font-medium">
-                        {a.handle}
-                      </span>
-                    </span>
-                    <span
-                      className={`text-[11px] font-medium ${
-                        a.status === "verified" || a.status === "connected"
-                          ? "text-green"
-                          : a.status === "connecting"
-                            ? "text-amber"
-                            : "text-muted"
-                      }`}
-                    >
-                      {a.status === "verified"
-                        ? "Verified"
-                        : a.status === "connected"
-                          ? "Connected"
-                          : a.status === "connecting"
-                            ? "Connecting"
-                            : "Not connected"}
-                    </span>
-                  </div>
-                ))}
-                <Link
-                  href="/clipper/accounts"
-                  className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-[10px] border px-3 py-2 text-[13px] font-medium transition-colors duration-150 hover:bg-accent-soft"
-                >
-                  Manage accounts <ArrowRight size={11} />
-                </Link>
-              </div>
+      {/* ── My clips + Performance — side by side ───────── */}
+      <div className="grid gap-8 lg:grid-cols-2">
+        {/* My clips */}
+        <section>
+          <div className="mb-4 flex items-baseline justify-between">
+            <h2 className="text-[18px] font-bold tracking-tight">My clips</h2>
+            {myClips.length > 0 && (
+              <Link
+                href="/clipper/submissions"
+                className="group inline-flex items-center gap-1.5 text-[13px] font-medium text-muted transition-colors duration-150 hover:text-foreground"
+              >
+                View all
+                <ArrowRight
+                  size={13}
+                  className="transition-transform duration-200 group-hover:translate-x-0.5"
+                />
+              </Link>
             )}
           </div>
 
-          {/* Wallet */}
-          <div className="flex-1">
-            <h3 className="mb-3 text-[13px] font-semibold text-foreground">
-              Wallet
-            </h3>
-            <div className="flex items-baseline justify-between">
-              <p className="font-mono text-xl font-bold">{rup(earnings)}</p>
-              <span
-                className={`text-[11px] font-medium ${earnings > 0 ? "text-green" : "text-muted"}`}
-              >
-                {earnings > 0 ? "Available" : "No earnings yet"}
-              </span>
+          {myClips.length === 0 ? (
+            <EmptySubmissions
+              onBrowse={() => router.push("/clipper/campaigns")}
+            />
+          ) : (
+            <div className="space-y-0 divide-y divide-border/50">
+              {myClips.slice(0, 5).map((k) => {
+                const camp = campaigns.find((c) => c.id === k.campaignId);
+                const finRec = financeRecords.find((r) => r.clipId === k.id);
+                const earning = (finRec?.netAmount ?? 0) / 100;
+                const thumb = camp?.thumbnails?.[0];
+                return (
+                  <Link
+                    key={k.id}
+                    href={`/clip/${k.id}`}
+                    className="group flex items-center gap-3.5 py-3 transition-colors duration-150 sm:gap-4"
+                  >
+                    <div className="h-10 w-14 shrink-0 overflow-hidden rounded-[10px] bg-accent-soft">
+                      {thumb ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={thumb}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center">
+                          <ImageIcon size={14} className="text-muted/30" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[14px] font-medium group-hover:underline underline-offset-2">
+                        {camp?.title ?? "Campaign"}
+                      </p>
+                      <p className="mt-0.5 flex items-center gap-1.5 text-[12px] text-muted">
+                        {k.platform && (
+                          <PlatformIcon p={k.platform} size={12} />
+                        )}
+                        <span className="truncate max-w-[160px]">
+                          {k.caption}
+                        </span>
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3 sm:gap-4">
+                      <div className="text-right">
+                        <p className="font-mono text-[13px] font-semibold">
+                          {k.verifiedViews ? fmtViews(k.verifiedViews) : "—"}
+                        </p>
+                        <p className="text-[10px] text-muted">views</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-mono text-[13px] font-semibold">
+                          {earning > 0 ? rup(earning) : "—"}
+                        </p>
+                        <p className="text-[10px] text-muted">earned</p>
+                      </div>
+                      <StatusPill status={k.status} />
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
-            <Link
-              href="/clipper/wallet"
-              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-[10px] border px-3 py-2 text-[13px] font-medium transition-colors duration-150 hover:bg-accent-soft"
+          )}
+        </section>
+
+        {/* Performance */}
+        <section>
+          <h2 className="mb-4 text-[18px] font-bold tracking-tight">
+            Performance
+          </h2>
+          {myClips.length === 0 ? (
+            <div className="rounded-[14px] border border-dashed bg-card py-12 text-center">
+              <p className="text-[15px] font-medium">No performance data yet</p>
+              <p className="mt-1.5 text-[13px] text-muted">
+                Submit your first clip to start tracking views.
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-[14px] border bg-card p-5 sm:p-6">
+              <div className="mb-5 flex flex-wrap gap-x-10 gap-y-3">
+                <div>
+                  <p className="text-[12px] text-muted">Total views</p>
+                  <p className="mt-1 font-mono text-[22px] font-bold tracking-tight">
+                    {fmtViews(verifiedViews)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[12px] text-muted">Total earnings</p>
+                  <p className="mt-1 font-mono text-[22px] font-bold tracking-tight">
+                    {rup(earnings)}
+                  </p>
+                </div>
+              </div>
+              <div className="h-[160px] w-full">
+                <TimeSeriesChart data={viewsSeries} format={fmtViews} />
+              </div>
+            </div>
+          )}
+        </section>
+      </div>
+
+      {/* ── Connected accounts + Wallet — side by side ──── */}
+      <div className="grid gap-8 border-t border-border/60 pt-8 lg:grid-cols-2">
+        {/* Connected Accounts */}
+        <section>
+          <h3 className="mb-3 text-[13px] font-semibold text-foreground">
+            Connected accounts
+          </h3>
+          {myAccounts.length === 0 ? (
+            <div className="flex items-center justify-between rounded-[10px] border border-dashed px-4 py-3">
+              <span className="text-[13px] text-muted">
+                No accounts connected
+              </span>
+              <Link
+                href="/clipper/accounts"
+                className="inline-flex items-center gap-1 text-[13px] font-medium text-foreground hover:underline"
+              >
+                Connect <ArrowRight size={12} />
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-0.5">
+              {myAccounts.map((a) => (
+                <div
+                  key={a.id}
+                  className="flex items-center justify-between rounded-[10px] px-3 py-2 transition-colors duration-150 hover:bg-accent-soft/50"
+                >
+                  <span className="flex items-center gap-2">
+                    <PlatformIcon p={a.platform} size={14} />
+                    <span className="text-[13px] font-medium">{a.handle}</span>
+                  </span>
+                  <span
+                    className={`text-[11px] font-medium ${
+                      a.status === "verified" || a.status === "connected"
+                        ? "text-green"
+                        : a.status === "connecting"
+                          ? "text-amber"
+                          : "text-muted"
+                    }`}
+                  >
+                    {a.status === "verified"
+                      ? "Verified"
+                      : a.status === "connected"
+                        ? "Connected"
+                        : a.status === "connecting"
+                          ? "Connecting"
+                          : "Not connected"}
+                  </span>
+                </div>
+              ))}
+              <Link
+                href="/clipper/accounts"
+                className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-[10px] border px-3 py-2 text-[13px] font-medium transition-colors duration-150 hover:bg-accent-soft"
+              >
+                Manage accounts <ArrowRight size={11} />
+              </Link>
+            </div>
+          )}
+        </section>
+
+        {/* Wallet */}
+        <section>
+          <h3 className="mb-3 text-[13px] font-semibold text-foreground">
+            Wallet
+          </h3>
+          <div className="flex items-baseline justify-between">
+            <p className="font-mono text-xl font-bold">{rup(earnings)}</p>
+            <span
+              className={`text-[11px] font-medium ${earnings > 0 ? "text-green" : "text-muted"}`}
             >
-              View wallet <ArrowRight size={11} />
-            </Link>
+              {earnings > 0 ? "Available" : "No earnings yet"}
+            </span>
           </div>
-        </div>
-      </section>
+          <Link
+            href="/clipper/wallet"
+            className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-[10px] border px-3 py-2 text-[13px] font-medium transition-colors duration-150 hover:bg-accent-soft"
+          >
+            View wallet <ArrowRight size={11} />
+          </Link>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Metric Card
+   ──────────────────────────────────────────────────────────────────────────── */
+
+function MetricCard({
+  label,
+  value,
+  sub,
+  valueClass,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  valueClass?: string;
+}) {
+  return (
+    <div className="rounded-[14px] border bg-card p-5">
+      <p className="text-[12px] font-medium text-muted">{label}</p>
+      <p
+        className={`mt-2 font-mono text-[22px] font-bold leading-none tracking-tight ${valueClass ?? ""}`}
+      >
+        {value}
+      </p>
+      {sub && (
+        <p className="mt-1.5 text-[11px] text-muted">{sub}</p>
+      )}
     </div>
   );
 }
@@ -463,21 +440,21 @@ function CampaignCardLarge({
 
       {/* Content */}
       <div className="flex flex-1 flex-col p-5">
-        <h3 className="line-clamp-2 text-[17px] font-semibold leading-snug group-hover:underline underline-offset-2">
+        <h3 className="line-clamp-2 text-[16px] font-semibold leading-snug group-hover:underline underline-offset-2">
           {campaign.title}
         </h3>
-        <p className="mt-1.5 text-[14px] text-muted">by {campaign.creator}</p>
+        <p className="mt-1 text-[13px] text-muted">by {campaign.creator}</p>
 
         {/* Payout */}
-        <div className="mt-4 flex items-baseline gap-1.5">
-          <span className="font-mono text-[22px] font-bold tracking-tight">
+        <div className="mt-3 flex items-baseline gap-1.5">
+          <span className="font-mono text-[20px] font-bold tracking-tight">
             {rup(campaign.payout)}
           </span>
-          <span className="text-[13px] text-muted">/ 1K views</span>
+          <span className="text-[12px] text-muted">/ 1K views</span>
         </div>
 
         {/* Secondary metrics */}
-        <div className="mt-2.5 flex items-center gap-3 text-[13px] text-muted">
+        <div className="mt-2 flex items-center gap-2 text-[12px] text-muted">
           <span>
             {remaining > 0 ? `${rup(remaining)} left` : "Flexible budget"}
           </span>
@@ -488,16 +465,16 @@ function CampaignCardLarge({
         <div className="flex-1" />
 
         {/* CTA */}
-        <div className="mt-5 flex items-center justify-between border-t border-border/50 pt-4">
-          <span className="text-[13px] text-muted">
+        <div className="mt-4 flex items-center justify-between border-t border-border/50 pt-3">
+          <span className="text-[12px] text-muted">
             {clippersIn > 0 ? `${clippersIn} clippers` : "Be the first"}
           </span>
           <Link
             href={`/campaigns/${campaign.id}`}
-            className="inline-flex items-center gap-1.5 rounded-[10px] bg-accent px-4 py-2.5 text-[13px] font-medium text-white transition-all duration-200 group-hover:bg-foreground/90"
+            className="inline-flex items-center gap-1.5 rounded-[10px] bg-accent px-3.5 py-2 text-[12px] font-medium text-white transition-all duration-200 group-hover:bg-foreground/90"
           >
             View campaign
-            <ArrowRight size={12} />
+            <ArrowRight size={11} />
           </Link>
         </div>
       </div>
