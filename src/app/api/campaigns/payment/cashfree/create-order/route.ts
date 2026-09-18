@@ -77,10 +77,11 @@ export async function POST(request: Request) {
     );
   }
 
-  // Fetch campaign — must belong to creator, must be draft or open
+  // Fetch campaign — must belong to creator, must be draft only
+  // Fix #5: Do not allow open/unverified campaigns as a starting point
   const { data: campaign } = await supabase
     .from("campaigns")
-    .select("id, budget, status, title, created_by")
+    .select("id, budget, status, title, created_by, launch_payment_status")
     .eq("id", campaignId)
     .eq("created_by", user.id)
     .single();
@@ -92,11 +93,59 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!["draft", "open"].includes(campaign.status)) {
+  // Fix #5: Only draft campaigns can start a new Cashfree payment flow
+  if (campaign.status !== "draft") {
     return NextResponse.json(
-      { error: "Cannot create payment for a campaign in this status" },
+      { error: "Cashfree payment is only available for draft campaigns" },
       { status: 400 },
     );
+  }
+
+  // Fix #7: Fetch creator's phone from auth.users — do NOT use fake data
+  const { data: authUser } = await supabase.auth.admin.getUserById(user.id);
+
+  const phone = authUser?.user?.phone;
+
+  if (!phone) {
+    return NextResponse.json(
+      { error: "A valid phone number is required for Cashfree payments. Please add a phone number to your account." },
+      { status: 400 },
+    );
+  }
+
+  // Fix #6: Check for existing active Cashfree payment record
+  // If one exists and is still usable, reuse it instead of creating a new order
+  const { data: existingPayment } = await supabase
+    .from("campaign_launch_payments")
+    .select("id, cashfree_order_id, cashfree_payment_session_id, payment_status, cashfree_order_status, cashfree_flow")
+    .eq("campaign_id", campaignId)
+    .single();
+
+  if (existingPayment) {
+    // If there's an existing submitted/active Cashfree order, reuse it
+    if (
+      existingPayment.cashfree_order_id &&
+      existingPayment.cashfree_flow === "cashfree" &&
+      existingPayment.payment_status === "submitted" &&
+      existingPayment.cashfree_order_status === "ACTIVE"
+    ) {
+      return NextResponse.json({
+        success: true,
+        payment_session_id: existingPayment.cashfree_payment_session_id,
+        order_id: existingPayment.cashfree_order_id,
+        amount: (Number(campaign.budget) * 1.1),
+        currency: "INR",
+        reused: true,
+      });
+    }
+
+    // If there's a rejected/pending record, we can create a new order for it
+    if (!["rejected", "pending"].includes(existingPayment.payment_status)) {
+      return NextResponse.json(
+        { error: "A payment already exists for this campaign" },
+        { status: 400 },
+      );
+    }
   }
 
   // Server-side amount calculation (same formula as submit_campaign_launch_payment)
@@ -117,7 +166,7 @@ export async function POST(request: Request) {
     customer_details: {
       customer_id: user.id,
       customer_email: user.email || undefined,
-      customer_phone: "9999999999", // Required by Cashfree, placeholder
+      customer_phone: phone,
       customer_name: profile.name || "Creator",
     },
     order_meta: {
