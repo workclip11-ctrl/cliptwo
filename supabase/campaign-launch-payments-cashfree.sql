@@ -11,7 +11,9 @@
 -- Security notes:
 --   - verify_cashfree_webhook() is SECURITY DEFINER, service_role ONLY
 --   - reject_cashfree_webhook() is SECURITY DEFINER, service_role ONLY
---   - submit_campaign_launch_payment_cashfree() is SECURITY DEFINER, authenticated ONLY
+--   - reserve_cashfree_payment_attempt() is SECURITY DEFINER, authenticated ONLY
+--   - confirm_cashfree_payment_attempt() is SECURITY DEFINER, authenticated ONLY
+--   - release_cashfree_payment_reservation() is SECURITY DEFINER, authenticated ONLY
 --   - enforce_campaign_open_requires_verified trigger prevents open without verified
 --   - enforce_campaign_launch_payment_integrity trigger prevents self-verification
 --   - All Cashfree verifications use FOR UPDATE row locking
@@ -62,18 +64,36 @@ BEGIN
     ALTER TABLE public.campaign_launch_payments
       ADD COLUMN cashfree_cf_payment_id text;
   END IF;
+
+  -- Attempt number for deterministic order IDs (Fix #2)
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'campaign_launch_payments' AND column_name = 'cashfree_attempt_number'
+  ) THEN
+    ALTER TABLE public.campaign_launch_payments
+      ADD COLUMN cashfree_attempt_number integer DEFAULT 0;
+  END IF;
 END $$;
 
+-- Unique constraint: one active Cashfree order per campaign
 CREATE UNIQUE INDEX IF NOT EXISTS idx_campaign_launch_payments_cashfree_order_id
   ON public.campaign_launch_payments(cashfree_order_id)
   WHERE cashfree_order_id IS NOT NULL;
 
--- ── 2. Submit campaign launch payment via Cashfree (Creator) ────────────────
+-- Unique constraint: one active Cashfree reservation/attempt per campaign
+-- Prevents concurrent creation of multiple active payment records
+CREATE UNIQUE INDEX IF NOT EXISTS idx_campaign_launch_payments_cashfree_active
+  ON public.campaign_launch_payments(campaign_id)
+  WHERE cashfree_flow = 'cashfree'
+    AND payment_status IN ('reserving', 'submitted')
+    AND cashfree_order_id IS NOT NULL;
 
-CREATE OR REPLACE FUNCTION public.submit_campaign_launch_payment_cashfree(
-  p_campaign_id uuid,
-  p_cashfree_order_id text,
-  p_cashfree_payment_session_id text
+-- ── 2. Reserve Cashfree payment attempt (atomic, DB-authoritative) ────────
+-- Fix #2: This is the serialization point. Two concurrent requests for the
+-- same campaign will serialize here. Only one can successfully reserve.
+
+CREATE OR REPLACE FUNCTION public.reserve_cashfree_payment_attempt(
+  p_campaign_id uuid
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -83,10 +103,11 @@ AS $$
 DECLARE
   v_creator_id uuid;
   v_campaign record;
+  v_attempt_number integer;
   v_platform_fee_paise integer;
   v_total_payable_paise integer;
   v_budget_paise integer;
-  v_existing record;
+  v_order_id text;
   v_payment record;
 BEGIN
   v_creator_id := auth.uid();
@@ -101,14 +122,6 @@ BEGIN
     RAISE EXCEPTION 'Only active creators can submit campaign payments';
   END IF;
 
-  IF p_cashfree_order_id IS NULL OR length(trim(p_cashfree_order_id)) = 0 THEN
-    RAISE EXCEPTION 'Cashfree order ID is required';
-  END IF;
-
-  IF p_cashfree_payment_session_id IS NULL OR length(trim(p_cashfree_payment_session_id)) = 0 THEN
-    RAISE EXCEPTION 'Cashfree payment session ID is required';
-  END IF;
-
   SELECT * INTO v_campaign
   FROM public.campaigns
   WHERE id = p_campaign_id AND created_by = v_creator_id;
@@ -121,102 +134,268 @@ BEGIN
     RAISE EXCEPTION 'Cashfree payment is only available for draft campaigns';
   END IF;
 
-  v_budget_paise := (v_campaign.budget * 100)::integer;
-  v_platform_fee_paise := (v_campaign.budget * 100 * 0.10)::integer;
-  v_total_payable_paise := v_budget_paise + v_platform_fee_paise;
+  -- Check for existing active Cashfree payment (reuse if found)
+  SELECT id, cashfree_order_id, cashfree_payment_session_id, payment_status,
+         cashfree_order_status, cashfree_attempt_number
+  INTO v_payment
+  FROM public.campaign_launch_payments
+  WHERE campaign_id = p_campaign_id
+    AND cashfree_flow = 'cashfree'
+    AND payment_status IN ('reserving', 'submitted')
+    AND cashfree_order_id IS NOT NULL
+  FOR UPDATE;
 
-  -- Lock existing row to prevent concurrent inserts (Fix #4)
-  SELECT id, payment_status INTO v_existing
+  IF v_payment IS NOT NULL THEN
+    -- Reuse existing reservation/submitted order
+    RETURN jsonb_build_object(
+      'success', true,
+      'reserved', false,
+      'reused', true,
+      'payment_id', v_payment.id,
+      'order_id', v_payment.cashfree_order_id,
+      'attempt_number', v_payment.cashfree_attempt_number,
+      'payment_session_id', v_payment.cashfree_payment_session_id,
+      'payment_status', v_payment.payment_status,
+      'message', 'Reusing existing active Cashfree payment'
+    );
+  END IF;
+
+  -- Check for rejected/pending records (allow resubmission)
+  SELECT id, payment_status INTO v_payment
   FROM public.campaign_launch_payments
   WHERE campaign_id = p_campaign_id
   FOR UPDATE;
 
-  IF v_existing IS NOT NULL THEN
-    IF v_existing.payment_status NOT IN ('rejected', 'pending') THEN
-      RAISE EXCEPTION 'A verified/submitted payment already exists for this campaign';
-    END IF;
+  IF v_payment IS NOT NULL AND v_payment.payment_status NOT IN ('rejected', 'pending') THEN
+    RAISE EXCEPTION 'A verified/submitted payment already exists for this campaign';
+  END IF;
 
-    IF NOT EXISTS (
-      SELECT 1 FROM public.campaigns
-      WHERE id = p_campaign_id AND status = 'draft'
-    ) THEN
-      RAISE EXCEPTION 'Cannot resubmit payment: campaign is no longer draft';
-    END IF;
+  -- Calculate amounts
+  v_budget_paise := (v_campaign.budget * 100)::integer;
+  v_platform_fee_paise := (v_campaign.budget * 100 * 0.10)::integer;
+  v_total_payable_paise := v_budget_paise + v_platform_fee_paise;
 
+  -- Determine attempt number: max existing + 1 (deterministic)
+  SELECT COALESCE(MAX(cashfree_attempt_number), 0) + 1
+  INTO v_attempt_number
+  FROM public.campaign_launch_payments
+  WHERE campaign_id = p_campaign_id;
+
+  -- Deterministic order ID
+  v_order_id := 'cliptwo_' || p_campaign_id::text || '_attempt_' || v_attempt_number;
+
+  IF v_payment IS NOT NULL THEN
+    -- Update existing rejected/pending record
     UPDATE public.campaign_launch_payments
     SET
-      cashfree_order_id = trim(p_cashfree_order_id),
-      cashfree_payment_session_id = trim(p_cashfree_payment_session_id),
+      cashfree_order_id = v_order_id,
       cashfree_flow = 'cashfree',
-      cashfree_order_status = 'ACTIVE',
-      payment_status = 'submitted',
+      cashfree_order_status = 'RESERVING',
+      cashfree_attempt_number = v_attempt_number,
+      payment_status = 'reserving',
       submitted_at = now(),
+      campaign_budget_rupees = v_campaign.budget,
+      platform_fee_paise = v_platform_fee_paise,
+      total_payable_paise = v_total_payable_paise,
       utr_reference = NULL,
       rejection_reason = NULL,
       rejected_at = NULL,
       rejected_by = NULL,
       updated_at = now()
-    WHERE id = v_existing.id
+    WHERE id = v_payment.id
     RETURNING * INTO v_payment;
-
-    UPDATE public.campaigns
-    SET launch_payment_status = 'submitted'
-    WHERE id = p_campaign_id;
-
-    INSERT INTO public.audit_logs (
-      id, actor_id, actor, action, entity_type, entity_id, entity_label,
-      after_state, metadata, idempotency_key
-    ) VALUES (
-      gen_random_uuid()::text, v_creator_id, 'creator',
-      'campaign_payment_submitted_cashfree', 'campaign', p_campaign_id::text,
-      (SELECT title FROM public.campaigns WHERE id = p_campaign_id),
-      jsonb_build_object('payment_status', 'submitted', 'cashfree_order_id', trim(p_cashfree_order_id)),
-      jsonb_build_object('campaign_budget_rupees', v_campaign.budget, 'platform_fee_paise', v_platform_fee_paise, 'total_payable_paise', v_total_payable_paise),
-      'payment_submit_cashfree_' || p_campaign_id::text || '_' || extract(epoch from now())::text
-    );
   ELSE
+    -- Create new reservation
     INSERT INTO public.campaign_launch_payments (
       campaign_id, creator_id, campaign_budget_rupees,
       platform_fee_paise, total_payable_paise,
-      payment_status, cashfree_order_id, cashfree_payment_session_id,
-      cashfree_flow, cashfree_order_status, submitted_at
+      payment_status, cashfree_order_id,
+      cashfree_flow, cashfree_order_status, cashfree_attempt_number,
+      submitted_at
     ) VALUES (
       p_campaign_id, v_creator_id, v_campaign.budget,
       v_platform_fee_paise, v_total_payable_paise,
-      'submitted', trim(p_cashfree_order_id), trim(p_cashfree_payment_session_id),
-      'cashfree', 'ACTIVE', now()
+      'reserving', v_order_id,
+      'cashfree', 'RESERVING', v_attempt_number,
+      now()
     ) RETURNING * INTO v_payment;
-
-    UPDATE public.campaigns
-    SET launch_payment_status = 'submitted'
-    WHERE id = p_campaign_id;
-
-    INSERT INTO public.audit_logs (
-      id, actor_id, actor, action, entity_type, entity_id, entity_label,
-      after_state, metadata, idempotency_key
-    ) VALUES (
-      gen_random_uuid()::text, v_creator_id, 'creator',
-      'campaign_payment_submitted_cashfree', 'campaign', p_campaign_id::text,
-      (SELECT title FROM public.campaigns WHERE id = p_campaign_id),
-      jsonb_build_object('payment_status', 'submitted', 'cashfree_order_id', trim(p_cashfree_order_id)),
-      jsonb_build_object('campaign_budget_rupees', v_campaign.budget, 'platform_fee_paise', v_platform_fee_paise, 'total_payable_paise', v_total_payable_paise),
-      'payment_submit_cashfree_' || p_campaign_id::text || '_' || extract(epoch from now())::text
-    );
   END IF;
+
+  -- Update campaign payment status
+  UPDATE public.campaigns
+  SET launch_payment_status = 'submitted'
+  WHERE id = p_campaign_id;
+
+  -- Audit log
+  INSERT INTO public.audit_logs (
+    id, actor_id, actor, action, entity_type, entity_id, entity_label,
+    after_state, metadata, idempotency_key
+  ) VALUES (
+    gen_random_uuid()::text, v_creator_id, 'creator',
+    'cashfree_payment_reserved', 'campaign', p_campaign_id::text,
+    (SELECT title FROM public.campaigns WHERE id = p_campaign_id),
+    jsonb_build_object('payment_status', 'reserving', 'cashfree_order_id', v_order_id, 'attempt_number', v_attempt_number),
+    jsonb_build_object('campaign_budget_rupees', v_campaign.budget, 'platform_fee_paise', v_platform_fee_paise, 'total_payable_paise', v_total_payable_paise),
+    'cashfree_reserve_' || p_campaign_id::text || '_' || v_attempt_number::text
+  );
 
   RETURN jsonb_build_object(
     'success', true,
+    'reserved', true,
+    'reused', false,
     'payment_id', v_payment.id,
-    'payment_status', v_payment.payment_status,
-    'campaign_id', p_campaign_id,
-    'cashfree_order_id', v_payment.cashfree_order_id
+    'order_id', v_order_id,
+    'attempt_number', v_attempt_number,
+    'payment_status', 'reserving',
+    'message', 'Payment attempt reserved'
   );
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.submit_campaign_launch_payment_cashfree(uuid, text, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.reserve_cashfree_payment_attempt(uuid) TO authenticated;
 
--- ── 3. Verify Cashfree webhook (atomic, service-role only) ─────────────────
+-- ── 3. Confirm Cashfree payment attempt (after successful Cashfree API call) ─
+
+CREATE OR REPLACE FUNCTION public.confirm_cashfree_payment_attempt(
+  p_campaign_id uuid,
+  p_cashfree_payment_session_id text
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_creator_id uuid;
+  v_payment record;
+BEGIN
+  v_creator_id := auth.uid();
+  IF v_creator_id IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = v_creator_id AND role = 'creator' AND status = 'active'
+  ) THEN
+    RAISE EXCEPTION 'Only active creators can submit campaign payments';
+  END IF;
+
+  IF p_cashfree_payment_session_id IS NULL OR length(trim(p_cashfree_payment_session_id)) = 0 THEN
+    RAISE EXCEPTION 'Cashfree payment session ID is required';
+  END IF;
+
+  -- Find the reservation (must be in 'reserving' state)
+  SELECT * INTO v_payment
+  FROM public.campaign_launch_payments
+  WHERE campaign_id = p_campaign_id
+    AND cashfree_flow = 'cashfree'
+    AND payment_status = 'reserving'
+    AND cashfree_order_id IS NOT NULL
+  FOR UPDATE;
+
+  IF v_payment IS NULL THEN
+    RAISE EXCEPTION 'No active Cashfree reservation found for this campaign';
+  END IF;
+
+  -- Confirm: set payment_session_id and move to 'submitted'
+  UPDATE public.campaign_launch_payments
+  SET
+    cashfree_payment_session_id = trim(p_cashfree_payment_session_id),
+    cashfree_order_status = 'ACTIVE',
+    payment_status = 'submitted',
+    updated_at = now()
+  WHERE id = v_payment.id
+  RETURNING * INTO v_payment;
+
+  -- Audit log
+  INSERT INTO public.audit_logs (
+    id, actor_id, actor, action, entity_type, entity_id, entity_label,
+    after_state, metadata, idempotency_key
+  ) VALUES (
+    gen_random_uuid()::text, v_creator_id, 'creator',
+    'cashfree_payment_confirmed', 'campaign', p_campaign_id::text,
+    (SELECT title FROM public.campaigns WHERE id = p_campaign_id),
+    jsonb_build_object('payment_status', 'submitted', 'cashfree_order_id', v_payment.cashfree_order_id),
+    jsonb_build_object('attempt_number', v_payment.cashfree_attempt_number),
+    'cashfree_confirm_' || p_campaign_id::text || '_' || v_payment.cashfree_attempt_number::text
+  );
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'payment_id', v_payment.id,
+    'payment_status', 'submitted',
+    'cashfree_order_id', v_payment.cashfree_order_id,
+    'attempt_number', v_payment.cashfree_attempt_number
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.confirm_cashfree_payment_attempt(uuid, text) TO authenticated;
+
+-- ── 4. Release Cashfree payment reservation (on Cashfree API failure) ──────
+
+CREATE OR REPLACE FUNCTION public.release_cashfree_payment_reservation(
+  p_campaign_id uuid
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_creator_id uuid;
+  v_payment record;
+BEGIN
+  v_creator_id := auth.uid();
+  IF v_creator_id IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  -- Find the reservation
+  SELECT * INTO v_payment
+  FROM public.campaign_launch_payments
+  WHERE campaign_id = p_campaign_id
+    AND cashfree_flow = 'cashfree'
+    AND payment_status = 'reserving'
+  FOR UPDATE;
+
+  IF v_payment IS NULL THEN
+    -- No reservation to release — idempotent
+    RETURN jsonb_build_object('success', true, 'idempotent', true);
+  END IF;
+
+  -- Release: delete the reservation row so a new attempt can be made
+  DELETE FROM public.campaign_launch_payments
+  WHERE id = v_payment.id;
+
+  -- Reset campaign payment status
+  UPDATE public.campaigns
+  SET launch_payment_status = NULL
+  WHERE id = p_campaign_id AND launch_payment_status = 'submitted';
+
+  -- Audit log
+  INSERT INTO public.audit_logs (
+    id, actor_id, actor, action, entity_type, entity_id,
+    metadata, idempotency_key
+  ) VALUES (
+    gen_random_uuid()::text, v_creator_id, 'creator',
+    'cashfree_payment_reservation_released', 'campaign', p_campaign_id::text,
+    jsonb_build_object('cashfree_order_id', v_payment.cashfree_order_id, 'attempt_number', v_payment.cashfree_attempt_number),
+    'cashfree_release_' || p_campaign_id::text || '_' || v_payment.cashfree_attempt_number::text
+  );
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'payment_id', v_payment.id,
+    'released', true
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.release_cashfree_payment_reservation(uuid) TO authenticated;
+
+-- ── 5. Verify Cashfree webhook (atomic, service-role only) ─────────────────
 -- Fix #4: Requires payment_status = 'submitted', uses FOR UPDATE row lock
 -- Fix #8: verified_by uses 'system' (not creator) for automated verification
 
@@ -255,7 +434,7 @@ BEGIN
     );
   END IF;
 
-  -- Only 'submitted' payments can be verified (Fix #4)
+  -- Only 'submitted' payments can be verified
   IF v_payment.payment_status != 'submitted' THEN
     RAISE EXCEPTION 'Payment is not in submitted status';
   END IF;
@@ -282,7 +461,7 @@ BEGIN
       id, actor_id, actor, action, entity_type, entity_id, entity_label,
       before_state, after_state, metadata, reason, idempotency_key
     ) VALUES (
-      gen_random_uuid()::text, v_payment.creator_id, 'system',
+      gen_random_uuid()::text, '00000000-0000-0000-0000-000000000000', 'system',
       'campaign_payment_rejected_amount_mismatch', 'campaign', v_payment.campaign_id::text,
       (SELECT title FROM public.campaigns WHERE id = v_payment.campaign_id),
       jsonb_build_object('payment_status', v_payment.payment_status),
@@ -300,7 +479,7 @@ BEGIN
   END IF;
 
   -- Atomic verification — all state changes in one transaction
-  -- Fix #8: verified_by = 'system' for automated Cashfree verification
+  -- verified_by = 'system' for automated Cashfree verification
   UPDATE public.campaign_launch_payments
   SET
     payment_status = 'verified',
@@ -349,7 +528,7 @@ REVOKE EXECUTE ON FUNCTION public.verify_cashfree_webhook(text, text, numeric) F
 REVOKE EXECUTE ON FUNCTION public.verify_cashfree_webhook(text, text, numeric) FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.verify_cashfree_webhook(text, text, numeric) TO service_role;
 
--- ── 4. Reject Cashfree webhook (service-role only) ────────────────────────
+-- ── 6. Reject Cashfree webhook (service-role only) ────────────────────────
 
 CREATE OR REPLACE FUNCTION public.reject_cashfree_webhook(
   p_cashfree_order_id text,

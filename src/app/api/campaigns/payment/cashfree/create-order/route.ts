@@ -98,10 +98,7 @@ export async function POST(request: Request) {
     );
   }
 
-  // ── Fix #3: Phone lookup via service-role (server-only) ──────────────
-  // getAuthenticatedUser() already verified the creator's identity.
-  // We use the service-role client solely to read auth.users.phone
-  // because the anon-key client cannot call auth.admin endpoints.
+  // ── Phone lookup via service-role (server-only) ──────────────────────
   let phone: string | undefined;
   try {
     const serviceClient = createServiceClient();
@@ -118,51 +115,44 @@ export async function POST(request: Request) {
     );
   }
 
-  // ── Fix #4: Check existing Cashfree payment via RPC (row lock) ──────
-  // The RPC handles idempotency with row-level locking.
-  // We only need to detect whether to create or reuse at the API layer.
-  const { data: existingPayment } = await supabase
-    .from("campaign_launch_payments")
-    .select("id, cashfree_order_id, cashfree_payment_session_id, payment_status, cashfree_order_status, cashfree_flow")
-    .eq("campaign_id", campaignId)
-    .single();
+  // ── Step 1: Atomically reserve payment attempt (DB-authoritative) ────
+  // This is the serialization point. Concurrent requests for the same
+  // campaign will serialize here. Only one can successfully reserve.
+  const { data: reserveResult, error: reserveError } = await supabase.rpc(
+    "reserve_cashfree_payment_attempt",
+    { p_campaign_id: campaignId },
+  );
 
-  if (existingPayment) {
-    if (
-      existingPayment.cashfree_order_id &&
-      existingPayment.cashfree_flow === "cashfree" &&
-      existingPayment.payment_status === "submitted" &&
-      existingPayment.cashfree_order_status === "ACTIVE"
-    ) {
-      return NextResponse.json({
-        success: true,
-        payment_session_id: existingPayment.cashfree_payment_session_id,
-        order_id: existingPayment.cashfree_order_id,
-        amount: Number(campaign.budget) * 1.1,
-        currency: "INR",
-        reused: true,
-      });
-    }
-
-    if (!["rejected", "pending"].includes(existingPayment.payment_status)) {
-      return NextResponse.json(
-        { error: "A payment already exists for this campaign" },
-        { status: 400 },
-      );
-    }
+  if (reserveError) {
+    console.error("[cashfree] Reserve error:", reserveError);
+    return NextResponse.json(
+      { error: sanitizeError(reserveError.message) },
+      { status: 400 },
+    );
   }
 
-  // ── Server-side amount calculation ────────────────────────────────────
+  const orderId = reserveResult.order_id as string;
+  const paymentSessionId = reserveResult.payment_session_id as string | null;
+
+  // If reused, return the existing session (don't call Cashfree again)
+  if (reserveResult.reused) {
+    return NextResponse.json({
+      success: true,
+      payment_session_id: paymentSessionId,
+      order_id: orderId,
+      amount: Number(campaign.budget) * 1.1,
+      currency: "INR",
+      reused: true,
+      attempt_number: reserveResult.attempt_number,
+    });
+  }
+
+  // ── Step 2: Call Cashfree Create Order with deterministic order_id ───
   const budgetRupees = Number(campaign.budget);
   const budgetPaise = Math.round(budgetRupees * 100);
   const platformFeePaise = Math.round(budgetRupees * 100 * 0.1);
   const totalPayablePaise = budgetPaise + platformFeePaise;
   const totalPayableRupees = totalPayablePaise / 100;
-
-  // ── Deterministic order ID ────────────────────────────────────────────
-  // Use campaign UUID + attempt counter for uniqueness.
-  // The RPC enforces one active Cashfree order per campaign via unique constraint.
-  const orderId = `cliptwo_${campaignId}_${Date.now()}`;
 
   const createOrderPayload = {
     order_id: orderId,
@@ -197,6 +187,12 @@ export async function POST(request: Request) {
     if (!cashfreeResponse.ok) {
       const errorBody = await cashfreeResponse.text();
       console.error("[cashfree] Create order failed:", cashfreeResponse.status, errorBody);
+
+      // Release the reservation so the creator can retry
+      await supabase.rpc("release_cashfree_payment_reservation", {
+        p_campaign_id: campaignId,
+      });
+
       return NextResponse.json(
         { error: "Failed to create payment order" },
         { status: 502 },
@@ -205,21 +201,23 @@ export async function POST(request: Request) {
 
     const orderData: CashfreeOrderResponse = await cashfreeResponse.json();
 
-    // ── RPC handles row locking + idempotency atomically ────────────────
-    const { error: rpcError } = await supabase.rpc(
-      "submit_campaign_launch_payment_cashfree",
+    // ── Step 3: Confirm reservation with Cashfree session details ──────
+    const { error: confirmError } = await supabase.rpc(
+      "confirm_cashfree_payment_attempt",
       {
         p_campaign_id: campaignId,
-        p_cashfree_order_id: orderData.order_id,
         p_cashfree_payment_session_id: orderData.payment_session_id,
       },
     );
 
-    if (rpcError) {
-      console.error("[cashfree] RPC error:", rpcError);
+    if (confirmError) {
+      console.error("[cashfree] Confirm error:", confirmError);
+      // Cashfree order was created but DB confirmation failed.
+      // The reservation is still in 'reserving' state — creator can retry.
+      // The Cashfree order_id is deterministic, so retry will reuse it.
       return NextResponse.json(
-        { error: sanitizeError(rpcError.message) },
-        { status: 400 },
+        { error: "Payment order created but confirmation failed. Please retry." },
+        { status: 502 },
       );
     }
 
@@ -230,9 +228,16 @@ export async function POST(request: Request) {
       cf_order_id: orderData.cf_order_id,
       amount: totalPayableRupees,
       currency: "INR",
+      attempt_number: reserveResult.attempt_number,
     });
   } catch (err) {
     console.error("[cashfree] Create order exception:", err);
+
+    // Release the reservation so the creator can retry
+    await supabase.rpc("release_cashfree_payment_reservation", {
+      p_campaign_id: campaignId,
+    });
+
     return NextResponse.json(
       { error: "Payment gateway error" },
       { status: 500 },

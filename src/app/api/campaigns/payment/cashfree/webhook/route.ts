@@ -244,52 +244,71 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No payment attempts found" }, { status: 502 });
   }
 
-  // Find the successful payment
-  const successfulPayment = payments.find(
-    (p) => p.payment_status === "SUCCESS",
+  // ── Fix #3: Find EXACT payment by cf_payment_id ──────────────────────
+  // Do NOT just find first SUCCESS — match the specific payment the webhook
+  // references. If no exact match, do NOT reject the campaign — log and
+  // return retry-safe response.
+  const exactPayment = payments.find(
+    (p) => p.cf_payment_id === webhookCfPaymentId,
   );
 
-  if (!successfulPayment) {
-    console.error(`[cashfree-webhook] Order ${orderId} is PAID but no SUCCESS payment in attempts`);
+  if (!exactPayment) {
+    // Webhook references a payment that doesn't exist in authoritative data.
+    // This could be a stale/delayed webhook for a failed attempt.
+    // Do NOT reject the campaign. Log and return 200 (retry-safe).
+    console.error(
+      `[cashfree-webhook] Webhook cf_payment_id ${webhookCfPaymentId} not found in authoritative payments for order ${orderId}`,
+    );
+    await supabase.from("audit_logs").insert({
+      id: crypto.randomUUID(),
+      actor_id: "00000000-0000-0000-0000-000000000000",
+      actor: "system",
+      action: "cashfree_webhook_payment_id_not_found",
+      entity_type: "campaign",
+      entity_id: paymentRecord.campaign_id,
+      metadata: {
+        cashfree_order_id: orderId,
+        webhook_cf_payment_id: webhookCfPaymentId,
+        authoritative_payment_ids: payments.map((p) => p.cf_payment_id),
+      },
+      idempotency_key: `webhook_unknown_payment_${orderId}_${webhookCfPaymentId}`,
+    });
     return NextResponse.json({ received: true });
   }
 
-  // ── Fix #2: Verify cf_payment_id matches authoritative payment ────────
-  if (webhookCfPaymentId && successfulPayment.cf_payment_id !== webhookCfPaymentId) {
+  // ── Exact payment found — verify it is SUCCESS ────────────────────────
+  if (exactPayment.payment_status !== "SUCCESS") {
     console.error(
-      `[cashfree-webhook] Payment ID mismatch: webhook=${webhookCfPaymentId}, authoritative=${successfulPayment.cf_payment_id}`,
+      `[cashfree-webhook] Exact payment ${webhookCfPaymentId} is not SUCCESS: ${exactPayment.payment_status}`,
     );
-    await supabase.rpc("reject_cashfree_webhook", {
-      p_cashfree_order_id: orderId,
-      p_cf_payment_id: successfulPayment.cf_payment_id,
-      p_failure_reason: `Payment ID mismatch: webhook reported ${webhookCfPaymentId}`,
-    });
+    // Do NOT reject the campaign — this is just a non-successful attempt.
+    // Return 200 so Cashfree doesn't retry.
     return NextResponse.json({ received: true });
   }
 
   // ── Verify exact amount ──────────────────────────────────────────────
   const expectedAmountRupees = paymentRecord.total_payable_paise / 100;
-  if (Math.abs(successfulPayment.payment_amount - expectedAmountRupees) > 0.01) {
+  if (Math.abs(exactPayment.payment_amount - expectedAmountRupees) > 0.01) {
     console.error(
-      `[cashfree-webhook] Amount mismatch: expected=${expectedAmountRupees}, actual=${successfulPayment.payment_amount}`,
+      `[cashfree-webhook] Amount mismatch: expected=${expectedAmountRupees}, actual=${exactPayment.payment_amount}`,
     );
     await supabase.rpc("reject_cashfree_webhook", {
       p_cashfree_order_id: orderId,
-      p_cf_payment_id: successfulPayment.cf_payment_id,
-      p_failure_reason: `Amount mismatch: expected ${expectedAmountRupees}, got ${successfulPayment.payment_amount}`,
+      p_cf_payment_id: exactPayment.cf_payment_id,
+      p_failure_reason: `Amount mismatch: expected ${expectedAmountRupees}, got ${exactPayment.payment_amount}`,
     });
     return NextResponse.json({ received: true });
   }
 
   // ── Verify currency is INR ────────────────────────────────────────────
-  if (successfulPayment.payment_currency !== "INR") {
+  if (exactPayment.payment_currency !== "INR") {
     console.error(
-      `[cashfree-webhook] Currency mismatch: expected=INR, actual=${successfulPayment.payment_currency}`,
+      `[cashfree-webhook] Currency mismatch: expected=INR, actual=${exactPayment.payment_currency}`,
     );
     await supabase.rpc("reject_cashfree_webhook", {
       p_cashfree_order_id: orderId,
-      p_cf_payment_id: successfulPayment.cf_payment_id,
-      p_failure_reason: `Currency mismatch: expected INR, got ${successfulPayment.payment_currency}`,
+      p_cf_payment_id: exactPayment.cf_payment_id,
+      p_failure_reason: `Currency mismatch: expected INR, got ${exactPayment.payment_currency}`,
     });
     return NextResponse.json({ received: true });
   }
@@ -299,8 +318,8 @@ export async function POST(request: Request) {
     "verify_cashfree_webhook",
     {
       p_cashfree_order_id: orderId,
-      p_cf_payment_id: successfulPayment.cf_payment_id,
-      p_payment_amount_rupees: successfulPayment.payment_amount,
+      p_cf_payment_id: exactPayment.cf_payment_id,
+      p_payment_amount_rupees: exactPayment.payment_amount,
     },
   );
 
