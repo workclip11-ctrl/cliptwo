@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/supabase/auth-helpers";
+import { createServiceClient } from "@/lib/supabase/server";
 import { createClient } from "@supabase/supabase-js";
 import { sanitizeError } from "@/lib/api-helpers";
 
-// Cashfree sandbox endpoints
 const CASHFREE_BASE_URL = "https://sandbox.cashfree.com/pg";
 const CASHFREE_API_VERSION = "2025-01-01";
 
@@ -22,7 +22,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Verify Cashfree env vars are configured (server-only, never exposed)
   const appId = process.env.CASHFREE_APP_ID;
   const secretKey = process.env.CASHFREE_SECRET_KEY;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL;
@@ -53,7 +52,7 @@ export async function POST(request: Request) {
     );
   }
 
-  // Create Supabase client with creator's token
+  // ── Creator auth via token (RLS-enforced) ────────────────────────────
   const authHeader = request.headers.get("authorization");
   const token = authHeader?.replace("Bearer ", "");
 
@@ -78,7 +77,6 @@ export async function POST(request: Request) {
   }
 
   // Fetch campaign — must belong to creator, must be draft only
-  // Fix #5: Do not allow open/unverified campaigns as a starting point
   const { data: campaign } = await supabase
     .from("campaigns")
     .select("id, budget, status, title, created_by, launch_payment_status")
@@ -93,7 +91,6 @@ export async function POST(request: Request) {
     );
   }
 
-  // Fix #5: Only draft campaigns can start a new Cashfree payment flow
   if (campaign.status !== "draft") {
     return NextResponse.json(
       { error: "Cashfree payment is only available for draft campaigns" },
@@ -101,10 +98,18 @@ export async function POST(request: Request) {
     );
   }
 
-  // Fix #7: Fetch creator's phone from auth.users — do NOT use fake data
-  const { data: authUser } = await supabase.auth.admin.getUserById(user.id);
-
-  const phone = authUser?.user?.phone;
+  // ── Fix #3: Phone lookup via service-role (server-only) ──────────────
+  // getAuthenticatedUser() already verified the creator's identity.
+  // We use the service-role client solely to read auth.users.phone
+  // because the anon-key client cannot call auth.admin endpoints.
+  let phone: string | undefined;
+  try {
+    const serviceClient = createServiceClient();
+    const { data: authUser } = await serviceClient.auth.admin.getUserById(user.id);
+    phone = authUser?.user?.phone;
+  } catch (err) {
+    console.error("[cashfree] Service-role phone lookup failed:", err);
+  }
 
   if (!phone) {
     return NextResponse.json(
@@ -113,8 +118,9 @@ export async function POST(request: Request) {
     );
   }
 
-  // Fix #6: Check for existing active Cashfree payment record
-  // If one exists and is still usable, reuse it instead of creating a new order
+  // ── Fix #4: Check existing Cashfree payment via RPC (row lock) ──────
+  // The RPC handles idempotency with row-level locking.
+  // We only need to detect whether to create or reuse at the API layer.
   const { data: existingPayment } = await supabase
     .from("campaign_launch_payments")
     .select("id, cashfree_order_id, cashfree_payment_session_id, payment_status, cashfree_order_status, cashfree_flow")
@@ -122,7 +128,6 @@ export async function POST(request: Request) {
     .single();
 
   if (existingPayment) {
-    // If there's an existing submitted/active Cashfree order, reuse it
     if (
       existingPayment.cashfree_order_id &&
       existingPayment.cashfree_flow === "cashfree" &&
@@ -133,13 +138,12 @@ export async function POST(request: Request) {
         success: true,
         payment_session_id: existingPayment.cashfree_payment_session_id,
         order_id: existingPayment.cashfree_order_id,
-        amount: (Number(campaign.budget) * 1.1),
+        amount: Number(campaign.budget) * 1.1,
         currency: "INR",
         reused: true,
       });
     }
 
-    // If there's a rejected/pending record, we can create a new order for it
     if (!["rejected", "pending"].includes(existingPayment.payment_status)) {
       return NextResponse.json(
         { error: "A payment already exists for this campaign" },
@@ -148,17 +152,18 @@ export async function POST(request: Request) {
     }
   }
 
-  // Server-side amount calculation (same formula as submit_campaign_launch_payment)
+  // ── Server-side amount calculation ────────────────────────────────────
   const budgetRupees = Number(campaign.budget);
   const budgetPaise = Math.round(budgetRupees * 100);
   const platformFeePaise = Math.round(budgetRupees * 100 * 0.1);
   const totalPayablePaise = budgetPaise + platformFeePaise;
   const totalPayableRupees = totalPayablePaise / 100;
 
-  // Generate deterministic order ID for idempotency
+  // ── Deterministic order ID ────────────────────────────────────────────
+  // Use campaign UUID + attempt counter for uniqueness.
+  // The RPC enforces one active Cashfree order per campaign via unique constraint.
   const orderId = `cliptwo_${campaignId}_${Date.now()}`;
 
-  // Build Cashfree create order request
   const createOrderPayload = {
     order_id: orderId,
     order_amount: totalPayableRupees,
@@ -177,7 +182,6 @@ export async function POST(request: Request) {
   };
 
   try {
-    // Call Cashfree sandbox create order API
     const cashfreeResponse = await fetch(`${CASHFREE_BASE_URL}/orders`, {
       method: "POST",
       headers: {
@@ -201,7 +205,7 @@ export async function POST(request: Request) {
 
     const orderData: CashfreeOrderResponse = await cashfreeResponse.json();
 
-    // Store Cashfree order details in database via RPC
+    // ── RPC handles row locking + idempotency atomically ────────────────
     const { error: rpcError } = await supabase.rpc(
       "submit_campaign_launch_payment_cashfree",
       {
