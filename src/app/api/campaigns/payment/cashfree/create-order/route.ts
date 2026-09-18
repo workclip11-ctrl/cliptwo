@@ -52,7 +52,6 @@ export async function POST(request: Request) {
     );
   }
 
-  // ── Creator auth via token (RLS-enforced) ────────────────────────────
   const authHeader = request.headers.get("authorization");
   const token = authHeader?.replace("Bearer ", "");
 
@@ -62,7 +61,6 @@ export async function POST(request: Request) {
     { global: { headers: { Authorization: `Bearer ${token}` } } },
   );
 
-  // Verify caller is an active creator and owns the campaign
   const { data: profile } = await supabase
     .from("profiles")
     .select("role, status, name")
@@ -76,7 +74,6 @@ export async function POST(request: Request) {
     );
   }
 
-  // Fetch campaign — must belong to creator, must be draft only
   const { data: campaign } = await supabase
     .from("campaigns")
     .select("id, budget, status, title, created_by, launch_payment_status")
@@ -98,7 +95,6 @@ export async function POST(request: Request) {
     );
   }
 
-  // ── Phone lookup via service-role (server-only) ──────────────────────
   let phone: string | undefined;
   try {
     const serviceClient = createServiceClient();
@@ -116,8 +112,6 @@ export async function POST(request: Request) {
   }
 
   // ── Step 1: Atomically reserve payment attempt (DB-authoritative) ────
-  // This is the serialization point. Concurrent requests for the same
-  // campaign will serialize here. Only one can successfully reserve.
   const { data: reserveResult, error: reserveError } = await supabase.rpc(
     "reserve_cashfree_payment_attempt",
     { p_campaign_id: campaignId },
@@ -134,17 +128,88 @@ export async function POST(request: Request) {
   const orderId = reserveResult.order_id as string;
   const paymentSessionId = reserveResult.payment_session_id as string | null;
 
-  // If reused, return the existing session (don't call Cashfree again)
+  // If reused, we have two cases:
+  // A) Already confirmed (submitted with session_id) — return it
+  // B) Still reserving (no session_id) — need to reconcile with Cashfree
   if (reserveResult.reused) {
-    return NextResponse.json({
-      success: true,
-      payment_session_id: paymentSessionId,
-      order_id: orderId,
-      amount: Number(campaign.budget) * 1.1,
-      currency: "INR",
-      reused: true,
-      attempt_number: reserveResult.attempt_number,
-    });
+    if (paymentSessionId) {
+      // Case A: Already has a session — return it
+      return NextResponse.json({
+        success: true,
+        payment_session_id: paymentSessionId,
+        order_id: orderId,
+        amount: Number(campaign.budget) * 1.1,
+        currency: "INR",
+        reused: true,
+        attempt_number: reserveResult.attempt_number,
+      });
+    }
+
+    // Case B: Existing 'reserving' reservation without session.
+    // This means a previous request created the Cashfree order but failed
+    // before confirming. Reconcile by fetching the existing order from Cashfree.
+    console.log(`[cashfree] Reconciling existing reservation for order ${orderId}`);
+
+    try {
+      const reconcileResponse = await fetch(`${CASHFREE_BASE_URL}/orders/${orderId}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "x-client-id": appId,
+          "x-client-secret": secretKey,
+          "x-api-version": CASHFREE_API_VERSION,
+        },
+      });
+
+      if (reconcileResponse.ok) {
+        const orderData: CashfreeOrderResponse = await reconcileResponse.json();
+
+        if (orderData.payment_session_id) {
+          // Cashfree recognizes the order — confirm with existing session
+          const { error: confirmError } = await supabase.rpc(
+            "confirm_cashfree_payment_attempt",
+            {
+              p_campaign_id: campaignId,
+              p_cashfree_payment_session_id: orderData.payment_session_id,
+            },
+          );
+
+          if (!confirmError) {
+            return NextResponse.json({
+              success: true,
+              payment_session_id: orderData.payment_session_id,
+              order_id: orderData.order_id,
+              cf_order_id: orderData.cf_order_id,
+              amount: Number(campaign.budget) * 1.1,
+              currency: "INR",
+              reused: true,
+              attempt_number: reserveResult.attempt_number,
+              reconciled: true,
+            });
+          }
+          console.error("[cashfree] Reconcile confirm error:", confirmError);
+        }
+      }
+
+      // Cashfree doesn't recognize the order, or no session available.
+      // The reservation is still in 'reserving' — release it so creator can retry.
+      console.log("[cashfree] Order not found at Cashfree, releasing reservation");
+      await supabase.rpc("release_cashfree_payment_reservation", {
+        p_campaign_id: campaignId,
+      });
+
+      return NextResponse.json(
+        { error: "Previous order not found. Please retry." },
+        { status: 502 },
+      );
+    } catch (err) {
+      console.error("[cashfree] Reconcile fetch failed:", err);
+      // Ambiguous: keep reservation, return retryable error
+      return NextResponse.json(
+        { error: "Unable to verify previous order. Please retry." },
+        { status: 502 },
+      );
+    }
   }
 
   // ── Step 2: Call Cashfree Create Order with deterministic order_id ───
@@ -188,7 +253,7 @@ export async function POST(request: Request) {
       const errorBody = await cashfreeResponse.text();
       console.error("[cashfree] Create order failed:", cashfreeResponse.status, errorBody);
 
-      // Release the reservation so the creator can retry
+      // Definitive failure: release the reservation
       await supabase.rpc("release_cashfree_payment_reservation", {
         p_campaign_id: campaignId,
       });
@@ -213,8 +278,9 @@ export async function POST(request: Request) {
     if (confirmError) {
       console.error("[cashfree] Confirm error:", confirmError);
       // Cashfree order was created but DB confirmation failed.
-      // The reservation is still in 'reserving' state — creator can retry.
-      // The Cashfree order_id is deterministic, so retry will reuse it.
+      // Reservation remains in 'reserving' — creator can retry.
+      // Same deterministic order_id will be used on retry.
+      // Cashfree's x-idempotency-key ensures no duplicate order.
       return NextResponse.json(
         { error: "Payment order created but confirmation failed. Please retry." },
         { status: 502 },
@@ -233,14 +299,14 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error("[cashfree] Create order exception:", err);
 
-    // Release the reservation so the creator can retry
-    await supabase.rpc("release_cashfree_payment_reservation", {
-      p_campaign_id: campaignId,
-    });
-
+    // Fix #1: Ambiguous network/transport failure.
+    // DO NOT release the reservation — the Cashfree order may have been created.
+    // Keep reservation in 'reserving' state. On retry, the same deterministic
+    // order_id will be used (Cashfree x-idempotency-key matches), so no
+    // duplicate order is created. The creator will get a retryable error.
     return NextResponse.json(
-      { error: "Payment gateway error" },
-      { status: 500 },
+      { error: "Payment gateway temporarily unavailable. Please retry." },
+      { status: 503 },
     );
   }
 }

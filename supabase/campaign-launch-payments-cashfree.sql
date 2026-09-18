@@ -18,9 +18,11 @@
 --   - enforce_campaign_launch_payment_integrity trigger prevents self-verification
 --   - All Cashfree verifications use FOR UPDATE row locking
 --   - verified_by uses 'system' for automated gateway verification
+--   - Persistent attempt counter on campaigns table survives reservation deletion
+--   - Ambiguous network failures do NOT release reservations
 -- ============================================================================
 
--- ── 1. Add Cashfree columns to campaign_launch_payments ─────────────────────
+-- ── 1. Add Cashfree columns ────────────────────────────────────────────────
 
 DO $$
 BEGIN
@@ -65,13 +67,22 @@ BEGIN
       ADD COLUMN cashfree_cf_payment_id text;
   END IF;
 
-  -- Attempt number for deterministic order IDs (Fix #2)
+  -- Attempt number on the payment row (deterministic, matches order_id)
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns
     WHERE table_name = 'campaign_launch_payments' AND column_name = 'cashfree_attempt_number'
   ) THEN
     ALTER TABLE public.campaign_launch_payments
       ADD COLUMN cashfree_attempt_number integer DEFAULT 0;
+  END IF;
+
+  -- Fix #2: Persistent attempt counter on campaigns (survives reservation deletion)
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'campaigns' AND column_name = 'cashfree_attempts_used'
+  ) THEN
+    ALTER TABLE public.campaigns
+      ADD COLUMN cashfree_attempts_used integer NOT NULL DEFAULT 0;
   END IF;
 END $$;
 
@@ -81,7 +92,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_campaign_launch_payments_cashfree_order_id
   WHERE cashfree_order_id IS NOT NULL;
 
 -- Unique constraint: one active Cashfree reservation/attempt per campaign
--- Prevents concurrent creation of multiple active payment records
 CREATE UNIQUE INDEX IF NOT EXISTS idx_campaign_launch_payments_cashfree_active
   ON public.campaign_launch_payments(campaign_id)
   WHERE cashfree_flow = 'cashfree'
@@ -89,8 +99,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_campaign_launch_payments_cashfree_active
     AND cashfree_order_id IS NOT NULL;
 
 -- ── 2. Reserve Cashfree payment attempt (atomic, DB-authoritative) ────────
--- Fix #2: This is the serialization point. Two concurrent requests for the
--- same campaign will serialize here. Only one can successfully reserve.
+-- Fix #4: Does NOT set campaign launch_payment_status to 'submitted'.
+--   Campaign remains in its secure pre-payment state until confirm RPC.
+-- Fix #2: Uses persistent campaign.cashfree_attempts_used counter.
 
 CREATE OR REPLACE FUNCTION public.reserve_cashfree_payment_attempt(
   p_campaign_id uuid
@@ -175,11 +186,12 @@ BEGIN
   v_platform_fee_paise := (v_campaign.budget * 100 * 0.10)::integer;
   v_total_payable_paise := v_budget_paise + v_platform_fee_paise;
 
-  -- Determine attempt number: max existing + 1 (deterministic)
-  SELECT COALESCE(MAX(cashfree_attempt_number), 0) + 1
-  INTO v_attempt_number
-  FROM public.campaign_launch_payments
-  WHERE campaign_id = p_campaign_id;
+  -- Fix #2: Persistent attempt counter — atomically increment on campaigns table
+  -- This survives reservation deletion and provides monotonically increasing attempt numbers.
+  UPDATE public.campaigns
+  SET cashfree_attempts_used = cashfree_attempts_used + 1
+  WHERE id = p_campaign_id
+  RETURNING cashfree_attempts_used INTO v_attempt_number;
 
   -- Deterministic order ID
   v_order_id := 'cliptwo_' || p_campaign_id::text || '_attempt_' || v_attempt_number;
@@ -221,10 +233,8 @@ BEGIN
     ) RETURNING * INTO v_payment;
   END IF;
 
-  -- Update campaign payment status
-  UPDATE public.campaigns
-  SET launch_payment_status = 'submitted'
-  WHERE id = p_campaign_id;
+  -- Fix #4: Do NOT set campaign launch_payment_status here.
+  -- Campaign stays in its current state until confirm_cashfree_payment_attempt.
 
   -- Audit log
   INSERT INTO public.audit_logs (
@@ -255,6 +265,8 @@ $$;
 GRANT EXECUTE ON FUNCTION public.reserve_cashfree_payment_attempt(uuid) TO authenticated;
 
 -- ── 3. Confirm Cashfree payment attempt (after successful Cashfree API call) ─
+-- Fix #6: Validates creator owns the reservation. Prevents cross-campaign binding.
+-- Fix #4: Sets campaign launch_payment_status = 'submitted' here (after Cashfree confirmed).
 
 CREATE OR REPLACE FUNCTION public.confirm_cashfree_payment_attempt(
   p_campaign_id uuid,
@@ -285,10 +297,11 @@ BEGIN
     RAISE EXCEPTION 'Cashfree payment session ID is required';
   END IF;
 
-  -- Find the reservation (must be in 'reserving' state)
+  -- Fix #6: Find the reservation — must belong to THIS creator and THIS campaign
   SELECT * INTO v_payment
   FROM public.campaign_launch_payments
   WHERE campaign_id = p_campaign_id
+    AND creator_id = v_creator_id
     AND cashfree_flow = 'cashfree'
     AND payment_status = 'reserving'
     AND cashfree_order_id IS NOT NULL
@@ -307,6 +320,11 @@ BEGIN
     updated_at = now()
   WHERE id = v_payment.id
   RETURNING * INTO v_payment;
+
+  -- Fix #4: Now that Cashfree order is confirmed, update campaign status
+  UPDATE public.campaigns
+  SET launch_payment_status = 'submitted'
+  WHERE id = p_campaign_id AND launch_payment_status IS DISTINCT FROM 'submitted';
 
   -- Audit log
   INSERT INTO public.audit_logs (
@@ -333,7 +351,11 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.confirm_cashfree_payment_attempt(uuid, text) TO authenticated;
 
--- ── 4. Release Cashfree payment reservation (on Cashfree API failure) ──────
+-- ── 4. Release Cashfree payment reservation (on definitive Cashfree failure) ─
+-- Fix #5: Only the owning creator can release. Only 'reserving' status.
+--   Never deletes submitted/verified/rejected records.
+--   Restores campaign to 'pending' (not NULL).
+--   Preserves persistent attempt counter.
 
 CREATE OR REPLACE FUNCTION public.release_cashfree_payment_reservation(
   p_campaign_id uuid
@@ -352,10 +374,11 @@ BEGIN
     RAISE EXCEPTION 'Not authenticated';
   END IF;
 
-  -- Find the reservation
+  -- Fix #5: Find reservation — must belong to THIS creator
   SELECT * INTO v_payment
   FROM public.campaign_launch_payments
   WHERE campaign_id = p_campaign_id
+    AND creator_id = v_creator_id
     AND cashfree_flow = 'cashfree'
     AND payment_status = 'reserving'
   FOR UPDATE;
@@ -366,12 +389,13 @@ BEGIN
   END IF;
 
   -- Release: delete the reservation row so a new attempt can be made
+  -- Persistent attempt counter on campaigns is NOT affected
   DELETE FROM public.campaign_launch_payments
   WHERE id = v_payment.id;
 
-  -- Reset campaign payment status
+  -- Fix #5: Restore campaign to 'pending' (not NULL)
   UPDATE public.campaigns
-  SET launch_payment_status = NULL
+  SET launch_payment_status = 'pending'
   WHERE id = p_campaign_id AND launch_payment_status = 'submitted';
 
   -- Audit log
@@ -396,8 +420,7 @@ $$;
 GRANT EXECUTE ON FUNCTION public.release_cashfree_payment_reservation(uuid) TO authenticated;
 
 -- ── 5. Verify Cashfree webhook (atomic, service-role only) ─────────────────
--- Fix #4: Requires payment_status = 'submitted', uses FOR UPDATE row lock
--- Fix #8: verified_by uses 'system' (not creator) for automated verification
+-- No changes to this RPC. Existing architecture preserved.
 
 CREATE OR REPLACE FUNCTION public.verify_cashfree_webhook(
   p_cashfree_order_id text,
@@ -413,7 +436,6 @@ DECLARE
   v_payment record;
   v_expected_amount_rupees numeric;
 BEGIN
-  -- Lock the row to prevent concurrent verification attempts
   SELECT * INTO v_payment
   FROM public.campaign_launch_payments
   WHERE cashfree_order_id = p_cashfree_order_id
@@ -423,7 +445,6 @@ BEGIN
     RAISE EXCEPTION 'Payment record not found for order';
   END IF;
 
-  -- Idempotent: already verified → return success
   IF v_payment.payment_status = 'verified' THEN
     RETURN jsonb_build_object(
       'success', true,
@@ -434,12 +455,10 @@ BEGIN
     );
   END IF;
 
-  -- Only 'submitted' payments can be verified
   IF v_payment.payment_status != 'submitted' THEN
     RAISE EXCEPTION 'Payment is not in submitted status';
   END IF;
 
-  -- Amount verification
   v_expected_amount_rupees := v_payment.total_payable_paise / 100.0;
 
   IF ABS(p_payment_amount_rupees - v_expected_amount_rupees) > 0.01 THEN
@@ -478,8 +497,6 @@ BEGIN
     );
   END IF;
 
-  -- Atomic verification — all state changes in one transaction
-  -- verified_by = 'system' for automated Cashfree verification
   UPDATE public.campaign_launch_payments
   SET
     payment_status = 'verified',
@@ -529,6 +546,7 @@ REVOKE EXECUTE ON FUNCTION public.verify_cashfree_webhook(text, text, numeric) F
 GRANT EXECUTE ON FUNCTION public.verify_cashfree_webhook(text, text, numeric) TO service_role;
 
 -- ── 6. Reject Cashfree webhook (service-role only) ────────────────────────
+-- No changes to this RPC. Existing architecture preserved.
 
 CREATE OR REPLACE FUNCTION public.reject_cashfree_webhook(
   p_cashfree_order_id text,

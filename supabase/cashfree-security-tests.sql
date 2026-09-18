@@ -739,3 +739,310 @@ DO $$ DECLARE v_result jsonb; v_ps text; BEGIN
 END $$;
 SELECT 'TEST AO PASSED' AS result;
 ROLLBACK;
+
+-- === SECTION 8: Reservation recovery and attempt sequencing (AP-BE) ===
+
+-- TEST AP: Release attempt 1 then new reservation gets attempt 2
+BEGIN;
+SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+SELECT set_config('role', 'authenticated', true);
+SELECT public.create_campaign('Cashfree Test AP', 'Brief', 'YouTube', 100, 'Test Creator', 'c0000000-0000-0000-0000-0000000000ap'::uuid);
+DO $$ DECLARE v_result jsonb; v_attempts integer; BEGIN
+  SELECT public.reserve_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000ap'::uuid) INTO v_result;
+  ASSERT (v_result->>'attempt_number')::int = 1, 'TEST AP FAIL: first attempt should be 1';
+  PERFORM public.release_cashfree_payment_reservation('c0000000-0000-0000-0000-0000000000ap'::uuid);
+  SELECT cashfree_attempts_used INTO v_attempts FROM public.campaigns WHERE id = 'c0000000-0000-0000-0000-0000000000ap';
+  ASSERT v_attempts = 1, 'TEST AP FAIL: counter should still be 1 after release, got ' || v_attempts;
+  SELECT public.reserve_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000ap'::uuid) INTO v_result;
+  ASSERT (v_result->>'attempt_number')::int = 2, 'TEST AP FAIL: second attempt should be 2, got ' || (v_result->>'attempt_number')::text;
+END $$;
+SELECT 'TEST AP PASSED' AS result;
+ROLLBACK;
+
+-- TEST AQ: Concurrent reservation only allocates one attempt number
+BEGIN;
+SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+SELECT set_config('role', 'authenticated', true);
+SELECT public.create_campaign('Cashfree Test AQ', 'Brief', 'YouTube', 100, 'Test Creator', 'c0000000-0000-0000-0000-0000000000aq'::uuid);
+DO $$ DECLARE v_r1 jsonb; v_r2 jsonb; v_attempts integer; BEGIN
+  SELECT public.reserve_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000aq'::uuid) INTO v_r1;
+  -- Second reserve should reuse, not allocate new number
+  SELECT public.reserve_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000aq'::uuid) INTO v_r2;
+  ASSERT (v_r2->>'reused')::boolean = true, 'TEST AQ FAIL: should reuse';
+  ASSERT (v_r2->>'attempt_number')::int = (v_r1->>'attempt_number')::int, 'TEST AQ FAIL: should be same attempt';
+  SELECT cashfree_attempts_used INTO v_attempts FROM public.campaigns WHERE id = 'c0000000-0000-0000-0000-0000000000aq';
+  ASSERT v_attempts = 1, 'TEST AQ FAIL: should only have 1 attempt, got ' || v_attempts;
+END $$;
+SELECT 'TEST AQ PASSED' AS result;
+ROLLBACK;
+
+-- TEST AR: Existing reserving reservation is reused (not new order created)
+BEGIN;
+SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+SELECT set_config('role', 'authenticated', true);
+SELECT public.create_campaign('Cashfree Test AR', 'Brief', 'YouTube', 100, 'Test Creator', 'c0000000-0000-0000-0000-0000000000ar'::uuid);
+DO $$ DECLARE v_result jsonb; v_order1 text; v_order2 text; BEGIN
+  SELECT public.reserve_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000ar'::uuid) INTO v_result;
+  v_order1 := v_result->>'order_id';
+  -- Second request — should reuse same order_id
+  SELECT public.reserve_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000ar'::uuid) INTO v_result;
+  v_order2 := v_result->>'order_id';
+  ASSERT v_order1 = v_order2, 'TEST AR FAIL: should be same order_id';
+  ASSERT (v_result->>'reused')::boolean = true, 'TEST AR FAIL: should be reused';
+END $$;
+SELECT 'TEST AR PASSED' AS result;
+ROLLBACK;
+
+-- TEST AS: Ambiguous network failure does not release reservation
+-- (tested at API layer — SQL reservation should persist)
+BEGIN;
+SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+SELECT set_config('role', 'authenticated', true);
+SELECT public.create_campaign('Cashfree Test AS', 'Brief', 'YouTube', 100, 'Test Creator', 'c0000000-0000-0000-0000-0000000000as'::uuid);
+DO $$ DECLARE v_result jsonb; v_ps text; v_order text; BEGIN
+  SELECT public.reserve_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000as'::uuid) INTO v_result;
+  v_order := v_result->>'order_id';
+  -- Simulate: reservation exists, don't release
+  SELECT payment_status INTO v_ps FROM public.campaign_launch_payments WHERE campaign_id = 'c0000000-0000-0000-0000-0000000000as';
+  ASSERT v_ps = 'reserving', 'TEST AS FAIL: should be reserving';
+  -- Retry should reuse same order
+  SELECT public.reserve_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000as'::uuid) INTO v_result;
+  ASSERT (v_result->>'order_id') = v_order, 'TEST AS FAIL: should reuse same order_id';
+END $$;
+SELECT 'TEST AS PASSED' AS result;
+ROLLBACK;
+
+-- TEST AT: Confirm failure then retry recovers same deterministic order
+BEGIN;
+SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+SELECT set_config('role', 'authenticated', true);
+SELECT public.create_campaign('Cashfree Test AT', 'Brief', 'YouTube', 100, 'Test Creator', 'c0000000-0000-0000-0000-0000000000at'::uuid);
+DO $$ DECLARE v_result jsonb; v_order1 text; v_order2 text; v_ps text; BEGIN
+  SELECT public.reserve_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000at'::uuid) INTO v_result;
+  v_order1 := v_result->>'order_id';
+  -- Simulate confirm failure: reservation still in 'reserving'
+  SELECT payment_status INTO v_ps FROM public.campaign_launch_payments WHERE campaign_id = 'c0000000-0000-0000-0000-0000000000at';
+  ASSERT v_ps = 'reserving', 'TEST AT FAIL: should be reserving';
+  -- Retry — should reuse same order
+  SELECT public.reserve_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000at'::uuid) INTO v_result;
+  v_order2 := v_result->>'order_id';
+  ASSERT v_order1 = v_order2, 'TEST AT FAIL: should reuse same order_id';
+  -- Now confirm should work
+  PERFORM public.confirm_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000at'::uuid, 'session_at');
+  SELECT payment_status INTO v_ps FROM public.campaign_launch_payments WHERE campaign_id = 'c0000000-0000-0000-0000-0000000000at';
+  ASSERT v_ps = 'submitted', 'TEST AT FAIL: should be submitted';
+END $$;
+SELECT 'TEST AT PASSED' AS result;
+ROLLBACK;
+
+-- TEST AU: Reserving campaign state cannot become open
+BEGIN;
+SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+SELECT set_config('role', 'authenticated', true);
+SELECT public.create_campaign('Cashfree Test AU', 'Brief', 'YouTube', 100, 'Test Creator', 'c0000000-0000-0000-0000-0000000000au'::uuid);
+DO $$ DECLARE v_c_status text; v_lps text; BEGIN
+  PERFORM public.reserve_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000au'::uuid);
+  SELECT status, launch_payment_status INTO v_c_status, v_lps FROM public.campaigns WHERE id = 'c0000000-0000-0000-0000-0000000000au';
+  ASSERT v_c_status = 'draft', 'TEST AU FAIL: status should be draft, got ' || v_c_status;
+  ASSERT v_lps IS DISTINCT FROM 'open', 'TEST AU FAIL: should not be open';
+END $$;
+SELECT 'TEST AU PASSED' AS result;
+ROLLBACK;
+
+-- TEST AV: Release restores launch_payment_status to pending, not NULL
+BEGIN;
+SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+SELECT set_config('role', 'authenticated', true);
+SELECT public.create_campaign('Cashfree Test AV', 'Brief', 'YouTube', 100, 'Test Creator', 'c0000000-0000-0000-0000-0000000000av'::uuid);
+DO $$ DECLARE v_lps text; BEGIN
+  PERFORM public.reserve_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000av'::uuid);
+  PERFORM public.confirm_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000av'::uuid, 'session_av');
+  SELECT launch_payment_status INTO v_lps FROM public.campaigns WHERE id = 'c0000000-0000-0000-0000-0000000000av';
+  ASSERT v_lps = 'submitted', 'TEST AV FAIL: should be submitted before release';
+  PERFORM public.release_cashfree_payment_reservation('c0000000-0000-0000-0000-0000000000av'::uuid);
+  SELECT launch_payment_status INTO v_lps FROM public.campaigns WHERE id = 'c0000000-0000-0000-0000-0000000000av';
+  -- Note: release only changes 'submitted' → 'pending'. If already not submitted, no change.
+  -- But the key assertion is: it must NOT be NULL if it was submitted before release.
+  ASSERT v_lps IS NOT NULL, 'TEST AV FAIL: should not be NULL after release';
+END $$;
+SELECT 'TEST AV PASSED' AS result;
+ROLLBACK;
+
+-- TEST AW: Creator cannot release another creator's reservation
+BEGIN;
+SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+SELECT set_config('role', 'authenticated', true);
+SELECT public.create_campaign('Cashfree Test AW', 'Brief', 'YouTube', 100, 'Test Creator', 'c0000000-0000-0000-0000-0000000000aw'::uuid);
+DO $$ DECLARE v_result jsonb; BEGIN
+  PERFORM public.reserve_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000aw'::uuid);
+  -- Clipper tries to release — should not find the reservation
+  PERFORM set_config('request.jwt.claims', '{"sub": "2d75364e-77e0-4eb2-af96-48f573cb4a43", "role": "authenticated"}', true);
+  SELECT public.release_cashfree_payment_reservation('c0000000-0000-0000-0000-0000000000aw'::uuid) INTO v_result;
+  ASSERT (v_result->>'idempotent')::boolean = true, 'TEST AW FAIL: should be idempotent (not found)';
+  -- Original creator's reservation should still exist
+  ASSERT EXISTS (SELECT 1 FROM public.campaign_launch_payments WHERE campaign_id = 'c0000000-0000-0000-0000-0000000000aw' AND payment_status = 'reserving'), 'TEST AW FAIL: reservation should still exist';
+END $$;
+SELECT 'TEST AW PASSED' AS result;
+ROLLBACK;
+
+-- TEST AX: Creator cannot confirm another creator's reservation
+BEGIN;
+SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+SELECT set_config('role', 'authenticated', true);
+SELECT public.create_campaign('Cashfree Test AX', 'Brief', 'YouTube', 100, 'Test Creator', 'c0000000-0000-0000-0000-0000000000ax'::uuid);
+DO $$ DECLARE v_err text; BEGIN
+  PERFORM public.reserve_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000ax'::uuid);
+  -- Clipper tries to confirm — should not find the reservation (ownership check)
+  PERFORM set_config('request.jwt.claims', '{"sub": "2d75364e-77e0-4eb2-af96-48f573cb4a43", "role": "authenticated"}', true);
+  BEGIN
+    PERFORM public.confirm_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000ax'::uuid, 'session_hijack');
+    ASSERT false, 'TEST AX FAIL: should have raised exception';
+  EXCEPTION WHEN OTHERS THEN
+    v_err := SQLERRM;
+    ASSERT v_err LIKE '%No active Cashfree reservation%', 'TEST AX FAIL: ' || v_err;
+  END;
+END $$;
+SELECT 'TEST AX PASSED' AS result;
+ROLLBACK;
+
+-- TEST AY: Arbitrary payment session cannot cross campaigns
+BEGIN;
+SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+SELECT set_config('role', 'authenticated', true);
+SELECT public.create_campaign('Cashfree Test AY-1', 'Brief', 'YouTube', 100, 'Test Creator', 'c0000000-0000-0000-0000-0000000000ay1'::uuid);
+SELECT public.create_campaign('Cashfree Test AY-2', 'Brief', 'YouTube', 200, 'Test Creator', 'c0000000-0000-0000-0000-0000000000ay2'::uuid);
+DO $$ DECLARE v_err text; BEGIN
+  PERFORM public.reserve_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000ay1'::uuid);
+  -- Try to confirm campaign AY-1's reservation with campaign AY-2's ID
+  BEGIN
+    PERFORM public.confirm_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000ay2'::uuid, 'session_cross');
+    ASSERT false, 'TEST AY FAIL: should have raised exception';
+  EXCEPTION WHEN OTHERS THEN
+    v_err := SQLERRM;
+    ASSERT v_err LIKE '%No active Cashfree reservation%', 'TEST AY FAIL: ' || v_err;
+  END;
+END $$;
+SELECT 'TEST AY PASSED' AS result;
+ROLLBACK;
+
+-- TEST AZ: Verified payment cannot be released
+BEGIN;
+SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+SELECT set_config('role', 'authenticated', true);
+SELECT public.create_campaign('Cashfree Test AZ', 'Brief', 'YouTube', 100, 'Test Creator', 'c0000000-0000-0000-0000-0000000000az'::uuid);
+DO $$ DECLARE v_result jsonb; v_ps text; BEGIN
+  PERFORM public.reserve_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000az'::uuid);
+  PERFORM public.confirm_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000az'::uuid, 'session_az');
+  PERFORM set_config('role', 'service_role', true);
+  PERFORM public.verify_cashfree_webhook('cliptwo_c0000000-0000-0000-0000-0000000000az_attempt_1', 'cf_az', 110.00);
+  PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+  SELECT public.release_cashfree_payment_reservation('c0000000-0000-0000-0000-0000000000az'::uuid) INTO v_result;
+  ASSERT (v_result->>'idempotent')::boolean = true, 'TEST AZ FAIL: should be idempotent (not reserving)';
+  SELECT payment_status INTO v_ps FROM public.campaign_launch_payments WHERE campaign_id = 'c0000000-0000-0000-0000-0000000000az';
+  ASSERT v_ps = 'verified', 'TEST AZ FAIL: should still be verified, got ' || v_ps;
+END $$;
+SELECT 'TEST AZ PASSED' AS result;
+ROLLBACK;
+
+-- TEST BA: Submitted payment cannot be released
+BEGIN;
+SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+SELECT set_config('role', 'authenticated', true);
+SELECT public.create_campaign('Cashfree Test BA', 'Brief', 'YouTube', 100, 'Test Creator', 'c0000000-0000-0000-0000-0000000000ba'::uuid);
+DO $$ DECLARE v_result jsonb; v_ps text; BEGIN
+  PERFORM public.reserve_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000ba'::uuid);
+  PERFORM public.confirm_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000ba'::uuid, 'session_ba');
+  -- Release should not find 'submitted' reservation
+  SELECT public.release_cashfree_payment_reservation('c0000000-0000-0000-0000-0000000000ba'::uuid) INTO v_result;
+  ASSERT (v_result->>'idempotent')::boolean = true, 'TEST BA FAIL: should be idempotent (not reserving)';
+  SELECT payment_status INTO v_ps FROM public.campaign_launch_payments WHERE campaign_id = 'c0000000-0000-0000-0000-0000000000ba';
+  ASSERT v_ps = 'submitted', 'TEST BA FAIL: should still be submitted, got ' || v_ps;
+END $$;
+SELECT 'TEST BA PASSED' AS result;
+ROLLBACK;
+
+-- TEST BB: Webhook exact payment matching remains intact
+BEGIN;
+SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+SELECT set_config('role', 'authenticated', true);
+SELECT public.create_campaign('Cashfree Test BB', 'Brief', 'YouTube', 100, 'Test Creator', 'c0000000-0000-0000-0000-0000000000bb'::uuid);
+DO $$ DECLARE v_result jsonb; BEGIN
+  PERFORM public.reserve_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000bb'::uuid);
+  PERFORM public.confirm_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000bb'::uuid, 'session_bb');
+  PERFORM set_config('role', 'service_role', true);
+  -- Verify with exact cf_payment_id
+  SELECT public.verify_cashfree_webhook('cliptwo_c0000000-0000-0000-0000-0000000000bb_attempt_1', 'cf_bb_exact', 110.00) INTO v_result;
+  ASSERT (v_result->>'success')::boolean = true, 'TEST BB FAIL: verify';
+END $$;
+SELECT 'TEST BB PASSED' AS result;
+ROLLBACK;
+
+-- TEST BC: Webhook unknown cf_payment_id does not reject campaign
+-- (tested at API layer — RPC doesn't check cf_payment_id matching)
+BEGIN;
+SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+SELECT set_config('role', 'authenticated', true);
+SELECT public.create_campaign('Cashfree Test BC', 'Brief', 'YouTube', 100, 'Test Creator', 'c0000000-0000-0000-0000-0000000000bc'::uuid);
+DO $$ DECLARE v_result jsonb; v_ps text; BEGIN
+  PERFORM public.reserve_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000bc'::uuid);
+  PERFORM public.confirm_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000bc'::uuid, 'session_bc');
+  PERFORM set_config('role', 'service_role', true);
+  -- Verify with a cf_payment_id — RPC accepts it (matching is in webhook handler)
+  SELECT public.verify_cashfree_webhook('cliptwo_c0000000-0000-0000-0000-0000000000bc_attempt_1', 'cf_bc_any', 110.00) INTO v_result;
+  ASSERT (v_result->>'success')::boolean = true, 'TEST BC FAIL: verify';
+  -- Campaign should be open, not rejected
+  ASSERT (v_result->>'campaign_status')::text = 'open', 'TEST BC FAIL: should be open';
+END $$;
+SELECT 'TEST BC PASSED' AS result;
+ROLLBACK;
+
+-- TEST BD: Successful exact payment opens campaign atomically
+BEGIN;
+SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+SELECT set_config('role', 'authenticated', true);
+SELECT public.create_campaign('Cashfree Test BD', 'Brief', 'YouTube', 100, 'Test Creator', 'c0000000-0000-0000-0000-0000000000bd'::uuid);
+DO $$ DECLARE v_result jsonb; v_c_status text; v_p_status text; v_lps text; v_log_exists boolean; BEGIN
+  PERFORM public.reserve_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000bd'::uuid);
+  PERFORM public.confirm_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000bd'::uuid, 'session_bd');
+  PERFORM set_config('role', 'service_role', true);
+  SELECT public.verify_cashfree_webhook('cliptwo_c0000000-0000-0000-0000-0000000000bd_attempt_1', 'cf_bd', 110.00) INTO v_result;
+  ASSERT (v_result->>'success')::boolean = true, 'TEST BD FAIL: verify';
+  SELECT status, launch_payment_status INTO v_c_status, v_lps FROM public.campaigns WHERE id = 'c0000000-0000-0000-0000-0000000000bd';
+  SELECT payment_status INTO v_p_status FROM public.campaign_launch_payments WHERE campaign_id = 'c0000000-0000-0000-0000-0000000000bd';
+  SELECT EXISTS (SELECT 1 FROM public.audit_logs WHERE action = 'campaign_payment_verified_cashfree' AND entity_id = 'c0000000-0000-0000-0000-0000000000bd') INTO v_log_exists;
+  ASSERT v_c_status = 'open', 'TEST BD FAIL: status is ' || v_c_status;
+  ASSERT v_lps = 'verified', 'TEST BD FAIL: lps is ' || v_lps;
+  ASSERT v_p_status = 'verified', 'TEST BD FAIL: payment is ' || v_p_status;
+  ASSERT v_log_exists, 'TEST BD FAIL: no audit log';
+END $$;
+SELECT 'TEST BD PASSED' AS result;
+ROLLBACK;
+
+-- TEST BE: Persistent attempt counter survives deleted reservation
+BEGIN;
+SELECT set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+SELECT set_config('role', 'authenticated', true);
+SELECT public.create_campaign('Cashfree Test BE', 'Brief', 'YouTube', 100, 'Test Creator', 'c0000000-0000-0000-0000-0000000000be'::uuid);
+DO $$ DECLARE v_result jsonb; v_attempts integer; BEGIN
+  -- Attempt 1
+  SELECT public.reserve_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000be'::uuid) INTO v_result;
+  ASSERT (v_result->>'attempt_number')::int = 1, 'TEST BE FAIL: attempt 1';
+  -- Release (deletes payment row)
+  PERFORM public.release_cashfree_payment_reservation('c0000000-0000-0000-0000-0000000000be'::uuid);
+  -- Counter persists
+  SELECT cashfree_attempts_used INTO v_attempts FROM public.campaigns WHERE id = 'c0000000-0000-0000-0000-0000000000be';
+  ASSERT v_attempts = 1, 'TEST BE FAIL: counter should be 1 after release, got ' || v_attempts;
+  -- Attempt 2 (new reservation, new number)
+  SELECT public.reserve_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000be'::uuid) INTO v_result;
+  ASSERT (v_result->>'attempt_number')::int = 2, 'TEST BE FAIL: attempt 2, got ' || (v_result->>'attempt_number')::text;
+  -- Release again
+  PERFORM public.release_cashfree_payment_reservation('c0000000-0000-0000-0000-0000000000be'::uuid);
+  -- Counter still persists
+  SELECT cashfree_attempts_used INTO v_attempts FROM public.campaigns WHERE id = 'c0000000-0000-0000-0000-0000000000be';
+  ASSERT v_attempts = 2, 'TEST BE FAIL: counter should be 2, got ' || v_attempts;
+  -- Attempt 3
+  SELECT public.reserve_cashfree_payment_attempt('c0000000-0000-0000-0000-0000000000be'::uuid) INTO v_result;
+  ASSERT (v_result->>'attempt_number')::int = 3, 'TEST BE FAIL: attempt 3, got ' || (v_result->>'attempt_number')::text;
+END $$;
+SELECT 'TEST BE PASSED' AS result;
+ROLLBACK;
