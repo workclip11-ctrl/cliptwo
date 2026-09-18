@@ -2,9 +2,8 @@
 
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, useRef, useCallback, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { QRCodeSVG } from "qrcode.react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -21,6 +20,7 @@ import {
   Link as LinkIcon,
   CreditCard,
   Clock,
+  Loader2,
 } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
@@ -35,6 +35,12 @@ import type {
   CampaignStatus,
   Platform,
 } from "@/lib/types";
+
+declare global {
+  interface Window {
+    Cashfree?: (config: { mode: string; paymentSession: string }) => { redirect: () => void };
+  }
+}
 
 const STEPS = [
   "Basic information",
@@ -121,12 +127,21 @@ export default function NewCampaignWizard() {
 
   // Payment flow state
   const [paymentPhase, setPaymentPhase] = useState<
-    "none" | "showing" | "submitted" | "error"
+    "none" | "showing" | "processing" | "polling" | "submitted"
   >("none");
   const [createdCampaignId, setCreatedCampaignId] = useState<string>("");
-  const [utrReference, setUtrReference] = useState("");
   const [paymentError, setPaymentError] = useState("");
-  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollCountRef = useRef(0);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
 
   // Step 3
   const [platforms, setPlatforms] = useState<Platform[]>([]);
@@ -341,42 +356,92 @@ export default function NewCampaignWizard() {
     }
   }
 
+  const CASHFREE_SCRIPT_URL = "https://sdk.cashfree.com/js/ui/2.0.0/cashfree.js";
+
+  function loadCashfreeScript(): Promise<boolean> {
+    return new Promise((resolve) => {
+      if (window.Cashfree) { resolve(true); return; }
+      const existing = document.querySelector(`script[src="${CASHFREE_SCRIPT_URL}"]`);
+      if (existing) {
+        const check = () => { if (window.Cashfree) resolve(true); else setTimeout(check, 100); };
+        check();
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = CASHFREE_SCRIPT_URL;
+      script.async = true;
+      script.onload = () => {
+        const check = () => { if (window.Cashfree) resolve(true); else setTimeout(check, 100); };
+        check();
+      };
+      script.onerror = () => resolve(false);
+      document.head.appendChild(script);
+    });
+  }
+
+  const startPaymentPolling = useCallback((campId: string) => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollCountRef.current = 0;
+    setPaymentPhase("polling");
+
+    pollRef.current = setInterval(async () => {
+      if (!mountedRef.current) { if (pollRef.current) clearInterval(pollRef.current); return; }
+      pollCountRef.current += 1;
+      if (!isSupabaseConfigured) { if (pollRef.current) clearInterval(pollRef.current); return; }
+      const { data } = await supabase
+        .from("campaigns")
+        .select("launch_payment_status")
+        .eq("id", campId)
+        .single();
+      if (!mountedRef.current) return;
+      const status = data?.launch_payment_status;
+      if (status === "verified" || status === "rejected" || pollCountRef.current >= 20) {
+        if (pollRef.current) clearInterval(pollRef.current);
+        setPaymentPhase("submitted");
+      }
+    }, 3000);
+  }, []);
+
   async function submitPayment() {
-    if (isSubmittingPayment || !utrReference.trim()) return;
-    setIsSubmittingPayment(true);
+    if (!createdCampaignId || paymentPhase === "processing" || paymentPhase === "polling") return;
     setPaymentError("");
+    setPaymentPhase("processing");
 
     try {
+      const scriptLoaded = await loadCashfreeScript();
+      if (!scriptLoaded || !window.Cashfree) {
+        throw new Error("Payment gateway could not be loaded. Please try again.");
+      }
+
       let headers: Record<string, string> = { "Content-Type": "application/json" };
       if (isSupabaseConfigured) {
         const { data } = await supabase.auth.getSession();
         const token = data.session?.access_token;
-        if (token) {
-          headers = { ...headers, Authorization: `Bearer ${token}` };
-        }
+        if (token) headers = { ...headers, Authorization: `Bearer ${token}` };
       }
-      const res = await fetch("/api/campaigns/payment/submit", {
+
+      const res = await fetch("/api/campaigns/payment/cashfree/create-order", {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          campaignId: createdCampaignId,
-          utrReference: utrReference.trim(),
-        }),
+        body: JSON.stringify({ campaignId: createdCampaignId }),
       });
 
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to create payment order");
+      if (!data.payment_session_id) throw new Error("Invalid response from payment gateway");
 
-      if (!res.ok) {
-        throw new Error(data.error || "Payment submission failed");
-      }
+      const cashfree = window.Cashfree({
+        mode: "sandbox",
+        paymentSession: data.payment_session_id,
+      });
+      cashfree.redirect();
 
-      setPaymentPhase("submitted");
+      startPaymentPolling(createdCampaignId);
     } catch (err) {
+      setPaymentPhase("showing");
       setPaymentError(
-        err instanceof Error ? err.message : "Payment submission failed. Please try again.",
+        err instanceof Error ? err.message : "Payment failed. Please try again.",
       );
-    } finally {
-      setIsSubmittingPayment(false);
     }
   }
 
@@ -395,7 +460,7 @@ export default function NewCampaignWizard() {
   const potentialViews = cpm > 0 ? Math.round((bud / cpm) * 1000) : 0;
 
   // ── Payment screens ─────────────────────────────────────────────────────
-  if (paymentPhase === "showing") {
+  if (paymentPhase === "showing" || paymentPhase === "processing" || paymentPhase === "polling") {
     const budgetRupees = Number(budget) || 0;
     const platformFeeRupees = Math.floor(budgetRupees * 0.10);
     const totalPayableRupees = budgetRupees + platformFeeRupees;
@@ -405,7 +470,8 @@ export default function NewCampaignWizard() {
         <button
           type="button"
           onClick={() => setPaymentPhase("none")}
-          className="inline-flex items-center gap-1 text-sm text-muted hover:text-foreground"
+          disabled={paymentPhase === "processing" || paymentPhase === "polling"}
+          className="inline-flex items-center gap-1 text-sm text-muted hover:text-foreground disabled:opacity-50"
         >
           <ArrowLeft size={14} /> Back to campaign
         </button>
@@ -443,64 +509,44 @@ export default function NewCampaignWizard() {
             budget remains fully allocated for clipper campaign payouts.
           </p>
 
-          {/* Dynamic UPI QR Code */}
-          <div className="flex flex-col items-center gap-4 rounded-xl border bg-background p-6">
-            <p className="text-sm font-medium">Scan to Pay</p>
-            {(() => {
-              const upiUri = `upi://pay?pa=9315851024@ptyes&pn=Cliptwo&am=${totalPayableRupees}&cu=INR`;
-              return (
-                <div className="rounded-lg border bg-white p-3">
-                  <QRCodeSVG
-                    value={upiUri}
-                    size={224}
-                    level="M"
-                    includeMargin={false}
-                  />
-                </div>
-              );
-            })()}
-            <div className="text-center space-y-1">
-              <p className="text-lg font-semibold font-mono">{rup(totalPayableRupees)}</p>
-              <p className="text-xs text-muted">Cliptwo Campaign Payment</p>
+          {(paymentPhase === "processing" || paymentPhase === "polling") && (
+            <div className="flex flex-col items-center gap-3 py-6">
+              <Loader2 size={24} className="animate-spin text-muted" />
+              <p className="text-sm text-muted">
+                {paymentPhase === "processing"
+                  ? "Opening payment checkout..."
+                  : "Confirming your payment..."}
+              </p>
+              {paymentPhase === "polling" && (
+                <p className="text-xs text-muted">
+                  This may take a few moments. You can safely leave this page.
+                </p>
+              )}
             </div>
-            <p className="text-xs text-center text-muted max-w-xs">
-              Please verify the payment amount before completing the transaction.
-              Your campaign will be published only after Cliptwo verifies your payment.
-            </p>
-          </div>
+          )}
 
-          {/* UTR Input */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium">UTR / Transaction Reference</label>
-            <input
-              className={inputCls}
-              value={utrReference}
-              onChange={(e) => setUtrReference(e.target.value)}
-              placeholder="Enter UTR or transaction reference number"
-            />
-          </div>
-
-          {paymentError && (
+          {paymentPhase === "showing" && paymentError && (
             <p className="text-sm text-red">{paymentError}</p>
           )}
 
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={() => setPaymentPhase("none")}
-              className="flex-1 rounded-lg border px-4 py-2.5 text-sm font-medium hover:bg-accent-soft"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={submitPayment}
-              disabled={isSubmittingPayment || !utrReference.trim()}
-              className="flex-1 rounded-lg bg-foreground px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
-            >
-              {isSubmittingPayment ? "Submitting..." : "I've Paid — Submit for Verification"}
-            </button>
-          </div>
+          {paymentPhase === "showing" && (
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setPaymentPhase("none")}
+                className="flex-1 rounded-lg border px-4 py-2.5 text-sm font-medium hover:bg-accent-soft"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitPayment}
+                className="flex-1 rounded-lg bg-foreground px-4 py-2.5 text-sm font-medium text-white hover:opacity-90"
+              >
+                Continue to payment
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -518,29 +564,22 @@ export default function NewCampaignWizard() {
             <div className="rounded-full bg-accent/10 p-3">
               <Clock size={32} className="text-accent" />
             </div>
-            <h2 className="text-lg font-semibold">Payment Submitted</h2>
+            <h2 className="text-lg font-semibold">Payment Processing</h2>
             <p className="text-sm text-muted">
-              Your campaign will be published after Cliptwo verifies your payment.
+              Cashfree has received your payment. We&apos;re confirming it. Your
+              campaign will be published after verification.
             </p>
           </div>
 
           <div className="space-y-3 rounded-xl border bg-background p-4">
             <div className="flex justify-between text-sm">
-              <span className="text-muted">Amount paid</span>
+              <span className="text-muted">Amount</span>
               <span className="font-mono font-medium">{rup(totalPayableRupees)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted">UTR / Reference</span>
-              <span className="font-mono text-xs">{utrReference}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted">Submitted</span>
-              <span className="text-xs">{new Date().toLocaleString()}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted">Status</span>
               <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600">
-                <Clock size={12} /> Pending verification
+                <Clock size={12} /> Processing
               </span>
             </div>
           </div>

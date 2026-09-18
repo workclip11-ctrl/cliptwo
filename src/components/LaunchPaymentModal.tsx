@@ -1,14 +1,56 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { QRCodeSVG } from "qrcode.react";
-import { X, CreditCard, Clock, AlertTriangle, Loader2 } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { X, CreditCard, Clock, AlertTriangle, Loader2, CheckCircle2 } from "lucide-react";
 import { rup } from "@/lib/format";
 import { useFocusTrap } from "@/lib/use-focus-trap";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
 import type { Campaign } from "@/lib/types";
 
-type Phase = "form" | "submitting" | "submitted";
+type Phase = "form" | "processing" | "polling" | "submitted" | "verified" | "rejected";
+
+declare global {
+  interface Window {
+    Cashfree?: (config: {
+      mode: string;
+      paymentSession: string;
+    }) => { redirect: () => void };
+  }
+}
+
+const CASHFREE_SCRIPT_URL = "https://sdk.cashfree.com/js/ui/2.0.0/cashfree.js";
+const POLL_INTERVAL_MS = 3000;
+const POLL_MAX_ATTEMPTS = 20;
+
+function loadCashfreeScript(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (window.Cashfree) {
+      resolve(true);
+      return;
+    }
+    const existing = document.querySelector(`script[src="${CASHFREE_SCRIPT_URL}"]`);
+    if (existing) {
+      const check = () => {
+        if (window.Cashfree) resolve(true);
+        else setTimeout(check, 100);
+      };
+      check();
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = CASHFREE_SCRIPT_URL;
+    script.async = true;
+    script.onload = () => {
+      const check = () => {
+        if (window.Cashfree) resolve(true);
+        else setTimeout(check, 100);
+      };
+      check();
+    };
+    script.onerror = () => resolve(false);
+    document.head.appendChild(script);
+  });
+}
 
 export function LaunchPaymentModal({
   campaign,
@@ -23,13 +65,28 @@ export function LaunchPaymentModal({
   const platformFeeRupees = Math.floor(budgetRupees * 0.10);
   const totalPayableRupees = budgetRupees + platformFeeRupees;
 
-  const isRejected = campaign.launchPaymentStatus === "rejected";
-  const isSubmitted = campaign.launchPaymentStatus === "submitted";
+  const launchStatus = campaign.launchPaymentStatus;
+  const isRejected = launchStatus === "rejected";
+  const isSubmitted = launchStatus === "submitted";
+  const isVerified = launchStatus === "verified";
 
-  const [phase, setPhase] = useState<Phase>(isSubmitted ? "submitted" : "form");
-  const [utrReference, setUtrReference] = useState("");
+  const [phase, setPhase] = useState<Phase>(
+    isVerified ? "verified" : isSubmitted ? "submitted" : isRejected ? "rejected" : "form",
+  );
   const [error, setError] = useState("");
+  const [orderAmount, setOrderAmount] = useState(totalPayableRupees);
   const { containerRef, onKeyDown } = useFocusTrap(true);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollCountRef = useRef(0);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -39,21 +96,56 @@ export function LaunchPaymentModal({
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  async function handleSubmit() {
-    const trimmed = utrReference.trim();
-    if (!trimmed || trimmed.length < 6) {
-      setError("UTR must be at least 6 characters.");
-      return;
-    }
-    if (trimmed.length > 50) {
-      setError("UTR must be 50 characters or fewer.");
-      return;
-    }
+  const refreshCampaignStatus = useCallback(async () => {
+    if (!isSupabaseConfigured) return null;
+    const { data } = await supabase
+      .from("campaigns")
+      .select("launch_payment_status")
+      .eq("id", campaign.id)
+      .single();
+    return data?.launch_payment_status as string | null;
+  }, [campaign.id]);
 
-    setPhase("submitting");
+  const startPolling = useCallback(() => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollCountRef.current = 0;
+    setPhase("polling");
+
+    pollRef.current = setInterval(async () => {
+      if (!mountedRef.current) {
+        if (pollRef.current) clearInterval(pollRef.current);
+        return;
+      }
+      pollCountRef.current += 1;
+      const status = await refreshCampaignStatus();
+      if (!mountedRef.current) return;
+
+      if (status === "verified") {
+        if (pollRef.current) clearInterval(pollRef.current);
+        setPhase("verified");
+        onPaymentSubmitted();
+      } else if (status === "rejected") {
+        if (pollRef.current) clearInterval(pollRef.current);
+        setPhase("rejected");
+      } else if (pollCountRef.current >= POLL_MAX_ATTEMPTS) {
+        if (pollRef.current) clearInterval(pollRef.current);
+        setPhase("submitted");
+      }
+    }, POLL_INTERVAL_MS);
+  }, [refreshCampaignStatus, onPaymentSubmitted]);
+
+  async function handleCheckout() {
     setError("");
+    setPhase("processing");
 
     try {
+      const scriptLoaded = await loadCashfreeScript();
+      if (!scriptLoaded || !window.Cashfree) {
+        setError("Payment gateway could not be loaded. Please try again.");
+        setPhase("form");
+        return;
+      }
+
       let headers: Record<string, string> = { "Content-Type": "application/json" };
       if (isSupabaseConfigured) {
         const { data } = await supabase.auth.getSession();
@@ -63,32 +155,39 @@ export function LaunchPaymentModal({
         }
       }
 
-      const res = await fetch("/api/campaigns/payment/submit", {
+      const res = await fetch("/api/campaigns/payment/cashfree/create-order", {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          campaignId: campaign.id,
-          utrReference: trimmed,
-        }),
+        body: JSON.stringify({ campaignId: campaign.id }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Payment submission failed");
+        throw new Error(data.error || "Failed to create payment order");
       }
 
-      setPhase("submitted");
-      onPaymentSubmitted();
+      if (!data.payment_session_id) {
+        throw new Error("Invalid response from payment gateway");
+      }
+
+      setOrderAmount(data.amount ?? totalPayableRupees);
+
+      const cashfree = window.Cashfree({
+        mode: "sandbox",
+        paymentSession: data.payment_session_id,
+      });
+
+      cashfree.redirect();
+
+      startPolling();
     } catch (err) {
       setPhase("form");
       setError(
-        err instanceof Error ? err.message : "Payment submission failed. Please try again.",
+        err instanceof Error ? err.message : "Payment failed. Please try again.",
       );
     }
   }
-
-  const upiUri = `upi://pay?pa=9315851024@ptyes&pn=Cliptwo&am=${totalPayableRupees}&cu=INR`;
 
   return (
     <div
@@ -118,32 +217,68 @@ export function LaunchPaymentModal({
 
         {/* Body */}
         <div className="space-y-5 overflow-y-auto p-5">
+          {/* ── Verified state ─────────────────────────── */}
+          {phase === "verified" && (
+            <div className="space-y-5">
+              <div className="flex flex-col items-center gap-3 rounded-xl border border-green/20 bg-green/5 py-6 text-center">
+                <CheckCircle2 size={28} className="text-green" />
+                <div>
+                  <p className="text-[15px] font-semibold">Payment Verified</p>
+                  <p className="mt-1 text-[13px] text-muted">
+                    Your campaign payment has been confirmed. You can now publish
+                    your campaign.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={onClose}
+                className="w-full rounded-lg bg-foreground px-4 py-2.5 text-[13px] font-medium text-white hover:opacity-90"
+              >
+                Close
+              </button>
+            </div>
+          )}
+
+          {/* ── Processing / Polling state ────────────── */}
+          {(phase === "processing" || phase === "polling") && (
+            <div className="flex flex-col items-center gap-3 py-8">
+              <Loader2 size={24} className="animate-spin text-muted" />
+              <p className="text-[13px] text-muted">
+                {phase === "processing"
+                  ? "Opening payment checkout..."
+                  : "Confirming your payment..."}
+              </p>
+              {phase === "polling" && (
+                <p className="text-[11px] text-muted">
+                  This may take a few moments. You can safely close this
+                  window.
+                </p>
+              )}
+            </div>
+          )}
+
           {/* ── Submitted state ─────────────────────────── */}
           {phase === "submitted" && (
             <div className="space-y-5">
               <div className="flex flex-col items-center gap-3 rounded-xl border border-amber/20 bg-amber/5 py-6 text-center">
                 <Clock size={28} className="text-amber" />
                 <div>
-                  <p className="text-[15px] font-semibold">Payment Submitted</p>
+                  <p className="text-[15px] font-semibold">Payment Processing</p>
                   <p className="mt-1 text-[13px] text-muted">
-                    Your campaign will be published after ClipTwo verifies your
-                    payment.
+                    Cashfree has received your payment. We&apos;re confirming
+                    it. Your campaign will be published after verification.
                   </p>
                 </div>
               </div>
               <div className="space-y-2 rounded-xl border bg-background p-4 text-[13px]">
                 <div className="flex justify-between">
                   <span className="text-muted">Amount</span>
-                  <span className="font-mono font-medium">{rup(totalPayableRupees)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted">UTR / Reference</span>
-                  <span className="font-mono text-xs">{utrReference || "—"}</span>
+                  <span className="font-mono font-medium">{rup(orderAmount)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted">Status</span>
                   <span className="inline-flex items-center gap-1 font-medium text-amber">
-                    <Clock size={12} /> Pending verification
+                    <Clock size={12} /> Processing
                   </span>
                 </div>
               </div>
@@ -157,31 +292,23 @@ export function LaunchPaymentModal({
           )}
 
           {/* ── Rejected state ──────────────────────────── */}
-          {phase === "form" && isRejected && (
+          {phase === "rejected" && (
             <>
               <div className="flex items-start gap-3 rounded-xl border border-red/20 bg-red/5 p-4">
                 <AlertTriangle size={16} className="mt-0.5 shrink-0 text-red" />
                 <div className="text-[13px]">
                   <p className="font-medium text-red">Payment rejected</p>
                   <p className="mt-0.5 text-muted">
-                    Your previous payment was not verified. Please submit a new
-                    payment with a valid UTR.
+                    Your previous payment was not verified. Please try again.
                   </p>
                 </div>
               </div>
 
-              {/* Payment summary */}
               <PaymentSummary
                 budget={budgetRupees}
                 fee={platformFeeRupees}
                 total={totalPayableRupees}
               />
-
-              {/* QR */}
-              <QRSection upiUri={upiUri} total={totalPayableRupees} />
-
-              {/* UTR */}
-              <UtrInput value={utrReference} onChange={setUtrReference} />
 
               {error && <p className="text-[13px] text-red">{error}</p>}
 
@@ -193,18 +320,17 @@ export function LaunchPaymentModal({
                   Cancel
                 </button>
                 <button
-                  onClick={handleSubmit}
-                  disabled={!utrReference.trim()}
-                  className="flex-1 rounded-lg bg-foreground px-4 py-2.5 text-[13px] font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={handleCheckout}
+                  className="flex-1 rounded-lg bg-foreground px-4 py-2.5 text-[13px] font-medium text-white hover:opacity-90"
                 >
-                  Submit Payment
+                  Try payment again
                 </button>
               </div>
             </>
           )}
 
           {/* ── Form state (pending / resubmit after rejected) ── */}
-          {phase === "form" && !isRejected && (
+          {phase === "form" && (
             <>
               <PaymentSummary
                 budget={budgetRupees}
@@ -219,10 +345,6 @@ export function LaunchPaymentModal({
                 clipper campaign payouts.
               </p>
 
-              <QRSection upiUri={upiUri} total={totalPayableRupees} />
-
-              <UtrInput value={utrReference} onChange={setUtrReference} />
-
               {error && <p className="text-[13px] text-red">{error}</p>}
 
               <div className="flex gap-3">
@@ -233,22 +355,13 @@ export function LaunchPaymentModal({
                   Cancel
                 </button>
                 <button
-                  onClick={handleSubmit}
-                  disabled={!utrReference.trim()}
-                  className="flex-1 rounded-lg bg-foreground px-4 py-2.5 text-[13px] font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={handleCheckout}
+                  className="flex-1 rounded-lg bg-foreground px-4 py-2.5 text-[13px] font-medium text-white hover:opacity-90"
                 >
-                  {"I've Paid \u2014 Submit for Verification"}
+                  Continue to payment
                 </button>
               </div>
             </>
-          )}
-
-          {/* ── Submitting spinner ──────────────────────── */}
-          {phase === "submitting" && (
-            <div className="flex flex-col items-center gap-3 py-8">
-              <Loader2 size={24} className="animate-spin text-muted" />
-              <p className="text-[13px] text-muted">Submitting payment...</p>
-            </div>
           )}
         </div>
       </div>
@@ -281,49 +394,6 @@ function PaymentSummary({
         <span className="text-[14px] font-medium">Total to pay</span>
         <span className="font-mono text-[16px] font-semibold">{rup(total)}</span>
       </div>
-    </div>
-  );
-}
-
-function QRSection({ upiUri, total }: { upiUri: string; total: number }) {
-  return (
-    <div className="flex flex-col items-center gap-3 rounded-xl border bg-background p-5">
-      <p className="text-[13px] font-medium">Scan to Pay</p>
-      <div className="rounded-lg border bg-white p-3">
-        <QRCodeSVG value={upiUri} size={200} level="M" includeMargin={false} />
-      </div>
-      <div className="text-center space-y-0.5">
-        <p className="text-[16px] font-semibold font-mono">{rup(total)}</p>
-        <p className="text-[11px] text-muted">ClipTwo Campaign Payment</p>
-      </div>
-      <p className="max-w-xs text-center text-[11px] text-muted">
-        Please verify the payment amount before completing the transaction.
-        Your campaign will be published only after ClipTwo verifies your
-        payment.
-      </p>
-    </div>
-  );
-}
-
-function UtrInput({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <label className="text-[13px] font-medium">
-        UTR / Payment Reference
-      </label>
-      <input
-        className="w-full rounded-lg border bg-background px-3 py-2 text-[13px] outline-none focus:border-foreground"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="Enter UTR or transaction reference number"
-        maxLength={50}
-      />
     </div>
   );
 }

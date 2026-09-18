@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
 import {
   Pencil,
   Pause,
@@ -33,8 +33,9 @@ import { TimeSeriesChart } from "@/components/charts";
 import { EditCampaignModal } from "@/components/EditCampaignModal";
 import { AdjustBudgetModal } from "@/components/AdjustBudgetModal";
 import { LaunchPaymentModal } from "@/components/LaunchPaymentModal";
-import { isStoragePath, resolveAssetUrls, resolveThumbnailUrls } from "@/lib/private-assets";
-import type { CampaignSourceAsset } from "@/lib/types";
+import { resolveAssetUrls, resolveThumbnailUrls } from "@/lib/private-assets";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
+import type { Campaign, CampaignSourceAsset } from "@/lib/types";
 
 function fmtDateTime(t: number) {
   return new Date(t).toLocaleString("en-IN", {
@@ -60,8 +61,13 @@ function paymentStatusColor(status: string): string {
   return "border-amber/20 bg-amber/5 text-amber";
 }
 
+const PAYMENT_POLL_INTERVAL_MS = 3000;
+const PAYMENT_POLL_MAX_ATTEMPTS = 20;
+
 export default function CreatorCampaignDetailPage() {
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const id = params.id;
   const {
     campaigns,
@@ -112,7 +118,48 @@ export default function CreatorCampaignDetailPage() {
       }
     })();
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [camp?.id, camp?.sourceAssets, camp?.brandAssets, camp?.thumbnails]);
+
+  // Handle Cashfree payment return — poll for status verification
+  const paymentReturnHandled = useRef(false);
+  useEffect(() => {
+    const paymentSuccess = searchParams.get("payment");
+    if (paymentSuccess !== "success" || paymentReturnHandled.current) return;
+    paymentReturnHandled.current = true;
+
+    // Clean URL params
+    router.replace(`/creator/campaigns/${id}`, { scroll: false });
+
+    // Poll for payment status confirmation
+    let attempts = 0;
+    let cancelled = false;
+    const interval = setInterval(async () => {
+      if (cancelled) return;
+      attempts += 1;
+      if (!isSupabaseConfigured || !id) { clearInterval(interval); return; }
+      const { data } = await supabase
+        .from("campaigns")
+        .select("launch_payment_status, status")
+        .eq("id", id)
+        .single();
+      if (cancelled || !data) return;
+      // Update local campaign state via store
+      updateCampaign(id, {
+        launchPaymentStatus: data.launch_payment_status,
+        status: data.status,
+      } as Partial<Campaign>);
+      if (
+        data.launch_payment_status === "verified" ||
+        data.launch_payment_status === "rejected" ||
+        attempts >= PAYMENT_POLL_MAX_ATTEMPTS
+      ) {
+        clearInterval(interval);
+      }
+    }, PAYMENT_POLL_INTERVAL_MS);
+
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [searchParams, id, router, updateCampaign, camp]);
 
   if (!camp) {
     return (
