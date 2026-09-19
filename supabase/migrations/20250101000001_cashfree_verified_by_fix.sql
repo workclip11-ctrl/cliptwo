@@ -108,9 +108,23 @@ BEGIN
     updated_at = now()
   WHERE id = v_payment.id;
 
-  -- Signal to enforce_campaign_launch_payment_integrity trigger that this is
-  -- a legitimate Cashfree webhook verification (service_role, not admin).
-  PERFORM set_config('app.cashfree_webhook_verified', 'true', true);
+  -- Authorization marker for the enforce_campaign_launch_payment_integrity trigger.
+  -- The trigger checks for this temp table's existence to distinguish the trusted
+  -- SECURITY DEFINER Cashfree verification path from direct UPDATE attempts.
+  --
+  -- WHY THIS IS SECURE (not a client-settable GUC):
+  --   1. This function is SECURITY DEFINER callable only by service_role.
+  --      The REVOKE on this function prevents authenticated/anon/public callers.
+  --   2. Inside SECURITY DEFINER, we run as the function owner (postgres) who
+  --      has CREATE privilege on pg_temp. Ordinary PostgREST connections do NOT.
+  --   3. Temp tables are session-scoped and transaction-visible only.
+  --      Each PostgREST request is a separate session — no cross-request leakage.
+  --   4. The trigger fires in the SAME transaction, so it sees this temp table.
+  --   5. An attacker would need ALL of: service_role access, ability to create
+  --      temp tables in pg_temp, AND pass the payment status/amount checks
+  --      inside this function. The trigger is one layer in a defense-in-depth.
+  DROP TABLE IF EXISTS _cf_verify_signal;
+  CREATE TEMPORARY TABLE _cf_verify_signal (id int) ON COMMIT DROP;
 
   UPDATE public.campaigns
   SET

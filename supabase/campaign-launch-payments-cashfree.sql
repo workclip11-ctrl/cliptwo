@@ -507,9 +507,10 @@ BEGIN
     updated_at = now()
   WHERE id = v_payment.id;
 
-  -- Signal to enforce_campaign_launch_payment_integrity trigger that this is
-  -- a legitimate Cashfree webhook verification (service_role, not admin).
-  PERFORM set_config('app.cashfree_webhook_verified', 'true', true);
+  -- Authorization marker for the enforce_campaign_launch_payment_integrity trigger.
+  -- See campaign-launch-payment-integrity.sql for full security analysis.
+  DROP TABLE IF EXISTS _cf_verify_signal;
+  CREATE TEMPORARY TABLE _cf_verify_signal (id int) ON COMMIT DROP;
 
   UPDATE public.campaigns
   SET
