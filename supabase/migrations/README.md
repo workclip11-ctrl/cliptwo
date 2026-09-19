@@ -23,9 +23,12 @@ The following SQL files must be applied in order. Later files may override earli
 12. **migrations/20250101000001_cashfree_verified_by_fix.sql** - Fixes FK violation in Cashfree webhook verification. Sets `verified_by = NULL` and `actor_id = NULL` in audit logs (fake UUID `00000000-0000-0000-0000-000000000000` violates `REFERENCES auth.users(id)`). Run AFTER step 11.
 13. **migrations/20250101000002_cashfree_trigger_fix.sql** - Fixes `enforce_campaign_launch_payment_integrity` trigger which blocked Cashfree webhook verification because `is_admin()` returns false for service_role (no JWT user). Adds temp table authorization marker (`_cf_verify_signal`) check. Run AFTER step 12.
 
+14. **migrations/20250101000003_lock_direct_campaign_status_updates.sql** — `enforce_campaign_status_protected` trigger blocks direct Creator UPDATE of `campaigns.status`. Uses `_campaign_transition_signal` temp table. Adds signal creation to `campaign_action()`, `admin_campaign_action()`, `verify_campaign_launch_payment()`, `verify_cashfree_webhook()`. Run AFTER step 13.
+15. **migrations/20250101000004_revoke_temp_table_privilege.sql** — Revokes TEMPORARY privilege from `authenticated`, `anon`, and `PUBLIC` on the database. Closes the temp-table forgery attack vector where an authenticated user could CREATE TEMPORARY TABLE `_campaign_transition_signal` to bypass the status protection trigger. SECURITY DEFINER functions are unaffected (they run as the owner). Run AFTER step 14.
+
 ### One-Time Recovery
 
-- **cashfree-recover-existing-payment.sql** — Recovers the existing sandbox payment (order `cliptwo_ef769e74-58f4-4df9-9c5f-de3333f1b577_attempt_1`, amount ₹110). Contains trigger fix + function fix + precondition checks + RPC call + post-verification queries. Execute in SQL Editor after step 13.
+- **cashfree-recover-existing-payment.sql** — Recovers the existing sandbox payment (order `cliptwo_ef769e74-58f4-4df9-9c5f-de3333f1b577_attempt_1`, amount ₹110). Contains trigger fix + function fix + precondition checks + RPC call + post-verification queries. Execute in SQL Editor after step 15.
 
 ### Previous Standalone Files (superseded)
 

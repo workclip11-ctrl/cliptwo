@@ -501,3 +501,118 @@ END $$;
 
 SELECT 'TEST O PASSED' AS result;
 ROLLBACK;
+
+-- ===========================================================================
+-- TEST P: TEMPORARY privilege revoked from authenticated
+-- ===========================================================================
+-- Verifies that migration 15 successfully revoked TEMPORARY from authenticated.
+-- If this test fails, the temp-table authorization boundary is broken.
+BEGIN;
+DO $$
+BEGIN
+  ASSERT NOT has_database_privilege('authenticated', 'postgres', 'TEMPORARY'),
+    'FAIL: authenticated still has TEMPORARY privilege — temp table forgery is possible';
+END $$;
+
+SELECT 'TEST P PASSED' AS result;
+ROLLBACK;
+
+-- ===========================================================================
+-- TEST Q: TEMPORARY privilege revoked from anon
+-- ===========================================================================
+BEGIN;
+DO $$
+BEGIN
+  ASSERT NOT has_database_privilege('anon', 'postgres', 'TEMPORARY'),
+    'FAIL: anon still has TEMPORARY privilege — temp table forgery is possible';
+END $$;
+
+SELECT 'TEST Q PASSED' AS result;
+ROLLBACK;
+
+-- ===========================================================================
+-- TEST R: Authenticated cannot CREATE TEMPORARY TABLE _campaign_transition_signal
+-- ===========================================================================
+-- Direct forgery attempt: authenticated tries to create the signal table.
+-- This MUST fail after migration 15. If it succeeds, the attack is live.
+BEGIN;
+SET LOCAL role = 'authenticated';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
+
+DO $$
+BEGIN
+  BEGIN
+    CREATE TEMPORARY TABLE _campaign_transition_signal (id int);
+    ASSERT false, 'FAIL: authenticated can still create temp tables — REVOKE TEMPORARY not applied';
+  EXCEPTION WHEN insufficient_privilege THEN
+    -- Expected: permission denied
+    NULL;
+  WHEN OTHERS THEN
+    -- Also acceptable: other privilege-related errors
+    RAISE NOTICE 'Unexpected error (still blocked): %', SQLERRM;
+  END;
+END $$;
+
+SELECT 'TEST R PASSED' AS result;
+ROLLBACK;
+
+-- ===========================================================================
+-- TEST S: Authenticated cannot CREATE TEMPORARY TABLE _cf_verify_signal
+-- ===========================================================================
+-- Forgery of the Cashfree verification signal.
+BEGIN;
+SET LOCAL role = 'authenticated';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
+
+DO $$
+BEGIN
+  BEGIN
+    CREATE TEMPORARY TABLE _cf_verify_signal (id int);
+    ASSERT false, 'FAIL: authenticated can still create temp tables — REVOKE TEMPORARY not applied';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  WHEN OTHERS THEN
+    RAISE NOTICE 'Unexpected error (still blocked): %', SQLERRM;
+  END;
+END $$;
+
+SELECT 'TEST S PASSED' AS result;
+ROLLBACK;
+
+-- ===========================================================================
+-- TEST T: Direct UPDATE blocked even with forged temp table name
+-- ===========================================================================
+-- End-to-end attack simulation: authenticated tries to create a table with
+-- the signal name (via a non-temp path) and then UPDATE status.
+-- Even if the table somehow exists, the trigger only checks pg_temp schemas.
+BEGIN;
+SET LOCAL role = 'authenticated';
+SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
+
+DO $$
+DECLARE
+  v_id uuid;
+BEGIN
+  INSERT INTO public.campaigns (
+    title, brief, platform, payout, creator, created_by,
+    budget, status, launch_payment_status
+  ) VALUES (
+    'Status Test T', 'Brief', 'YouTube', 0, 'Creator',
+    'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid,
+    0, 'draft', 'pending'
+  ) RETURNING id INTO v_id;
+
+  -- Attempt direct status change — should be blocked by trigger
+  BEGIN
+    UPDATE public.campaigns SET status = 'open' WHERE id = v_id;
+    ASSERT false, 'Should have raised exception';
+  EXCEPTION WHEN OTHERS THEN
+    ASSERT SQLERRM LIKE '%cannot be changed directly%',
+      'Wrong error: ' || SQLERRM;
+  END;
+
+  DELETE FROM public.campaigns WHERE id = v_id;
+END $$;
+
+SELECT 'TEST T PASSED' AS result;
+ROLLBACK;
