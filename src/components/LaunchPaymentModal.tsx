@@ -19,8 +19,29 @@ declare global {
 }
 
 const CASHFREE_SCRIPT_URL = "https://sdk.cashfree.com/js/ui/2.0.0/cashfree.js";
+const CASHFREE_LOAD_TIMEOUT_MS = 10000;
 const POLL_INTERVAL_MS = 3000;
 const POLL_MAX_ATTEMPTS = 20;
+
+function waitForCashfree(pollMs: number, timeoutMs: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (window.Cashfree) {
+      resolve(true);
+      return;
+    }
+    const start = Date.now();
+    const check = () => {
+      if (window.Cashfree) {
+        resolve(true);
+      } else if (Date.now() - start >= timeoutMs) {
+        resolve(false);
+      } else {
+        setTimeout(check, pollMs);
+      }
+    };
+    check();
+  });
+}
 
 function loadCashfreeScript(): Promise<boolean> {
   return new Promise((resolve) => {
@@ -30,22 +51,14 @@ function loadCashfreeScript(): Promise<boolean> {
     }
     const existing = document.querySelector(`script[src="${CASHFREE_SCRIPT_URL}"]`);
     if (existing) {
-      const check = () => {
-        if (window.Cashfree) resolve(true);
-        else setTimeout(check, 100);
-      };
-      check();
+      waitForCashfree(100, CASHFREE_LOAD_TIMEOUT_MS).then(resolve);
       return;
     }
     const script = document.createElement("script");
     script.src = CASHFREE_SCRIPT_URL;
     script.async = true;
     script.onload = () => {
-      const check = () => {
-        if (window.Cashfree) resolve(true);
-        else setTimeout(check, 100);
-      };
-      check();
+      waitForCashfree(100, CASHFREE_LOAD_TIMEOUT_MS).then(resolve);
     };
     script.onerror = () => resolve(false);
     document.head.appendChild(script);
