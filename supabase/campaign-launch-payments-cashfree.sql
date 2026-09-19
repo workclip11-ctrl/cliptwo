@@ -507,6 +507,10 @@ BEGIN
     updated_at = now()
   WHERE id = v_payment.id;
 
+  -- Signal to enforce_campaign_launch_payment_integrity trigger that this is
+  -- a legitimate Cashfree webhook verification (service_role, not admin).
+  PERFORM set_config('app.cashfree_webhook_verified', 'true', true);
+
   UPDATE public.campaigns
   SET
     launch_payment_status = 'verified',

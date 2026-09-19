@@ -1,27 +1,69 @@
 -- ============================================================================
--- CASHFREE VERIFIED_BY FIX — IDEMPOTENT MIGRATION
+-- CASHFREE TRIGGER FIX — IDEMPOTENT MIGRATION
 -- ============================================================================
--- Fix: Cashfree webhook verification fails with FK violation because
--- verified_by = '00000000-0000-0000-0000-000000000000' does not exist in
--- auth.users. The verified_by column has REFERENCES auth.users(id).
+-- Fix: enforce_campaign_launch_payment_integrity trigger blocks
+-- verify_cashfree_webhook() because:
+--   1. verify_cashfree_webhook is SECURITY DEFINER called by service_role
+--   2. service_role has no JWT user, so auth.uid() returns NULL
+--   3. is_admin() checks profiles WHERE id = auth.uid() — returns false
+--   4. Trigger blocks the UPDATE with 'Only admin can verify campaign launch payment'
 --
--- Similarly, audit_logs.actor_id has REFERENCES auth.users(id), so the
--- same fake UUID in audit log inserts would also fail.
+-- Fix: Allow the trigger to pass when verify_cashfree_webhook sets the
+-- session variable app.cashfree_webhook_verified = 'true'.
 --
--- Fix: Set verified_by = NULL for automated Cashfree verification.
--- Set actor_id = NULL for Cashfree webhook audit logs.
--- The 'actor' text column continues to record 'system' for identification.
+-- Also updates verify_cashfree_webhook to set this session variable before
+-- the campaigns UPDATE.
 --
--- This does NOT affect admin UTR verification (verify_campaign_launch_payment),
--- which correctly uses auth.uid() — a real admin UUID.
---
--- Run AFTER: 20250101000000_cashfree_integration.sql
+-- Run AFTER: 20250101000001_cashfree_verified_by_fix.sql
 -- Safe to run multiple times (idempotent CREATE OR REPLACE).
--- ============================================================================
+-- =============================================================================
 
--- ── 1. Fix verify_cashfree_webhook ──────────────────────────────────────────
--- Sets verified_by = NULL (not a fake UUID) for automated Cashfree verification.
--- Sets actor_id = NULL in audit logs (not a fake UUID).
+-- ── 1. Fix trigger to allow Cashfree webhook verification ──────────────────
+
+CREATE OR REPLACE FUNCTION public.enforce_campaign_launch_payment_integrity()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NEW.launch_payment_status IS DISTINCT FROM OLD.launch_payment_status THEN
+
+    -- 'verified' can be set by admin (via verify_campaign_launch_payment RPC)
+    -- OR by Cashfree webhook verification (service_role sets session variable)
+    IF NEW.launch_payment_status = 'verified' AND NOT public.is_admin() THEN
+      IF current_setting('app.cashfree_webhook_verified', true) IS DISTINCT FROM 'true' THEN
+        RAISE EXCEPTION 'Only admin can verify campaign launch payment';
+      END IF;
+    END IF;
+
+    IF NEW.launch_payment_status = 'submitted' THEN
+      IF NEW.created_by != auth.uid() AND NOT public.is_admin() THEN
+        RAISE EXCEPTION 'Only the campaign owner can submit launch payment';
+      END IF;
+    END IF;
+
+    IF NEW.launch_payment_status = 'rejected' AND NOT public.is_admin() THEN
+      RAISE EXCEPTION 'Only admin can reject campaign launch payment';
+    END IF;
+
+    IF NEW.launch_payment_status = 'pending' THEN
+      RAISE EXCEPTION 'Cannot set launch payment status to pending via UPDATE';
+    END IF;
+
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS enforce_campaign_launch_payment_integrity ON public.campaigns;
+CREATE TRIGGER enforce_campaign_launch_payment_integrity
+  BEFORE UPDATE ON public.campaigns
+  FOR EACH ROW
+  EXECUTE FUNCTION public.enforce_campaign_launch_payment_integrity();
+
+-- ── 2. Fix verify_cashfree_webhook to set session variable ──────────────────
 
 CREATE OR REPLACE FUNCTION public.verify_cashfree_webhook(
   p_cashfree_order_id text,
@@ -108,8 +150,7 @@ BEGIN
     updated_at = now()
   WHERE id = v_payment.id;
 
-  -- Signal to enforce_campaign_launch_payment_integrity trigger that this is
-  -- a legitimate Cashfree webhook verification (service_role, not admin).
+  -- Signal to the trigger that this is a legitimate Cashfree webhook verification
   PERFORM set_config('app.cashfree_webhook_verified', 'true', true);
 
   UPDATE public.campaigns
@@ -150,98 +191,10 @@ REVOKE EXECUTE ON FUNCTION public.verify_cashfree_webhook(text, text, numeric) F
 REVOKE EXECUTE ON FUNCTION public.verify_cashfree_webhook(text, text, numeric) FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.verify_cashfree_webhook(text, text, numeric) TO service_role;
 
--- ── 2. Fix reject_cashfree_webhook ──────────────────────────────────────────
--- Sets actor_id = NULL in audit logs (not a fake UUID).
-
-CREATE OR REPLACE FUNCTION public.reject_cashfree_webhook(
-  p_cashfree_order_id text,
-  p_cf_payment_id text,
-  p_failure_reason text DEFAULT NULL
-)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_payment record;
-BEGIN
-  SELECT * INTO v_payment
-  FROM public.campaign_launch_payments
-  WHERE cashfree_order_id = p_cashfree_order_id
-  FOR UPDATE;
-
-  IF v_payment IS NULL THEN
-    INSERT INTO public.audit_logs (
-      id, actor_id, actor, action, entity_type, entity_id,
-      metadata, idempotency_key
-    ) VALUES (
-      gen_random_uuid()::text, NULL, 'system',
-      'cashfree_webhook_unknown_order', 'campaign', 'unknown',
-      jsonb_build_object('cashfree_order_id', p_cashfree_order_id, 'cf_payment_id', p_cf_payment_id),
-      'webhook_unknown_' || p_cashfree_order_id
-    );
-
-    RETURN jsonb_build_object('success', true, 'idempotent', true);
-  END IF;
-
-  IF v_payment.payment_status IN ('rejected', 'verified') THEN
-    RETURN jsonb_build_object(
-      'success', true,
-      'payment_id', v_payment.id,
-      'payment_status', v_payment.payment_status,
-      'idempotent', true
-    );
-  END IF;
-
-  UPDATE public.campaign_launch_payments
-  SET
-    payment_status = 'rejected',
-    cashfree_cf_payment_id = p_cf_payment_id,
-    cashfree_order_status = 'FAILED',
-    rejection_reason = COALESCE(p_failure_reason, 'Payment failed via Cashfree'),
-    rejected_at = now(),
-    updated_at = now()
-  WHERE id = v_payment.id;
-
-  UPDATE public.campaigns
-  SET launch_payment_status = 'rejected'
-  WHERE id = v_payment.campaign_id;
-
-  INSERT INTO public.audit_logs (
-    id, actor_id, actor, action, entity_type, entity_id, entity_label,
-    before_state, after_state, metadata, reason, idempotency_key
-  ) VALUES (
-    gen_random_uuid()::text, NULL, 'system',
-    'campaign_payment_rejected_cashfree', 'campaign', v_payment.campaign_id::text,
-    (SELECT title FROM public.campaigns WHERE id = v_payment.campaign_id),
-    jsonb_build_object('payment_status', v_payment.payment_status),
-    jsonb_build_object('payment_status', 'rejected'),
-    jsonb_build_object('cashfree_order_id', p_cashfree_order_id, 'cf_payment_id', p_cf_payment_id),
-    COALESCE(p_failure_reason, 'Payment failed via Cashfree'),
-    'webhook_reject_' || p_cashfree_order_id
-  );
-
-  RETURN jsonb_build_object(
-    'success', true,
-    'payment_id', v_payment.id,
-    'payment_status', 'rejected',
-    'campaign_id', v_payment.campaign_id
-  );
-END;
-$$;
-
-REVOKE EXECUTE ON FUNCTION public.reject_cashfree_webhook(text, text, text) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.reject_cashfree_webhook(text, text, text) FROM anon;
-REVOKE EXECUTE ON FUNCTION public.reject_cashfree_webhook(text, text, text) FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.reject_cashfree_webhook(text, text, text) TO service_role;
-
 -- ── 3. Verification ─────────────────────────────────────────────────────────
 
--- Verify verify_cashfree_webhook exists
 SELECT 'verify_cashfree_webhook' AS rpc,
   to_regprocedure('public.verify_cashfree_webhook(text,text,numeric)') IS NOT NULL AS exists;
 
--- Verify reject_cashfree_webhook exists
-SELECT 'reject_cashfree_webhook' AS rpc,
-  to_regprocedure('public.reject_cashfree_webhook(text,text,text)') IS NOT NULL AS exists;
+SELECT 'enforce_campaign_launch_payment_integrity' AS trigger_fn,
+  to_regprocedure('public.enforce_campaign_launch_payment_integrity()') IS NOT NULL AS exists;

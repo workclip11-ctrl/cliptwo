@@ -25,9 +25,12 @@ BEGIN
   -- Only care when launch_payment_status actually changes
   IF NEW.launch_payment_status IS DISTINCT FROM OLD.launch_payment_status THEN
 
-    -- 'verified' can ONLY be set by admin (via verify_campaign_launch_payment RPC)
+    -- 'verified' can be set by admin (via verify_campaign_launch_payment RPC)
+    -- OR by Cashfree webhook verification (service_role sets session variable)
     IF NEW.launch_payment_status = 'verified' AND NOT public.is_admin() THEN
-      RAISE EXCEPTION 'Only admin can verify campaign launch payment';
+      IF current_setting('app.cashfree_webhook_verified', true) IS DISTINCT FROM 'true' THEN
+        RAISE EXCEPTION 'Only admin can verify campaign launch payment';
+      END IF;
     END IF;
 
     -- 'submitted' can be set by campaign owner (submit RPC) or admin

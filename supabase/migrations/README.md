@@ -21,6 +21,11 @@ The following SQL files must be applied in order. Later files may override earli
 
 11. **migrations/20250101000000_cashfree_integration.sql** - Cashfree sandbox payment integration (idempotent, safe to re-run). Adds 7 columns, 2 indexes, 5 RPCs. Run AFTER step 9.
 12. **migrations/20250101000001_cashfree_verified_by_fix.sql** - Fixes FK violation in Cashfree webhook verification. Sets `verified_by = NULL` and `actor_id = NULL` in audit logs (fake UUID `00000000-0000-0000-0000-000000000000` violates `REFERENCES auth.users(id)`). Run AFTER step 11.
+13. **migrations/20250101000002_cashfree_trigger_fix.sql** - Fixes `enforce_campaign_launch_payment_integrity` trigger which blocked Cashfree webhook verification because `is_admin()` returns false for service_role (no JWT user). Adds session variable bypass (`app.cashfree_webhook_verified`). Also updates `verify_cashfree_webhook` to set this session variable. Run AFTER step 12.
+
+### One-Time Recovery
+
+- **cashfree-recover-existing-payment.sql** — Recovers the existing sandbox payment (order `cliptwo_ef769e74-58f4-4df9-9c5f-de3333f1b577_attempt_1`, amount ₹110). Contains trigger fix + function fix + precondition checks + RPC call + post-verification queries. Execute in SQL Editor after step 13.
 
 ### Previous Standalone Files (superseded)
 
