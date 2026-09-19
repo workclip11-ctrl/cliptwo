@@ -192,6 +192,46 @@ CREATE TRIGGER enforce_campaign_open_requires_verified
   FOR EACH ROW
   EXECUTE FUNCTION public.enforce_campaign_open_requires_verified();
 
+-- ── 4b. UPDATE trigger: block direct Creator status changes ─────────────────
+-- Safety net: prevents any direct UPDATE from changing campaigns.status
+-- unless the caller is an admin or a trusted SECURITY DEFINER function has
+-- created the _campaign_transition_signal temp table in the same transaction.
+-- See migration 20250101000003 for full security analysis.
+
+CREATE OR REPLACE FUNCTION public.enforce_campaign_status_protected()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NEW.status IS DISTINCT FROM OLD.status THEN
+    IF public.is_admin() THEN
+      RETURN NEW;
+    END IF;
+
+    IF EXISTS (
+      SELECT 1 FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE c.relname = '_campaign_transition_signal'
+        AND n.nspname LIKE 'pg_temp%'
+    ) THEN
+      RETURN NEW;
+    END IF;
+
+    RAISE EXCEPTION 'Campaign status cannot be changed directly. Use campaign_action().';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS enforce_campaign_status_protected ON public.campaigns;
+CREATE TRIGGER enforce_campaign_status_protected
+  BEFORE UPDATE ON public.campaigns
+  FOR EACH ROW
+  EXECUTE FUNCTION public.enforce_campaign_status_protected();
+
 -- ── 5. Fix campaign_action('publish'): require verified payment ──────────────
 -- The owner 'publish' action previously transitioned draft -> open without
 -- checking launch_payment_status. This is now gated on payment verification.
@@ -272,6 +312,10 @@ begin
       end if;
       v_new_status := 'open';
   end case;
+
+  -- Authorization marker for enforce_campaign_status_protected trigger.
+  DROP TABLE IF EXISTS _campaign_transition_signal;
+  CREATE TEMPORARY TABLE _campaign_transition_signal (id int) ON COMMIT DROP;
 
   update public.campaigns set status = v_new_status where id = p_campaign_id;
 

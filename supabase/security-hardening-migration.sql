@@ -648,6 +648,10 @@ BEGIN
     updated_at = now()
   WHERE id = p_payment_id;
 
+  -- Authorization marker for enforce_campaign_status_protected trigger.
+  DROP TABLE IF EXISTS _campaign_transition_signal;
+  CREATE TEMPORARY TABLE _campaign_transition_signal (id int) ON COMMIT DROP;
+
   UPDATE public.campaigns
   SET
     launch_payment_status = 'verified',

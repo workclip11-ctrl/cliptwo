@@ -512,6 +512,10 @@ BEGIN
   DROP TABLE IF EXISTS _cf_verify_signal;
   CREATE TEMPORARY TABLE _cf_verify_signal (id int) ON COMMIT DROP;
 
+  -- Authorization marker for the enforce_campaign_status_protected trigger.
+  DROP TABLE IF EXISTS _campaign_transition_signal;
+  CREATE TEMPORARY TABLE _campaign_transition_signal (id int) ON COMMIT DROP;
+
   UPDATE public.campaigns
   SET
     launch_payment_status = 'verified',

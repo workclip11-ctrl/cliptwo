@@ -644,6 +644,10 @@ begin
     end if;
   end if;
 
+  -- Authorization marker for enforce_campaign_status_protected trigger.
+  DROP TABLE IF EXISTS _campaign_transition_signal;
+  CREATE TEMPORARY TABLE _campaign_transition_signal (id int) ON COMMIT DROP;
+
   -- State transition validation: enforce valid status changes
   case p_action
     when 'pause' then
