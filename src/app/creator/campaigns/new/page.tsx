@@ -38,7 +38,9 @@ import type {
 
 declare global {
   interface Window {
-    Cashfree?: (config: { mode: string; paymentSession: string }) => { redirect: () => void };
+    Cashfree?: (config: { mode: string }) => {
+      checkout: (options: { paymentSessionId: string }) => void;
+    };
   }
 }
 
@@ -356,7 +358,7 @@ export default function NewCampaignWizard() {
     }
   }
 
-  const CASHFREE_SCRIPT_URL = "https://sdk.cashfree.com/js/ui/2.0.0/cashfree.js";
+  const CASHFREE_SCRIPT_URL = "https://sdk.cashfree.com/js/v3/cashfree.js";
 
   function loadCashfreeScript(): Promise<boolean> {
     return new Promise((resolve) => {
@@ -432,9 +434,10 @@ export default function NewCampaignWizard() {
 
       const cashfree = window.Cashfree({
         mode: "sandbox",
-        paymentSession: data.payment_session_id,
       });
-      cashfree.redirect();
+      cashfree.checkout({
+        paymentSessionId: data.payment_session_id,
+      });
 
       startPaymentPolling(createdCampaignId);
     } catch (err) {

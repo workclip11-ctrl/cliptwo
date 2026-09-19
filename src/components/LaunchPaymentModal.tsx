@@ -11,14 +11,13 @@ type Phase = "form" | "processing" | "polling" | "submitted" | "verified" | "rej
 
 declare global {
   interface Window {
-    Cashfree?: (config: {
-      mode: string;
-      paymentSession: string;
-    }) => { redirect: () => void };
+    Cashfree?: (config: { mode: string }) => {
+      checkout: (options: { paymentSessionId: string }) => void;
+    };
   }
 }
 
-const CASHFREE_SCRIPT_URL = "https://sdk.cashfree.com/js/ui/2.0.0/cashfree.js";
+const CASHFREE_SCRIPT_URL = "https://sdk.cashfree.com/js/v3/cashfree.js";
 const CASHFREE_LOAD_TIMEOUT_MS = 10000;
 const POLL_INTERVAL_MS = 3000;
 const POLL_MAX_ATTEMPTS = 20;
@@ -188,10 +187,11 @@ export function LaunchPaymentModal({
 
       const cashfree = window.Cashfree({
         mode: "sandbox",
-        paymentSession: data.payment_session_id,
       });
 
-      cashfree.redirect();
+      cashfree.checkout({
+        paymentSessionId: data.payment_session_id,
+      });
 
       startPolling();
     } catch (err) {
