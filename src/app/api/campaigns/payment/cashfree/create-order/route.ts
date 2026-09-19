@@ -3,6 +3,7 @@ import { getAuthenticatedUser } from "@/lib/supabase/auth-helpers";
 import { createServiceClient } from "@/lib/supabase/server";
 import { createClient } from "@supabase/supabase-js";
 import { sanitizeError } from "@/lib/api-helpers";
+import { normalizeIndianPhone } from "@/lib/phone";
 
 const CASHFREE_BASE_URL = "https://sandbox.cashfree.com/pg";
 const CASHFREE_API_VERSION = "2025-01-01";
@@ -111,14 +112,15 @@ export async function POST(request: Request) {
     );
   }
 
-  // Cashfree expects a 10-digit Indian mobile number (no +91 prefix).
-  const cashfreePhone = phone.replace(/^\+91/, "");
-  if (!/^[6-9]\d{9}$/.test(cashfreePhone)) {
+  // Normalize to canonical +91XXXXXXXXXX, then derive 10-digit Cashfree phone.
+  const normalizedPhone = normalizeIndianPhone(phone);
+  if (!normalizedPhone) {
     return NextResponse.json(
       { error: "Stored phone number is not a valid Indian mobile number." },
       { status: 400 },
     );
   }
+  const cashfreePhone = normalizedPhone.slice(3);
 
   // ── Step 1: Atomically reserve payment attempt (DB-authoritative) ────
   const { data: reserveResult, error: reserveError } = await supabase.rpc(
