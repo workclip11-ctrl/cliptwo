@@ -8,6 +8,11 @@
 -- All function definitions use CREATE OR REPLACE.
 -- All index creations use IF NOT EXISTS.
 --
+-- Cashfree uses an internal 'reserving' payment state before 'submitted'.
+-- The original payment_status CHECK constraint only allowed:
+--   pending, submitted, verified, rejected
+-- This migration updates it to also allow 'reserving'.
+--
 -- To execute: paste into Supabase Dashboard → SQL Editor → Run
 -- ============================================================================
 
@@ -72,6 +77,19 @@ BEGIN
       ADD COLUMN cashfree_attempts_used integer NOT NULL DEFAULT 0;
   END IF;
 END $$;
+
+-- ── 1b. Update payment_status CHECK constraint to allow 'reserving' ─────────
+-- The original constraint from campaign-launch-payments.sql only allowed:
+--   pending, submitted, verified, rejected
+-- Cashfree reservation flow requires 'reserving' as an intermediate state.
+-- DROP CONSTRAINT IF EXISTS is idempotent — safe to re-run.
+
+ALTER TABLE public.campaign_launch_payments
+  DROP CONSTRAINT IF EXISTS campaign_launch_payments_payment_status_check;
+
+ALTER TABLE public.campaign_launch_payments
+  ADD CONSTRAINT campaign_launch_payments_payment_status_check
+    CHECK (payment_status IN ('pending','reserving','submitted','verified','rejected'));
 
 -- ── 2. Indexes ──────────────────────────────────────────────────────────────
 
@@ -631,3 +649,11 @@ SELECT 'idx_campaign_launch_payments_cashfree_order_id' AS idx,
 UNION ALL
 SELECT 'idx_campaign_launch_payments_cashfree_active',
   EXISTS(SELECT 1 FROM pg_indexes WHERE indexname='idx_campaign_launch_payments_cashfree_active');
+
+-- payment_status constraint check — must include 'reserving'
+SELECT 'payment_status CHECK includes reserving' AS check_name,
+  EXISTS(
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'campaign_launch_payments_payment_status_check'
+      AND pg_get_constraintdef(oid) LIKE '%reserving%'
+  ) AS includes_reserving;
