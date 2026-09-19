@@ -87,7 +87,7 @@
 
 -- TEST D (Cashfree): Client cannot override the phone
 -- The create-order request body only accepts { campaignId }.
-- phone is derived from auth.users via serviceClient, never from request body.
+-- phone is derived from auth.users via serviceClient, never from request body.
 -- Verification: no phone parameter in create-order request body parsing.
 
 -- TEST E (Cashfree): Supabase still stores +919315851024
