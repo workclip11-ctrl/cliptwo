@@ -76,6 +76,7 @@ export default function CreatorSettingsPage() {
         setPhoneError(data.error || "Could not update phone number.");
         return;
       }
+      await supabase.auth.refreshSession();
       setPhone(normalized.replace(/^\+91/, ""));
       setPhoneSaved(true);
       setTimeout(() => setPhoneSaved(false), 2000);
