@@ -61,16 +61,27 @@ export default function CreatorSettingsPage() {
       return;
     }
     if (!isSupabaseConfigured) return;
-    const { error } = await supabase.auth.updateUser({ phone: normalized });
-    if (error) {
-      setPhoneError(error.message.includes("phone")
-        ? "Phone update failed. Please try again."
-        : "Could not update phone number.");
-      return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch("/api/account/phone", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ phone: normalized }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPhoneError(data.error || "Could not update phone number.");
+        return;
+      }
+      setPhone(normalized.replace(/^\+91/, ""));
+      setPhoneSaved(true);
+      setTimeout(() => setPhoneSaved(false), 2000);
+    } catch {
+      setPhoneError("Could not update phone number.");
     }
-    setPhone(normalized.replace(/^\+91/, ""));
-    setPhoneSaved(true);
-    setTimeout(() => setPhoneSaved(false), 2000);
   }
 
   return (
