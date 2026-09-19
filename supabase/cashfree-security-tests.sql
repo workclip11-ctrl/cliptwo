@@ -324,7 +324,7 @@ DO $$ DECLARE v_result jsonb; v_c_status text; v_p_status text; v_verified_by uu
   SELECT payment_status INTO v_p_status FROM public.campaign_launch_payments WHERE campaign_id = 'c0000000-0000-0000-0000-00000000000r';
   ASSERT v_p_status = 'verified', 'TEST R FAIL: payment status is ' || v_p_status;
   SELECT verified_by INTO v_verified_by FROM public.campaign_launch_payments WHERE campaign_id = 'c0000000-0000-0000-0000-00000000000r';
-  ASSERT v_verified_by = '00000000-0000-0000-0000-000000000000', 'TEST R FAIL: verified_by should be system';
+  ASSERT v_verified_by IS NULL, 'TEST R FAIL: verified_by should be NULL for automated Cashfree verification';
 END $$;
 SELECT 'TEST R PASSED' AS result;
 ROLLBACK;

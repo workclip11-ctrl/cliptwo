@@ -480,7 +480,7 @@ BEGIN
       id, actor_id, actor, action, entity_type, entity_id, entity_label,
       before_state, after_state, metadata, reason, idempotency_key
     ) VALUES (
-      gen_random_uuid()::text, '00000000-0000-0000-0000-000000000000', 'system',
+      gen_random_uuid()::text, NULL, 'system',
       'campaign_payment_rejected_amount_mismatch', 'campaign', v_payment.campaign_id::text,
       (SELECT title FROM public.campaigns WHERE id = v_payment.campaign_id),
       jsonb_build_object('payment_status', v_payment.payment_status),
@@ -503,7 +503,7 @@ BEGIN
     cashfree_cf_payment_id = p_cf_payment_id,
     cashfree_order_status = 'PAID',
     verified_at = now(),
-    verified_by = '00000000-0000-0000-0000-000000000000',
+    verified_by = NULL,
     updated_at = now()
   WHERE id = v_payment.id;
 
@@ -521,7 +521,7 @@ BEGIN
     id, actor_id, actor, action, entity_type, entity_id, entity_label,
     before_state, after_state, metadata, idempotency_key
   ) VALUES (
-    gen_random_uuid()::text, '00000000-0000-0000-0000-000000000000', 'system',
+    gen_random_uuid()::text, NULL, 'system',
     'campaign_payment_verified_cashfree', 'campaign', v_payment.campaign_id::text,
     (SELECT title FROM public.campaigns WHERE id = v_payment.campaign_id),
     jsonb_build_object('payment_status', v_payment.payment_status),
@@ -571,7 +571,7 @@ BEGIN
       id, actor_id, actor, action, entity_type, entity_id,
       metadata, idempotency_key
     ) VALUES (
-      gen_random_uuid()::text, '00000000-0000-0000-0000-000000000000', 'system',
+      gen_random_uuid()::text, NULL, 'system',
       'cashfree_webhook_unknown_order', 'campaign', 'unknown',
       jsonb_build_object('cashfree_order_id', p_cashfree_order_id, 'cf_payment_id', p_cf_payment_id),
       'webhook_unknown_' || p_cashfree_order_id
@@ -607,7 +607,7 @@ BEGIN
     id, actor_id, actor, action, entity_type, entity_id, entity_label,
     before_state, after_state, metadata, reason, idempotency_key
   ) VALUES (
-    gen_random_uuid()::text, '00000000-0000-0000-0000-000000000000', 'system',
+    gen_random_uuid()::text, NULL, 'system',
     'campaign_payment_rejected_cashfree', 'campaign', v_payment.campaign_id::text,
     (SELECT title FROM public.campaigns WHERE id = v_payment.campaign_id),
     jsonb_build_object('payment_status', v_payment.payment_status),

@@ -20,6 +20,7 @@ The following SQL files must be applied in order. Later files may override earli
 ### Cashfree Extension
 
 11. **migrations/20250101000000_cashfree_integration.sql** - Cashfree sandbox payment integration (idempotent, safe to re-run). Adds 7 columns, 2 indexes, 5 RPCs. Run AFTER step 9.
+12. **migrations/20250101000001_cashfree_verified_by_fix.sql** - Fixes FK violation in Cashfree webhook verification. Sets `verified_by = NULL` and `actor_id = NULL` in audit logs (fake UUID `00000000-0000-0000-0000-000000000000` violates `REFERENCES auth.users(id)`). Run AFTER step 11.
 
 ### Previous Standalone Files (superseded)
 
