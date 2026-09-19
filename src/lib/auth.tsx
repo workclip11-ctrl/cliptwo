@@ -15,6 +15,7 @@ export interface UserProfile {
   id: string;
   name: string;
   email: string;
+  phone?: string;
   role: Role;
   permissions?: string[];
 }
@@ -55,6 +56,7 @@ function mapError(err: { message: string }): string {
 function profileFromUser(user: {
   id?: string | null;
   email?: string | null;
+  phone?: string | null;
   user_metadata?: Record<string, unknown>;
 } | null): UserProfile | null {
   if (!user) return null;
@@ -67,7 +69,7 @@ function profileFromUser(user: {
     typeof meta.name === "string" && meta.name
       ? meta.name
       : (user.email?.split("@")[0] ?? "User");
-  return { id: user.id ?? "", name, email: user.email ?? "", role };
+  return { id: user.id ?? "", name, email: user.email ?? "", phone: user.phone ?? undefined, role };
 }
 
 // Also check the profiles table for the real role (user_metadata can be stale).

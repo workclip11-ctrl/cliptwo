@@ -14,6 +14,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
+import { normalizeIndianPhone } from "@/lib/phone";
 
 export default function CreatorSettingsPage() {
   const router = useRouter();
@@ -21,6 +22,9 @@ export default function CreatorSettingsPage() {
   const { profiles, updateProfile, deactivateOwnAccount } = useStore();
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
+  const [phone, setPhone] = useState("");
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [phoneSaved, setPhoneSaved] = useState(false);
   const [emailNotifs, setEmailNotifs] = useState(true);
   const [pushNotifs, setPushNotifs] = useState(true);
   const [campaignAlerts, setCampaignAlerts] = useState(true);
@@ -33,6 +37,7 @@ export default function CreatorSettingsPage() {
       const me = profiles.find((p) => p.id === user.id);
       setName(user.name || user.email || "");
       setBio(me?.bio ?? "");
+      setPhone(user.phone ? user.phone.replace(/^\+91/, "") : "");
       loaded.current = true;
     }
   }, [user, profiles]);
@@ -45,6 +50,27 @@ export default function CreatorSettingsPage() {
     }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  }
+
+  async function savePhone() {
+    setPhoneError(null);
+    setPhoneSaved(false);
+    const normalized = normalizeIndianPhone(phone);
+    if (!normalized) {
+      setPhoneError("Enter a valid 10-digit Indian mobile number.");
+      return;
+    }
+    if (!isSupabaseConfigured) return;
+    const { error } = await supabase.auth.updateUser({ phone: normalized });
+    if (error) {
+      setPhoneError(error.message.includes("phone")
+        ? "Phone update failed. Please try again."
+        : "Could not update phone number.");
+      return;
+    }
+    setPhone(normalized.replace(/^\+91/, ""));
+    setPhoneSaved(true);
+    setTimeout(() => setPhoneSaved(false), 2000);
   }
 
   return (
@@ -102,6 +128,28 @@ export default function CreatorSettingsPage() {
                     readOnly
                     className="h-11 w-full rounded-[10px] border border-border/60 bg-background px-3.5 text-[14px] text-muted outline-none"
                   />
+                </label>
+              </div>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <label className="block text-[14px]">
+                  <span className="mb-1.5 block text-muted">Phone number</span>
+                  <div className="flex gap-2">
+                    <span className="flex h-11 shrink-0 items-center rounded-[10px] border border-border/60 bg-background px-3 text-[14px] text-muted">+91</span>
+                    <input
+                      value={phone}
+                      onChange={(e) => { setPhone(e.target.value); setPhoneError(null); }}
+                      placeholder="9876543210"
+                      className="h-11 min-w-0 flex-1 rounded-[10px] border border-border/60 bg-background px-3.5 text-[14px] outline-none transition-colors focus:border-foreground/30"
+                    />
+                    <button
+                      onClick={savePhone}
+                      className="h-11 shrink-0 cursor-pointer rounded-[10px] border border-border/60 bg-background px-4 text-[14px] font-medium text-muted transition-colors hover:border-foreground/20 hover:text-foreground"
+                    >
+                      {phoneSaved ? "Saved" : "Save"}
+                    </button>
+                  </div>
+                  {phoneError && <p className="mt-1 text-[13px] text-red">{phoneError}</p>}
+                  <p className="mt-1 text-[13px] text-muted">Required for campaign launch payments.</p>
                 </label>
               </div>
               <label className="mt-4 block text-[14px]">
