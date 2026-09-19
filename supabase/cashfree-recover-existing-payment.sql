@@ -201,11 +201,11 @@ SELECT
   before_state,
   after_state,
   metadata,
-  created_at
+  timestamp
 FROM public.audit_logs
 WHERE entity_id = 'ef769e74-58f4-4df9-9c5f-de3333f1b577'
   AND idempotency_key = 'webhook_verify_cliptwo_ef769e74-58f4-4df9-9c5f-de3333f1b577_attempt_1'
-ORDER BY created_at DESC
+ORDER BY timestamp DESC
 LIMIT 1;
 
 
