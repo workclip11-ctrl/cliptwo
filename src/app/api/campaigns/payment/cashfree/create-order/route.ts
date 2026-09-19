@@ -111,6 +111,15 @@ export async function POST(request: Request) {
     );
   }
 
+  // Cashfree expects a 10-digit Indian mobile number (no +91 prefix).
+  const cashfreePhone = phone.replace(/^\+91/, "");
+  if (!/^[6-9]\d{9}$/.test(cashfreePhone)) {
+    return NextResponse.json(
+      { error: "Stored phone number is not a valid Indian mobile number." },
+      { status: 400 },
+    );
+  }
+
   // ── Step 1: Atomically reserve payment attempt (DB-authoritative) ────
   const { data: reserveResult, error: reserveError } = await supabase.rpc(
     "reserve_cashfree_payment_attempt",
@@ -226,7 +235,7 @@ export async function POST(request: Request) {
     customer_details: {
       customer_id: user.id,
       customer_email: user.email || undefined,
-      customer_phone: phone,
+      customer_phone: cashfreePhone,
       customer_name: profile.name || "Creator",
     },
     order_meta: {

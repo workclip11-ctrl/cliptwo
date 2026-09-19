@@ -69,3 +69,32 @@
 -- After this change, supabase.auth.updateUser({ phone }) is NOT called from any browser code.
 -- All phone updates go through POST /api/account/phone → server → auth.admin.updateUserById.
 -- Verification: grep for "updateUser.*phone" in src/ → only found in api/account/phone/route.ts.
+
+-- === SECTION 3: Cashfree phone formatting ===
+
+-- TEST A (Cashfree): Stored +919315851024 becomes 9315851024 for Cashfree
+-- The create-order route strips the +91 prefix: phone.replace(/^\+91/, "")
+-- Stored value: +919315851024 → Cashfree receives: 9315851024
+-- Verification: grep for cashfreePhone in create-order/route.ts
+
+-- TEST B (Cashfree): Stored 9315851024 also becomes 9315851024
+-- If phone is already 10-digit (no +91 prefix), replace is a no-op.
+-- The validation regex /^[6-9]\d{9}$/ still passes.
+
+-- TEST C (Cashfree): Invalid phone is rejected
+-- After stripping +91, the route validates /^[6-9]\d{9}$/.
+-- Invalid formats (e.g. 1234567890, +9112345678, empty) → 400.
+
+-- TEST D (Cashfree): Client cannot override the phone
+-- The create-order request body only accepts { campaignId }.
+- phone is derived from auth.users via serviceClient, never from request body.
+-- Verification: no phone parameter in create-order request body parsing.
+
+-- TEST E (Cashfree): Supabase still stores +919315851024
+-- The phone-api-security-tests verify updateUserById writes +91XXXXXXXXXX.
+-- The create-order route does NOT modify auth.users.phone.
+
+-- TEST F (Cashfree): Campaign ownership and payment reservation protections unchanged
+-- The fix only adds phone formatting before the Cashfree API call.
+-- All existing checks (role, status, campaign ownership, draft status, reserve/confirm RPCs)
+-- remain in place and are not bypassed.
