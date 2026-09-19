@@ -17,6 +17,28 @@ The following SQL files must be applied in order. Later files may override earli
 9. **security-hardening-migration.sql** - AUTHORITATIVE security RPCs (request_payout, complete_payout_request, process_payout_request, admin_clip_action, admin_user_action, verify_campaign_launch_payment, reject_campaign_launch_payment, adjust_campaign_budget, ingest_clip_metrics, enforce_social_connection_token_protection trigger)
 10. **security-regression-tests.sql** - Regression test suite
 
+### Cashfree Extension
+
+11. **migrations/20250101000000_cashfree_integration.sql** - Cashfree sandbox payment integration (idempotent, safe to re-run). Adds 7 columns, 2 indexes, 5 RPCs. Run AFTER step 9.
+
+### Previous Standalone Files (superseded)
+
+- `campaign-launch-payments-cashfree.sql` — original standalone file, content now duplicated in the migration above
+- `campaign-launch-payment-integrity.sql` — integrity constraints (run before Cashfree if not already applied)
+- `campaign-budget-lock.sql` — budget lock triggers (step 8)
+- `campaign-state-machine-phase1.sql` — campaign lifecycle (step 6)
+- `security-hardening-migration.sql` — security RPCs (step 9)
+- `security-regression-tests.sql` — regression tests (step 10)
+- `social-and-metrics-integration-tests.sql` — integration tests
+- `phase7a-security-tests.sql` — phase 7a tests
+- `campaign-security-regression-tests.sql` — campaign security tests
+- `cashfree-security-tests.sql` — Cashfree security tests
+- `phone-api-security-tests.sql` — phone API security tests
+- `campaign-assets-security.sql` — campaign assets security
+- `campaign-assets-security-tests.sql` — campaign assets security tests
+- `security-hardening.sql` — security hardening
+- `security-regression-tests.sql` — security regression tests
+
 ### Important Notes
 
 - **DO NOT** run files out of order - later files intentionally override earlier ones
