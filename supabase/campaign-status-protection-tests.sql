@@ -15,6 +15,104 @@
 -- ===========================================================================
 
 -- ===========================================================================
+-- DIAGNOSTIC: Migration-state verification
+-- ===========================================================================
+-- Verifies that the installed database has the required security migrations
+-- applied. If any of these fail, subsequent tests will also fail with
+-- unclear errors. Run this section FIRST to diagnose missing migrations.
+-- ===========================================================================
+BEGIN;
+DO $$
+BEGIN
+  -- 1. enforce_campaign_status_protected trigger function must exist
+  ASSERT EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE p.proname = 'enforce_campaign_status_protected'
+      AND n.nspname = 'public'
+  ), 'MISSING: public.enforce_campaign_status_protected() function. '
+     'Apply migration 20250101000003_lock_direct_campaign_status_updates.sql';
+
+  -- 2. enforce_campaign_status_protected trigger must exist on campaigns
+  ASSERT EXISTS (
+    SELECT 1 FROM pg_trigger t
+    JOIN pg_class c ON t.tgrelid = c.oid
+    JOIN pg_namespace n ON c.relnamespace = n.oid
+    WHERE t.tgname = 'enforce_campaign_status_protected'
+      AND c.relname = 'campaigns'
+      AND n.nspname = 'public'
+  ), 'MISSING: enforce_campaign_status_protected trigger on campaigns. '
+     'Apply migration 20250101000003_lock_direct_campaign_status_updates.sql';
+
+  -- 3. enforce_campaign_status_protected must be SECURITY DEFINER
+  ASSERT EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE p.proname = 'enforce_campaign_status_protected'
+      AND n.nspname = 'public'
+      AND p.prosecdef = true
+  ), 'WRONG: enforce_campaign_status_protected is not SECURITY DEFINER. '
+     'Re-apply migration 20250101000003';
+
+  -- 4. enforce_campaign_launch_payment_integrity trigger must exist
+  ASSERT EXISTS (
+    SELECT 1 FROM pg_trigger t
+    JOIN pg_class c ON t.tgrelid = c.oid
+    JOIN pg_namespace n ON c.relnamespace = n.oid
+    WHERE t.tgname = 'enforce_campaign_launch_payment_integrity'
+      AND c.relname = 'campaigns'
+      AND n.nspname = 'public'
+  ), 'MISSING: enforce_campaign_launch_payment_integrity trigger on campaigns. '
+     'Apply migration 20250101000002_cashfree_trigger_fix.sql';
+
+  -- 5. enforce_campaign_open_requires_verified trigger must exist
+  ASSERT EXISTS (
+    SELECT 1 FROM pg_trigger t
+    JOIN pg_class c ON t.tgrelid = c.oid
+    JOIN pg_namespace n ON c.relnamespace = n.oid
+    WHERE t.tgname = 'enforce_campaign_open_requires_verified'
+      AND c.relname = 'campaigns'
+      AND n.nspname = 'public'
+  ), 'MISSING: enforce_campaign_open_requires_verified trigger on campaigns. '
+     'Apply campaign-state-machine-phase1.sql';
+
+  -- 6. verify_campaign_launch_payment must create _campaign_transition_signal
+  ASSERT EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE p.proname = 'verify_campaign_launch_payment'
+      AND n.nspname = 'public'
+      AND pg_get_functiondef(p.oid) LIKE '%_campaign_transition_signal%'
+  ), 'WRONG: verify_campaign_launch_payment does not create _campaign_transition_signal. '
+     'Apply migration 20250101000003_lock_direct_campaign_status_updates.sql. '
+     'The installed database likely has the OLD function without temp-table signal.';
+
+  -- 7. verify_campaign_launch_payment must set both columns atomically
+  ASSERT EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE p.proname = 'verify_campaign_launch_payment'
+      AND n.nspname = 'public'
+      AND pg_get_functiondef(p.oid) LIKE '%launch_payment_status = ''verified''%'
+      AND pg_get_functiondef(p.oid) LIKE '%status = ''open''%'
+  ), 'WRONG: verify_campaign_launch_payment does not set launch_payment_status and status '
+     'in the same UPDATE. Apply migration 20250101000003.';
+
+  -- 8. TEMPORARY privilege revoked from authenticated
+  ASSERT NOT has_database_privilege('authenticated', current_database(), 'TEMPORARY'),
+    'FAIL: authenticated still has TEMPORARY privilege. '
+     'Apply migration 20250101000004_revoke_temp_table_privilege.sql';
+
+  -- 9. TEMPORARY privilege revoked from anon
+  ASSERT NOT has_database_privilege('anon', current_database(), 'TEMPORARY'),
+    'FAIL: anon still has TEMPORARY privilege. '
+     'Apply migration 20250101000004_revoke_temp_table_privilege.sql';
+
+  RAISE NOTICE 'DIAGNOSTIC PASSED: All security migrations appear to be applied correctly.';
+END $$;
+ROLLBACK;
+
+-- ===========================================================================
 -- TEST A: Creator creates campaign → status = draft, launch_payment_status = pending
 -- ===========================================================================
 BEGIN;
@@ -150,14 +248,17 @@ ROLLBACK;
 -- ===========================================================================
 -- TEST E: Creator direct UPDATE status = 'draft' on open campaign → DENIED
 -- ===========================================================================
--- Establishes a legitimately verified/open campaign via the standard RPC flow
--- (submit payment → verify payment), then attempts a direct status UPDATE.
+-- Establishes an open/verified campaign via direct Admin UPDATE (test fixture),
+-- then attempts a direct status UPDATE as Creator.
+--
+-- Fixture uses a direct Admin UPDATE instead of verify_campaign_launch_payment()
+-- because the RPC creates _campaign_transition_signal temp table which persists
+-- in the same transaction and would bypass enforce_campaign_status_protected.
+-- The real RPC state machine is exercised by tests G, K, L, M.
 BEGIN;
 DO $$
 DECLARE
   v_campaign_id uuid;
-  v_payment jsonb;
-  v_payment_id uuid;
 BEGIN
   -- Phase 1: Create campaign as creator (INSERT trigger forces draft/pending)
   PERFORM set_config('request.jwt.claims',
@@ -172,17 +273,22 @@ BEGIN
     100, 'draft', 'pending'
   ) RETURNING id INTO v_campaign_id;
 
-  -- Phase 2: Submit launch payment as creator
-  v_payment := public.submit_campaign_launch_payment(v_campaign_id, 'TEST_UTR_E');
-  v_payment_id := (v_payment->>'payment_id')::uuid;
-
-  -- Phase 3: Verify payment as admin (transitions to open/verified)
+  -- Phase 2: Admin establishes open/verified fixture (direct UPDATE).
+  -- This is permitted: enforce_campaign_status_protected allows admin,
+  -- enforce_campaign_open_requires_verified allows atomic set of both columns.
   PERFORM set_config('request.jwt.claims',
     '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
 
-  PERFORM public.verify_campaign_launch_payment(v_payment_id);
+  UPDATE public.campaigns
+  SET launch_payment_status = 'verified', status = 'open'
+  WHERE id = v_campaign_id;
 
-  -- Phase 4: Switch back to creator and attempt direct status UPDATE
+  ASSERT (SELECT status FROM public.campaigns WHERE id = v_campaign_id) = 'open',
+    'Fixture setup: campaign should be open after admin UPDATE';
+  ASSERT (SELECT launch_payment_status FROM public.campaigns WHERE id = v_campaign_id) = 'verified',
+    'Fixture setup: launch_payment_status should be verified after admin UPDATE';
+
+  -- Phase 3: Switch back to creator and attempt direct status UPDATE
   PERFORM set_config('request.jwt.claims',
     '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
 
@@ -201,14 +307,17 @@ ROLLBACK;
 -- ===========================================================================
 -- TEST F: Creator direct UPDATE status on verified/open campaign → DENIED
 -- ===========================================================================
--- Establishes a legitimately verified/open campaign via the standard RPC flow,
--- then attempts to change status to paused via direct UPDATE.
+-- Establishes an open/verified campaign via direct Admin UPDATE (test fixture),
+-- then attempts to change status to paused via direct UPDATE as Creator.
+--
+-- Fixture uses a direct Admin UPDATE instead of verify_campaign_launch_payment()
+-- because the RPC creates _campaign_transition_signal temp table which persists
+-- in the same transaction and would bypass enforce_campaign_status_protected.
+-- The real RPC state machine is exercised by tests G, K, L, M.
 BEGIN;
 DO $$
 DECLARE
   v_campaign_id uuid;
-  v_payment jsonb;
-  v_payment_id uuid;
 BEGIN
   -- Phase 1: Create campaign as creator (INSERT trigger forces draft/pending)
   PERFORM set_config('request.jwt.claims',
@@ -223,17 +332,22 @@ BEGIN
     100, 'draft', 'pending'
   ) RETURNING id INTO v_campaign_id;
 
-  -- Phase 2: Submit launch payment as creator
-  v_payment := public.submit_campaign_launch_payment(v_campaign_id, 'TEST_UTR_F');
-  v_payment_id := (v_payment->>'payment_id')::uuid;
-
-  -- Phase 3: Verify payment as admin (transitions to open/verified)
+  -- Phase 2: Admin establishes open/verified fixture (direct UPDATE).
+  -- This is permitted: enforce_campaign_status_protected allows admin,
+  -- enforce_campaign_open_requires_verified allows atomic set of both columns.
   PERFORM set_config('request.jwt.claims',
     '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
 
-  PERFORM public.verify_campaign_launch_payment(v_payment_id);
+  UPDATE public.campaigns
+  SET launch_payment_status = 'verified', status = 'open'
+  WHERE id = v_campaign_id;
 
-  -- Phase 4: Switch back to creator and attempt direct status UPDATE
+  ASSERT (SELECT status FROM public.campaigns WHERE id = v_campaign_id) = 'open',
+    'Fixture setup: campaign should be open after admin UPDATE';
+  ASSERT (SELECT launch_payment_status FROM public.campaigns WHERE id = v_campaign_id) = 'verified',
+    'Fixture setup: launch_payment_status should be verified after admin UPDATE';
+
+  -- Phase 3: Switch back to creator and attempt direct status UPDATE
   PERFORM set_config('request.jwt.claims',
     '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
 
