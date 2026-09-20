@@ -148,34 +148,51 @@ SELECT 'TEST D PASSED' AS result;
 ROLLBACK;
 
 -- ===========================================================================
--- TEST E: Creator direct UPDATE status = 'draft' → DENIED
+-- TEST E: Creator direct UPDATE status = 'draft' on open campaign → DENIED
 -- ===========================================================================
+-- Establishes a legitimately verified/open campaign via the standard RPC flow
+-- (submit payment → verify payment), then attempts a direct status UPDATE.
 BEGIN;
-SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
-
 DO $$
 DECLARE
-  v_id uuid;
+  v_campaign_id uuid;
+  v_payment jsonb;
+  v_payment_id uuid;
 BEGIN
+  -- Phase 1: Create campaign as creator (INSERT trigger forces draft/pending)
+  PERFORM set_config('request.jwt.claims',
+    '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+
   INSERT INTO public.campaigns (
     title, brief, platform, payout, creator, created_by,
     budget, status, launch_payment_status
   ) VALUES (
-    'Status Test E', 'Brief', 'YouTube', 0, 'Creator',
+    'Status Test E', 'Brief', 'YouTube', 100, 'Creator',
     'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid,
-    0, 'open', 'verified'
-  ) RETURNING id INTO v_id;
+    100, 'draft', 'pending'
+  ) RETURNING id INTO v_campaign_id;
+
+  -- Phase 2: Submit launch payment as creator
+  v_payment := public.submit_campaign_launch_payment(v_campaign_id, 'TEST_UTR_E');
+  v_payment_id := (v_payment->>'payment_id')::uuid;
+
+  -- Phase 3: Verify payment as admin (transitions to open/verified)
+  PERFORM set_config('request.jwt.claims',
+    '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
+
+  PERFORM public.verify_campaign_launch_payment(v_payment_id);
+
+  -- Phase 4: Switch back to creator and attempt direct status UPDATE
+  PERFORM set_config('request.jwt.claims',
+    '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
 
   BEGIN
-    UPDATE public.campaigns SET status = 'draft' WHERE id = v_id;
+    UPDATE public.campaigns SET status = 'draft' WHERE id = v_campaign_id;
     ASSERT false, 'Should have raised exception';
   EXCEPTION WHEN OTHERS THEN
     ASSERT SQLERRM LIKE '%cannot be changed directly%',
       'Wrong error: ' || SQLERRM;
   END;
-
-  DELETE FROM public.campaigns WHERE id = v_id;
 END $$;
 
 SELECT 'TEST E PASSED' AS result;
@@ -184,32 +201,49 @@ ROLLBACK;
 -- ===========================================================================
 -- TEST F: Creator direct UPDATE status on verified/open campaign → DENIED
 -- ===========================================================================
+-- Establishes a legitimately verified/open campaign via the standard RPC flow,
+-- then attempts to change status to paused via direct UPDATE.
 BEGIN;
-SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
-
 DO $$
 DECLARE
-  v_id uuid;
+  v_campaign_id uuid;
+  v_payment jsonb;
+  v_payment_id uuid;
 BEGIN
+  -- Phase 1: Create campaign as creator (INSERT trigger forces draft/pending)
+  PERFORM set_config('request.jwt.claims',
+    '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+
   INSERT INTO public.campaigns (
     title, brief, platform, payout, creator, created_by,
     budget, status, launch_payment_status
   ) VALUES (
-    'Status Test F', 'Brief', 'YouTube', 0, 'Creator',
+    'Status Test F', 'Brief', 'YouTube', 100, 'Creator',
     'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid,
-    0, 'open', 'verified'
-  ) RETURNING id INTO v_id;
+    100, 'draft', 'pending'
+  ) RETURNING id INTO v_campaign_id;
+
+  -- Phase 2: Submit launch payment as creator
+  v_payment := public.submit_campaign_launch_payment(v_campaign_id, 'TEST_UTR_F');
+  v_payment_id := (v_payment->>'payment_id')::uuid;
+
+  -- Phase 3: Verify payment as admin (transitions to open/verified)
+  PERFORM set_config('request.jwt.claims',
+    '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
+
+  PERFORM public.verify_campaign_launch_payment(v_payment_id);
+
+  -- Phase 4: Switch back to creator and attempt direct status UPDATE
+  PERFORM set_config('request.jwt.claims',
+    '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
 
   BEGIN
-    UPDATE public.campaigns SET status = 'paused' WHERE id = v_id;
+    UPDATE public.campaigns SET status = 'paused' WHERE id = v_campaign_id;
     ASSERT false, 'Should have raised exception';
   EXCEPTION WHEN OTHERS THEN
     ASSERT SQLERRM LIKE '%cannot be changed directly%',
       'Wrong error: ' || SQLERRM;
   END;
-
-  DELETE FROM public.campaigns WHERE id = v_id;
 END $$;
 
 SELECT 'TEST F PASSED' AS result;
