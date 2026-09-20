@@ -463,14 +463,17 @@ ROLLBACK;
 -- ===========================================================================
 -- TEST I: Admin direct UPDATE status → ALLOWED
 -- ===========================================================================
+-- Campaign is created by Creator (RLS requires auth.uid() = created_by),
+-- then Admin directly changes status to verify admin bypass.
 BEGIN;
-SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}';
-
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
+  -- Phase 1: Create campaign as Creator (INSERT trigger forces draft/pending)
+  PERFORM set_config('request.jwt.claims',
+    '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+
   INSERT INTO public.campaigns (
     title, brief, platform, payout, creator, created_by,
     budget, status, launch_payment_status
@@ -480,7 +483,13 @@ BEGIN
     0, 'draft', 'pending'
   ) RETURNING id INTO v_id;
 
-  -- Admin should be able to directly change status
+  ASSERT (SELECT status FROM public.campaigns WHERE id = v_id) = 'draft',
+    'Fixture setup: campaign should be draft after creator INSERT';
+
+  -- Phase 2: Switch to Admin and directly change status
+  PERFORM set_config('request.jwt.claims',
+    '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
+
   UPDATE public.campaigns SET status = 'paused' WHERE id = v_id;
 
   ASSERT (SELECT status FROM public.campaigns WHERE id = v_id) = 'paused',
