@@ -260,13 +260,8 @@ export default function CreatorCampaignsPage() {
               daysLeft: 30,
               category: niche,
               platforms: extra.platforms,
-              objective: extra.objective || undefined,
               maxPayoutPerClip: extra.maxPayoutPerClip || undefined,
               recommendedDuration: extra.recommendedDuration || undefined,
-              aspectRatio: extra.aspectRatio || undefined,
-              cta: extra.cta || undefined,
-              hook: extra.hook || undefined,
-              branding: extra.branding || undefined,
               startDate: new Date().toISOString().slice(0, 10),
               endDate: new Date(Date.now() + 30 * 864e5)
                 .toISOString()

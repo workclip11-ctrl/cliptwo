@@ -1,17 +1,13 @@
 "use client";
 
-"use client";
-
 import { useState, useEffect, useRef, useCallback, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
   Check,
-  Plus,
   X,
   Save,
-  Eye,
   Send,
   Upload,
   FileVideo,
@@ -29,7 +25,6 @@ import { uploadCampaignFile } from "@/lib/upload";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
 import type {
   Campaign,
-  CampaignApproval,
   CampaignRights,
   CampaignSourceAsset,
   CampaignStatus,
@@ -50,9 +45,6 @@ const STEPS = [
   "Platforms",
   "Payment",
   "Duration",
-  "Creative brief",
-  "Rules",
-  "Approval rules",
   "Content rights",
   "Review",
 ];
@@ -105,13 +97,12 @@ export default function NewCampaignWizard() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [savedMsg, setSavedMsg] = useState("");
 
-  // Step 1
+  // Step 1 — Basic information
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
-  const [objective, setObjective] = useState("");
   const [description, setDescription] = useState("");
 
-  // Step 2 — source content
+  // Step 2 — Source content
   const [sourceType, setSourceType] = useState<"link" | "file">("link");
   const [sourceLink, setSourceLink] = useState("");
   const [sourceFile, setSourceFile] = useState<File | null>(null);
@@ -145,38 +136,20 @@ export default function NewCampaignWizard() {
     };
   }, []);
 
-  // Step 3
+  // Step 3 — Platforms
   const [platforms, setPlatforms] = useState<Platform[]>([]);
 
-  // Step 4
+  // Step 4 — Payment
   const [payout, setPayout] = useState("");
   const [budget, setBudget] = useState("");
   const [maxPayoutPerClip, setMaxPayoutPerClip] = useState("");
-  const [minViews, setMinViews] = useState("");
-  const [spendCap, setSpendCap] = useState("");
 
-  // Step 5
+  // Step 5 — Duration
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [timezone, setTimezone] = useState("");
-
-  // Step 6
-  const [whatToMake, setWhatToMake] = useState("");
   const [recommendedDuration, setRecommendedDuration] = useState("");
-  const [hook, setHook] = useState("");
-  const [captionReq, setCaptionReq] = useState("");
-  const [cta, setCta] = useState("");
-  const [style, setStyle] = useState("");
 
-  // Step 7
-  const [dos, setDos] = useState<string[]>([""]);
-  const [donts, setDonts] = useState<string[]>([""]);
-
-  // Step 8
-  const [reviewTime, setReviewTime] = useState("");
-  const [rejectionReasons, setRejectionReasons] = useState<string[]>([""]);
-
-  // Step 9
+  // Step 6 — Content rights
   const [rightsAds, setRightsAds] = useState(true);
   const [rightsSocial, setRightsSocial] = useState(true);
   const [rightsWebsite, setRightsWebsite] = useState(false);
@@ -199,7 +172,6 @@ export default function NewCampaignWizard() {
     const e: Record<string, string> = {};
     if (!title.trim()) e.title = "Campaign name is required.";
     if (!category) e.category = "Pick a category.";
-    if (!objective.trim()) e.objective = "Objective is required.";
     if (!description.trim()) e.description = "Description is required.";
     if (platforms.length === 0) e.platforms = "Select at least one platform.";
     const cp = Number(payout);
@@ -210,11 +182,6 @@ export default function NewCampaignWizard() {
     if (!endDate) e.endDate = "End date is required.";
     if (startDate && endDate && new Date(endDate) < new Date(startDate))
       e.endDate = "End date must be after the start date.";
-    if (!whatToMake.trim()) e.whatToMake = "Describe what to make.";
-    if (dos.map((d) => d.trim()).filter(Boolean).length === 0)
-      e.dos = "Add at least one DO rule.";
-    if (donts.map((d) => d.trim()).filter(Boolean).length === 0)
-      e.donts = "Add at least one DON'T rule.";
     return e;
   }
 
@@ -223,17 +190,6 @@ export default function NewCampaignWizard() {
     thumbnails: string[];
     brandAssets: CampaignSourceAsset[];
   }): Omit<Campaign, "id" | "createdAt" | "status"> {
-    const cleanDos = dos.map((d) => d.trim()).filter(Boolean);
-    const cleanDonts = donts.map((d) => d.trim()).filter(Boolean);
-    const cleanReject = rejectionReasons.map((r) => r.trim()).filter(Boolean);
-    const approval: CampaignApproval = {
-      afterSubmission: "Manual review by the ClipTwo team.",
-      reviewTime: reviewTime.trim() || undefined,
-      criteria: "",
-      rejectionReasons: cleanReject,
-      appeal: "Reply to the decision email within 7 days.",
-      autoReview: false,
-    };
     const rights: CampaignRights = {
       ads: rightsAds,
       social: rightsSocial,
@@ -254,30 +210,14 @@ export default function NewCampaignWizard() {
       rules: "",
       category,
       platforms,
-      objective: objective.trim(),
       startDate: startDate || undefined,
       endDate: endDate || undefined,
       maxPayoutPerClip: maxPayoutPerClip ? Number(maxPayoutPerClip) : undefined,
       recommendedDuration: recommendedDuration.trim() || undefined,
-      hook: hook.trim() || undefined,
-      captionReq: captionReq.trim() || undefined,
-      aspectRatio: "9:16 vertical",
-      cta: cta.trim() || undefined,
-      branding: style.trim() || undefined,
-      doList: cleanDos,
-      dontList: cleanDonts,
       sourceAssets: uploaded.sourceAssets,
       exampleClips: [],
-      viewRules: {
-        minViews: minViews ? Number(minViews) : undefined,
-      },
-      approval,
       thumbnails: uploaded.thumbnails,
       brandAssets: uploaded.brandAssets,
-      spendCap: spendCap ? Number(spendCap) : undefined,
-      timezone: timezone.trim() || undefined,
-      whatToMake: whatToMake.trim() || undefined,
-      style: style.trim() || undefined,
       rights,
       verified: false,
     };
@@ -297,7 +237,6 @@ export default function NewCampaignWizard() {
 
     setIsSubmitting(true);
     try {
-      // Upload files to storage before creating the campaign
       const tempCampaignId = crypto.randomUUID();
       const uploadedSourceAssets: CampaignSourceAsset[] = [];
       const uploadedThumbnails: string[] = [];
@@ -326,8 +265,6 @@ export default function NewCampaignWizard() {
         if (url) uploadedBrandAssets.push({ label: brandFile.name, url });
       }
 
-      // When publishing: create as draft, then show payment screen
-      // The campaign will be published after ClipTwo verifies the launch payment
       const createdId = await addCampaign(
         buildCampaign({
           sourceAssets: uploadedSourceAssets,
@@ -340,7 +277,6 @@ export default function NewCampaignWizard() {
 
       if (createdId) {
         if (status === "open") {
-          // Show payment screen for launch fee
           setCreatedCampaignId(createdId);
           setPaymentPhase("showing");
         } else {
@@ -449,12 +385,10 @@ export default function NewCampaignWizard() {
   }
 
   function stepWithError(e: Record<string, string>): number {
-    if (e.title || e.category || e.objective || e.description) return 0;
+    if (e.title || e.category || e.description) return 0;
     if (e.platforms) return 2;
     if (e.payout || e.budget) return 3;
     if (e.startDate || e.endDate) return 4;
-    if (e.whatToMake) return 5;
-    if (e.dos || e.donts) return 6;
     return 0;
   }
 
@@ -490,7 +424,6 @@ export default function NewCampaignWizard() {
             </div>
           </div>
 
-          {/* Payment summary */}
           <div className="space-y-3 rounded-xl border bg-background p-4">
             <div className="flex justify-between text-sm">
               <span className="text-muted">Campaign budget</span>
@@ -651,7 +584,7 @@ export default function NewCampaignWizard() {
       )}
 
       <div className="rounded-2xl border bg-card p-6">
-        {/* STEP 1 */}
+        {/* STEP 1 — Basic information */}
         {step === 0 && (
           <div className="space-y-4">
             <Field label="Campaign name">
@@ -680,17 +613,6 @@ export default function NewCampaignWizard() {
                 <p className="mt-1 text-xs text-red">{errors.category}</p>
               )}
             </Field>
-            <Field label="Campaign objective">
-              <input
-                className={inputCls}
-                value={objective}
-                onChange={(e) => setObjective(e.target.value)}
-                placeholder="e.g. Drive pre-launch awareness"
-              />
-              {errors.objective && (
-                <p className="mt-1 text-xs text-red">{errors.objective}</p>
-              )}
-            </Field>
             <Field label="Description">
               <textarea
                 className={inputCls + " resize-none"}
@@ -716,7 +638,6 @@ export default function NewCampaignWizard() {
                 Paste a link to the source footage creators should cut from.
               </p>
 
-              {/* Mode toggle */}
               <div className="mt-3 flex gap-2">
                 <button
                   type="button"
@@ -742,7 +663,6 @@ export default function NewCampaignWizard() {
                 </button>
               </div>
 
-              {/* Link input */}
               {sourceType === "link" && (
                 <div className="mt-3">
                   <input
@@ -754,7 +674,6 @@ export default function NewCampaignWizard() {
                 </div>
               )}
 
-              {/* File input */}
               {sourceType === "file" && (
                 <div className="mt-3">
                   {sourceFile ? (
@@ -925,7 +844,7 @@ export default function NewCampaignWizard() {
           </div>
         )}
 
-        {/* STEP 3 */}
+        {/* STEP 3 — Platforms */}
         {step === 2 && (
           <div className="space-y-3">
             <p className="text-sm font-medium">Platforms</p>
@@ -969,7 +888,7 @@ export default function NewCampaignWizard() {
           </div>
         )}
 
-        {/* STEP 4 */}
+        {/* STEP 4 — Payment */}
         {step === 3 && (
           <div className="space-y-4">
             <Field label="CPM — payout per 1,000 views" hint="₹">
@@ -1004,22 +923,6 @@ export default function NewCampaignWizard() {
                 inputMode="numeric"
               />
             </Field>
-            <Field label="Minimum views" hint="optional">
-              <input
-                className={inputCls}
-                value={minViews}
-                onChange={(e) => setMinViews(e.target.value)}
-                inputMode="numeric"
-              />
-            </Field>
-            <Field label="Campaign-wide spending cap" hint="optional ₹">
-              <input
-                className={inputCls}
-                value={spendCap}
-                onChange={(e) => setSpendCap(e.target.value)}
-                inputMode="numeric"
-              />
-            </Field>
 
             <div className="rounded-xl bg-background p-4 text-sm">
               <p className="font-medium">Live estimate</p>
@@ -1042,7 +945,7 @@ export default function NewCampaignWizard() {
           </div>
         )}
 
-        {/* STEP 5 */}
+        {/* STEP 5 — Duration */}
         {step === 4 && (
           <div className="space-y-4">
             <Field label="Start date">
@@ -1067,205 +970,19 @@ export default function NewCampaignWizard() {
                 <p className="mt-1 text-xs text-red">{errors.endDate}</p>
               )}
             </Field>
-            <Field label="Time zone">
-              <input
-                className={inputCls}
-                value={timezone}
-                onChange={(e) => setTimezone(e.target.value)}
-                placeholder="e.g. IST (Asia/Kolkata)"
-              />
-            </Field>
-          </div>
-        )}
-
-        {/* STEP 6 */}
-        {step === 5 && (
-          <div className="space-y-4">
-            <Field label="What to make">
-              <textarea
-                className={inputCls + " resize-none"}
-                rows={3}
-                value={whatToMake}
-                onChange={(e) => setWhatToMake(e.target.value)}
-                placeholder="e.g. Turn the keynote into punchy 20s hooks."
-              />
-              {errors.whatToMake && (
-                <p className="mt-1 text-xs text-red">{errors.whatToMake}</p>
-              )}
-            </Field>
             <Field label="Recommended duration" hint="optional">
               <input
                 className={inputCls}
                 value={recommendedDuration}
                 onChange={(e) => setRecommendedDuration(e.target.value)}
-                placeholder="15–30s"
-              />
-            </Field>
-            <Field label="Hook requirements" hint="optional">
-              <input
-                className={inputCls}
-                value={hook}
-                onChange={(e) => setHook(e.target.value)}
-                placeholder="Open with the hook in the first 3 seconds."
-              />
-            </Field>
-            <Field label="Caption requirements" hint="optional">
-              <input
-                className={inputCls}
-                value={captionReq}
-                onChange={(e) => setCaptionReq(e.target.value)}
-                placeholder="English caption + 3 hashtags."
-              />
-            </Field>
-            <Field label="Call to action" hint="optional">
-              <input
-                className={inputCls}
-                value={cta}
-                onChange={(e) => setCta(e.target.value)}
-                placeholder="Link in bio to install the app."
-              />
-            </Field>
-            <Field label="Style instructions" hint="optional">
-              <textarea
-                className={inputCls + " resize-none"}
-                rows={2}
-                value={style}
-                onChange={(e) => setStyle(e.target.value)}
-                placeholder="Cinematic grade, stable shots, burnt-in subtitles."
+                placeholder="e.g. 15–30s"
               />
             </Field>
           </div>
         )}
 
-        {/* STEP 7 */}
-        {step === 6 && (
-          <div className="grid gap-5 sm:grid-cols-2">
-            <div>
-              <p className="text-sm font-medium text-green">DO</p>
-              {errors.dos && <p className="text-xs text-red">{errors.dos}</p>}
-              <div className="mt-2 space-y-2">
-                {dos.map((d, i) => (
-                  <div key={i} className="flex gap-2">
-                    <input
-                      className={inputCls}
-                      value={d}
-                      placeholder="e.g. Keep the hook intact"
-                      onChange={(e) =>
-                        setDos((prev) =>
-                          prev.map((x, j) => (j === i ? e.target.value : x)),
-                        )
-                      }
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setDos((prev) => prev.filter((_, j) => j !== i))}
-                      className="rounded-md border px-2 text-muted"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setDos((prev) => [...prev, ""])}
-                  className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
-                >
-                  <Plus size={12} /> Add DO
-                </button>
-              </div>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-red">DON&apos;T</p>
-              {errors.donts && <p className="text-xs text-red">{errors.donts}</p>}
-              <div className="mt-2 space-y-2">
-                {donts.map((d, i) => (
-                  <div key={i} className="flex gap-2">
-                    <input
-                      className={inputCls}
-                      value={d}
-                      placeholder="e.g. No watermarks"
-                      onChange={(e) =>
-                        setDonts((prev) =>
-                          prev.map((x, j) => (j === i ? e.target.value : x)),
-                        )
-                      }
-                    />
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setDonts((prev) => prev.filter((_, j) => j !== i))
-                      }
-                      className="rounded-md border px-2 text-muted"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setDonts((prev) => [...prev, ""])}
-                  className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
-                >
-                  <Plus size={12} /> Add DON&apos;T
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 8 */}
-        {step === 7 && (
-          <div className="space-y-4">
-            <Field label="Expected review time" hint="optional">
-              <input
-                className={inputCls}
-                value={reviewTime}
-                onChange={(e) => setReviewTime(e.target.value)}
-                placeholder="Within 48 hours"
-              />
-            </Field>
-            <div>
-              <p className="text-sm font-medium">Rejection rules</p>
-              <div className="mt-2 space-y-2">
-                {rejectionReasons.map((r, i) => (
-                  <div key={i} className="flex gap-2">
-                    <input
-                      className={inputCls}
-                      value={r}
-                      placeholder="e.g. Watermark"
-                      onChange={(e) =>
-                        setRejectionReasons((prev) =>
-                          prev.map((x, j) => (j === i ? e.target.value : x)),
-                        )
-                      }
-                    />
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setRejectionReasons((prev) =>
-                          prev.filter((_, j) => j !== i),
-                        )
-                      }
-                      className="rounded-md border px-2 text-muted"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setRejectionReasons((prev) => [...prev, ""])}
-                  className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
-                >
-                  <Plus size={12} /> Add rejection reason
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 9 */}
-        {step === 8 && (
+        {/* STEP 6 — Content rights */}
+        {step === 5 && (
           <div className="space-y-3">
             <p className="text-sm font-medium">
               What rights does the creator receive over submitted clips?
@@ -1319,13 +1036,12 @@ export default function NewCampaignWizard() {
           </div>
         )}
 
-        {/* STEP 10 */}
-        {step === 9 && (
+        {/* STEP 7 — Review */}
+        {step === 6 && (
           <div className="space-y-4 text-sm">
             <p className="font-medium">Review your campaign</p>
             <ReviewRow label="Name" value={title} />
             <ReviewRow label="Category" value={category} />
-            <ReviewRow label="Objective" value={objective} />
             <ReviewRow label="Description" value={description} />
             <ReviewRow
               label="Source"
@@ -1352,23 +1068,12 @@ export default function NewCampaignWizard() {
             <ReviewRow label="CPM" value={rup(cpm)} />
             <ReviewRow label="Budget" value={rup(bud)} />
             <ReviewRow
-              label="Max / min / cap"
-              value={`${maxPayoutPerClip || "—"} / ${minViews || "—"} / ${
-                spendCap || "—"
-              }`}
+              label="Max payout / clip"
+              value={maxPayoutPerClip ? rup(Number(maxPayoutPerClip)) : "—"}
             />
             <ReviewRow
               label="Duration"
-              value={`${startDate || "—"} → ${endDate || "—"} (${timezone || "—"})`}
-            />
-            <ReviewRow label="What to make" value={whatToMake} />
-            <ReviewRow label="DO" value={dos.filter(Boolean).join("; ")} />
-            <ReviewRow label="DON&apos;T" value={donts.filter(Boolean).join("; ")} />
-            <ReviewRow
-              label="Review"
-              value={`Manual review${
-                reviewTime ? ` · ${reviewTime}` : ""
-              }`}
+              value={`${startDate || "—"} → ${endDate || "—"}${recommendedDuration ? ` (${recommendedDuration})` : ""}`}
             />
             <ReviewRow
               label="Rights"
@@ -1406,14 +1111,6 @@ export default function NewCampaignWizard() {
             className="inline-flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent-soft disabled:opacity-50"
           >
             <Save size={14} /> {isSubmitting ? "Saving…" : "Save draft"}
-          </button>
-          <button
-            type="button"
-            onClick={() => goStep(9)}
-            disabled={isSubmitting}
-            className="inline-flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent-soft disabled:opacity-50"
-          >
-            <Eye size={14} /> Preview
           </button>
           {step < STEPS.length - 1 ? (
             <button

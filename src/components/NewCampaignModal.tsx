@@ -16,13 +16,8 @@ const NICHES = ["Tech", "Gaming", "Finance", "Comedy", "Fitness", "Podcast"];
 
 export interface NewCampaignExtra {
   platforms: Platform[];
-  objective: string;
   maxPayoutPerClip: number;
   recommendedDuration: string;
-  aspectRatio: string;
-  cta: string;
-  hook: string;
-  branding: string;
 }
 
 export function NewCampaignModal({
@@ -51,13 +46,8 @@ export function NewCampaignModal({
   const [sourceLink, setSourceLink] = useState("");
   const [fileName, setFileName] = useState("");
 
-  const [objective, setObjective] = useState("");
   const [maxPayout, setMaxPayout] = useState("");
   const [duration, setDuration] = useState("");
-  const [aspectRatio, setAspectRatio] = useState("9:16 vertical");
-  const [cta, setCta] = useState("");
-  const [hook, setHook] = useState("");
-  const [branding, setBranding] = useState("");
   const { containerRef, onKeyDown } = useFocusTrap(true);
 
   useEffect(() => {
@@ -205,57 +195,15 @@ export function NewCampaignModal({
           />
         </div>
 
-        <label className="mt-4 block text-sm font-medium">Objective</label>
-        <textarea
-          value={objective}
-          onChange={(e) => setObjective(e.target.value)}
-          rows={2}
-          placeholder="What you want from the clips…"
-          className="mt-1 w-full resize-none rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
-        />
-
-        {/* Creative brief */}
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm font-medium">Clip duration</label>
-            <input
-              value={duration}
-              onChange={(e) => setDuration(e.target.value)}
-              placeholder="e.g. 15–30s"
-              className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium">Aspect ratio</label>
-            <input
-              value={aspectRatio}
-              onChange={(e) => setAspectRatio(e.target.value)}
-              placeholder="9:16 vertical"
-              className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
-            />
-          </div>
+        <div className="mt-4">
+          <label className="block text-sm font-medium">Clip duration</label>
+          <input
+            value={duration}
+            onChange={(e) => setDuration(e.target.value)}
+            placeholder="e.g. 15–30s"
+            className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
+          />
         </div>
-        <label className="mt-4 block text-sm font-medium">Hook requirement</label>
-        <input
-          value={hook}
-          onChange={(e) => setHook(e.target.value)}
-          placeholder="Lead with…"
-          className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
-        />
-        <label className="mt-4 block text-sm font-medium">CTA</label>
-        <input
-          value={cta}
-          onChange={(e) => setCta(e.target.value)}
-          placeholder="Link in bio…"
-          className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
-        />
-        <label className="mt-4 block text-sm font-medium">Branding</label>
-        <input
-          value={branding}
-          onChange={(e) => setBranding(e.target.value)}
-          placeholder="Logo in last 2s…"
-          className="mt-1 w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground"
-        />
 
         {/* Video resource */}
         <div className="mt-4">
@@ -306,13 +254,8 @@ export function NewCampaignModal({
                 sourceLink,
                 {
                   platforms,
-                  objective,
                   maxPayoutPerClip: Number(maxPayout) || 0,
                   recommendedDuration: duration,
-                  aspectRatio,
-                  cta,
-                  hook,
-                  branding,
                 },
               )
             }
