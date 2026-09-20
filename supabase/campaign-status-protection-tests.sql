@@ -252,31 +252,48 @@ ROLLBACK;
 -- ===========================================================================
 -- TEST G: Creator campaign_action('pause') on open campaign → ALLOWED
 -- ===========================================================================
+-- Establishes a legitimate open/verified campaign via the standard RPC flow,
+-- then pauses it through campaign_action().
 BEGIN;
-SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
-
 DO $$
 DECLARE
-  v_id uuid;
+  v_campaign_id uuid;
+  v_payment jsonb;
+  v_payment_id uuid;
   v_result jsonb;
 BEGIN
+  -- Phase 1: Create campaign as creator (INSERT trigger forces draft/pending)
+  PERFORM set_config('request.jwt.claims',
+    '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+
   INSERT INTO public.campaigns (
     title, brief, platform, payout, creator, created_by,
     budget, status, launch_payment_status
   ) VALUES (
     'Status Test G', 'Brief', 'YouTube', 0, 'Creator',
     'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid,
-    100, 'open', 'verified'
-  ) RETURNING id INTO v_id;
+    100, 'draft', 'pending'
+  ) RETURNING id INTO v_campaign_id;
 
-  v_result := public.campaign_action(v_id, 'pause', 'Test pause');
+  -- Phase 2: Submit launch payment as creator
+  v_payment := public.submit_campaign_launch_payment(v_campaign_id, 'TEST_UTR_G');
+  v_payment_id := (v_payment->>'payment_id')::uuid;
+
+  -- Phase 3: Verify payment as admin (transitions to open/verified)
+  PERFORM set_config('request.jwt.claims',
+    '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
+
+  PERFORM public.verify_campaign_launch_payment(v_payment_id);
+
+  -- Phase 4: Switch back to creator and pause the campaign
+  PERFORM set_config('request.jwt.claims',
+    '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+
+  v_result := public.campaign_action(v_campaign_id, 'pause', 'Test pause');
 
   ASSERT (v_result->>'success')::boolean = true, 'campaign_action should succeed';
-  ASSERT (SELECT status FROM public.campaigns WHERE id = v_id) = 'paused',
+  ASSERT (SELECT status FROM public.campaigns WHERE id = v_campaign_id) = 'paused',
     'Campaign should be paused';
-
-  DELETE FROM public.campaigns WHERE id = v_id;
 END $$;
 
 SELECT 'TEST G PASSED' AS result;
@@ -389,31 +406,49 @@ ROLLBACK;
 -- ===========================================================================
 -- TEST K: Creator campaign_action('resume') on paused campaign → ALLOWED
 -- ===========================================================================
+-- Establishes a legitimate open/verified campaign, pauses it, then resumes it.
 BEGIN;
-SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
-
 DO $$
 DECLARE
-  v_id uuid;
+  v_campaign_id uuid;
+  v_payment jsonb;
+  v_payment_id uuid;
   v_result jsonb;
 BEGIN
+  -- Phase 1: Create campaign as creator (INSERT trigger forces draft/pending)
+  PERFORM set_config('request.jwt.claims',
+    '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+
   INSERT INTO public.campaigns (
     title, brief, platform, payout, creator, created_by,
     budget, status, launch_payment_status
   ) VALUES (
     'Status Test K', 'Brief', 'YouTube', 0, 'Creator',
     'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid,
-    100, 'paused', 'verified'
-  ) RETURNING id INTO v_id;
+    100, 'draft', 'pending'
+  ) RETURNING id INTO v_campaign_id;
 
-  v_result := public.campaign_action(v_id, 'resume', 'Test resume');
+  -- Phase 2: Submit launch payment as creator
+  v_payment := public.submit_campaign_launch_payment(v_campaign_id, 'TEST_UTR_K');
+  v_payment_id := (v_payment->>'payment_id')::uuid;
+
+  -- Phase 3: Verify payment as admin (transitions to open/verified)
+  PERFORM set_config('request.jwt.claims',
+    '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
+
+  PERFORM public.verify_campaign_launch_payment(v_payment_id);
+
+  -- Phase 4: Switch back to creator, pause, then resume
+  PERFORM set_config('request.jwt.claims',
+    '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+
+  PERFORM public.campaign_action(v_campaign_id, 'pause', 'Pause before resume');
+
+  v_result := public.campaign_action(v_campaign_id, 'resume', 'Test resume');
 
   ASSERT (v_result->>'success')::boolean = true, 'campaign_action should succeed';
-  ASSERT (SELECT status FROM public.campaigns WHERE id = v_id) = 'open',
+  ASSERT (SELECT status FROM public.campaigns WHERE id = v_campaign_id) = 'open',
     'Campaign should be open';
-
-  DELETE FROM public.campaigns WHERE id = v_id;
 END $$;
 
 SELECT 'TEST K PASSED' AS result;
@@ -422,31 +457,47 @@ ROLLBACK;
 -- ===========================================================================
 -- TEST L: Creator campaign_action('close') on open campaign → ALLOWED
 -- ===========================================================================
+-- Establishes a legitimate open/verified campaign, then closes it.
 BEGIN;
-SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
-
 DO $$
 DECLARE
-  v_id uuid;
+  v_campaign_id uuid;
+  v_payment jsonb;
+  v_payment_id uuid;
   v_result jsonb;
 BEGIN
+  -- Phase 1: Create campaign as creator (INSERT trigger forces draft/pending)
+  PERFORM set_config('request.jwt.claims',
+    '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+
   INSERT INTO public.campaigns (
     title, brief, platform, payout, creator, created_by,
     budget, status, launch_payment_status
   ) VALUES (
     'Status Test L', 'Brief', 'YouTube', 0, 'Creator',
     'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid,
-    100, 'open', 'verified'
-  ) RETURNING id INTO v_id;
+    100, 'draft', 'pending'
+  ) RETURNING id INTO v_campaign_id;
 
-  v_result := public.campaign_action(v_id, 'close', 'Test close');
+  -- Phase 2: Submit launch payment as creator
+  v_payment := public.submit_campaign_launch_payment(v_campaign_id, 'TEST_UTR_L');
+  v_payment_id := (v_payment->>'payment_id')::uuid;
+
+  -- Phase 3: Verify payment as admin (transitions to open/verified)
+  PERFORM set_config('request.jwt.claims',
+    '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
+
+  PERFORM public.verify_campaign_launch_payment(v_payment_id);
+
+  -- Phase 4: Switch back to creator and close the campaign
+  PERFORM set_config('request.jwt.claims',
+    '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+
+  v_result := public.campaign_action(v_campaign_id, 'close', 'Test close');
 
   ASSERT (v_result->>'success')::boolean = true, 'campaign_action should succeed';
-  ASSERT (SELECT status FROM public.campaigns WHERE id = v_id) = 'closed',
+  ASSERT (SELECT status FROM public.campaigns WHERE id = v_campaign_id) = 'closed',
     'Campaign should be closed';
-
-  DELETE FROM public.campaigns WHERE id = v_id;
 END $$;
 
 SELECT 'TEST L PASSED' AS result;
@@ -455,31 +506,49 @@ ROLLBACK;
 -- ===========================================================================
 -- TEST M: Creator campaign_action('reopen') on closed campaign → ALLOWED
 -- ===========================================================================
+-- Establishes a legitimate open/verified campaign, closes it, then reopens it.
 BEGIN;
-SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
-
 DO $$
 DECLARE
-  v_id uuid;
+  v_campaign_id uuid;
+  v_payment jsonb;
+  v_payment_id uuid;
   v_result jsonb;
 BEGIN
+  -- Phase 1: Create campaign as creator (INSERT trigger forces draft/pending)
+  PERFORM set_config('request.jwt.claims',
+    '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+
   INSERT INTO public.campaigns (
     title, brief, platform, payout, creator, created_by,
     budget, status, launch_payment_status
   ) VALUES (
     'Status Test M', 'Brief', 'YouTube', 0, 'Creator',
     'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid,
-    100, 'closed', 'verified'
-  ) RETURNING id INTO v_id;
+    100, 'draft', 'pending'
+  ) RETURNING id INTO v_campaign_id;
 
-  v_result := public.campaign_action(v_id, 'reopen', 'Test reopen');
+  -- Phase 2: Submit launch payment as creator
+  v_payment := public.submit_campaign_launch_payment(v_campaign_id, 'TEST_UTR_M');
+  v_payment_id := (v_payment->>'payment_id')::uuid;
+
+  -- Phase 3: Verify payment as admin (transitions to open/verified)
+  PERFORM set_config('request.jwt.claims',
+    '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
+
+  PERFORM public.verify_campaign_launch_payment(v_payment_id);
+
+  -- Phase 4: Switch back to creator, close, then reopen
+  PERFORM set_config('request.jwt.claims',
+    '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+
+  PERFORM public.campaign_action(v_campaign_id, 'close', 'Close before reopen');
+
+  v_result := public.campaign_action(v_campaign_id, 'reopen', 'Test reopen');
 
   ASSERT (v_result->>'success')::boolean = true, 'campaign_action should succeed';
-  ASSERT (SELECT status FROM public.campaigns WHERE id = v_id) = 'open',
+  ASSERT (SELECT status FROM public.campaigns WHERE id = v_campaign_id) = 'open',
     'Campaign should be open';
-
-  DELETE FROM public.campaigns WHERE id = v_id;
 END $$;
 
 SELECT 'TEST M PASSED' AS result;
@@ -488,31 +557,63 @@ ROLLBACK;
 -- ===========================================================================
 -- TEST N: Creator campaign_action('publish') on draft+verified → ALLOWED
 -- ===========================================================================
+-- Establishes draft+verified via legitimate flows:
+--   1. Creator creates campaign (draft/pending)
+--   2. Creator submits launch payment (submitted)
+--   3. Admin sets launch_payment_status = 'verified' directly
+--      (admin is permitted by enforce_campaign_launch_payment_integrity)
+--   4. Campaign is now draft/verified — the state publish() requires
+-- Then creator calls campaign_action('publish') → transitions to open.
 BEGIN;
-SET LOCAL role = 'authenticated';
-SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
-
 DO $$
 DECLARE
-  v_id uuid;
+  v_campaign_id uuid;
+  v_payment jsonb;
+  v_payment_id uuid;
   v_result jsonb;
 BEGIN
+  -- Phase 1: Create campaign as creator (INSERT trigger forces draft/pending)
+  PERFORM set_config('request.jwt.claims',
+    '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+
   INSERT INTO public.campaigns (
     title, brief, platform, payout, creator, created_by,
     budget, status, launch_payment_status
   ) VALUES (
     'Status Test N', 'Brief', 'YouTube', 0, 'Creator',
     'e92427b0-254e-44cc-b2df-be83792c8a94'::uuid,
-    100, 'draft', 'verified'
-  ) RETURNING id INTO v_id;
+    100, 'draft', 'pending'
+  ) RETURNING id INTO v_campaign_id;
 
-  v_result := public.campaign_action(v_id, 'publish', 'Test publish');
+  -- Phase 2: Submit launch payment as creator
+  v_payment := public.submit_campaign_launch_payment(v_campaign_id, 'TEST_UTR_N');
+  v_payment_id := (v_payment->>'payment_id')::uuid;
+
+  -- Phase 3: Admin sets launch_payment_status = 'verified' directly.
+  -- This is permitted by enforce_campaign_launch_payment_integrity (admin check).
+  -- Status stays 'draft' — we do NOT call verify_campaign_launch_payment()
+  -- because that would also transition status to 'open'.
+  PERFORM set_config('request.jwt.claims',
+    '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
+
+  UPDATE public.campaigns
+  SET launch_payment_status = 'verified'
+  WHERE id = v_campaign_id;
+
+  ASSERT (SELECT status FROM public.campaigns WHERE id = v_campaign_id) = 'draft',
+    'Campaign should still be draft after admin verifies payment';
+  ASSERT (SELECT launch_payment_status FROM public.campaigns WHERE id = v_campaign_id) = 'verified',
+    'Launch payment should be verified';
+
+  -- Phase 4: Creator publishes (draft+verified → open)
+  PERFORM set_config('request.jwt.claims',
+    '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
+
+  v_result := public.campaign_action(v_campaign_id, 'publish', 'Test publish');
 
   ASSERT (v_result->>'success')::boolean = true, 'campaign_action should succeed';
-  ASSERT (SELECT status FROM public.campaigns WHERE id = v_id) = 'open',
+  ASSERT (SELECT status FROM public.campaigns WHERE id = v_campaign_id) = 'open',
     'Campaign should be open';
-
-  DELETE FROM public.campaigns WHERE id = v_id;
 END $$;
 
 SELECT 'TEST N PASSED' AS result;
