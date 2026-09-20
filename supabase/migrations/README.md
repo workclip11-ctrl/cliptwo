@@ -31,23 +31,20 @@ The following SQL files must be applied in order. Later files may override earli
 
 - **cashfree-recover-existing-payment.sql** — Recovers the existing sandbox payment (order `cliptwo_ef769e74-58f4-4df9-9c5f-de3333f1b577_attempt_1`, amount ₹110). Contains trigger fix + function fix + precondition checks + RPC call + post-verification queries. Execute in SQL Editor after step 15.
 
-### Previous Standalone Files (superseded)
+### Standalone Test Files
 
-- `campaign-launch-payments-cashfree.sql` — original standalone file, content now duplicated in the migration above
-- `campaign-launch-payment-integrity.sql` — integrity constraints (run before Cashfree if not already applied)
-- `campaign-budget-lock.sql` — budget lock triggers (step 8)
-- `campaign-state-machine-phase1.sql` — campaign lifecycle (step 6)
-- `security-hardening-migration.sql` — security RPCs (step 9)
-- `security-regression-tests.sql` — regression tests (step 10)
-- `social-and-metrics-integration-tests.sql` — integration tests
-- `phase7a-security-tests.sql` — phase 7a tests
-- `campaign-security-regression-tests.sql` — campaign security tests
+- `campaign-payment-hardening-tests.sql` — Final security hardening tests: Cashfree retry regression (submitted→failed→retryable→release→new attempt→success), behavioral RLS checks (clipper/creator/anon visibility), function ACL verification (has_function_privilege), social OAuth verification invariants
+- `campaign-status-protection-tests.sql` — Campaign status protection trigger tests (A-T)
+- `security-audit-regression-tests.sql` — Security audit regression tests (A-H)
+- `cashfree-webhook-trigger-tests.sql` — Cashfree webhook trigger tests
 - `cashfree-security-tests.sql` — Cashfree security tests
-- `phone-api-security-tests.sql` — phone API security tests
-- `campaign-assets-security.sql` — campaign assets security
-- `campaign-assets-security-tests.sql` — campaign assets security tests
-- `security-hardening.sql` — security hardening
-- `security-regression-tests.sql` — security regression tests
+- `campaign-visibility-tests.sql` — Campaign visibility behavioral tests
+- `social-and-metrics-integration-tests.sql` — Social and metrics integration tests
+- `phase7a-security-tests.sql` — Phase 7a security tests
+- `campaign-security-regression-tests.sql` — Campaign security tests
+- `phone-api-security-tests.sql` — Phone API security tests
+- `campaign-assets-security.sql` — Campaign assets security (authoritative)
+- `campaign-assets-security-tests.sql` — Campaign assets security tests
 
 ### Important Notes
 
