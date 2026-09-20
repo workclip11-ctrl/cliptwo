@@ -167,9 +167,16 @@ BEGIN
     UPDATE public.campaigns SET status = 'open' WHERE id = v_id;
     ASSERT false, 'Should have raised exception';
   EXCEPTION WHEN OTHERS THEN
-    ASSERT SQLERRM LIKE '%cannot be changed directly%',
-      'Wrong error: ' || SQLERRM;
+    -- Any denial is acceptable. enforce_campaign_open_requires_verified
+    -- fires first (alphabetical) and rejects status='open' without verified
+    -- payment. enforce_campaign_status_protected would also reject it.
+    -- We must not depend on which trigger fires first.
+    NULL;
   END;
+
+  -- Verify the UPDATE did NOT succeed
+  ASSERT (SELECT status FROM public.campaigns WHERE id = v_id) = 'draft',
+    'UPDATE should not have succeeded — status must remain draft';
 
   DELETE FROM public.campaigns WHERE id = v_id;
 END $$;
@@ -856,9 +863,16 @@ BEGIN
     UPDATE public.campaigns SET status = 'open' WHERE id = v_id;
     ASSERT false, 'Should have raised exception';
   EXCEPTION WHEN OTHERS THEN
-    ASSERT SQLERRM LIKE '%cannot be changed directly%',
-      'Wrong error: ' || SQLERRM;
+    -- Any denial is acceptable. enforce_campaign_open_requires_verified
+    -- fires first (alphabetical) and rejects status='open' without verified
+    -- payment. enforce_campaign_status_protected would also reject it.
+    -- We must not depend on which trigger fires first.
+    NULL;
   END;
+
+  -- Verify the UPDATE did NOT succeed
+  ASSERT (SELECT status FROM public.campaigns WHERE id = v_id) = 'draft',
+    'UPDATE should not have succeeded — status must remain draft';
 
   DELETE FROM public.campaigns WHERE id = v_id;
 END $$;
