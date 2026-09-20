@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import type { ReactNode } from "react";
 import {
@@ -21,6 +21,7 @@ import {
 import { TopBar } from "@/components/TopBar";
 import { AdminGuard } from "@/components/AdminGuard";
 import { MobileSidebar } from "@/components/MobileSidebar";
+import { useAuth } from "@/lib/auth";
 
 const NAV = [
   { href: "/admin", label: "Dashboard", icon: LayoutGrid, exact: true },
@@ -38,6 +39,8 @@ const NAV = [
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { signOut } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
@@ -96,13 +99,13 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               </nav>
 
               <div className="border-t border-border/60 pt-4">
-                <Link
-                  href="/login"
-                  className="flex items-center gap-2 rounded-[10px] px-2.5 py-[6px] text-[15px] text-red transition-colors duration-150 hover:bg-red/5"
+                <button
+                  onClick={() => { signOut(); router.push("/login"); }}
+                  className="flex w-full items-center gap-2 rounded-[10px] px-2.5 py-[6px] text-[15px] text-red transition-colors duration-150 hover:bg-red/5"
                 >
                   <LogOut size={18} strokeWidth={1.5} />
                   Log Out
-                </Link>
+                </button>
               </div>
             </div>
           </aside>

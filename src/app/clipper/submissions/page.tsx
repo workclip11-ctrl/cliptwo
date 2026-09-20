@@ -43,7 +43,6 @@ export default function ClipperSubmissionsPage() {
   useAutoRefresh();
   const [tab, setTab] = useState<TabKey>("all");
   const [page, setPage] = useState(1);
-  const [appealed, setAppealed] = useState<Record<string, boolean>>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   function selectTab(key: TabKey) {
@@ -388,23 +387,7 @@ export default function ClipperSubmissionsPage() {
                   >
                     <ExternalLink size={13} /> View campaign
                   </Link>
-                  {k.status === "rejected" && (
-                    <button
-                      onClick={() =>
-                        setAppealed((a) => ({ ...a, [k.id]: true }))
-                      }
-                      className="inline-flex items-center gap-1.5 rounded-[10px] border bg-card px-4 py-2.5 text-[13px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft"
-                    >
-                      <MessageSquareWarning size={13} /> Appeal rejection
-                    </button>
-                  )}
                 </div>
-                {appealed[k.id] && (
-                  <p className="mt-2.5 text-[13px] text-green">
-                    Appeal submitted — our team will review and respond within 7
-                    days.
-                  </p>
-                )}
               </div>
             );
           })}

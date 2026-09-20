@@ -71,8 +71,8 @@ export default function AdminDashboard() {
   const creators = profiles.filter((p) => p.role === "creator");
 
   const fin = financeOf(financeRecords);
-  const pendingCount = fin.pendingCount;
-  const approvedCount = fin.totalCount;
+  const pendingCount = clips.filter((k) => k.status === "pending").length;
+  const approvedCount = clips.filter((k) => k.status === "approved").length;
   const paidCount = fin.paidCount;
   const rejectedCount = clips.filter((k) => k.status === "rejected").length;
 

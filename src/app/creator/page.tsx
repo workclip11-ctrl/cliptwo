@@ -13,7 +13,7 @@ import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { rup, fmtViews } from "@/lib/format";
-import { financeOf, campaignSpent } from "@/lib/finance";
+import { financeOf, campaignSpent, campaignBudget } from "@/lib/finance";
 import { seriesByDay } from "@/lib/analytics";
 import type { Campaign, Clip } from "@/lib/types";
 
@@ -488,9 +488,33 @@ function CampaignRow({
 }) {
   const campClips = clips.filter((k) => k.campaignId === c.id);
   const spent = campaignSpent(c, financeRecords);
-  const isOpen = c.status === "open";
+  const budget = campaignBudget(c, financeRecords);
   const isArchived = c.status === "archived";
   const thumb = c.thumbnails?.[0];
+
+  const displayStatus = isArchived
+    ? "Archived"
+    : c.status === "draft"
+      ? "Draft"
+      : c.status === "paused"
+        ? "Paused"
+        : c.status === "closed"
+          ? "Closed"
+          : budget.status === "budget_reached"
+            ? "Budget Reached"
+            : budget.status === "near_budget"
+              ? "Near Budget"
+              : "Open";
+
+  const badgeClass = isArchived
+    ? "border-amber-500/20 bg-amber-500/10 text-amber-600"
+    : displayStatus === "Budget Reached"
+      ? "border-red/20 bg-red/10 text-red"
+      : displayStatus === "Near Budget"
+        ? "border-amber/20 bg-amber/10 text-amber"
+        : displayStatus === "Open"
+          ? "border-green/20 bg-green/10 text-green"
+          : "border-muted/20 bg-accent-soft text-muted";
 
   return (
     <button
@@ -521,15 +545,9 @@ function CampaignRow({
             {c.title}
           </p>
           <span
-            className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium ${
-              isArchived
-                ? "border-amber-500/20 bg-amber-500/10 text-amber-600"
-                : isOpen
-                  ? "border-green/20 bg-green/10 text-green"
-                  : "border-muted/20 bg-accent-soft text-muted"
-            }`}
+            className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium ${badgeClass}`}
           >
-            {isArchived ? "Archived" : isOpen ? "Open" : "Closed"}
+            {displayStatus}
           </span>
         </div>
         <p className="mt-0.5 text-[12px] text-muted">
@@ -564,11 +582,37 @@ function CampaignDetailModal({
   const approvedN = campClips.filter((k) => k.status === "approved").length;
   const pendingN = campClips.filter((k) => k.status === "pending").length;
   const spent = campaignSpent(campaign, financeRecords);
+  const budget = campaignBudget(campaign, financeRecords);
   const pct = campaign.budget
     ? Math.min(100, Math.round((spent / campaign.budget) * 100))
     : 0;
   const remaining = (campaign.budget ?? 0) - spent;
-  const isOpen = campaign.status === "open";
+
+  const displayStatus =
+    campaign.status === "archived"
+      ? "Archived"
+      : campaign.status === "draft"
+        ? "Draft"
+        : campaign.status === "paused"
+          ? "Paused"
+          : campaign.status === "closed"
+            ? "Closed"
+            : budget.status === "budget_reached"
+              ? "Budget Reached"
+              : budget.status === "near_budget"
+                ? "Near Budget"
+                : "Open";
+
+  const badgeClass =
+    campaign.status === "archived"
+      ? "border-amber-500/20 bg-amber-500/10 text-amber-600"
+      : displayStatus === "Budget Reached"
+        ? "border-red/20 bg-red/10 text-red"
+        : displayStatus === "Near Budget"
+          ? "border-amber/20 bg-amber/10 text-amber"
+          : displayStatus === "Open"
+            ? "border-green/20 bg-green/10 text-green"
+            : "border-muted/20 bg-accent-soft text-muted";
 
   return (
     <div
@@ -588,13 +632,9 @@ function CampaignDetailModal({
             </p>
           </div>
           <span
-            className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[12px] font-medium ${
-              isOpen
-                ? "border-green/20 bg-green/10 text-green"
-                : "border-muted/20 bg-accent-soft text-muted"
-            }`}
+            className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[12px] font-medium ${badgeClass}`}
           >
-            {isOpen ? "Open" : "Closed"}
+            {displayStatus}
           </span>
         </div>
 

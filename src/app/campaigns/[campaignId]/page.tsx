@@ -14,8 +14,6 @@ import {
   Sparkles,
   Check,
   X,
-  Flag,
-  HelpCircle,
   Bookmark,
   Download,
   Clock,
@@ -28,7 +26,7 @@ import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup, fmtViews, clipEarnings } from "@/lib/format";
 import { campaignSpent } from "@/lib/finance";
-import { isStoragePath, resolveAssetUrls, resolveThumbnailUrls } from "@/lib/private-assets";
+import { resolveAssetUrls, resolveThumbnailUrls } from "@/lib/private-assets";
 import type { Clip, Platform, CampaignSourceAsset } from "@/lib/types";
 
 function Section({
@@ -67,7 +65,6 @@ export default function CampaignDetailPage() {
   const { isSignedIn, user } = useAuth();
   const router = useRouter();
   const [active, setActive] = useState(false);
-  const [reported, setReported] = useState(false);
   const [resolvedSourceAssets, setResolvedSourceAssets] = useState<CampaignSourceAsset[]>([]);
   const [resolvedThumbnails, setResolvedThumbnails] = useState<string[]>([]);
 
@@ -249,7 +246,7 @@ export default function CampaignDetailPage() {
             )}
 
             {/* Primary CTA */}
-            {campaign.status === "open" && isClipper && (
+            {campaign.status === "open" && campaign.launchPaymentStatus === "verified" && isClipper && (
               <button
                 onClick={join}
                 className="mt-5 flex w-full items-center justify-center gap-1.5 rounded-lg bg-foreground px-4 py-3 text-sm font-medium text-white hover:opacity-90"
@@ -267,24 +264,7 @@ export default function CampaignDetailPage() {
                 <Bookmark size={14} className={saved ? "fill-accent" : ""} />{" "}
                 {saved ? "Saved" : "Save"}
               </button>
-              <button
-                onClick={() => setReported(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium text-muted hover:bg-accent-soft"
-              >
-                <Flag size={14} /> Report
-              </button>
-              <Link
-                href="/clipper/settings"
-                className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium text-muted hover:bg-accent-soft"
-              >
-                <HelpCircle size={14} /> Ask
-              </Link>
             </div>
-            {reported && (
-              <p className="mt-2 text-xs text-amber">
-                Thanks — our team will review this report.
-              </p>
-            )}
           </div>
         </div>
 
