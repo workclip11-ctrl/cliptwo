@@ -16,14 +16,9 @@
 --
 -- Solution:
 --   REVOKE TEMPORARY ON DATABASE from authenticated, anon, and PUBLIC.
---   SECURITY DEFINER functions execute with the owner's privileges (e.g.,
---   postgres), which are NOT affected by this revocation. They can still
---   create temp tables as authorization signals.
---
--- Defense in depth:
---   Also REVOKE CREATE ON SCHEMA pg_temp from authenticated and anon to
---   prevent future escalation paths (e.g., creating persistent objects
---   in temp schemas).
+--   SECURITY DEFINER functions (e.g., campaign_action, verify_cashfree_webhook)
+--   execute with the owner's privileges (postgres) and are NOT affected by
+--   this revocation. They can still create temp tables as authorization signals.
 --
 -- Run AFTER: 20250101000003_lock_direct_campaign_status_updates.sql
 -- Safe to run multiple times (idempotent REVOKE).
@@ -35,10 +30,6 @@ REVOKE TEMPORARY ON DATABASE postgres FROM PUBLIC;
 -- Revoke TEMPORARY from specific PostgREST roles
 REVOKE TEMPORARY ON DATABASE postgres FROM authenticated;
 REVOKE TEMPORARY ON DATABASE postgres FROM anon;
-
--- Defense in depth: prevent CREATE on pg_temp schemas
-REVOKE CREATE ON SCHEMA pg_temp FROM authenticated;
-REVOKE CREATE ON SCHEMA pg_temp FROM anon;
 
 -- Verify the revocation took effect (informational, will show in migration output)
 DO $$
