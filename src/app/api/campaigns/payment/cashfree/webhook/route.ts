@@ -226,12 +226,13 @@ export async function POST(request: Request) {
   if (orderData.order_status !== "PAID") {
     console.error(`[cashfree-webhook] Order ${orderId} is not PAID: ${orderData.order_status}`);
 
+    // Only reject on definitive gateway failure. PAYMENT_FAILED_WEBHOOK events
+    // are retryable — the user can attempt payment again with a different method.
+    // Do NOT permanently reject on transient/payment-level failures.
+    // Amount and currency mismatches (handled below in verify_cashfree_webhook)
+    // are truly terminal and will be rejected there.
     if (type === "PAYMENT_FAILED_WEBHOOK" || webhookPaymentStatus === "FAILED") {
-      await supabase.rpc("reject_cashfree_webhook", {
-        p_cashfree_order_id: orderId,
-        p_cf_payment_id: webhookCfPaymentId || "",
-        p_failure_reason: data?.payment?.payment_message || "Payment failed via Cashfree",
-      });
+      console.log(`[cashfree-webhook] Payment failed for order ${orderId} — leaving record retryable (not permanently rejecting)`);
     }
 
     return NextResponse.json({ received: true });

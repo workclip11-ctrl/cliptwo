@@ -25,6 +25,7 @@ The following SQL files must be applied in order. Later files may override earli
 
 14. **migrations/20250101000003_lock_direct_campaign_status_updates.sql** — `enforce_campaign_status_protected` trigger blocks direct Creator UPDATE of `campaigns.status`. Uses `_campaign_transition_signal` temp table. Adds signal creation to `campaign_action()`, `admin_campaign_action()`, `verify_campaign_launch_payment()`, `verify_cashfree_webhook()`. Run AFTER step 13.
 15. **migrations/20250101000004_revoke_temp_table_privilege.sql** — Revokes TEMPORARY privilege from `authenticated`, `anon`, and `PUBLIC` on the database. Closes the temp-table forgery attack vector where an authenticated user could CREATE TEMPORARY TABLE `_campaign_transition_signal` to bypass the status protection trigger. SECURITY DEFINER functions are unaffected (they run as the owner). Run AFTER step 14.
+16. **migrations/20250101000005_cashfree_retry_safety.sql** — Documents Cashfree webhook retry safety. The TypeScript webhook handler no longer calls `reject_cashfree_webhook()` for retryable payment failures (PAYMENT_FAILED_WEBHOOK). Only terminal failures (amount/currency mismatch) permanently reject. Adds function comments. Run AFTER step 15.
 
 ### One-Time Recovery
 

@@ -1,8 +1,17 @@
 -- =============================================================
--- Supabase Storage setup for campaign assets
+-- ⚠️  OBSOLETE — DO NOT RUN ON PRODUCTION DATABASES  ⚠️
 --
--- Run this ONCE in the Supabase SQL Editor to create the
--- storage bucket and access policies.
+-- This file was the ORIGINAL storage setup with a PUBLIC bucket.
+-- It has been SUPERSEDED by campaign-assets-security.sql which:
+--   1. Sets campaign-assets bucket to PRIVATE (public = false)
+--   2. Adds path-based public/private access control
+--   3. Adds role-based access (creator/admin/clipper)
+--   4. Drops all policies from this file and recreates them
+--
+-- If you run this file AFTER campaign-assets-security.sql, it will
+-- REVERT the bucket to public and REPLACE the secure policies.
+--
+-- AUTHORITATIVE FILE: supabase/campaign-assets-security.sql
 -- =============================================================
 
 -- 1. Create the bucket (public read access)

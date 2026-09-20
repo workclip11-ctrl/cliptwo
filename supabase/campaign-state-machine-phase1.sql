@@ -1,14 +1,14 @@
 -- ============================================================================
 -- PHASE 1: Campaign creation state machine hardening
 -- ============================================================================
--- Goal: A campaign can NEVER become publicly active/open before its launch
--- payment has been verified by an Admin.
+-- AUTHORITATIVE FOR: create_campaign(), campaign_action(), delete_campaign(),
+--   enforce_campaign_insert_defaults(), enforce_campaign_open_requires_verified()
 --
--- Changes:
---   1. Fix column defaults: status='draft', launch_payment_status='pending'
---   2. Remove p_status from create_campaign (always draft + pending)
---   3. Add UPDATE trigger: open requires verified payment
---   4. Fix campaign_action('publish'): require verified payment
+-- SUPERSEDES: admin-schema.sql (create_campaign, campaign_action removed there)
+-- OVERRIDDEN BY: migration 000003 (campaign_action, enforce_campaign_status_protected)
+--
+-- Note: enforce_campaign_status_protected() is defined in migration 000003,
+--   NOT in this file. This file's version is superseded by the migration.
 -- ============================================================================
 
 -- ── 1. Fix column defaults ──────────────────────────────────────────────────

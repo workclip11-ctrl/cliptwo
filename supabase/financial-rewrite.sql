@@ -1,9 +1,15 @@
 -- ===========================================================================
 -- FINANCIAL ARCHITECTURE REWRITE
+-- ===========================================================================
+-- AUTHORITATIVE FOR: financial_records table, payout_requests table,
+--   approve_clip(), get_wallet_balance(), get_clipper_finance_records(),
+--   get_payout_requests(), get_all_payout_requests(), get_campaign_budget()
 --
--- Separates clip moderation status from financial status.
--- Creates authoritative financial_records and payout_requests tables.
--- Migrates existing data. Safe to run once on existing databases.
+-- SUPERSEDES: admin-schema.sql (earnings, wallet_ledger functions removed)
+-- OVERRIDDEN BY: security-hardening.sql (get_clipper_finance_records, get_payout_requests,
+--   get_all_payout_requests — IDOR fixes), security-hardening-migration.sql
+--   (request_payout, process_payout_request, complete_payout_request)
+-- ===========================================================================
 --
 -- FINANCIAL SEMANTICS (single source of truth):
 --

@@ -1,12 +1,13 @@
 -- ============================================================================
 -- CAMPAIGN LAUNCH PAYMENTS — CASHFREE INTEGRATION
 -- ============================================================================
--- Adds Cashfree sandbox payment support alongside existing UTR flow.
--- Creator can choose UTR or Cashfree checkout. Both paths converge at
--- payment_status = 'verified' → campaign status = 'open'.
+-- AUTHORITATIVE FOR: reserve_cashfree_payment_attempt(),
+--   confirm_cashfree_payment_attempt(), release_cashfree_payment_reservation(),
+--   verify_cashfree_webhook(), reject_cashfree_webhook()
 --
--- Run order: AFTER campaign-launch-payments.sql, security-hardening-migration.sql,
---            campaign-launch-payment-integrity.sql
+-- SUPERSEDES: campaign-launch-payments.sql (verify/reject definitions removed)
+-- OVERRIDDEN BY: migration 000001 (verified_by/actor_id fix),
+--   migration 000002 (trigger fix), migration 000003 (transition signal)
 --
 -- Security notes:
 --   - verify_cashfree_webhook() is SECURITY DEFINER, service_role ONLY
@@ -555,7 +556,11 @@ REVOKE EXECUTE ON FUNCTION public.verify_cashfree_webhook(text, text, numeric) F
 GRANT EXECUTE ON FUNCTION public.verify_cashfree_webhook(text, text, numeric) TO service_role;
 
 -- ── 6. Reject Cashfree webhook (service-role only) ────────────────────────
--- No changes to this RPC. Existing architecture preserved.
+-- TERMINAL failure only. Do NOT call this for retryable payment failures.
+-- Use for: amount mismatch, currency mismatch, definitive gateway rejection.
+-- Payment-level failures (PAYMENT_FAILED) should NOT call this — leave the
+-- record in 'submitted' state so the creator can retry. The creator can
+-- release the reservation and start a new Cashfree payment attempt.
 
 CREATE OR REPLACE FUNCTION public.reject_cashfree_webhook(
   p_cashfree_order_id text,

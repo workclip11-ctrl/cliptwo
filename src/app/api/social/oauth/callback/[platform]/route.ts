@@ -284,27 +284,39 @@ export async function GET(request: NextRequest) {
         logError(`verification update (social_connections) failed: ${verifyConnErr.message}`);
       }
     } else {
-      // Even if verifyOwnership reports a mismatch, the channel from
-      // the token exchange IS the authoritative connected channel.
-      // Mark as verified based on successful token exchange + channel fetch.
-      // For YouTube, the OAuth consent itself proves which channel authorized.
-      log("Ownership verification did not match claimed handle — marking as verified based on successful OAuth exchange");
+      // Ownership verification failed — the claimed handle does not match the
+      // actual provider account. Mark as NOT verified. The user must re-connect
+      // with the correct account or re-verify via /api/social/verify.
+      log(`Ownership verification failed: ${verification.error ?? "handle mismatch"} — marking as unverified`);
       await adminClient
         .from("social_accounts")
         .update({
-          verified: true,
-          provider_account_id: tokenResult.providerAccountId,
-          avatar_url: tokenResult.avatarUrl ?? null,
+          verified: false,
+          provider_account_id: verification.providerAccountId,
+          avatar_url: verification.avatarUrl ?? null,
         })
         .eq("id", socialAccountId)
         .eq("user_id", userId);
+
+      const { error: verifyConnErr } = await adminClient
+        .from("social_connections")
+        .update({
+          verification_data: verification,
+        })
+        .eq("social_account_id", socialAccountId);
+      if (verifyConnErr) {
+        logError(`verification data update (social_connections) failed: ${verifyConnErr.message}`);
+      }
     }
 
-    // ── Step 10: Redirect back to accounts page with success ───────────
+    // ── Step 10: Redirect back to accounts page with result ───────────
     log("SUCCESS");
     const redirectUrl = new URL(redirectPath, request.url);
     redirectUrl.searchParams.set("connected", platform.toLowerCase());
-    redirectUrl.searchParams.set("verified", "true");
+    redirectUrl.searchParams.set("verified", String(verification.verified));
+    if (!verification.verified && verification.error) {
+      redirectUrl.searchParams.set("verification_error", verification.error);
+    }
 
     return NextResponse.redirect(redirectUrl);
   } catch (e) {

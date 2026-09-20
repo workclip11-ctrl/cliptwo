@@ -1,9 +1,19 @@
 -- =============================================================================
 -- SECURITY HARDENING MIGRATION
+-- =============================================================================
+-- AUTHORITATIVE FOR:
+--   admin_clip_action(), admin_user_action(), process_payout_request(),
+--   complete_payout_request(), request_payout(), verify_campaign_launch_payment(),
+--   reject_campaign_launch_payment(), adjust_campaign_budget(), ingest_clip_metrics(),
+--   prevent_audit_log_modification(), prevent_audit_log_deletion(),
+--   enforce_social_connection_token_protection()
 --
--- Run AFTER: schema.sql, admin-schema.sql, financial-rewrite.sql,
---            finance-consolidation.sql, integrity-constraints.sql,
---            campaign-launch-payments.sql, phase7a-lock-service-rpcs.sql
+-- SUPERSEDES: admin-schema.sql, financial-rewrite.sql, finance-consolidation.sql,
+--   campaign-launch-payments.sql (definitions marked [DEFINITION REMOVED])
+--
+-- This file contains the FINAL hardened versions of all functions it defines.
+-- Later migrations may override specific functions — check migration headers.
+-- =============================================================================
 --
 -- Addresses:
 --   PART 2:  Admin fine-grained permission checks on all admin RPCs
