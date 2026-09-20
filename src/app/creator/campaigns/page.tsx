@@ -5,12 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus, Search, X } from "lucide-react";
 import { PlatformIcon } from "@/components/PlatformIcon";
-import { NewCampaignModal } from "@/components/NewCampaignModal";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { rup } from "@/lib/format";
 import { campaignSpent } from "@/lib/finance";
-import type { Campaign, Platform } from "@/lib/types";
+import type { Campaign } from "@/lib/types";
 
 type StatusFilter = "all" | "active" | "draft" | "closed";
 
@@ -60,13 +59,11 @@ export default function CreatorCampaignsPage() {
   const {
     campaigns,
     clips,
-    addCampaign,
     closeCampaign,
     financeRecords,
   } = useStore();
   const { user } = useAuth();
   const router = useRouter();
-  const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
@@ -124,12 +121,6 @@ export default function CreatorCampaignsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setOpen(true)}
-            className="inline-flex h-10 items-center gap-2 rounded-[10px] border bg-card px-4 text-[13px] font-medium text-muted transition-colors duration-150 hover:bg-accent-soft hover:text-foreground sm:h-11 sm:px-5 sm:text-[14px]"
-          >
-            Quick add
-          </button>
           <Link
             href="/creator/campaigns/new"
             className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-accent px-4 text-[13px] font-medium text-white transition-all duration-150 hover:bg-foreground/90 active:scale-[0.98] sm:h-11 sm:px-5 sm:text-[14px]"
@@ -232,45 +223,6 @@ export default function CreatorCampaignsPage() {
         </div>
       )}
 
-      {/* ── Quick Add Modal ─────────────────────────────── */}
-      {open && (
-        <NewCampaignModal
-          onClose={() => setOpen(false)}
-          onSubmit={(
-            title,
-            brief,
-            platform,
-            payout,
-            niche,
-            budget,
-            sourceLink,
-            extra,
-          ) => {
-            addCampaign({
-              title,
-              creator: user?.name ?? user?.email ?? "Creator",
-              created_by: user?.id,
-              brief,
-              platform: platform as Platform,
-              payout,
-              niche,
-              budget,
-              sourceLink: sourceLink || undefined,
-              spent: 0,
-              daysLeft: 30,
-              category: niche,
-              platforms: extra.platforms,
-              maxPayoutPerClip: extra.maxPayoutPerClip || undefined,
-              recommendedDuration: extra.recommendedDuration || undefined,
-              startDate: new Date().toISOString().slice(0, 10),
-              endDate: new Date(Date.now() + 30 * 864e5)
-                .toISOString()
-                .slice(0, 10),
-            });
-            setOpen(false);
-          }}
-        />
-      )}
     </div>
   );
 }

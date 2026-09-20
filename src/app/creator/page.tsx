@@ -9,14 +9,13 @@ import {
   Wallet,
 } from "lucide-react";
 import { PlatformIcon } from "@/components/PlatformIcon";
-import { NewCampaignModal } from "@/components/NewCampaignModal";
 import { useStore } from "@/lib/store";
 import { useAuth } from "@/lib/auth";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { rup, fmtViews } from "@/lib/format";
 import { financeOf, campaignSpent } from "@/lib/finance";
 import { seriesByDay } from "@/lib/analytics";
-import type { Campaign, Clip, Platform } from "@/lib/types";
+import type { Campaign, Clip } from "@/lib/types";
 
 function timeAgo(ts: number): string {
   const diff = Date.now() - ts;
@@ -30,10 +29,9 @@ function timeAgo(ts: number): string {
 }
 
 export default function CreatorPage() {
-  const { campaigns, clips, addCampaign, financeRecords } = useStore();
+  const { campaigns, clips, financeRecords } = useStore();
   const { user } = useAuth();
   useAutoRefresh();
-  const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<Campaign | null>(null);
 
   const myCampaigns = campaigns.filter(
@@ -384,46 +382,6 @@ export default function CreatorPage() {
           </Link>
         </div>
       </section>
-
-      {/* ── Modals ──────────────────────────────────────── */}
-      {open && (
-        <NewCampaignModal
-          onClose={() => setOpen(false)}
-          onSubmit={(
-            title,
-            brief,
-            platform,
-            payout,
-            niche,
-            budget,
-            sourceLink,
-            extra,
-          ) => {
-            addCampaign({
-              title,
-              creator: user?.name ?? user?.email ?? "Creator",
-              created_by: user?.id,
-              brief,
-              platform: platform as Platform,
-              payout,
-              niche,
-              budget,
-              sourceLink: sourceLink || undefined,
-              spent: 0,
-              daysLeft: 30,
-              category: niche,
-              platforms: extra.platforms,
-              maxPayoutPerClip: extra.maxPayoutPerClip || undefined,
-              recommendedDuration: extra.recommendedDuration || undefined,
-              startDate: new Date().toISOString().slice(0, 10),
-              endDate: new Date(Date.now() + 30 * 864e5)
-                .toISOString()
-                .slice(0, 10),
-            });
-            setOpen(false);
-          }}
-        />
-      )}
 
       {selected && (
         <CampaignDetailModal
