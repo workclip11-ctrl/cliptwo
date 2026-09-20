@@ -200,7 +200,7 @@ export async function POST(request: Request) {
     console.error(`[cashfree-webhook] No payment record for order ${orderId}`);
     await supabase.from("audit_logs").insert({
       id: crypto.randomUUID(),
-      actor_id: "00000000-0000-0000-0000-000000000000",
+      actor_id: null,
       actor: "system",
       action: "cashfree_webhook_unknown_order",
       entity_type: "campaign",
@@ -261,7 +261,7 @@ export async function POST(request: Request) {
     );
     await supabase.from("audit_logs").insert({
       id: crypto.randomUUID(),
-      actor_id: "00000000-0000-0000-0000-000000000000",
+      actor_id: null,
       actor: "system",
       action: "cashfree_webhook_payment_id_not_found",
       entity_type: "campaign",
