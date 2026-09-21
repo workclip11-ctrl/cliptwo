@@ -94,8 +94,12 @@ async function enrichProfileFromDb(u: UserProfile): Promise<UserProfile> {
 // SECURITY: Never trust u.role from client. New profiles always get "clipper".
 // Role promotion is exclusively via adminProfilePatch (admin-controlled).
 // For OAuth signups, initialRole is the user's selected role from metadata.
+//
+// SKIP on /auth/complete: that page handles profile creation explicitly
+// via finalize_profile RPC, ensuring role selection for generic Google login.
 async function ensureProfile(u: UserProfile, initialRole?: Role) {
   if (!isSupabaseConfigured) return;
+  if (typeof window !== "undefined" && window.location.pathname === "/auth/complete") return;
   try {
     const { data } = await supabase
       .from("profiles")
@@ -278,9 +282,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(msg);
     }
     const redirectUrl = `${window.location.origin}/auth/callback`;
-    if (desiredRole) {
-      window.sessionStorage.setItem("cliptwo_oauth_role", desiredRole);
-    }
+    // Role is passed via queryParams and stored by Supabase in user_metadata.
+    // The auth completion page reads it to create the profile with the correct role.
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
