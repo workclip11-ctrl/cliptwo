@@ -119,7 +119,7 @@ export default function AdminDashboard() {
           />
           <MetricCard
             label="Total Clips"
-            value={String(approvedCount)}
+            value={String(clips.length)}
             sub={`${pendingCount} pending`}
           />
           <MetricCard

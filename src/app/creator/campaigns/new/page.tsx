@@ -333,9 +333,17 @@ export default function NewCampaignWizard() {
         .single();
       if (!mountedRef.current) return;
       const status = data?.launch_payment_status;
-      if (status === "verified" || status === "rejected" || pollCountRef.current >= 20) {
+      if (status === "verified") {
         if (pollRef.current) clearInterval(pollRef.current);
         setPaymentPhase("submitted");
+      } else if (status === "rejected") {
+        if (pollRef.current) clearInterval(pollRef.current);
+        setPaymentPhase("showing");
+        setPaymentError("Payment was rejected. Please try again.");
+      } else if (pollCountRef.current >= 20) {
+        if (pollRef.current) clearInterval(pollRef.current);
+        setPaymentPhase("showing");
+        setPaymentError("Payment verification is taking longer than expected. Please check again shortly.");
       }
     }, 3000);
   }, []);
