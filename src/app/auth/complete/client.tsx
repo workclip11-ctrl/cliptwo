@@ -1,15 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Scissors, Film } from "lucide-react";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
+import { supabase } from "@/lib/supabase/client";
 
 type Phase = "loading" | "role_select" | "creating" | "error";
 
 export default function AuthCompleteClient() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const subRef = useRef<{ unsubscribe: () => void } | null>(null);
   const routedRef = useRef(false);
@@ -17,7 +16,6 @@ export default function AuthCompleteClient() {
 
   const [phase, setPhase] = useState<Phase>("loading");
   const [error, setError] = useState("");
-  const [userId, setUserId] = useState<string>("");
 
   const routeByRole = useCallback(
     (role: string) => {
@@ -58,7 +56,6 @@ export default function AuthCompleteClient() {
 
     const handleSession = async (uid: string) => {
       if (!active) return;
-      setUserId(uid);
 
       let profileRole: string | null = null;
       try {
@@ -111,10 +108,17 @@ export default function AuthCompleteClient() {
     } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       if (!active || routedRef.current || handlingRef.current) return;
       if (event === "SIGNED_IN" && newSession) {
-        handlingRef.current = true;
-        cleanup();
-        await handleSession(newSession.user.id);
-        handlingRef.current = false;
+        try {
+          handlingRef.current = true;
+          cleanup();
+          await handleSession(newSession.user.id);
+        } catch {
+          if (active && !routedRef.current) {
+            router.replace("/login?error=oauth_failed");
+          }
+        } finally {
+          handlingRef.current = false;
+        }
       }
     });
     subRef.current = subscription;
@@ -128,11 +132,19 @@ export default function AuthCompleteClient() {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session && active && !routedRef.current && !handlingRef.current) {
-        handlingRef.current = true;
-        cleanup();
-        handleSession(session.user.id).then(() => {
-          handlingRef.current = false;
-        });
+        (async () => {
+          try {
+            handlingRef.current = true;
+            cleanup();
+            await handleSession(session.user.id);
+          } catch {
+            if (active && !routedRef.current) {
+              router.replace("/login?error=oauth_failed");
+            }
+          } finally {
+            handlingRef.current = false;
+          }
+        })();
       }
     });
 
