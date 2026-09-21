@@ -10,7 +10,8 @@ type Phase = "loading" | "role_select" | "creating" | "error";
 export default function AuthCompleteClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const cleanupRef = useRef<(() => void) | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const subRef = useRef<{ unsubscribe: () => void } | null>(null);
   const routedRef = useRef(false);
   const handlingRef = useRef(false);
 
@@ -55,54 +56,10 @@ export default function AuthCompleteClient() {
   useEffect(() => {
     let active = true;
 
-    const run = async () => {
-      try {
-        const {
-          data: { subscription },
-        } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-          if (!active || routedRef.current || handlingRef.current) return;
-          if (event === "SIGNED_IN" && newSession) {
-            handlingRef.current = true;
-            cleanupRef.current?.();
-            await handleSession(newSession.user.id);
-            handlingRef.current = false;
-          }
-        });
-
-        const timer = setTimeout(() => {
-          if (active && !routedRef.current) {
-            router.replace("/login?error=oauth_failed");
-          }
-        }, 8000);
-
-        cleanupRef.current = () => {
-          active = false;
-          clearTimeout(timer);
-          subscription.unsubscribe();
-        };
-
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        if (session && active && !routedRef.current && !handlingRef.current) {
-          handlingRef.current = true;
-          cleanupRef.current?.();
-          await handleSession(session.user.id);
-          handlingRef.current = false;
-        }
-      } catch {
-        if (active && !routedRef.current) {
-          router.replace("/login?error=oauth_failed");
-        }
-      }
-    };
-
     const handleSession = async (uid: string) => {
       if (!active) return;
       setUserId(uid);
 
-      // profiles.role is the SOLE source of truth for authorization.
       let profileRole: string | null = null;
       try {
         const { data: profile } = await supabase
@@ -118,19 +75,14 @@ export default function AuthCompleteClient() {
       if (!active) return;
 
       if (profileRole) {
-        // Existing profile — route immediately (existing user)
         routeByRole(profileRole);
         return;
       }
 
-      // No profile yet. Check if user_metadata has a role from the OAuth flow.
-      // This handles role-specific CTAs ("Start Clipping" / "Creator CTA") where
-      // the role was passed via queryParams and stored in user_metadata.
       try {
         const { data: userData } = await supabase.auth.getUser();
         const metaRole = userData?.user?.user_metadata?.role;
         if (metaRole === "clipper" || metaRole === "creator") {
-          // Role was pre-selected — finalize profile and route
           await finalizeAndRoute(metaRole);
           return;
         }
@@ -140,17 +92,55 @@ export default function AuthCompleteClient() {
 
       if (!active) return;
 
-      // No profile, no role in metadata — show role selection (generic Google login)
       setPhase("role_select");
     };
 
-    run();
+    const cleanup = () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      if (subRef.current) {
+        subRef.current.unsubscribe();
+        subRef.current = null;
+      }
+    };
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      if (!active || routedRef.current || handlingRef.current) return;
+      if (event === "SIGNED_IN" && newSession) {
+        handlingRef.current = true;
+        cleanup();
+        await handleSession(newSession.user.id);
+        handlingRef.current = false;
+      }
+    });
+    subRef.current = subscription;
+
+    timerRef.current = setTimeout(() => {
+      if (active && !routedRef.current) {
+        cleanup();
+        router.replace("/login?error=oauth_failed");
+      }
+    }, 8000);
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session && active && !routedRef.current && !handlingRef.current) {
+        handlingRef.current = true;
+        cleanup();
+        handleSession(session.user.id).then(() => {
+          handlingRef.current = false;
+        });
+      }
+    });
 
     return () => {
       active = false;
-      cleanupRef.current?.();
+      cleanup();
     };
-  }, [router, searchParams, routeByRole, finalizeAndRoute]);
+  }, [router, routeByRole, finalizeAndRoute]);
 
   // ── Role selection UI ──────────────────────────────────────────
   if (phase === "role_select") {
