@@ -12,6 +12,7 @@ export default function AuthCompleteClient() {
   const searchParams = useSearchParams();
   const cleanupRef = useRef<(() => void) | null>(null);
   const routedRef = useRef(false);
+  const handlingRef = useRef(false);
 
   const [phase, setPhase] = useState<Phase>("loading");
   const [error, setError] = useState("");
@@ -59,11 +60,12 @@ export default function AuthCompleteClient() {
         const {
           data: { subscription },
         } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-          if (!active || routedRef.current) return;
+          if (!active || routedRef.current || handlingRef.current) return;
           if (event === "SIGNED_IN" && newSession) {
-            routedRef.current = true;
+            handlingRef.current = true;
             cleanupRef.current?.();
             await handleSession(newSession.user.id);
+            handlingRef.current = false;
           }
         });
 
@@ -83,10 +85,11 @@ export default function AuthCompleteClient() {
           data: { session },
         } = await supabase.auth.getSession();
 
-        if (session && active && !routedRef.current) {
-          routedRef.current = true;
+        if (session && active && !routedRef.current && !handlingRef.current) {
+          handlingRef.current = true;
           cleanupRef.current?.();
           await handleSession(session.user.id);
+          handlingRef.current = false;
         }
       } catch {
         if (active && !routedRef.current) {
