@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useRef, useCallback, useEffect } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -473,6 +473,45 @@ function FAQ() {
   );
 }
 
+// Footer social row. Official ClipTwo profile URLs are not configured in
+// this codebase — platforms without a real `href` render as non-clickable
+// icons (no fake "#" links). Add `href` when a real URL is provided.
+type FooterSocial = { name: string; href?: string; icon: ReactNode };
+
+const FOOTER_SOCIALS: FooterSocial[] = [
+  {
+    name: "Instagram",
+    icon: <PlatformIcon p="Instagram" size={15} />,
+  },
+  {
+    name: "X",
+    icon: (
+      <svg width={15} height={15} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M18.9 2H22l-6.8 7.8L23 22h-6.3l-4.9-6.4L6.2 22H3l7.3-8.3L2.5 2h6.4l4.4 5.9L18.9 2zm-1.1 18h1.7L7.6 3.7H5.7L17.8 20z" />
+      </svg>
+    ),
+  },
+  {
+    name: "Threads",
+    icon: (
+      <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12.8 8.5c-1.9-1.8-4.9-1.5-6.2.7-1 1.7-.7 4 .7 5.3 1.6 1.5 4.1 1.7 6 .4 1.7-1.1 2.6-3.1 2.4-5-.1-1.4-.9-2.6-2.1-3.1" />
+        <path d="M15.6 5c1.7.9 3.1 2.5 3.8 4.4" />
+      </svg>
+    ),
+  },
+  {
+    name: "LinkedIn",
+    icon: (
+      <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z" />
+        <rect x="2" y="9" width="4" height="12" />
+        <circle cx="4" cy="4" r="2" />
+      </svg>
+    ),
+  },
+];
+
 export default function Home() {
   const router = useRouter();
   const { campaigns, siteSettings } = useStore();
@@ -818,11 +857,29 @@ export default function Home() {
                 India&apos;s clipping marketplace — connect creators with clippers, paid per view and settled straight to UPI.
               </p>
               <div className="mt-4 flex items-center gap-2">
-                {(["Instagram", "YouTube"] as const).map((p) => (
-                  <span key={p} className="flex h-8 w-8 items-center justify-center rounded-[8px] border border-border/40 bg-background text-muted">
-                    <PlatformIcon p={p} size={15} />
-                  </span>
-                ))}
+                {FOOTER_SOCIALS.map((s) =>
+                  s.href ? (
+                    <a
+                      key={s.name}
+                      href={s.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`ClipTwo on ${s.name}`}
+                      className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-[8px] border border-border/40 bg-background text-muted transition-colors hover:text-foreground"
+                    >
+                      {s.icon}
+                    </a>
+                  ) : (
+                    <span
+                      key={s.name}
+                      role="img"
+                      aria-label={`${s.name} (link coming soon)`}
+                      className="flex h-8 w-8 items-center justify-center rounded-[8px] border border-border/40 bg-background text-muted transition-colors hover:text-foreground"
+                    >
+                      {s.icon}
+                    </span>
+                  ),
+                )}
               </div>
             </div>
 

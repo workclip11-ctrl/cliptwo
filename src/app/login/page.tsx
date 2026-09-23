@@ -3,7 +3,7 @@
 import { Suspense, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, Scissors, Film } from "lucide-react";
+import { ArrowRight, ArrowLeft, Scissors, Film } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
 
@@ -149,6 +149,13 @@ function AuthForm() {
         </Link>
 
         <div className="mx-auto w-full max-w-[400px]">
+          <Link
+            href="/"
+            className="mb-5 inline-flex items-center gap-1.5 text-[13px] text-muted transition-colors hover:text-foreground cursor-pointer"
+          >
+            <ArrowLeft size={14} aria-hidden="true" />
+            Back to homepage
+          </Link>
           <h1 className="text-[28px] font-bold tracking-tight">
             {mode === "signin" ? "Welcome back" : "Create your account"}
           </h1>
