@@ -214,7 +214,7 @@ BEGIN
     AND pronamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public');
 
   ASSERT v_func.prokind = 'f', 'TEST 3.1 FAIL: not a function';
-  ASSERT v_func.prosecuritydefiner = true, 'TEST 3.1 FAIL: not SECURITY DEFINER';
+  ASSERT v_func.prosecdef = true, 'TEST 3.1 FAIL: not SECURITY DEFINER';
   ASSERT v_func.provolatile = 'v', 'TEST 3.1 FAIL: not volatile (expected volatile for RPC)';
   RAISE NOTICE 'TEST 3.1 PASS: finalize_profile exists, is SECURITY DEFINER';
 END $$;
@@ -497,7 +497,7 @@ DO $$
 DECLARE
   v_secdef boolean;
 BEGIN
-  SELECT prosecuritydefiner INTO v_secdef
+  SELECT prosecdef INTO v_secdef
   FROM pg_proc
   WHERE proname = 'handle_new_user_profile'
     AND pronamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public');
