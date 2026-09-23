@@ -4,22 +4,26 @@
 -- Tests for role-aware Google sign-in and email confirmation persistence.
 --
 -- Coverage:
---   1. Trigger auto-creates profile with correct role from metadata
---   2. Trigger strips admin role / defaults missing role to clipper
+--   1. Trigger auto-creates profile ONLY on explicit clipper/creator metadata
+--      (email path); OAuth newcomers without a metadata role are left
+--      profile-less for the finalize_profile() intent handoff
+--   2. Trigger never creates admin; invalid/absent role creates NO profile
 --   3. Existing profile role is never overwritten by trigger
 --   4. finalize_profile RPC: structure, ACL, and null-auth behavior
 --   5. RLS: non-admin cannot change profiles.role
 --   6. Function existence and trigger enabled state
 --   7. profiles INSERT constraint only allows clipper/creator
 --
--- Authenticated-context tests (finalize_profile with real auth.uid()) require
--- a live Supabase session and are documented here for manual execution.
+-- Authenticated-context and browser-flow tests (finalize_profile with a real
+-- auth.uid(), OAuth intent plumbing, stale-role safety) require a live
+-- Supabase session / browser and are documented in SECTION 4 for manual
+-- execution rather than pretended as automated.
 --
 -- Each test is wrapped in BEGIN/ROLLBACK so no data persists.
 -- ===========================================================================
 
 -- ===========================================================================
--- SECTION 1: TRIGGER — auto-creates profile for new auth users
+-- SECTION 1: TRIGGER — explicit-role auto-create; OAuth handoff skip
 -- ===========================================================================
 
 -- TEST 1.1: New email signup gets profile with correct role from metadata
@@ -58,57 +62,84 @@ BEGIN
 END $$;
 ROLLBACK;
 
--- TEST 1.3: Admin role in metadata is stripped to clipper
+-- TEST 1.3: Admin role in metadata creates NO profile via trigger
+-- (admin can never be self-assigned; finalize_profile/ensureProfile default
+-- such users to clipper during completion)
 BEGIN;
 DO $$
 DECLARE
   v_user_id uuid;
-  v_role text;
+  v_count int;
 BEGIN
   v_user_id := gen_random_uuid();
   INSERT INTO auth.users (id, email, raw_user_meta_data, created_at)
   VALUES (v_user_id, 'test_trigger_admin_' || v_user_id || '@test.com',
           '{"name":"Fake Admin","role":"admin"}', now());
 
-  SELECT role INTO v_role FROM public.profiles WHERE id = v_user_id;
-  ASSERT v_role = 'clipper', 'TEST 1.3 FAIL: admin should be stripped, got ' || coalesce(v_role, 'NULL');
-  RAISE NOTICE 'TEST 1.3 PASS: admin role stripped to clipper in trigger';
+  SELECT count(*) INTO v_count FROM public.profiles WHERE id = v_user_id;
+  ASSERT v_count = 0, 'TEST 1.3 FAIL: admin metadata must not create a profile, found ' || v_count;
+
+  RAISE NOTICE 'TEST 1.3 PASS: admin metadata creates no profile via trigger';
 END $$;
 ROLLBACK;
 
--- TEST 1.4: No role in metadata defaults to clipper
+-- TEST 1.4: No role in metadata creates NO profile (OAuth intent handoff)
+-- New Google users arrive without user_metadata.role; the trigger must NOT
+-- pre-empt them with a default clipper profile, otherwise /auth/complete and
+-- finalize_profile() (existing-wins) could never route Creator intents.
 BEGIN;
 DO $$
 DECLARE
   v_user_id uuid;
-  v_role text;
+  v_count int;
 BEGIN
   v_user_id := gen_random_uuid();
   INSERT INTO auth.users (id, email, raw_user_meta_data, created_at)
   VALUES (v_user_id, 'test_trigger_norole_' || v_user_id || '@test.com',
           '{"name":"No Role User"}', now());
 
-  SELECT role INTO v_role FROM public.profiles WHERE id = v_user_id;
-  ASSERT v_role = 'clipper', 'TEST 1.4 FAIL: expected clipper default, got ' || coalesce(v_role, 'NULL');
-  RAISE NOTICE 'TEST 1.4 PASS: missing role defaults to clipper';
+  SELECT count(*) INTO v_count FROM public.profiles WHERE id = v_user_id;
+  ASSERT v_count = 0, 'TEST 1.4 FAIL: role-less user must stay profile-less, found ' || v_count;
+
+  RAISE NOTICE 'TEST 1.4 PASS: missing role leaves user profile-less for intent handoff';
 END $$;
 ROLLBACK;
 
--- TEST 1.5: Invalid role string in metadata defaults to clipper
+-- TEST 1.5: Invalid role string in metadata creates NO profile
 BEGIN;
 DO $$
 DECLARE
   v_user_id uuid;
-  v_role text;
+  v_count int;
 BEGIN
   v_user_id := gen_random_uuid();
   INSERT INTO auth.users (id, email, raw_user_meta_data, created_at)
   VALUES (v_user_id, 'test_trigger_badrole_' || v_user_id || '@test.com',
           '{"name":"Bad Role","role":"superadmin"}', now());
 
-  SELECT role INTO v_role FROM public.profiles WHERE id = v_user_id;
-  ASSERT v_role = 'clipper', 'TEST 1.5 FAIL: invalid role should default to clipper, got ' || coalesce(v_role, 'NULL');
-  RAISE NOTICE 'TEST 1.5 PASS: invalid role string defaults to clipper';
+  SELECT count(*) INTO v_count FROM public.profiles WHERE id = v_user_id;
+  ASSERT v_count = 0, 'TEST 1.5 FAIL: invalid role must not create a profile, found ' || v_count;
+
+  RAISE NOTICE 'TEST 1.5 PASS: invalid role string creates no profile';
+END $$;
+ROLLBACK;
+
+-- TEST 1.6: OAuth-style insert (provider metadata, no role) creates NO profile
+BEGIN;
+DO $$
+DECLARE
+  v_user_id uuid;
+  v_count int;
+BEGIN
+  v_user_id := gen_random_uuid();
+  INSERT INTO auth.users (id, email, raw_user_meta_data, created_at)
+  VALUES (v_user_id, 'test_oauth_style_' || v_user_id || '@gmail.com',
+          '{"name":"Google User","picture":"https://example.com/p.jpg","iss":"https://accounts.google.com"}', now());
+
+  SELECT count(*) INTO v_count FROM public.profiles WHERE id = v_user_id;
+  ASSERT v_count = 0, 'TEST 1.6 FAIL: OAuth-style user must stay profile-less, found ' || v_count;
+
+  RAISE NOTICE 'TEST 1.6 PASS: OAuth-style insert creates no profile (intent handoff)';
 END $$;
 ROLLBACK;
 
@@ -237,14 +268,17 @@ END $$;
 ROLLBACK;
 
 -- ===========================================================================
--- SECTION 4: finalize_profile RPC — authenticated-context tests
+-- SECTION 4: finalize_profile RPC + OAuth intent — authenticated-context tests
 -- ===========================================================================
--- These tests require a real Supabase JWT context. They are documented here
--- for manual execution via the Supabase Dashboard SQL Editor (which runs as
--- the authenticated user when initiated from the dashboard).
+-- These tests require a real Supabase JWT context and/or a live browser OAuth
+-- round trip. They are documented here for manual execution via the Supabase
+-- Dashboard SQL Editor (runs as the authenticated user) and a test browser,
+-- rather than pretended as automated.
 --
--- To run: authenticate as the test user in the Supabase Dashboard, then
--- execute each test in the SQL Editor.
+-- PREREQUISITE for all browser flows: migration
+-- 20250101000007_oauth_intent_handoff.sql must be applied, otherwise the
+-- trigger pre-creates clipper profiles for OAuth newcomers and every new
+-- user lands on /clipper regardless of intent (the original bug).
 -- ===========================================================================
 
 -- TEST 4.1 (MANUAL): Authenticated user with no profile + finalize_profile('creator')
@@ -282,6 +316,46 @@ ROLLBACK;
 --   SELECT public.finalize_profile('admin');
 --   SELECT role FROM profiles WHERE id = auth.uid();
 --   -- Expected: 'clipper' (admin stripped to clipper)
+
+-- TEST 4.5 (MANUAL, BROWSER): Flow A — Start clipping → /clipper
+--   1. Fresh browser profile (or incognito). Delete any prior test user.
+--   2. Visit /login?role=clipper → Continue with Google → brand-new Gmail.
+--   3. EXPECT: new profile row with role='clipper', lands on /clipper,
+--      NO role-selection screen.
+
+-- TEST 4.6 (MANUAL, BROWSER): Flow B — Launch a campaign → /creator
+--   1. Fresh browser profile. Brand-new Gmail (never used before).
+--   2. Visit /login?role=creator → Continue with Google.
+--   3. EXPECT: new profile row with role='creator', lands on /creator.
+--      (This is the exact reported bug: pre-fix it landed on /clipper.)
+
+-- TEST 4.7 (MANUAL, BROWSER): Flow C — generic login → role selection
+--   1. Fresh browser profile. Brand-new Gmail.
+--   2. Visit bare /login (no ?role=) → Continue with Google.
+--   3. EXPECT: role-selection screen. Choose Clipper → /clipper + profile
+--      role='clipper'. Repeat with another Gmail choosing Creator → /creator.
+
+-- TEST 4.8 (MANUAL, BROWSER): Flow D — existing roles always win
+--   D1. Existing creator (/login?role=clipper → Google as creator):
+--       EXPECT /creator, profiles.role stays 'creator'.
+--   D2. Existing clipper (/login?role=creator → Google as clipper):
+--       EXPECT /clipper, profiles.role stays 'clipper'.
+--   D3. Existing admin (/login?role=creator → Google as admin):
+--       EXPECT /admin, profiles.role stays 'admin'.
+--   In all cases the OAuth intent must NOT overwrite the existing role.
+
+-- TEST 4.9 (MANUAL, BROWSER): Stale-role safety
+--   1. Start Creator OAuth (/login?role=creator), cancel at Google.
+--   2. Start Clipper OAuth (/login?role=clipper) with a brand-new Gmail.
+--   3. EXPECT: /clipper with role='clipper' — the cancelled creator intent
+--      must not leak. Also verify: browser back + refresh during
+--      /auth/complete never changes the finalized role.
+
+-- TEST 4.10 (MANUAL, BROWSER): Duplicate/repeated callback safety
+--   1. Complete any OAuth login, then re-visit the /auth/callback URL
+--      (or double-fire via back/forward).
+--   2. EXPECT: single profile row, role unchanged, exactly one dashboard
+--      routing (routedRef guard + idempotent finalize_profile).
 
 -- ===========================================================================
 -- SECTION 5: RLS — users cannot change their own role

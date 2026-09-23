@@ -8,6 +8,12 @@ import {
   type ReactNode,
 } from "react";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
+import {
+  isOAuthIntentRole,
+  newOAuthNonce,
+  writeOAuthIntent,
+  clearOAuthIntent,
+} from "@/lib/oauth-intent";
 
 export type Role = "clipper" | "creator" | "admin";
 
@@ -281,14 +287,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(msg);
       throw new Error(msg);
     }
-    const redirectUrl = `${window.location.origin}/auth/callback`;
-    // Role is passed via queryParams and stored by Supabase in user_metadata.
-    // The auth completion page reads it to create the profile with the correct role.
+    const origin = window.location.origin;
+    // OAuth onboarding intent (clipper/creator for NEW users only).
+    //
+    // Previously the role was sent as a Google OAuth queryParam, which Google
+    // discards — Supabase never wrote it to user_metadata, so the completion
+    // page could not recover it. The intent is now carried in OUR redirectTo
+    // URL (/auth/callback?intent=…&nonce=…, preserved by Supabase and forwarded
+    // by the callback route), mirrored per-tab in sessionStorage.
+    //
+    // Strict validation: only clipper/creator become an intent. Anything else
+    // (including undefined = generic login) clears stale intent so a previous
+    // cancelled attempt can never leak into this one.
+    const intentRole = isOAuthIntentRole(desiredRole) ? desiredRole : undefined;
+    let redirectUrl = `${origin}/auth/callback`;
+    if (intentRole) {
+      const nonce = newOAuthNonce();
+      writeOAuthIntent(intentRole, nonce);
+      redirectUrl += `?intent=${intentRole}&nonce=${encodeURIComponent(nonce)}`;
+    } else {
+      clearOAuthIntent();
+    }
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: redirectUrl,
-        queryParams: desiredRole ? { role: desiredRole } : undefined,
       },
     });
     if (oauthError) {

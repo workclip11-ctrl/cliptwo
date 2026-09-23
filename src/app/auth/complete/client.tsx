@@ -1,14 +1,20 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Scissors, Film } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
+import {
+  isOAuthIntentRole,
+  readOAuthIntent,
+  clearOAuthIntent,
+} from "@/lib/oauth-intent";
 
 type Phase = "loading" | "role_select" | "creating" | "error";
 
 export default function AuthCompleteClient() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const subRef = useRef<{ unsubscribe: () => void } | null>(null);
   const routedRef = useRef(false);
@@ -72,19 +78,58 @@ export default function AuthCompleteClient() {
       if (!active) return;
 
       if (profileRole) {
+        // Existing profile is authoritative — ignore any OAuth intent and
+        // discard this tab's stored intent so it cannot leak into a later
+        // attempt (stale-role protection).
+        clearOAuthIntent();
         routeByRole(profileRole);
         return;
       }
 
-      try {
-        const { data: userData } = await supabase.auth.getUser();
-        const metaRole = userData?.user?.user_metadata?.role;
-        if (metaRole === "clipper" || metaRole === "creator") {
-          await finalizeAndRoute(metaRole);
-          return;
+      // New user (no profile): recover the intended onboarding role for THIS
+      // OAuth transaction. Precedence:
+      //   1. Callback-forwarded URL intent (bound to the completed transaction)
+      //   2. Per-tab sessionStorage mirror (fallback, e.g. new-tab edge cases)
+      //   3. Legacy user_metadata.role (last-resort fallback; Google OAuth
+      //      queryParams never populate it, but email-style metadata might)
+      //
+      // Strict allowlist — anything else falls through to role selection.
+      // Nonce mismatch between URL and storage means the URL belongs to an
+      // older superseded attempt (back-button/resumed tab): the latest intent
+      // started in this tab wins.
+      let intentRole: "clipper" | "creator" | null = null;
+      const urlIntent = searchParams.get("intent");
+      const urlNonce = searchParams.get("nonce");
+      const stored = readOAuthIntent();
+      if (isOAuthIntentRole(urlIntent)) {
+        if (
+          stored &&
+          urlNonce &&
+          stored.nonce &&
+          urlNonce !== stored.nonce
+        ) {
+          intentRole = stored.role;
+        } else {
+          intentRole = urlIntent;
         }
-      } catch {
-        /* fall through to role selection */
+      } else if (stored) {
+        intentRole = stored.role;
+      }
+      if (!intentRole) {
+        try {
+          const { data: userData } = await supabase.auth.getUser();
+          const metaRole = userData?.user?.user_metadata?.role;
+          if (isOAuthIntentRole(metaRole)) intentRole = metaRole;
+        } catch {
+          /* fall through to role selection */
+        }
+      }
+
+      if (intentRole) {
+        // Consume the one-time intent before finalizing.
+        clearOAuthIntent();
+        await finalizeAndRoute(intentRole);
+        return;
       }
 
       if (!active) return;
@@ -152,7 +197,7 @@ export default function AuthCompleteClient() {
       active = false;
       cleanup();
     };
-  }, [router, routeByRole, finalizeAndRoute]);
+  }, [router, searchParams, routeByRole, finalizeAndRoute]);
 
   // ── Role selection UI ──────────────────────────────────────────
   if (phase === "role_select") {
@@ -171,7 +216,10 @@ export default function AuthCompleteClient() {
           <div className="space-y-3">
             <button
               type="button"
-              onClick={() => finalizeAndRoute("clipper")}
+              onClick={() => {
+                clearOAuthIntent();
+                finalizeAndRoute("clipper");
+              }}
               className="flex h-[72px] w-full cursor-pointer flex-col items-center justify-center gap-1 rounded-[10px] border border-border/60 bg-card text-[14px] font-medium transition-all duration-150 hover:border-foreground/20 hover:bg-accent-soft"
             >
               <Scissors size={16} />
@@ -183,7 +231,10 @@ export default function AuthCompleteClient() {
 
             <button
               type="button"
-              onClick={() => finalizeAndRoute("creator")}
+              onClick={() => {
+                clearOAuthIntent();
+                finalizeAndRoute("creator");
+              }}
               className="flex h-[72px] w-full cursor-pointer flex-col items-center justify-center gap-1 rounded-[10px] border border-border/60 bg-card text-[14px] font-medium transition-all duration-150 hover:border-foreground/20 hover:bg-accent-soft"
             >
               <Film size={16} />

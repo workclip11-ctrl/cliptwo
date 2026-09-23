@@ -19,6 +19,15 @@ function AuthForm() {
   const [desiredRole, setDesiredRole] = useState<"clipper" | "creator">(
     searchParams.get("role") === "creator" ? "creator" : "clipper",
   );
+  // Strict OAuth intent: only an explicit ?role=clipper|creator from a CTA
+  // (Start clipping / Launch a campaign) becomes an onboarding intent for NEW
+  // users. Bare /login (or any other value) is a generic login with NO forced
+  // role — new users get the role-selection screen instead.
+  const ctaRoleParam = searchParams.get("role");
+  const ctaRole =
+    ctaRoleParam === "creator" || ctaRoleParam === "clipper"
+      ? ctaRoleParam
+      : null;
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -30,7 +39,11 @@ function AuthForm() {
     setError("");
     setGoogleLoading(true);
     try {
-      await signInWithGoogle(desiredRole);
+      // Signup mode: the user explicitly picked a role in the selector.
+      // Signin mode: only a CTA role param is an intent; otherwise generic.
+      await signInWithGoogle(
+        mode === "signup" ? desiredRole : (ctaRole ?? undefined),
+      );
     } catch (err) {
       const msg =
         err instanceof Error ? err.message : "Google sign-in failed.";
