@@ -234,6 +234,8 @@ END $$;
 ROLLBACK;
 
 -- TEST 3.3: finalize_profile is NOT executable by anon role
+-- Prerequisite: migration 20250101000008_finalize_profile_acl.sql applied
+-- (revokes the PostgreSQL default PUBLIC EXECUTE that anon inherited).
 BEGIN;
 DO $$
 DECLARE
@@ -264,6 +266,23 @@ BEGIN
       'TEST 3.4 FAIL: unexpected error: ' || v_error_msg;
     RAISE NOTICE 'TEST 3.4 PASS: finalize_profile rejects null auth.uid() — %', v_error_msg;
   END;
+END $$;
+ROLLBACK;
+
+-- TEST 3.5: PUBLIC does not retain EXECUTE on finalize_profile
+-- PostgreSQL grants EXECUTE to PUBLIC by default on new functions; without
+-- an explicit REVOKE, anon inherits it through PUBLIC (root cause of the
+-- TEST 3.3 failure). Prerequisite: migration
+-- 20250101000008_finalize_profile_acl.sql applied.
+BEGIN;
+DO $$
+DECLARE
+  v_has_priv boolean;
+BEGIN
+  SELECT has_function_privilege('public', 'public.finalize_profile(text)', 'execute')
+  INTO v_has_priv;
+  ASSERT v_has_priv = false, 'TEST 3.5 FAIL: PUBLIC must NOT execute finalize_profile';
+  RAISE NOTICE 'TEST 3.5 PASS: PUBLIC does not have EXECUTE on finalize_profile';
 END $$;
 ROLLBACK;
 
