@@ -261,7 +261,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: res, error: signUpError } = await supabase.auth.signUp({
       email: data.email,
       password: data.password,
-      options: { data: { name: data.name, role: safeRole } },
+      options: {
+        data: { name: data.name, role: safeRole },
+        // Email confirmation must return through the shared auth callback so
+        // /auth/complete can authenticate the session and route by the
+        // DATABASE profile role (profiles.role stays authoritative — no role
+        // is ever encoded in this URL). Without this, Supabase falls back to
+        // the Site URL (homepage) and the user never reaches their dashboard.
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
     });
     if (signUpError) {
       const msg = mapError(signUpError);
