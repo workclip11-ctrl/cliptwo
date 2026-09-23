@@ -88,32 +88,37 @@ export default function AuthCompleteClient() {
 
       // New user (no profile): recover the intended onboarding role for THIS
       // OAuth transaction. Precedence:
-      //   1. Callback-forwarded URL intent (bound to the completed transaction)
-      //   2. Per-tab sessionStorage mirror (fallback, e.g. new-tab edge cases)
+      //   1. Valid stored per-tab intent: the URL intent is accepted ONLY when
+      //      its nonce exactly matches the stored nonce (same transaction).
+      //      Missing or mismatched URL nonce → stored intent wins (stale
+      //      protection: a nonceless/stale callback can never override the
+      //      latest per-tab intent).
+      //   2. No stored intent → a strictly allowlisted URL intent may be used.
       //   3. Legacy user_metadata.role (last-resort fallback; Google OAuth
       //      queryParams never populate it, but email-style metadata might)
       //
       // Strict allowlist — anything else falls through to role selection.
-      // Nonce mismatch between URL and storage means the URL belongs to an
-      // older superseded attempt (back-button/resumed tab): the latest intent
-      // started in this tab wins.
       let intentRole: "clipper" | "creator" | null = null;
       const urlIntent = searchParams.get("intent");
       const urlNonce = searchParams.get("nonce");
       const stored = readOAuthIntent();
-      if (isOAuthIntentRole(urlIntent)) {
+      if (stored) {
+        // Stored per-tab intent is authoritative unless the callback proves it
+        // belongs to the same transaction via an exact nonce match AND agrees
+        // with that transaction's role (a nonce-matching but role-differing
+        // callback is treated as tampered — stored wins).
         if (
-          stored &&
+          isOAuthIntentRole(urlIntent) &&
           urlNonce &&
-          stored.nonce &&
-          urlNonce !== stored.nonce
+          urlNonce === stored.nonce &&
+          urlIntent === stored.role
         ) {
-          intentRole = stored.role;
-        } else {
           intentRole = urlIntent;
+        } else {
+          intentRole = stored.role;
         }
-      } else if (stored) {
-        intentRole = stored.role;
+      } else if (isOAuthIntentRole(urlIntent)) {
+        intentRole = urlIntent;
       }
       if (!intentRole) {
         try {

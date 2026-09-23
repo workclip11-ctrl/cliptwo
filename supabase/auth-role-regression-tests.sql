@@ -357,6 +357,42 @@ ROLLBACK;
 --   2. EXPECT: single profile row, role unchanged, exactly one dashboard
 --      routing (routedRef guard + idempotent finalize_profile).
 
+-- ---------------------------------------------------------------------------
+-- TEST 4.11–4.17 (MANUAL, BROWSER): OAuth intent nonce-validation precedence
+--
+-- These exercise sessionStorage nonce comparison logic in
+-- src/app/auth/complete/client.tsx and CANNOT run as SQL tests — they need a
+-- real browser tab (per-tab sessionStorage) plus a Supabase session. They are
+-- documented here rather than presented as automated coverage.
+--
+-- Setup for all: in DevTools console on the app origin, seed the stored
+-- intent as shown (or let a real OAuth attempt write it via signInWithGoogle):
+--   sessionStorage.setItem('cliptwo_oauth_intent_v1',
+--     JSON.stringify({ role: 'creator', nonce: 'ABC', ts: Date.now() }));
+-- Then navigate to /auth/complete?intent=…&nonce=… (with a signed-in session
+-- for a user that has NO profile row) and observe the resolved role.
+--
+-- 4.11  stored {creator,ABC} + URL intent=creator nonce=ABC  → creator
+-- 4.12  stored {creator,ABC} + URL intent=clipper nonce=ABC  → creator
+--       (stored per-tab intent wins over a differing URL role even on a
+--        matching nonce — the transaction's stored intent is authoritative)
+-- 4.13  stored {creator,ABC} + URL intent=clipper, NO nonce  → creator
+--       (THE REGRESSION THIS FIX ADDS: a nonceless callback must never
+--        override a valid stored intent)
+-- 4.14  stored {creator,ABC} + URL intent=clipper nonce=XYZ  → creator
+--       (mismatched nonce: stored intent wins)
+-- 4.15  no stored intent + URL intent=creator nonce=XYZ      → creator
+--       (validated URL intent is usable when storage is empty)
+-- 4.16  existing profile role=creator + any clipper intent (stored and/or
+--       URL)                                              → creator
+-- 4.17  existing profile role=admin   + creator intent      → admin
+--       (existing profile always wins; intent never consulted)
+--
+-- Also verify: after resolution the stored intent is consumed
+-- (sessionStorage key cleared), and role 'admin' can never appear from an
+-- intent — only from an existing profiles.role row.
+-- ---------------------------------------------------------------------------
+
 -- ===========================================================================
 -- SECTION 5: RLS — users cannot change their own role
 -- ===========================================================================
