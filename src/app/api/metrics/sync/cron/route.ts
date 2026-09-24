@@ -90,7 +90,12 @@ async function handleSync(request: Request) {
 
     try {
       // ── Fetch ALL approved clips in batches ───────────────────────────────
-      const results: Array<{ clipId: string; status: string; error?: string }> = [];
+      const results: Array<{
+        clipId: string;
+        status: string;
+        error?: string;
+        diagnostic?: string;
+      }> = [];
       let offset = 0;
 
       while (true) {
@@ -287,8 +292,15 @@ async function handleSync(request: Request) {
               console.log("[metrics/sync] skipping ingest — insights not verified:", JSON.stringify({
                 clipId: clip.id,
                 verificationStatus: metrics.verificationStatus,
+                insightsError: metrics.insightsError ?? null,
               }));
-              results.push({ clipId: clip.id, status: "skipped", error: `Insights unavailable (status: ${metrics.verificationStatus})` });
+              results.push({
+                clipId: clip.id,
+                status: "skipped",
+                error: `Insights unavailable (status: ${metrics.verificationStatus})`,
+                // Sanitized allowlisted classification (never raw provider text)
+                ...(metrics.insightsError ? { diagnostic: metrics.insightsError } : {}),
+              });
               continue;
             }
 

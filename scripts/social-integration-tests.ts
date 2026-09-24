@@ -14,6 +14,10 @@
 //   - Token encryption roundtrip + expiry helpers (pre-expiry refresh window)
 //   - Token refresh paths (IG ig_refresh_token, YouTube refresh_token)
 //   - YouTube batch fetchAccountMetrics (implemented, ownership-filtered)
+//   - Sanitized Instagram insights diagnostics (allowlisted classification:
+//     metric_missing_in_response / media_posted_before_business_conversion /
+//     metric_not_supported_for_media_type / api_error_<status> / network_error;
+//     never tokens, raw provider text, or response bodies)
 //   - Production cron configuration (base_url = https://cliptwo.in, idempotent
 //     migration, cron URL built from app_settings at runtime, cron endpoint
 //     auth/ingest ordering — static file checks, no network)
@@ -676,6 +680,7 @@ async function main(): Promise<void> {
   // ── K: insights fail-closed semantics ────────────────────────────────────
   async function igWithInsights(
     insights: (url: string, init?: RequestInit | undefined) => Response,
+    token = "tok",
   ) {
     route(
       [
@@ -695,41 +700,153 @@ async function main(): Promise<void> {
       ],
       [(u) => u.includes("/555/insights"), insights],
     );
-    return igMetric.fetchMetrics("https://www.instagram.com/reel/OK001/", "tok", "acc1");
+    return igMetric.fetchMetrics("https://www.instagram.com/reel/OK001/", token, "acc1");
   }
 
-  await test("Instagram insights: genuine 0 → verified (counts as real value)", async () => {
+  // Allowlisted diagnostic categories — the ONLY permitted values.
+  const INSIGHTS_DIAG_RE =
+    /^(metric_missing_in_response|media_posted_before_business_conversion|metric_not_supported_for_media_type|api_error_[0-9]{3}|network_error)$/;
+
+  await test("Instagram insights A: genuine 0 → verified (counts as real value)", async () => {
     const m = await igWithInsights(() =>
       json({ data: [{ name: "views", values: [{ value: 0 }] }] }),
     );
     assert.equal(m.views, 0);
     assert.equal(m.verificationStatus, "verified");
+    assert.equal(m.insightsError, undefined, "verified result must carry no diagnostic");
   });
 
-  await test("Instagram insights: error 100 (metric unsupported) → NOT verified (fail-closed)", async () => {
+  await test("Instagram insights A: valid views → verified, insightsError undefined", async () => {
+    const m = await igWithInsights(() =>
+      json({ data: [{ name: "views", values: [{ value: 42 }] }] }),
+    );
+    assert.equal(m.views, 42);
+    assert.equal(m.verificationStatus, "verified");
+    assert.equal(m.insightsError, undefined, "verified result must carry no diagnostic");
+    assert.ok(
+      !JSON.stringify(m).includes("insightsError"),
+      "serialized verified result must not include a diagnostic field",
+    );
+  });
+
+  await test("Instagram insights C: error 100 (metric unsupported) → NOT verified (fail-closed)", async () => {
     const m = await igWithInsights(() =>
       json({ error: { message: "(#100) Field invalid", code: 100 } }, 400),
     );
     assert.equal(m.views, 0);
     assert.equal(m.verificationStatus, "failed", "unavailable insights must not be verified-0");
+    assert.equal(m.insightsError, "metric_not_supported_for_media_type");
+    assert.match(String(m.insightsError), INSIGHTS_DIAG_RE);
   });
 
-  await test("Instagram insights: HTTP 200 missing views metric → NOT verified", async () => {
+  await test("Instagram insights B: HTTP 200 missing views metric → NOT verified", async () => {
     const m = await igWithInsights(() => json({ data: [] }));
     assert.equal(m.views, 0);
     assert.equal(m.verificationStatus, "failed");
+    assert.equal(m.insightsError, "metric_missing_in_response");
+    assert.match(String(m.insightsError), INSIGHTS_DIAG_RE);
   });
 
-  await test("Instagram insights: network error → NOT verified", async () => {
+  await test("Instagram insights D: posted before business conversion → failed + classified", async () => {
+    const m = await igWithInsights(() =>
+      json(
+        {
+          error: {
+            message:
+              "(#100) Media cannot be retrieved because it was posted before this account was converted to a Business account",
+            code: 100,
+          },
+        },
+        400,
+      ),
+    );
+    assert.equal(m.views, 0, "never fabricate views for unavailable insights");
+    assert.equal(m.verificationStatus, "failed");
+    assert.equal(m.insightsError, "media_posted_before_business_conversion");
+    assert.match(String(m.insightsError), INSIGHTS_DIAG_RE);
+    assert.ok(!String(m.insightsError).includes("account"), "raw Meta message must not leak");
+  });
+
+  await test("Instagram insights E: arbitrary Meta error → failed + api_error_<status>", async () => {
+    const m = await igWithInsights(() =>
+      json(
+        { error: { message: "Invalid OAuth access token string", code: 190 } },
+        401,
+      ),
+    );
+    assert.equal(m.views, 0);
+    assert.equal(m.verificationStatus, "failed");
+    assert.equal(m.insightsError, "api_error_401");
+    assert.match(String(m.insightsError), INSIGHTS_DIAG_RE);
+    assert.ok(!String(m.insightsError).includes("OAuth"), "raw Meta message must not leak");
+  });
+
+  await test("Instagram insights F: network error → failed + network_error", async () => {
     const m = await igWithInsights(() => {
       throw new TypeError("fetch failed");
     });
     assert.equal(m.verificationStatus, "failed");
+    assert.equal(m.insightsError, "network_error");
+    assert.match(String(m.insightsError), INSIGHTS_DIAG_RE);
+    assert.ok(!String(m.insightsError).includes("fetch"), "raw error text must not leak");
   });
 
   await test("Instagram insights: generic API failure → NOT verified", async () => {
     const m = await igWithInsights(() => json({ error: { message: "boom" } }, 500));
     assert.equal(m.verificationStatus, "failed");
+    assert.equal(m.insightsError, "api_error_500");
+  });
+
+  await test("Instagram insights G: no token/secret can appear in diagnostic or result", async () => {
+    const SECRET_TOKEN = "IGPRD-SECRET-TOKEN-XYZ-0123456789";
+    const scenarios: Array<{
+      name: string;
+      insights: () => Response;
+      expected: RegExp;
+    }> = [
+      { name: "missing_views", insights: () => json({ data: [] }), expected: /^metric_missing_in_response$/ },
+      {
+        name: "before_conversion",
+        insights: () =>
+          json(
+            { error: { message: "Posted before business conversion", code: 100 } },
+            400,
+          ),
+        expected: /^media_posted_before_business_conversion$/,
+      },
+      {
+        name: "error_100",
+        insights: () => json({ error: { message: "(#100) Field invalid", code: 100 } }, 400),
+        expected: /^metric_not_supported_for_media_type$/,
+      },
+      {
+        name: "api_error_403",
+        insights: () =>
+          json({ error: { message: "Forbidden secret client_secret value", code: 200 } }, 403),
+        expected: /^api_error_403$/,
+      },
+      {
+        name: "network_error",
+        insights: () => { throw new TypeError("fetch failed"); },
+        expected: /^network_error$/,
+      },
+    ];
+
+    for (const s of scenarios) {
+      const m = await igWithInsights(s.insights, SECRET_TOKEN);
+      assert.equal(m.verificationStatus, "failed", `${s.name}: must stay fail-closed`);
+      assert.ok(m.insightsError, `${s.name}: diagnostic required`);
+      assert.match(m.insightsError, s.expected, `${s.name}: must match allowlist`);
+
+      // The serialized result (what routes return to callers) must never
+      // contain credentials of any kind.
+      const serialized = JSON.stringify(m);
+      assert.ok(!serialized.includes(SECRET_TOKEN), `${s.name}: access token leaked`);
+      assert.ok(!serialized.includes("access_token"), `${s.name}: access_token leaked`);
+      assert.ok(!serialized.includes("client_secret"), `${s.name}: client_secret leaked`);
+      assert.ok(!serialized.includes("Bearer"), `${s.name}: auth header leaked`);
+      assert.ok(!serialized.includes("IGPRD-"), `${s.name}: token fragment leaked`);
+    }
   });
 
   // ── J/L: YouTube video ID extraction + fail-closed API errors ────────────
@@ -936,6 +1053,49 @@ async function main(): Promise<void> {
     assert.ok(sql.includes("'app_settings base_url is exactly https://cliptwo.in'"));
     assert.ok(sql.includes("'cron job auto-metrics-sync scheduled and active'"));
     assert.ok(sql.includes("to_regclass('cron.job') IS NULL"), "must degrade gracefully without pg_cron");
+  });
+
+  // ── Insights diagnostic propagation (routes + source hygiene) ────────────
+  await test("all sync routes keep fail-closed wording and expose sanitized diagnostic", () => {
+    const routes = [
+      "src/app/api/metrics/sync/route.ts",
+      "src/app/api/metrics/sync/cron/route.ts",
+      "src/app/api/metrics/sync/admin-trigger/route.ts",
+    ];
+    for (const f of routes) {
+      const src = readRepo(f);
+      assert.ok(src.includes('verificationStatus !== "verified"'), `${f}: must stay fail-closed`);
+      assert.ok(src.includes("Insights unavailable (status:"), `${f}: generic wording must remain`);
+      assert.ok(
+        src.includes("diagnostic: metrics.insightsError"),
+        `${f}: must expose the sanitized diagnostic on skip`,
+      );
+    }
+  });
+
+  await test("provider insightsError is allowlisted classification only (no raw provider text)", () => {
+    const src = readRepo("src/lib/metric-providers.ts");
+    assert.ok(src.includes("insightsError?: string"), "FetchedMetrics must expose insightsError");
+    assert.ok(
+      src.includes("insightsError = `api_error_${insightsRes.status}`"),
+      "api_error classification must be HTTP-status-only",
+    );
+    assert.ok(
+      src.includes('insightsError = "network_error"'),
+      "network_error classification must be bare (no message)",
+    );
+    assert.ok(
+      !src.includes("api_error_${insightsRes.status}: ${errMsg}"),
+      "raw Meta error message must never reach insightsError",
+    );
+    assert.ok(
+      !src.includes("`network_error: ${"),
+      "raw network error text must never reach insightsError",
+    );
+    assert.ok(
+      !src.includes("_insightsErrorReason = `api_error_"),
+      "legacy reason variable must not reintroduce raw messages",
+    );
   });
 
   // ── Summary ──────────────────────────────────────────────────────────────

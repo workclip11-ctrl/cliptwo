@@ -29,6 +29,21 @@ export interface FetchedMetrics {
   fetchedAt: Date;
   source: "platform_api" | "admin_override";
   verificationStatus: "verified" | "pending" | "failed";
+  /**
+   * Sanitized failure classification — ONLY set when verificationStatus
+   * !== "verified" (undefined on verified results).
+   *
+   * Strict allowlist (bounded, no provider text, no tokens):
+   *   metric_missing_in_response
+   *   media_posted_before_business_conversion
+   *   metric_not_supported_for_media_type
+   *   api_error_<http_status>
+   *   network_error
+   *
+   * Never contains raw Meta error messages, response bodies, URLs,
+   * access tokens, or captions.
+   */
+  insightsError?: string;
 }
 
 export interface MetricProvider {
@@ -215,9 +230,13 @@ class InstagramMetricProvider implements MetricProvider {
     // 3. Fetch views from media insights
     //    views is the current metric (replaced deprecated impressions/plays)
     //    Available for VIDEO and REELS, may not be available for IMAGE
+    //
+    //    insightsError holds a SANITIZED, allowlisted classification only.
+    //    Raw provider error messages are used internally to pick the
+    //    category, then discarded — they are never returned or logged.
     let views = 0;
     let insightsFailed = false;
-    let _insightsErrorReason = "";
+    let insightsError = "";
 
     try {
       const insightsRes = await fetch(
@@ -255,7 +274,7 @@ class InstagramMetricProvider implements MetricProvider {
           // HTTP 200 but the views metric is absent: availability is unknown.
           // Fail closed — never ingest an unavailable metric as verified 0.
           insightsFailed = true;
-          _insightsErrorReason = "metric_missing_in_response";
+          insightsError = "metric_missing_in_response";
           console.warn(
             `[instagram] Insights response for ${mediaId} missing "views" metric — ` +
             `marking verification failed (fail-closed)`,
@@ -265,12 +284,15 @@ class InstagramMetricProvider implements MetricProvider {
         // Insights request failed — do NOT treat views=0 as verified.
         // This includes Meta error 100 (metric not supported for this media
         // type, e.g. IMAGE posts): unavailable insights fail closed.
+        //
+        // errMsg is read ONLY to classify the failure. It (and the raw
+        // response body) never leaves this block — not returned, not logged.
         insightsFailed = true;
         const errObj = body?.error as Record<string, unknown> | undefined;
         const errMsg = String(errObj?.message ?? insightsRes.statusText);
 
         if (errMsg.toLowerCase().includes("posted before") && errMsg.toLowerCase().includes("business")) {
-          _insightsErrorReason = "media_posted_before_business_conversion";
+          insightsError = "media_posted_before_business_conversion";
           console.warn(
             `[instagram] Insights unavailable for ${mediaId}: ` +
             `media was posted before this account was converted to a Business account. ` +
@@ -278,26 +300,29 @@ class InstagramMetricProvider implements MetricProvider {
           );
         } else if (errObj?.code === 100) {
           // Error 100 = parameter/metric error (not supported for this media type)
-          _insightsErrorReason = "metric_not_supported_for_media_type";
+          insightsError = "metric_not_supported_for_media_type";
           console.warn(
             `[instagram] Insights metric "views" not supported for media ${mediaId} ` +
             `(error 100) — marking verification failed (fail-closed)`,
           );
         } else {
-          _insightsErrorReason = `api_error_${insightsRes.status}: ${errMsg}`;
+          // Allowlisted classification: HTTP status only, never the raw message.
+          insightsError = `api_error_${insightsRes.status}`;
           console.error(
-            `[instagram] Insights fetch failed for ${mediaId} (HTTP ${insightsRes.status}):`,
-            errMsg,
+            `[instagram] Insights fetch failed for ${mediaId} (HTTP ${insightsRes.status}) — ` +
+            `classification: ${insightsError}`,
           );
         }
       }
     } catch (e) {
-      // Network error — views stay at 0, mark as failed
+      // Network error — views stay at 0, mark as failed.
+      // Allowlisted classification only: raw error messages can embed the
+      // request URL (which contains the access token) and must not be logged.
       insightsFailed = true;
-      _insightsErrorReason = `network_error: ${e instanceof Error ? e.message : String(e)}`;
+      insightsError = "network_error";
       console.error("[instagram] insights network error:", JSON.stringify({
         mediaId,
-        error: e instanceof Error ? e.message : String(e),
+        errorName: e instanceof Error ? e.name : typeof e,
       }));
     }
 
@@ -310,6 +335,9 @@ class InstagramMetricProvider implements MetricProvider {
       fetchedAt: new Date(),
       source: "platform_api",
       verificationStatus: insightsFailed ? "failed" : "verified",
+      // Sanitized diagnostic attached only on failure; verified results
+      // carry no insightsError (undefined).
+      ...(insightsFailed && insightsError ? { insightsError } : {}),
     };
   }
 

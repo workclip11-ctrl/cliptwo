@@ -96,6 +96,7 @@ export async function POST(request: Request) {
         status: string;
         views?: number;
         error?: string;
+        diagnostic?: string;
       }> = [];
 
       // Process clips in batches of 10 to manage API quota
@@ -298,8 +299,15 @@ export async function POST(request: Request) {
               console.log("[metrics/sync] skipping ingest — insights not verified:", JSON.stringify({
                 clipId: clip.id,
                 verificationStatus: metrics.verificationStatus,
+                insightsError: metrics.insightsError ?? null,
               }));
-              results.push({ clipId: clip.id, status: "skipped", error: `Insights unavailable (status: ${metrics.verificationStatus})` });
+              results.push({
+                clipId: clip.id,
+                status: "skipped",
+                error: `Insights unavailable (status: ${metrics.verificationStatus})`,
+                // Sanitized allowlisted classification (never raw provider text)
+                ...(metrics.insightsError ? { diagnostic: metrics.insightsError } : {}),
+              });
               return;
             }
 

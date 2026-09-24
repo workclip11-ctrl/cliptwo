@@ -72,6 +72,7 @@ export async function POST(request: Request) {
       metrics?: { views: number; likes: number; comments: number; shares: number };
       source?: string;
       error?: string;
+      diagnostic?: string;
     }> = [];
 
     for (const cid of targetClipIds) {
@@ -298,11 +299,14 @@ export async function POST(request: Request) {
           console.log("[metrics/sync] skipping ingest — insights not verified:", JSON.stringify({
             clipId: cid,
             verificationStatus: metrics.verificationStatus,
+            insightsError: metrics.insightsError ?? null,
           }));
           results.push({
             clipId: cid,
             status: "skipped",
             error: `Insights unavailable (status: ${metrics.verificationStatus}). Metrics not stored.`,
+            // Sanitized allowlisted classification (never raw provider text)
+            ...(metrics.insightsError ? { diagnostic: metrics.insightsError } : {}),
           });
           continue;
         }
