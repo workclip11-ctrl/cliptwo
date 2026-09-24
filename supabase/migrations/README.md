@@ -27,6 +27,10 @@ The following SQL files must be applied in order. Later files may override earli
 15. **migrations/20250101000004_revoke_temp_table_privilege.sql** — Revokes TEMPORARY privilege from `authenticated`, `anon`, and `PUBLIC` on the database. Closes the temp-table forgery attack vector where an authenticated user could CREATE TEMPORARY TABLE `_campaign_transition_signal` to bypass the status protection trigger. SECURITY DEFINER functions are unaffected (they run as the owner). Run AFTER step 14.
 16. **migrations/20250101000005_cashfree_retry_safety.sql** — Documents Cashfree webhook retry safety. The TypeScript webhook handler no longer calls `reject_cashfree_webhook()` for retryable payment failures (PAYMENT_FAILED_WEBHOOK). Only terminal failures (amount/currency mismatch) permanently reject. Adds function comments. Run AFTER step 15.
 
+### Metrics Sync
+
+- **migrations/20250101000009_production_cron_base_url.sql** — Sets `public.app_settings.base_url` to the production domain `https://cliptwo.in` (idempotent `INSERT ... ON CONFLICT (key) DO UPDATE`, touches only `base_url`; `cron_secret` untouched). The pg_cron `auto-metrics-sync` job reads `base_url` at runtime, so this single row is the authoritative cron target configuration. Run AFTER `auto-metrics-sync.sql`.
+
 ### One-Time Recovery
 
 - **cashfree-recover-existing-payment.sql** — Recovers the existing sandbox payment (order `cliptwo_ef769e74-58f4-4df9-9c5f-de3333f1b577_attempt_1`, amount ₹110). Contains trigger fix + function fix + precondition checks + RPC call + post-verification queries. Execute in SQL Editor after step 15.

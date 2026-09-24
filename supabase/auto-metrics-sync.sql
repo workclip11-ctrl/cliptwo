@@ -10,12 +10,16 @@
 --   4. After deploying, insert your secrets into app_settings:
 --
 --      INSERT INTO app_settings (key, value)
---      VALUES ('cron_secret', 'YOUR_CRON_SECRET'), ('base_url', 'https://cliptwo.vercel.app')
+--      VALUES ('cron_secret', 'YOUR_CRON_SECRET'), ('base_url', 'https://cliptwo.in')
 --      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
 --
 --      Use the SAME CRON_SECRET value as your Vercel env var.
 --      These settings are stored in a database table (not ALTER DATABASE)
 --      so they work within Supabase's permission model.
+--
+-- PRODUCTION BASE URL: https://cliptwo.in
+--   (authoritative value lives in app_settings.base_url; changed via
+--    migrations/20250101000009_production_cron_base_url.sql)
 -- ===========================================================================
 
 -- 1. Enable required extensions
@@ -31,9 +35,11 @@ CREATE TABLE IF NOT EXISTS public.app_settings (
 );
 
 -- Seed with default values (override after deployment via SQL)
+-- Production base_url is updated idempotently by
+-- migrations/20250101000009_production_cron_base_url.sql
 INSERT INTO public.app_settings (key, value) VALUES
   ('cron_secret', ''),
-  ('base_url', 'https://cliptwo.vercel.app')
+  ('base_url', 'https://cliptwo.in')
 ON CONFLICT (key) DO NOTHING;
 
 -- Grant read to service_role (pg_cron runs with service_role privileges)
@@ -169,11 +175,11 @@ GRANT EXECUTE ON FUNCTION public.renew_sync_lock(text, uuid, integer) TO service
 -- Replace '<YOUR_CRON_SECRET>' with the same value as your Vercel CRON_SECRET env var.
 --
 --   INSERT INTO app_settings (key, value)
---   VALUES ('cron_secret', '<YOUR_CRON_SECRET>'), ('base_url', 'https://cliptwo.vercel.app')
+--   VALUES ('cron_secret', '<YOUR_CRON_SECRET>'), ('base_url', 'https://cliptwo.in')
 --   ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
 --
--- Verify configuration:
---   SELECT * FROM app_settings;
+-- Verify configuration (never SELECT cron_secret's raw value):
+--   SELECT key, value FROM public.app_settings WHERE key <> 'cron_secret';
 --   SELECT jobid, jobname, schedule FROM cron.job WHERE jobname = 'auto-metrics-sync';
 --
 -- Check recent runs (after waiting ~30 minutes):
@@ -181,6 +187,6 @@ GRANT EXECUTE ON FUNCTION public.renew_sync_lock(text, uuid, integer) TO service
 --   WHERE jobid = (SELECT jobid FROM cron.job WHERE jobname = 'auto-metrics-sync')
 --   ORDER BY start_time DESC LIMIT 5;
 --
--- Manually test the endpoint:
---   curl -X POST https://cliptwo.vercel.app/api/metrics/sync/cron \
+-- Manually test the endpoint (use the real CRON_SECRET from your environment):
+--   curl -X POST https://cliptwo.in/api/metrics/sync/cron \
 --     -H "Authorization: Bearer <CRON_SECRET>"

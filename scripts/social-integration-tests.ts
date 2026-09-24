@@ -14,11 +14,17 @@
 //   - Token encryption roundtrip + expiry helpers (pre-expiry refresh window)
 //   - Token refresh paths (IG ig_refresh_token, YouTube refresh_token)
 //   - YouTube batch fetchAccountMetrics (implemented, ownership-filtered)
+//   - Production cron configuration (base_url = https://cliptwo.in, idempotent
+//     migration, cron URL built from app_settings at runtime, cron endpoint
+//     auth/ingest ordering — static file checks, no network)
 //
 // SQL-side structural tests live in supabase/social-and-metrics-integration-tests.sql
 // ---------------------------------------------------------------------------
 
 import assert from "node:assert/strict";
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 // Test env (secrets here are fake fixtures, never real credentials).
 process.env.SOCIAL_TOKEN_KEY =
@@ -137,6 +143,21 @@ function json(body: unknown, status = 200): Response {
     status,
     headers: { "Content-Type": "application/json" },
   });
+}
+
+// ── Repo file fixtures (static configuration checks, no network) ───────────
+
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+const readRepo = (rel: string): string => readFileSync(join(repoRoot, rel), "utf8");
+
+function sqlFilesUnder(dir: string): string[] {
+  const found: string[] = [];
+  for (const entry of readdirSync(join(repoRoot, dir), { withFileTypes: true })) {
+    const rel = `${dir}/${entry.name}`;
+    if (entry.isDirectory()) found.push(...sqlFilesUnder(rel));
+    else if (entry.name.endsWith(".sql")) found.push(rel);
+  }
+  return found;
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────
@@ -852,6 +873,69 @@ async function main(): Promise<void> {
     assert.equal(results[0].metrics.views, 5);
     assert.equal(results[0].metrics.verificationStatus, "verified");
     assert.ok(results[0].postUrl.includes("instagram.com/reel/ZZZ/"));
+  });
+
+  // ── Production cron configuration (base_url regression) ──────────────────
+  await test("migration 000009 upserts base_url to https://cliptwo.in (cron_secret untouched)", () => {
+    const sql = readRepo("supabase/migrations/20250101000009_production_cron_base_url.sql");
+    assert.ok(sql.includes("VALUES ('base_url', 'https://cliptwo.in')"), "must upsert production domain");
+    assert.ok(sql.includes("ON CONFLICT (key) DO UPDATE"), "must be an idempotent upsert");
+    assert.ok(!sql.includes("DO NOTHING"), "existing base_url row must be updated, not skipped");
+    assert.ok(!sql.includes("('cron_secret'"), "must never insert/replace the cron_secret value");
+  });
+
+  await test("auto-metrics-sync.sql: executable seed targets https://cliptwo.in", () => {
+    const sql = readRepo("supabase/auto-metrics-sync.sql");
+    assert.ok(sql.includes("('base_url', 'https://cliptwo.in')"), "seed default must be production domain");
+    assert.ok(!sql.includes("cliptwo.vercel.app"), "no retired domain anywhere in cron SQL");
+    assert.ok(!sql.includes("SELECT * FROM app_settings"), "must not print cron_secret when run");
+  });
+
+  await test("fix-cron-secrets.sql: production URL + cron_secret never printed", () => {
+    const sql = readRepo("supabase/fix-cron-secrets.sql");
+    assert.ok(sql.includes("https://cliptwo.in"), "setup comments must show production domain");
+    assert.ok(!sql.includes("cliptwo.vercel.app"), "no retired domain in lock setup SQL");
+    assert.ok(!sql.includes("SELECT * FROM app_settings"), "verify query must hide cron_secret");
+    assert.ok(sql.includes("CASE WHEN key = 'cron_secret'"), "secret masking must be explicit");
+  });
+
+  await test("no SQL seed/example left on retired cliptwo.vercel.app host", () => {
+    const files = sqlFilesUnder("supabase");
+    assert.ok(files.length > 10, `expected many supabase SQL files, got ${files.length}`);
+    const offenders = files.filter((f) => readRepo(f).includes("'https://cliptwo.vercel.app'"));
+    assert.deepEqual(offenders, [], `retired quoted URL still present in: ${offenders.join(", ")}`);
+  });
+
+  await test("cron job SQL builds URL from app_settings at runtime (no reschedule needed)", () => {
+    const sql = readRepo("supabase/auto-metrics-sync.sql");
+    assert.ok(
+      sql.includes("FROM public.app_settings WHERE key = 'base_url') || '/api/metrics/sync/cron'"),
+      "job body must compose URL from base_url per run",
+    );
+    assert.ok(sql.includes("'*/30 * * * *'"), "schedule must stay every 30 minutes");
+    assert.ok(sql.includes("'auto-metrics-sync'"), "job name must stay stable");
+    assert.ok(sql.includes("|| (SELECT value FROM public.app_settings WHERE key = 'cron_secret')"), "auth header must read cron_secret at runtime");
+  });
+
+  await test("cron endpoint: Bearer CRON_SECRET, approved-only, verified account, ingest before last_sync_at", () => {
+    const route = readRepo("src/app/api/metrics/sync/cron/route.ts");
+    assert.ok(route.includes("process.env.CRON_SECRET"), "CRON_SECRET env must gate auth");
+    assert.ok(route.includes("timingSafeEqual"), "constant-time secret compare required");
+    assert.ok(route.includes('.eq("status", "approved")'), "must only process approved clips");
+    assert.ok(route.includes('rpc("ingest_clip_metrics"'), "must persist via ingest_clip_metrics RPC");
+    assert.ok(route.includes('verificationStatus !== "verified"'), "must skip non-verified metrics (fail-closed)");
+    assert.ok(route.includes("socialAccount.verified"), "must gate on an ownership-verified account");
+    assert.ok(route.includes('socialAccount.status !== "connected"'), "must gate on connected status");
+    const ingestAt = route.indexOf('rpc("ingest_clip_metrics"');
+    const syncAt = route.indexOf("last_sync_at");
+    assert.ok(ingestAt !== -1 && syncAt > ingestAt, "last_sync_at must be written only after successful ingest");
+  });
+
+  await test("SQL suite covers production base_url + cron job (tests 36-40)", () => {
+    const sql = readRepo("supabase/social-and-metrics-integration-tests.sql");
+    assert.ok(sql.includes("'app_settings base_url is exactly https://cliptwo.in'"));
+    assert.ok(sql.includes("'cron job auto-metrics-sync scheduled and active'"));
+    assert.ok(sql.includes("to_regclass('cron.job') IS NULL"), "must degrade gracefully without pg_cron");
   });
 
   // ── Summary ──────────────────────────────────────────────────────────────

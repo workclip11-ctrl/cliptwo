@@ -114,13 +114,27 @@ async function handleSync(request: Request) {
             // Find social account for this user+platform
             const { data: socialAccount } = await adminClient
               .from("social_accounts")
-              .select("id, provider_account_id, handle")
+              .select("id, provider_account_id, handle, status, verified")
               .eq("user_id", clip.user_id)
               .eq("platform", clipPlatform)
               .single();
 
             if (!socialAccount) {
               results.push({ clipId: clip.id, status: "skipped", error: `No connected ${clipPlatform} account` });
+              continue;
+            }
+
+            // Only sync from a connected + ownership-verified account
+            // (fail-closed: unverified/disconnected accounts are skipped).
+            if (
+              !socialAccount.verified ||
+              (socialAccount.status !== "connected" && socialAccount.status !== "verified")
+            ) {
+              results.push({
+                clipId: clip.id,
+                status: "skipped",
+                error: `Account not connected/verified (status: ${socialAccount.status})`,
+              });
               continue;
             }
 

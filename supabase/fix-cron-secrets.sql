@@ -10,7 +10,7 @@
 --   Supabase SQL Editor (Dashboard → SQL Editor):
 --
 --   INSERT INTO app_settings (key, value)
---   VALUES ('cron_secret', 'YOUR_SECRET_HERE'), ('base_url', 'https://cliptwo.vercel.app')
+--   VALUES ('cron_secret', 'YOUR_SECRET_HERE'), ('base_url', 'https://cliptwo.in')
 --   ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
 --
 --   Use the SAME value as your Vercel CRON_SECRET environment variable.
@@ -97,7 +97,13 @@ GRANT EXECUTE ON FUNCTION public.renew_sync_lock(text, uuid, integer) TO service
 -- 3. Verify
 -- After running, configure your cron secret via the Supabase SQL Editor:
 --   INSERT INTO app_settings (key, value)
---   VALUES ('cron_secret', 'YOUR_SECRET_HERE'), ('base_url', 'https://cliptwo.vercel.app')
+--   VALUES ('cron_secret', 'YOUR_SECRET_HERE'), ('base_url', 'https://cliptwo.in')
 --   ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
-SELECT * FROM app_settings;
+-- Verify WITHOUT printing the cron_secret value (value stays hidden):
+SELECT key,
+       CASE WHEN key = 'cron_secret'
+            THEN '(hidden — length ' || length(value) || ')'
+            ELSE value
+       END AS value
+FROM app_settings;
 SELECT * FROM sync_locks;

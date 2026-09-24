@@ -10,6 +10,8 @@
 -- 4. Encrypted token columns + RLS stay fail-closed for browsers
 -- 5. last_sync_at exists (sync routes write it after verified ingest)
 -- 6. ingest_clip_metrics stays service_role-only
+-- 7. Automatic metrics sync targets the production domain (base_url
+--    = https://cliptwo.in) — see migrations/20250101000009
 --
 -- No test data is created (FK constraints prevent fake user creation).
 --
@@ -477,6 +479,71 @@ BEGIN
     AND t.relname = 'social_connections'
     AND t.relrowsecurity = true
   );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- =========================================================================
+  -- SECTION D: Automatic metrics sync production configuration
+  -- (base_url must be https://cliptwo.in — set by
+  --  migrations/20250101000009_production_cron_base_url.sql)
+  -- =========================================================================
+
+  -- TEST 36: app_settings has a base_url row (cron target configuration)
+  v_test_id := v_test_id + 1;
+  v_test_name := 'app_settings has base_url key';
+  v_pass := EXISTS (
+    SELECT 1 FROM public.app_settings WHERE key = 'base_url'
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 37: base_url is the production domain (exact match)
+  v_test_id := v_test_id + 1;
+  v_test_name := 'app_settings base_url is exactly https://cliptwo.in';
+  v_pass := EXISTS (
+    SELECT 1 FROM public.app_settings
+    WHERE key = 'base_url' AND value = 'https://cliptwo.in'
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 38: base_url never points at the retired cliptwo.vercel.app host
+  v_test_id := v_test_id + 1;
+  v_test_name := 'app_settings base_url does not reference cliptwo.vercel.app';
+  v_pass := NOT EXISTS (
+    SELECT 1 FROM public.app_settings
+    WHERE key = 'base_url' AND value LIKE '%cliptwo.vercel.app%'
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 39: cron_secret is configured and non-empty (value NEVER read/printed)
+  v_test_id := v_test_id + 1;
+  v_test_name := 'cron_secret configured (non-empty; value not exposed)';
+  v_pass := EXISTS (
+    SELECT 1 FROM public.app_settings
+    WHERE key = 'cron_secret' AND length(value) > 0
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 40: pg_cron job 'auto-metrics-sync' exists and is active.
+  -- (Skipped → PASS when pg_cron is not installed in this environment.)
+  v_test_id := v_test_id + 1;
+  v_test_name := 'cron job auto-metrics-sync scheduled and active';
+  IF to_regclass('cron.job') IS NULL THEN
+    v_pass := true;
+  ELSE
+    v_pass := EXISTS (
+      SELECT 1 FROM cron.job
+      WHERE jobname = 'auto-metrics-sync' AND active
+    );
+  END IF;
   v_results := v_results || jsonb_build_object(
     'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
   );
