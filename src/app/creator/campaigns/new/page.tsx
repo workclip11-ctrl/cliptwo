@@ -100,31 +100,14 @@ function DateField({
   onChange: (v: string) => void;
   error?: string;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
   return (
-    <label
-      className="block cursor-pointer text-sm"
-      onClick={(e) => {
-        const el = inputRef.current;
-        if (!el || e.target === el) return;
-        if (typeof el.showPicker !== "function") return;
-        // Cancel implicit label re-activation so the picker isn't toggled twice.
-        e.preventDefault();
-        el.focus();
-        try {
-          el.showPicker();
-        } catch {
-          /* showPicker may throw if the element isn't renderable */
-        }
-      }}
-    >
+    <label className="block text-sm">
       <span className="font-medium">{label}</span>
       <div className="mt-1.5">
         <div className="cursor-pointer rounded-lg border bg-background focus-within:border-foreground">
           <input
-            ref={inputRef}
             type="date"
-            className="w-full cursor-pointer border-0 bg-transparent px-3 py-2 text-sm outline-none"
+            className="block h-full w-full cursor-pointer border-0 bg-transparent px-3 py-2 text-sm outline-none"
             value={value}
             onChange={(e) => onChange(e.target.value)}
           />
