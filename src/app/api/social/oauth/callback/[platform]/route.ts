@@ -15,7 +15,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
-import { getProvider } from "@/lib/social-providers";
+import { getProvider, validateOAuthState } from "@/lib/social-providers";
 import { encryptToken, tokenExpiresIn } from "@/lib/token-crypto";
 import { sanitizeError } from "@/lib/api-helpers";
 import type { Platform } from "@/lib/types";
@@ -103,20 +103,20 @@ export async function GET(request: NextRequest) {
 
     log(`State found — user: ${stateRecord.user_id.slice(0, 8)}..., platform: ${stateRecord.platform}`);
 
-    // ── Step 3: Check expiry ───────────────────────────────────────────
-    if (new Date(stateRecord.expires_at).getTime() < Date.now()) {
-      logError("State expired");
+    // ── Step 3: Validate state (expiry + platform match, fail-closed) ──
+    const stateCheck = validateOAuthState(stateRecord, platform);
+    if (!stateCheck.ok) {
+      logError(`State rejected: ${stateCheck.reason}`);
+      // Always consume the state so it cannot be replayed.
       await adminClient.from("social_oauth_states").delete().eq("state", state);
+      const errorParam =
+        stateCheck.reason === "not_found"
+          ? "invalid_state"
+          : stateCheck.reason === "expired"
+            ? "state_expired"
+            : "platform_mismatch";
       return NextResponse.redirect(
-        new URL(`${baseRedirect}?error=state_expired&platform=${platform}`, request.url),
-      );
-    }
-
-    // ── Step 4: Verify platform matches ────────────────────────────────
-    if (stateRecord.platform !== platform) {
-      logError(`Platform mismatch — expected: ${stateRecord.platform}, got: ${platform}`);
-      return NextResponse.redirect(
-        new URL(`${baseRedirect}?error=platform_mismatch&platform=${platform}`, request.url),
+        new URL(`${baseRedirect}?error=${errorParam}&platform=${platform}`, request.url),
       );
     }
 
@@ -125,11 +125,11 @@ export async function GET(request: NextRequest) {
     const userId = stateRecord.user_id;
     const redirectPath = validateRedirectPath(stateRecord.redirect_to);
 
-    // ── Step 5: Delete the used state (one-time use) ───────────────────
+    // ── Step 4: Delete the used state (one-time use) ───────────────────
     await adminClient.from("social_oauth_states").delete().eq("state", state);
     log("State consumed");
 
-    // ── Step 6: Exchange code for tokens ───────────────────────────────
+    // ── Step 5: Exchange code for tokens ───────────────────────────────
     log("Exchanging authorization code for tokens");
     const provider = getProvider(platform);
     const tokenResult = await provider.exchangeCode(code, state, stateRecord.code_verifier ?? undefined);
@@ -141,14 +141,14 @@ export async function GET(request: NextRequest) {
 
     log(`Token exchange successful — channel: ${tokenResult.handle || "unknown"}, account: ${tokenResult.providerAccountId.slice(0, 8)}...`);
 
-    // ── Step 7: Encrypt tokens before storage ──────────────────────────
+    // ── Step 6: Encrypt tokens before storage ──────────────────────────
     const accessTokenEnc = encryptToken(tokenResult.accessToken);
     const refreshTokenEnc = tokenResult.refreshToken
       ? encryptToken(tokenResult.refreshToken)
       : null;
     const expiresAt = tokenExpiresIn(tokenResult.expiresIn);
 
-    // ── Step 8: Check if social_account already exists ────────────────
+    // ── Step 7: Check if social_account already exists ────────────────
     const { data: existingAccount } = await adminClient
       .from("social_accounts")
       .select("id")
@@ -250,7 +250,7 @@ export async function GET(request: NextRequest) {
       log("Social account and connection created");
     }
 
-    // ── Step 9: Verify ownership (server-side) ────────────────────────
+    // ── Step 8: Verify ownership (server-side) ────────────────────────
     log("Verifying ownership");
     const verification = await provider.verifyOwnership(
       tokenResult.accessToken,
@@ -309,7 +309,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // ── Step 10: Redirect back to accounts page with result ───────────
+    // ── Step 9: Redirect back to accounts page with result ─────────────
     log("SUCCESS");
     const redirectUrl = new URL(redirectPath, request.url);
     redirectUrl.searchParams.set("connected", platform.toLowerCase());

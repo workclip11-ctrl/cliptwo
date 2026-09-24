@@ -73,7 +73,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    console.log(`[oauth/initiate] Authenticated user: ${authUser.id}`);
+    console.log(`[oauth/initiate] Authenticated user: ${authUser.id.slice(0, 8)}...`);
 
     // ── Step 2: Service-role client for trusted DB operations ───────────
     const adminClient = createServiceClient();

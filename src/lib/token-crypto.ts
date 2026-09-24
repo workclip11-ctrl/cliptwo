@@ -75,9 +75,30 @@ export function decryptToken(encoded: string): string {
 
 export function isTokenExpired(expiresAt: string | null): boolean {
   if (!expiresAt) return false;
-  return new Date(expiresAt).getTime() < Date.now();
+  const t = new Date(expiresAt).getTime();
+  if (!Number.isFinite(t)) return true; // invalid timestamp → fail closed
+  return t < Date.now();
+}
+
+/**
+ * True when the token expires within `windowMs` (default 48 hours).
+ * Instagram long-lived tokens CANNOT be refreshed once expired, so sync
+ * routes must refresh them while they are still valid but expiring soon.
+ */
+export function isTokenExpiringSoon(
+  expiresAt: string | null,
+  windowMs: number = 48 * 60 * 60 * 1000,
+): boolean {
+  if (!expiresAt) return false;
+  const t = new Date(expiresAt).getTime();
+  if (!Number.isFinite(t)) return true; // invalid timestamp → treat as needing refresh
+  return t - Date.now() < windowMs;
 }
 
 export function tokenExpiresIn(expiresIn: number): Date {
-  return new Date(Date.now() + expiresIn * 1000);
+  // Guard against missing/NaN/negative expires_in from providers —
+  // an Invalid Date here would crash social_connections upserts.
+  const seconds =
+    Number.isFinite(expiresIn) && expiresIn > 0 ? expiresIn : 3600;
+  return new Date(Date.now() + seconds * 1000);
 }

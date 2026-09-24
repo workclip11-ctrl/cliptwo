@@ -101,13 +101,12 @@ class InstagramMetricProvider implements MetricProvider {
         accessToken,
       );
 
-      // DIAG LOG #1: After shortcode resolution
-      console.log("[IG-DIAG] #1 shortcode resolution:", JSON.stringify({
+      // DIAG LOG: After shortcode resolution (account ID prefix-only)
+      console.log("[instagram] shortcode resolution:", JSON.stringify({
         shortcode,
-        accountIdentifier,
-        resolvedMediaId: resolved?.mediaId ?? null,
-        resolvedUsername: resolved?.username ?? null,
+        account: accountIdentifier.slice(0, 8),
         found: !!resolved,
+        resolvedMediaId: resolved?.mediaId ?? null,
       }));
 
       if (!resolved) {
@@ -146,38 +145,72 @@ class InstagramMetricProvider implements MetricProvider {
     mediaId: string,
     accessToken: string,
   ): Promise<FetchedMetrics> {
-    // 1. Fetch media details (type, product type, username, caption)
-    const mediaRes = await fetch(
-      `${InstagramMetricProvider.API_BASE}/${mediaId}?fields=id,media_type,media_product_type,username,caption,permalink&access_token=${accessToken}`,
-    );
+    // 1. Fetch media details (type, product type, username, caption, engagement).
+    //    Engagement counts (like_count, comments_count, shares) must be requested
+    //    explicitly — Meta only returns requested fields. If the API rejects a
+    //    field tier (e.g. `shares` unsupported for the account), fall back to
+    //    progressively safer field sets so views tracking never breaks.
+    const mediaFieldTiers = [
+      "id,media_type,media_product_type,username,caption,permalink,like_count,comments_count,shares",
+      "id,media_type,media_product_type,username,caption,permalink,like_count,comments_count",
+      "id,media_type,media_product_type,username,caption,permalink",
+    ];
 
-    if (!mediaRes.ok) {
-      const err = await mediaRes.json().catch(() => ({}));
-      throw new Error(
-        `Instagram media fetch failed: ${err.error?.message ?? mediaRes.statusText}`,
+    let media: Record<string, unknown> | null = null;
+    let mediaErr: { message?: string } | null = null;
+    let mediaHttpStatus = 0;
+    let mediaFieldTier = -1;
+
+    for (let tier = 0; tier < mediaFieldTiers.length; tier++) {
+      const mediaRes = await fetch(
+        `${InstagramMetricProvider.API_BASE}/${mediaId}?fields=${mediaFieldTiers[tier]}&access_token=${accessToken}`,
+      );
+      mediaHttpStatus = mediaRes.status;
+
+      if (mediaRes.ok) {
+        media = await mediaRes.json();
+        mediaFieldTier = tier;
+        break;
+      }
+      mediaErr = await mediaRes.json().catch(() => ({})) as { message?: string };
+      // Only fall back when the request itself failed — never retry on success.
+      console.warn(
+        `[instagram] media fields tier ${tier} rejected (HTTP ${mediaRes.status}) — ` +
+        `retrying with reduced field set`,
       );
     }
 
-    const media = await mediaRes.json();
+    if (!media) {
+      throw new Error(
+        `Instagram media fetch failed: ${mediaErr?.message ?? `HTTP ${mediaHttpStatus}`}`,
+      );
+    }
 
-    // DIAG LOG #2: After media lookup
-    console.log("[IG-DIAG] #2 media lookup:", JSON.stringify({
+    // DIAG LOG: After media lookup (no caption bodies, no tokens)
+    console.log("[instagram] media lookup:", JSON.stringify({
       mediaId,
+      fieldTier: mediaFieldTier,
+      httpStatus: mediaHttpStatus,
       media_type: media.media_type,
       media_product_type: media.media_product_type,
       username: media.username,
-      permalink: media.permalink,
       like_count: media.like_count,
       comments_count: media.comments_count,
-      shares_count: media.shares?.count,
-      caption: media.caption?.substring(0, 80),
+      shares_count: typeof media.shares === "number"
+        ? media.shares
+        : (media.shares as { count?: number } | undefined)?.count,
     }));
 
-    // 2. Fetch engagement metrics from the media object
-    //    likes, comments_count, shares are on the media object directly
-    const likes = media.like_count ?? 0;
-    const comments = media.comments_count ?? 0;
-    const shares = media.shares?.count ?? 0;
+    // 2. Engagement metrics are on the media object — but only if the field
+    //    tier that requested them succeeded. Missing field ⇒ 0 is a genuine
+    //    "not requested/unavailable", not a metric the provider reported.
+    const likes = typeof media.like_count === "number" ? media.like_count : 0;
+    const comments =
+      typeof media.comments_count === "number" ? media.comments_count : 0;
+    const shares =
+      typeof media.shares === "number"
+        ? media.shares
+        : (media.shares as { count?: number } | undefined)?.count ?? 0;
 
     // 3. Fetch views from media insights
     //    views is the current metric (replaced deprecated impressions/plays)
@@ -191,57 +224,69 @@ class InstagramMetricProvider implements MetricProvider {
         `${InstagramMetricProvider.API_BASE}/${mediaId}/insights?metric=views&access_token=${accessToken}`,
       );
 
-      // DIAG LOG #3: After insights API request
+      // DIAG LOG: After insights API request (compact — metric verification
+      // status + HTTP status only, never the access token)
       let insightsBody: unknown = null;
       try { insightsBody = await insightsRes.json(); } catch { insightsBody = "<unreadable>"; }
 
-      const parsedViews = (() => {
-        if (!insightsRes.ok) return 0;
-        const b = insightsBody as Record<string, unknown> | null;
-        const d = b?.data as Array<Record<string, unknown>> | undefined;
-        const m = d?.find((x) => x.name === "views");
-        const v = (m?.values as Array<Record<string, unknown>> | undefined)?.[0]?.value;
-        return typeof v === "number" ? v : 0;
-      })();
+      const body = insightsBody as Record<string, unknown> | null;
+      const entries = body?.data as Array<Record<string, unknown>> | undefined;
+      const viewsEntry = entries?.find((x) => x.name === "views");
+      const rawValue = (viewsEntry?.values as Array<Record<string, unknown>> | undefined)
+        ?.[0]?.value;
+      const metricFound = typeof rawValue === "number";
 
-      console.log("[IG-DIAG] #3 insights response:", JSON.stringify({
+      console.log("[instagram] insights fetch:", JSON.stringify({
         mediaId,
         httpStatus: insightsRes.status,
-        httpStatusText: insightsRes.statusText,
-        responseBody: insightsBody,
-        parsedViews,
+        metricFound,
+        parsedViews: metricFound ? rawValue : null,
         likes,
         comments,
         shares,
-        metricFound: ((insightsBody as Record<string, unknown>)?.data as Array<Record<string, unknown>> | undefined)?.some((x) => x.name === "views") ?? false,
       }));
 
       if (insightsRes.ok) {
-        views = parsedViews;
+        if (metricFound) {
+          // Genuine provider value — including a real 0 — is verified.
+          views = rawValue;
+          insightsFailed = false;
+        } else {
+          // HTTP 200 but the views metric is absent: availability is unknown.
+          // Fail closed — never ingest an unavailable metric as verified 0.
+          insightsFailed = true;
+          _insightsErrorReason = "metric_missing_in_response";
+          console.warn(
+            `[instagram] Insights response for ${mediaId} missing "views" metric — ` +
+            `marking verification failed (fail-closed)`,
+          );
+        }
       } else {
-        // Insights request failed — do NOT treat views=0 as verified
+        // Insights request failed — do NOT treat views=0 as verified.
+        // This includes Meta error 100 (metric not supported for this media
+        // type, e.g. IMAGE posts): unavailable insights fail closed.
         insightsFailed = true;
-        const err = insightsBody as Record<string, unknown> | null;
-        const errObj = err?.error as Record<string, unknown> | undefined;
+        const errObj = body?.error as Record<string, unknown> | undefined;
         const errMsg = String(errObj?.message ?? insightsRes.statusText);
 
-        // Detect specific Meta error: media posted before Business account conversion
         if (errMsg.toLowerCase().includes("posted before") && errMsg.toLowerCase().includes("business")) {
           _insightsErrorReason = "media_posted_before_business_conversion";
-          console.error(
-            `[instagram-metrics] Insights unavailable for ${mediaId}: ` +
+          console.warn(
+            `[instagram] Insights unavailable for ${mediaId}: ` +
             `media was posted before this account was converted to a Business account. ` +
             `Views cannot be retrieved for this post.`,
           );
         } else if (errObj?.code === 100) {
-          // Error 100 = parameter error (metric not supported for this media type)
-          // This is expected for IMAGE posts — not a failure, just N/A
-          insightsFailed = false;
+          // Error 100 = parameter/metric error (not supported for this media type)
           _insightsErrorReason = "metric_not_supported_for_media_type";
+          console.warn(
+            `[instagram] Insights metric "views" not supported for media ${mediaId} ` +
+            `(error 100) — marking verification failed (fail-closed)`,
+          );
         } else {
           _insightsErrorReason = `api_error_${insightsRes.status}: ${errMsg}`;
           console.error(
-            `[instagram-metrics] Insights fetch failed for ${mediaId}:`,
+            `[instagram] Insights fetch failed for ${mediaId} (HTTP ${insightsRes.status}):`,
             errMsg,
           );
         }
@@ -250,7 +295,7 @@ class InstagramMetricProvider implements MetricProvider {
       // Network error — views stay at 0, mark as failed
       insightsFailed = true;
       _insightsErrorReason = `network_error: ${e instanceof Error ? e.message : String(e)}`;
-      console.error("[IG-DIAG] #3 insights network error:", JSON.stringify({
+      console.error("[instagram] insights network error:", JSON.stringify({
         mediaId,
         error: e instanceof Error ? e.message : String(e),
       }));
@@ -261,7 +306,7 @@ class InstagramMetricProvider implements MetricProvider {
       likes,
       comments,
       shares,
-      username: media.username,
+      username: media.username as string | undefined,
       fetchedAt: new Date(),
       source: "platform_api",
       verificationStatus: insightsFailed ? "failed" : "verified",
@@ -328,14 +373,24 @@ class InstagramMetricProvider implements MetricProvider {
       `&access_token=${accessToken}`;
 
     let pageCount = 0;
+    let scanned = 0;
 
     while (url && pageCount < InstagramMetricProvider.MAX_MEDIA_PAGES) {
       const res = await fetch(url);
-      if (!res.ok) return null;
+      if (!res.ok) {
+        // Fail closed, but leave a diagnosable trace (HTTP status only —
+        // the URL contains the access token and must never be logged).
+        console.warn(
+          `[instagram] media library scan failed (HTTP ${res.status}) after ` +
+          `${pageCount} page(s) / ${scanned} item(s), account: ${accountIdentifier.slice(0, 8)}`,
+        );
+        return null;
+      }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data: any = await res.json();
       const mediaList: Array<{ id: string; shortcode?: string; username?: string }> = data.data ?? [];
+      scanned += mediaList.length;
 
       for (const media of mediaList) {
         if (media.shortcode === shortcode) {
@@ -347,6 +402,11 @@ class InstagramMetricProvider implements MetricProvider {
       pageCount++;
     }
 
+    console.warn(
+      `[instagram] shortcode "${shortcode}" not found after scanning ` +
+      `${pageCount} page(s) / ${scanned} item(s) (max ${InstagramMetricProvider.MAX_MEDIA_PAGES} pages), ` +
+      `account: ${accountIdentifier.slice(0, 8)}`,
+    );
     return null;
   }
 
@@ -400,7 +460,10 @@ class YouTubeMetricProvider implements MetricProvider {
     );
 
     if (!res.ok) {
-      throw new Error(`YouTube metrics fetch failed: ${res.statusText}`);
+      // Fail closed: throw so the sync routes never ingest a fabricated 0.
+      // HTTP status only — response bodies may echo request parameters.
+      console.error(`[youtube] videos.list failed (HTTP ${res.status}) for video ${videoId}`);
+      throw new Error(`YouTube metrics fetch failed: HTTP ${res.status}`);
     }
 
     const data = await res.json();
@@ -434,10 +497,87 @@ class YouTubeMetricProvider implements MetricProvider {
   }
 
   async fetchAccountMetrics(
-    _accountIdentifier: string,
-    _accessToken: string,
+    accountIdentifier: string,
+    accessToken: string,
   ): Promise<Array<{ postUrl: string; metrics: FetchedMetrics }>> {
-    throw new Error("YouTube batch metrics not yet implemented");
+    // Batch path: resolve the channel's uploads playlist, page through it
+    // (bounded), then fetch statistics in 50-video batches. Ownership is
+    // enforced here too — only videos whose snippet.channelId matches the
+    // connected channel are returned.
+    const headers = { Authorization: `Bearer ${accessToken}` };
+    const results: Array<{ postUrl: string; metrics: FetchedMetrics }> = [];
+    const MAX_UPLOAD_PAGES = 5;
+    const PAGE_SIZE = 50;
+
+    const channelRes = await fetch(
+      `https://www.googleapis.com/youtube/v3/channels?part=contentDetails&id=${accountIdentifier}`,
+      { headers },
+    );
+    if (!channelRes.ok) {
+      throw new Error(`YouTube channel fetch failed: HTTP ${channelRes.status}`);
+    }
+    const channelData = await channelRes.json();
+    const uploadsPlaylistId =
+      channelData.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
+    if (!uploadsPlaylistId) {
+      throw new Error("No uploads playlist found for YouTube channel");
+    }
+
+    const videoIds: string[] = [];
+    let pageToken = "";
+    let pages = 0;
+    while (pages < MAX_UPLOAD_PAGES) {
+      const url =
+        `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails` +
+        `&playlistId=${uploadsPlaylistId}&maxResults=${PAGE_SIZE}` +
+        (pageToken ? `&pageToken=${pageToken}` : "");
+      const res = await fetch(url, { headers });
+      if (!res.ok) {
+        throw new Error(`YouTube uploads fetch failed: HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      for (const item of data.items ?? []) {
+        const id = item?.contentDetails?.videoId;
+        if (typeof id === "string") videoIds.push(id);
+      }
+      pageToken = data.nextPageToken ?? "";
+      pages++;
+      if (!pageToken) break;
+    }
+
+    for (let i = 0; i < videoIds.length; i += PAGE_SIZE) {
+      const batchIds = videoIds.slice(i, i + PAGE_SIZE).join(",");
+      const res = await fetch(
+        `https://www.googleapis.com/youtube/v3/videos?part=statistics,snippet&id=${batchIds}`,
+        { headers },
+      );
+      if (!res.ok) {
+        throw new Error(`YouTube videos fetch failed: HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      for (const video of data.items ?? []) {
+        const snippet = video.snippet;
+        const stats = video.statistics;
+        if (!snippet?.channelId || snippet.channelId !== accountIdentifier) {
+          continue; // fail-closed: never return metrics for foreign videos
+        }
+        results.push({
+          postUrl: `https://www.youtube.com/watch?v=${video.id}`,
+          metrics: {
+            views: parseInt(stats?.viewCount ?? "0", 10),
+            likes: parseInt(stats?.likeCount ?? "0", 10),
+            comments: parseInt(stats?.commentCount ?? "0", 10),
+            shares: 0,
+            channelId: snippet.channelId,
+            fetchedAt: new Date(),
+            source: "platform_api",
+            verificationStatus: "verified",
+          },
+        });
+      }
+    }
+
+    return results;
   }
 
   private extractVideoId(url: string): string | null {
@@ -445,6 +585,8 @@ class YouTubeMetricProvider implements MetricProvider {
       /[?&]v=([A-Za-z0-9_-]{11})/,
       /youtu\.be\/([A-Za-z0-9_-]{11})/,
       /youtube\.com\/shorts\/([A-Za-z0-9_-]{11})/,
+      /youtube\.com\/embed\/([A-Za-z0-9_-]{11})/,
+      /youtube\.com\/live\/([A-Za-z0-9_-]{11})/,
     ];
     for (const p of patterns) {
       const match = url.match(p);
@@ -510,4 +652,67 @@ export function getMetricProvider(platform: Platform): MetricProvider {
 
 export function isMetricProviderConfigured(platform: Platform): boolean {
   return isConfigured(platform);
+}
+
+// ── Ownership verification (shared by all sync routes) ─────────────────────
+//
+// Fail-closed: metrics are only accepted when the provider-reported identity
+// (YouTube channelId / Instagram username) matches the connected
+// social_accounts row for the clip owner. Pure function — unit-tested.
+
+export interface MetricOwnershipInput {
+  platform: Platform;
+  metrics: Pick<FetchedMetrics, "channelId" | "username">;
+  accountProviderId: string | null | undefined;
+  accountHandle: string | null | undefined;
+}
+
+export interface MetricOwnershipResult {
+  ok: boolean;
+  error?: string;
+}
+
+export function verifyMetricOwnership(
+  input: MetricOwnershipInput,
+): MetricOwnershipResult {
+  const { platform, metrics, accountProviderId, accountHandle } = input;
+
+  if (platform === "YouTube") {
+    if (!metrics.channelId || !accountProviderId) {
+      return {
+        ok: false,
+        error: "YouTube ownership could not be verified — missing channel identification",
+      };
+    }
+    if (metrics.channelId !== accountProviderId) {
+      return {
+        ok: false,
+        error: "This YouTube video does not belong to your connected YouTube channel",
+      };
+    }
+    return { ok: true };
+  }
+
+  if (platform === "Instagram") {
+    if (!metrics.username) {
+      return {
+        ok: false,
+        error:
+          "Instagram ownership could not be verified — missing username on resolved media",
+      };
+    }
+    if (metrics.username.toLowerCase() !== (accountHandle ?? "").toLowerCase()) {
+      return {
+        ok: false,
+        error: `This Instagram post does not belong to your connected account (expected "${accountHandle}", got "${metrics.username}")`,
+      };
+    }
+    return { ok: true };
+  }
+
+  // Kick and other platforms: no metric provider — reject.
+  return {
+    ok: false,
+    error: `${platform} ownership verification is not available`,
+  };
 }

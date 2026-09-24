@@ -11,9 +11,18 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/supabase/auth-helpers";
 import { createServiceClient } from "@/lib/supabase/server";
-import { getMetricProvider, isMetricProviderConfigured } from "@/lib/metric-providers";
+import {
+  getMetricProvider,
+  isMetricProviderConfigured,
+  verifyMetricOwnership,
+} from "@/lib/metric-providers";
 import { getProvider } from "@/lib/social-providers";
-import { decryptToken, encryptToken, isTokenExpired } from "@/lib/token-crypto";
+import {
+  decryptToken,
+  encryptToken,
+  isTokenExpired,
+  isTokenExpiringSoon,
+} from "@/lib/token-crypto";
 import { sanitizeError } from "@/lib/api-helpers";
 import type { Platform } from "@/lib/types";
 
@@ -138,8 +147,16 @@ export async function POST(request: Request) {
 
         let accessToken = decryptToken(connection.access_token_enc);
 
-        // Token refresh: if expired, try to refresh using the provider's mechanism
-        if (isTokenExpired(connection.expires_at)) {
+        // Token refresh: Instagram long-lived tokens CANNOT be refreshed once
+        // expired, so refresh them while still valid but expiring soon (48h
+        // window). YouTube/other platforms use standard refresh tokens and
+        // refresh after expiry.
+        const tokenNeedsRefresh =
+          clipPlatform === "Instagram"
+            ? isTokenExpiringSoon(connection.expires_at)
+            : isTokenExpired(connection.expires_at);
+
+        if (tokenNeedsRefresh) {
           // Instagram uses ig_refresh_token grant — the access token itself is used
           // to generate a new long-lived token. No separate refresh token exists.
           if (clipPlatform === "Instagram") {
@@ -157,19 +174,29 @@ export async function POST(request: Request) {
                 .eq("social_account_id", socialAccount.id);
 
               accessToken = refreshed.accessToken;
-            } catch {
-              await adminClient
-                .from("social_accounts")
-                .update({ status: "connection_error", error: "Token refresh failed — reconnect required" })
-                .eq("id", socialAccount.id)
-                .eq("user_id", clip.user_id);
+            } catch (refreshErr) {
+              if (isTokenExpired(connection.expires_at)) {
+                // Token already dead — reconnect is the only path.
+                await adminClient
+                  .from("social_accounts")
+                  .update({ status: "connection_error", error: "Token refresh failed — reconnect required" })
+                  .eq("id", socialAccount.id)
+                  .eq("user_id", clip.user_id);
 
-              results.push({
-                clipId: cid,
-                status: "skipped",
-                error: "Instagram token refresh failed — reconnect the account",
-              });
-              continue;
+                results.push({
+                  clipId: cid,
+                  status: "skipped",
+                  error: "Instagram token refresh failed — reconnect the account",
+                });
+                continue;
+              }
+              // Pre-expiry refresh failed (e.g. transient network error) but
+              // the existing token is still valid — continue with it.
+              console.warn(
+                `[metrics/sync] Instagram pre-expiry refresh failed clip=${cid.slice(0, 8)} ` +
+                `— continuing with existing valid token: ` +
+                `${refreshErr instanceof Error ? refreshErr.message : String(refreshErr)}`,
+              );
             }
           } else {
             // YouTube and other platforms use separate refresh tokens
@@ -232,47 +259,28 @@ export async function POST(request: Request) {
           socialAccount.provider_account_id,
         );
 
-        // Ownership verification (fail-closed)
-        if (clipPlatform === "YouTube") {
-          if (!metrics.channelId || !socialAccount.provider_account_id) {
-            results.push({
-              clipId: cid,
-              status: "rejected",
-              error: "YouTube ownership could not be verified — missing channel identification",
-            });
-            continue;
-          }
-          if (metrics.channelId !== socialAccount.provider_account_id) {
-            results.push({
-              clipId: cid,
-              status: "rejected",
-              error: "This YouTube video does not belong to your connected YouTube channel",
-            });
-            continue;
-          }
+        // Ownership verification (fail-closed, shared helper)
+        const ownership = verifyMetricOwnership({
+          platform: clipPlatform,
+          metrics,
+          accountProviderId: socialAccount.provider_account_id,
+          accountHandle: socialAccount.handle,
+        });
+        if (!ownership.ok) {
+          console.log(
+            `[metrics/sync] Ownership rejected clip=${cid.slice(0, 8)} ` +
+            `platform=${clipPlatform}: ${ownership.error}`,
+          );
+          results.push({
+            clipId: cid,
+            status: "rejected",
+            error: ownership.error ?? "Ownership verification failed",
+          });
+          continue;
         }
 
-        if (clipPlatform === "Instagram") {
-          if (!metrics.username) {
-            results.push({
-              clipId: cid,
-              status: "rejected",
-              error: "Instagram ownership could not be verified — missing username on resolved media",
-            });
-            continue;
-          }
-          if (metrics.username.toLowerCase() !== (socialAccount.handle ?? "").toLowerCase()) {
-            results.push({
-              clipId: cid,
-              status: "rejected",
-              error: `This Instagram post does not belong to your connected account (expected "${socialAccount.handle}", got "${metrics.username}")`,
-            });
-            continue;
-          }
-        }
-
-        // DIAG LOG #4: Before ingest_clip_metrics
-        console.log("[IG-DIAG] #4 before ingest:", JSON.stringify({
+        // DIAG LOG: Before ingest_clip_metrics
+        console.log("[metrics/sync] before ingest:", JSON.stringify({
           clipId: cid,
           platform: clipPlatform,
           views: metrics.views,
@@ -282,11 +290,12 @@ export async function POST(request: Request) {
           source: metrics.source,
           verificationStatus: metrics.verificationStatus,
           username: metrics.username,
+          channelId: metrics.channelId,
         }));
 
         // Skip ingest if insights failed — do NOT store views=0 as verified
         if (metrics.verificationStatus !== "verified") {
-          console.log("[IG-DIAG] #4 skipping ingest — insights not verified:", JSON.stringify({
+          console.log("[metrics/sync] skipping ingest — insights not verified:", JSON.stringify({
             clipId: cid,
             verificationStatus: metrics.verificationStatus,
           }));
@@ -312,8 +321,8 @@ export async function POST(request: Request) {
           },
         );
 
-        // DIAG LOG #5: After ingest_clip_metrics
-        console.log("[IG-DIAG] #5 after ingest:", JSON.stringify({
+        // DIAG LOG: After ingest_clip_metrics
+        console.log("[metrics/sync] after ingest:", JSON.stringify({
           clipId: cid,
           ingestError: ingestError?.message ?? null,
           ingestResult,
@@ -322,6 +331,19 @@ export async function POST(request: Request) {
         if (ingestError) {
           results.push({ clipId: cid, status: "error", error: sanitizeError(ingestError.message) });
           continue;
+        }
+
+        // Record successful sync time (shown as "Last synced" on the
+        // accounts page). Best-effort — a failure here must not fail the sync.
+        const { error: syncStampErr } = await adminClient
+          .from("social_accounts")
+          .update({ last_sync_at: new Date().toISOString() })
+          .eq("id", socialAccount.id);
+        if (syncStampErr) {
+          console.warn(
+            `[metrics/sync] last_sync_at update failed for account ` +
+            `${socialAccount.id.slice(0, 8)}: ${syncStampErr.message}`,
+          );
         }
 
         results.push({

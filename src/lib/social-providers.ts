@@ -492,7 +492,9 @@ class YouTubeProvider implements SocialProvider {
     });
 
     if (!res.ok) {
-      throw new Error("YouTube token refresh failed");
+      // Safe to log/return the HTTP status only — never the response body
+      // (it may echo request parameters).
+      throw new Error(`YouTube token refresh failed: HTTP ${res.status}`);
     }
 
     const data = await res.json();
@@ -595,6 +597,39 @@ function isConfigured(platform: Platform): boolean {
     default:
       return false;
   }
+}
+
+// ── OAuth state validation (CSRF) ───────────────────────────────────────────
+//
+// Pure helper shared by the OAuth callback route so the expiry / platform /
+// one-time-use checks are unit-testable. Fails closed: missing, expired, or
+// unparsable state is always rejected.
+
+export type OAuthStateValidationReason =
+  | "not_found"
+  | "expired"
+  | "platform_mismatch";
+
+export type OAuthStateValidation =
+  | { ok: true }
+  | { ok: false; reason: OAuthStateValidationReason };
+
+export function validateOAuthState(
+  record: { platform: string; expires_at: string | Date } | null | undefined,
+  expectedPlatform: Platform,
+  nowMs: number = Date.now(),
+): OAuthStateValidation {
+  if (!record) {
+    return { ok: false, reason: "not_found" };
+  }
+  const expiresAt = new Date(record.expires_at).getTime();
+  if (!Number.isFinite(expiresAt) || expiresAt < nowMs) {
+    return { ok: false, reason: "expired" };
+  }
+  if (record.platform !== expectedPlatform) {
+    return { ok: false, reason: "platform_mismatch" };
+  }
+  return { ok: true };
 }
 
 /** Returns the real provider for the platform, or null if not available. */

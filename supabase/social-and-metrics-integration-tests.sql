@@ -6,6 +6,10 @@
 -- These tests verify structural properties of the functions/triggers:
 -- 1. social_connections trigger exists and is correctly configured
 -- 2. ingest_clip_metrics contains the verified_views regression guard
+-- 3. OAuth state table supports CSRF (unique state, expiry, PKCE, redirect)
+-- 4. Encrypted token columns + RLS stay fail-closed for browsers
+-- 5. last_sync_at exists (sync routes write it after verified ingest)
+-- 6. ingest_clip_metrics stays service_role-only
 --
 -- No test data is created (FK constraints prevent fake user creation).
 --
@@ -252,6 +256,227 @@ BEGIN
   v_test_id := v_test_id + 1;
   v_test_name := 'Regression guard preserves current value when new is lower';
   v_pass := v_funcdef LIKE '%ELSE%v_clip.verified_views%';
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- =========================================================================
+  -- SECTION C: OAuth state, encrypted storage, ownership & sync structure
+  -- =========================================================================
+
+  -- TEST 21: social_oauth_states.state is UNIQUE (one-time-use CSRF lookup)
+  v_test_id := v_test_id + 1;
+  v_test_name := 'social_oauth_states.state is UNIQUE';
+  v_pass := EXISTS (
+    SELECT 1 FROM pg_index i
+    JOIN pg_class t ON i.indrelid = t.oid
+    JOIN pg_namespace n ON t.relnamespace = n.oid
+    WHERE n.nspname = 'public' AND t.relname = 'social_oauth_states'
+    AND i.indisunique
+    AND pg_get_indexdef(i.indexrelid) LIKE '%(state)%'
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 22: social_oauth_states.expires_at is NOT NULL (expiry enforced)
+  v_test_id := v_test_id + 1;
+  v_test_name := 'social_oauth_states.expires_at is NOT NULL';
+  v_pass := EXISTS (
+    SELECT 1 FROM information_schema.columns c
+    WHERE c.table_schema = 'public'
+    AND c.table_name = 'social_oauth_states'
+    AND c.column_name = 'expires_at'
+    AND c.is_nullable = 'NO'
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 23: social_oauth_states has code_verifier (PKCE for YouTube)
+  v_test_id := v_test_id + 1;
+  v_test_name := 'social_oauth_states has code_verifier column';
+  v_pass := EXISTS (
+    SELECT 1 FROM information_schema.columns c
+    WHERE c.table_schema = 'public'
+    AND c.table_name = 'social_oauth_states'
+    AND c.column_name = 'code_verifier'
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 24: social_oauth_states has redirect_to (validated return path)
+  v_test_id := v_test_id + 1;
+  v_test_name := 'social_oauth_states has redirect_to column';
+  v_pass := EXISTS (
+    SELECT 1 FROM information_schema.columns c
+    WHERE c.table_schema = 'public'
+    AND c.table_name = 'social_oauth_states'
+    AND c.column_name = 'redirect_to'
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 25: social_oauth_states has NO permissive SELECT policy for browsers
+  v_test_id := v_test_id + 1;
+  v_test_name := 'social_oauth_states has no SELECT policy';
+  v_pass := NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+    AND tablename = 'social_oauth_states'
+    AND cmd = 'SELECT'
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 26: social_connections has UNIQUE constraint on social_account_id
+  -- (required for the OAuth callback upsert on conflict target)
+  v_test_id := v_test_id + 1;
+  v_test_name := 'social_connections unique on social_account_id';
+  v_pass := EXISTS (
+    SELECT 1 FROM pg_constraint con
+    JOIN pg_class t ON con.conrelid = t.oid
+    JOIN pg_namespace n ON t.relnamespace = n.oid
+    WHERE n.nspname = 'public'
+    AND t.relname = 'social_connections'
+    AND con.contype = 'u'
+    AND pg_get_constraintdef(con.oid) LIKE '%(social_account_id)%'
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 27: social_accounts has UNIQUE (user_id, platform) — one row per platform
+  v_test_id := v_test_id + 1;
+  v_test_name := 'social_accounts unique on (user_id, platform)';
+  v_pass := EXISTS (
+    SELECT 1 FROM pg_constraint con
+    JOIN pg_class t ON con.conrelid = t.oid
+    JOIN pg_namespace n ON t.relnamespace = n.oid
+    WHERE n.nspname = 'public'
+    AND t.relname = 'social_accounts'
+    AND con.contype = 'u'
+    AND pg_get_constraintdef(con.oid) LIKE '%(user_id, platform)%'
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 28: Token columns are encrypted-at-rest text columns (access/refresh)
+  v_test_id := v_test_id + 1;
+  v_test_name := 'social_connections token columns exist (access_token_enc, refresh_token_enc)';
+  v_pass :=
+    EXISTS (
+      SELECT 1 FROM information_schema.columns c
+      WHERE c.table_schema = 'public'
+      AND c.table_name = 'social_connections'
+      AND c.column_name = 'access_token_enc'
+    )
+    AND EXISTS (
+      SELECT 1 FROM information_schema.columns c
+      WHERE c.table_schema = 'public'
+      AND c.table_name = 'social_connections'
+      AND c.column_name = 'refresh_token_enc'
+    );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 29: social_connections SELECT policy denies all browser reads
+  v_test_id := v_test_id + 1;
+  v_test_name := 'social_connections SELECT policy is USING (false)';
+  v_pass := EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+    AND tablename = 'social_connections'
+    AND cmd = 'SELECT'
+    AND qual = 'false'
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 30: social_accounts.last_sync_at column exists (written by sync routes)
+  v_test_id := v_test_id + 1;
+  v_test_name := 'social_accounts.last_sync_at column exists';
+  v_pass := EXISTS (
+    SELECT 1 FROM information_schema.columns c
+    WHERE c.table_schema = 'public'
+    AND c.table_name = 'social_accounts'
+    AND c.column_name = 'last_sync_at'
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 31: ingest_clip_metrics NOT executable by anon
+  v_test_id := v_test_id + 1;
+  v_test_name := 'ingest_clip_metrics: anon cannot execute';
+  v_pass := NOT has_function_privilege(
+    'anon',
+    'public.ingest_clip_metrics(uuid,integer,integer,integer,integer,text,text)',
+    'EXECUTE'
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 32: ingest_clip_metrics IS executable by service_role
+  v_test_id := v_test_id + 1;
+  v_test_name := 'ingest_clip_metrics: service_role can execute';
+  v_pass := has_function_privilege(
+    'service_role',
+    'public.ingest_clip_metrics(uuid,integer,integer,integer,integer,text,text)',
+    'EXECUTE'
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 33: social_accounts SELECT policy scoped to own rows (RLS not weakened)
+  v_test_id := v_test_id + 1;
+  v_test_name := 'social_accounts SELECT policy scoped to auth.uid()';
+  v_pass := EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+    AND tablename = 'social_accounts'
+    AND cmd = 'SELECT'
+    AND qual LIKE '%auth.uid() = user_id%'
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 34: social_accounts.status check constraint includes connection_error
+  -- (refresh-failure path sets this status — must remain a legal value)
+  v_test_id := v_test_id + 1;
+  v_test_name := 'social_accounts status allows connection_error';
+  v_pass := EXISTS (
+    SELECT 1 FROM pg_constraint con
+    JOIN pg_class t ON con.conrelid = t.oid
+    JOIN pg_namespace n ON t.relnamespace = n.oid
+    WHERE n.nspname = 'public'
+    AND t.relname = 'social_accounts'
+    AND con.contype = 'c'
+    AND pg_get_constraintdef(con.oid) LIKE '%connection_error%'
+  );
+  v_results := v_results || jsonb_build_object(
+    'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
+  );
+
+  -- TEST 35: social_connections RLS is enabled (tokens never bypass RLS)
+  v_test_id := v_test_id + 1;
+  v_test_name := 'social_connections RLS enabled';
+  v_pass := EXISTS (
+    SELECT 1 FROM pg_class t
+    JOIN pg_namespace n ON t.relnamespace = n.oid
+    WHERE n.nspname = 'public'
+    AND t.relname = 'social_connections'
+    AND t.relrowsecurity = true
+  );
   v_results := v_results || jsonb_build_object(
     'test_id', v_test_id, 'name', v_test_name, 'PASS', v_pass
   );
