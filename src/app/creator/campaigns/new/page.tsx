@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, type ReactNode } from "react";
+import { useState, useEffect, useRef, useCallback, useId, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -100,21 +100,41 @@ function DateField({
   onChange: (v: string) => void;
   error?: string;
 }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const labelId = useId();
+
+  function handlePointerDown(e: React.PointerEvent<HTMLInputElement>) {
+    const input = e.currentTarget;
+    if (typeof input.showPicker === "function") {
+      e.preventDefault();
+      try {
+        input.showPicker();
+      } catch {
+        // Fall back to normal native behavior if showPicker cannot be invoked.
+      }
+    }
+  }
+
   return (
-    <label className="block text-sm">
-      <span className="font-medium">{label}</span>
+    <div className="block text-sm">
+      <span id={labelId} className="font-medium">
+        {label}
+      </span>
       <div className="mt-1.5">
         <div className="cursor-pointer rounded-lg border bg-background focus-within:border-foreground">
           <input
+            ref={inputRef}
             type="date"
-            className="block h-full w-full cursor-pointer border-0 bg-transparent px-3 py-2 text-sm outline-none"
+            aria-labelledby={labelId}
+            className="block w-full cursor-pointer border-0 bg-transparent px-3 py-2 text-sm outline-none"
             value={value}
             onChange={(e) => onChange(e.target.value)}
+            onPointerDown={handlePointerDown}
           />
         </div>
         {error && <p className="mt-1 text-xs text-red">{error}</p>}
       </div>
-    </label>
+    </div>
   );
 }
 
