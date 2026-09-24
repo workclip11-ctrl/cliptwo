@@ -89,6 +89,52 @@ function Field({
 const inputCls =
   "w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:border-foreground";
 
+function DateField({
+  label,
+  value,
+  onChange,
+  error,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  error?: string;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  return (
+    <label
+      className="block cursor-pointer text-sm"
+      onClick={(e) => {
+        const el = inputRef.current;
+        if (!el || e.target === el) return;
+        if (typeof el.showPicker !== "function") return;
+        // Cancel implicit label re-activation so the picker isn't toggled twice.
+        e.preventDefault();
+        el.focus();
+        try {
+          el.showPicker();
+        } catch {
+          /* showPicker may throw if the element isn't renderable */
+        }
+      }}
+    >
+      <span className="font-medium">{label}</span>
+      <div className="mt-1.5">
+        <div className="cursor-pointer rounded-lg border bg-background focus-within:border-foreground">
+          <input
+            ref={inputRef}
+            type="date"
+            className="w-full cursor-pointer border-0 bg-transparent px-3 py-2 text-sm outline-none"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+          />
+        </div>
+        {error && <p className="mt-1 text-xs text-red">{error}</p>}
+      </div>
+    </label>
+  );
+}
+
 export default function NewCampaignWizard() {
   const router = useRouter();
   const { addCampaign } = useStore();
@@ -956,28 +1002,18 @@ export default function NewCampaignWizard() {
         {/* STEP 5 — Duration */}
         {step === 4 && (
           <div className="space-y-4">
-            <Field label="Start date">
-              <input
-                type="date"
-                className={inputCls}
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-              />
-              {errors.startDate && (
-                <p className="mt-1 text-xs text-red">{errors.startDate}</p>
-              )}
-            </Field>
-            <Field label="End date">
-              <input
-                type="date"
-                className={inputCls}
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-              />
-              {errors.endDate && (
-                <p className="mt-1 text-xs text-red">{errors.endDate}</p>
-              )}
-            </Field>
+            <DateField
+              label="Start date"
+              value={startDate}
+              onChange={setStartDate}
+              error={errors.startDate}
+            />
+            <DateField
+              label="End date"
+              value={endDate}
+              onChange={setEndDate}
+              error={errors.endDate}
+            />
             <Field label="Recommended duration" hint="optional">
               <input
                 className={inputCls}

@@ -251,12 +251,23 @@ export default function AdminCreators() {
                 return (
                   <tr
                     key={p.id}
-                    className="transition-colors hover:bg-accent-soft/50"
+                    onClick={() => setSelectedId(p.id)}
+                    onKeyDown={(e) => {
+                      // Only when the row itself holds focus; inner controls
+                      // keep their native Enter/Space activation (which
+                      // bubbles up to this handler as a click).
+                      if (e.target !== e.currentTarget) return;
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setSelectedId(p.id);
+                      }
+                    }}
+                    tabIndex={0}
+                    className="cursor-pointer transition-colors hover:bg-accent-soft/50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-foreground"
                   >
                     {/* Creator */}
                     <td className="px-5 py-4">
                       <button
-                        onClick={() => setSelectedId(p.id)}
                         className="flex w-full items-center gap-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
                       >
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-soft text-[13px] font-semibold text-foreground">
