@@ -331,9 +331,13 @@ SELECT public._ingest_sec_assert(
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- L1: RLS still forbids direct verified-row insertion by a normal session.
--- Uses an explicit transaction so SET LOCAL ROLE/claims apply (RLS depends on
--- the actual session role, not on the claims GUC alone).
-BEGIN;
+-- Uses a SAVEPOINT (NOT a full ROLLBACK) so that:
+--   * SET LOCAL ROLE/claims still apply for the DO block (RLS depends on the
+--     actual session role, not on the claims GUC alone), while
+--   * rolling back only L1's statements — a bare ROLLBACK would also undo the
+--     _ingest_sec_assert / _ingest_sec_try_call definitions created earlier in
+--     the same SQL Editor script transaction, breaking tests L2-L4.
+SAVEPOINT ingest_l1;
 SET LOCAL ROLE authenticated;
 SET LOCAL request.jwt.claims = '{"sub":"e92427b0-254e-44cc-b2df-be83792c8a94","role":"authenticated"}';
 
@@ -361,7 +365,11 @@ BEGIN
   END IF;
 END $$;
 
-ROLLBACK;
+ROLLBACK TO SAVEPOINT ingest_l1;
+-- Explicit state cleanup so L2-L4 run as the original session with no
+-- residual role or claims GUC (rollback-to-savepoint already restores both).
+RESET ROLE;
+SELECT set_config('request.jwt.claims', '', false);
 
 -- L2: the insert policy is still admin-gated (service-role/RLS architecture intact)
 SELECT public._ingest_sec_assert(
