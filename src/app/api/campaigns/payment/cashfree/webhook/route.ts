@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
-
-const CASHFREE_BASE_URL = "https://sandbox.cashfree.com/pg";
-const CASHFREE_API_VERSION = "2025-01-01";
+import { CASHFREE_API_VERSION, getCashfreeConfig } from "@/lib/cashfree";
 
 const WEBHOOK_MAX_AGE_MS = 5 * 60 * 1000;
 
@@ -80,14 +78,16 @@ function isTimestampFresh(timestamp: string): { valid: boolean; reason?: string 
 }
 
 async function fetchCashfreeOrder(orderId: string): Promise<CashfreeOrderResponse | null> {
-  const appId = process.env.CASHFREE_APP_ID;
-  const secretKey = process.env.CASHFREE_SECRET_KEY;
-  if (!appId || !secretKey) {
-    console.error("[cashfree-webhook] CASHFREE_APP_ID or CASHFREE_SECRET_KEY not configured");
+  const config = getCashfreeConfig();
+  if (!config) {
+    console.error(
+      "[cashfree-webhook] Cashfree configuration invalid: CASHFREE_ENVIRONMENT/CASHFREE_APP_ID/CASHFREE_SECRET_KEY",
+    );
     return null;
   }
+  const { baseUrl, appId, secretKey } = config;
   try {
-    const response = await fetch(`${CASHFREE_BASE_URL}/orders/${orderId}`, {
+    const response = await fetch(`${baseUrl}/orders/${orderId}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -108,13 +108,11 @@ async function fetchCashfreeOrder(orderId: string): Promise<CashfreeOrderRespons
 }
 
 async function fetchCashfreePayments(orderId: string): Promise<CashfreePaymentAttempt[]> {
-  const appId = process.env.CASHFREE_APP_ID;
-  const secretKey = process.env.CASHFREE_SECRET_KEY;
-  if (!appId || !secretKey) {
-    return [];
-  }
+  const config = getCashfreeConfig();
+  if (!config) return [];
+  const { baseUrl, appId, secretKey } = config;
   try {
-    const response = await fetch(`${CASHFREE_BASE_URL}/orders/${orderId}/payments`, {
+    const response = await fetch(`${baseUrl}/orders/${orderId}/payments`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -141,11 +139,18 @@ export async function POST(request: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
   );
 
-  const secretKey = process.env.CASHFREE_SECRET_KEY;
-  if (!secretKey) {
-    console.error("[cashfree-webhook] CASHFREE_SECRET_KEY not configured");
+  // Fail closed: never process a webhook when the environment-driven
+  // configuration is missing/invalid (no silent sandbox fallback).
+  const config = getCashfreeConfig();
+  if (!config) {
+    console.error(
+      "[cashfree-webhook] Cashfree configuration invalid: CASHFREE_ENVIRONMENT must be explicitly " +
+      "'production' or 'sandbox' (production builds require 'production') and " +
+      "CASHFREE_APP_ID/CASHFREE_SECRET_KEY must be set",
+    );
     return NextResponse.json({ error: "Configuration error" }, { status: 500 });
   }
+  const { secretKey } = config;
 
   const rawBody = await request.text();
 

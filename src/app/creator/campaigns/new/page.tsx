@@ -33,7 +33,7 @@ import type {
 
 declare global {
   interface Window {
-    Cashfree?: (config: { mode: string }) => {
+    Cashfree?: (config: { mode: "production" | "sandbox" }) => {
       checkout: (options: { paymentSessionId: string }) => void;
     };
   }
@@ -425,8 +425,15 @@ export default function NewCampaignWizard() {
       if (!res.ok) throw new Error(data.error || "Failed to create payment order");
       if (!data.payment_session_id) throw new Error("Invalid response from payment gateway");
 
+      // Server-authoritative SDK environment (production/sandbox) — the
+      // backend fails closed when unconfigured, so never default to sandbox.
+      const mode = data.environment;
+      if (mode !== "production" && mode !== "sandbox") {
+        throw new Error("Invalid response from payment gateway");
+      }
+
       const cashfree = window.Cashfree({
-        mode: "sandbox",
+        mode,
       });
       cashfree.checkout({
         paymentSessionId: data.payment_session_id,

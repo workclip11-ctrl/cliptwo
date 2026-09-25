@@ -4,9 +4,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { createClient } from "@supabase/supabase-js";
 import { sanitizeError } from "@/lib/api-helpers";
 import { normalizeIndianPhone } from "@/lib/phone";
-
-const CASHFREE_BASE_URL = "https://sandbox.cashfree.com/pg";
-const CASHFREE_API_VERSION = "2025-01-01";
+import { CASHFREE_API_VERSION, getCashfreeConfig } from "@/lib/cashfree";
 
 interface CashfreeOrderResponse {
   cf_order_id: string;
@@ -23,17 +21,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const appId = process.env.CASHFREE_APP_ID;
-  const secretKey = process.env.CASHFREE_SECRET_KEY;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-
-  if (!appId || !secretKey) {
-    console.error("[cashfree] CASHFREE_APP_ID or CASHFREE_SECRET_KEY not configured");
+  // Environment-driven Cashfree configuration — fail closed when the
+  // environment is missing/invalid (no silent sandbox fallback).
+  const cashfree = getCashfreeConfig();
+  if (!cashfree) {
+    console.error(
+      "[cashfree] Payment configuration invalid: CASHFREE_ENVIRONMENT must be explicitly " +
+      "'production' or 'sandbox' (production builds require 'production') and " +
+      "CASHFREE_APP_ID/CASHFREE_SECRET_KEY must be set",
+    );
     return NextResponse.json(
       { error: "Payment gateway not configured" },
       { status: 503 },
     );
   }
+  const { baseUrl: CASHFREE_BASE_URL, appId, secretKey, environment } = cashfree;
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
 
   if (!appUrl) {
     console.error("[cashfree] NEXT_PUBLIC_APP_URL not configured");
@@ -153,6 +157,8 @@ export async function POST(request: Request) {
         currency: "INR",
         reused: true,
         attempt_number: reserveResult.attempt_number,
+        // Server-authoritative SDK mode for the browser checkout
+        environment,
       });
     }
 
@@ -196,6 +202,7 @@ export async function POST(request: Request) {
               reused: true,
               attempt_number: reserveResult.attempt_number,
               reconciled: true,
+              environment,
             });
           }
           console.error("[cashfree] Reconcile confirm error:", confirmError);
@@ -306,6 +313,8 @@ export async function POST(request: Request) {
       amount: totalPayableRupees,
       currency: "INR",
       attempt_number: reserveResult.attempt_number,
+      // Server-authoritative SDK mode for the browser checkout
+      environment,
     });
   } catch (err) {
     console.error("[cashfree] Create order exception:", err);

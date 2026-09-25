@@ -11,7 +11,7 @@ type Phase = "form" | "processing" | "polling" | "submitted" | "verified" | "rej
 
 declare global {
   interface Window {
-    Cashfree?: (config: { mode: string }) => {
+    Cashfree?: (config: { mode: "production" | "sandbox" }) => {
       checkout: (options: { paymentSessionId: string }) => void;
     };
   }
@@ -183,10 +183,17 @@ export function LaunchPaymentModal({
         throw new Error("Invalid response from payment gateway");
       }
 
+      // Server-authoritative SDK environment (production/sandbox) — the
+      // backend fails closed when unconfigured, so never default to sandbox.
+      const mode = data.environment;
+      if (mode !== "production" && mode !== "sandbox") {
+        throw new Error("Invalid response from payment gateway");
+      }
+
       setOrderAmount(data.amount ?? totalPayableRupees);
 
       const cashfree = window.Cashfree({
-        mode: "sandbox",
+        mode,
       });
 
       cashfree.checkout({

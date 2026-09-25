@@ -118,7 +118,7 @@ class InstagramProvider implements SocialProvider {
       if (process.env.NODE_ENV === "production") {
         throw new Error(
           "[social-providers] NEXT_PUBLIC_APP_URL must be set in production. " +
-            "Set it to your deployed URL (e.g., https://cliptwo.vercel.app).",
+            "Set it to your deployed URL (e.g., https://cliptwo.in).",
         );
       }
       return "http://localhost:3000/api/social/oauth/callback/instagram";
@@ -315,7 +315,7 @@ class YouTubeProvider implements SocialProvider {
       if (process.env.NODE_ENV === "production") {
         throw new Error(
           "[social-providers] NEXT_PUBLIC_APP_URL must be set in production. " +
-            "Set it to your deployed URL (e.g., https://cliptwo.vercel.app).",
+            "Set it to your deployed URL (e.g., https://cliptwo.in).",
         );
       }
       return "http://localhost:3000/api/social/oauth/callback/youtube";

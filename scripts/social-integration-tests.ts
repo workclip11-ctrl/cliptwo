@@ -18,6 +18,11 @@
 //     metric_missing_in_response / media_posted_before_business_conversion /
 //     metric_not_supported_for_media_type / api_error_<status> / network_error;
 //     never tokens, raw provider text, or response bodies)
+//   - Production-ready Cashfree configuration (environment-driven base URL,
+//     fail-closed validation, server-authoritative SDK mode, no hardcoded
+//     sandbox) + static payment-security regression checks
+//   - Auth/OAuth production audits (Supabase Google + PKCE, env-driven
+//     Instagram/YouTube callbacks, no legacy host references)
 //   - Production cron configuration (base_url = https://cliptwo.in, idempotent
 //     migration, cron URL built from app_settings at runtime, cron endpoint
 //     auth/ingest ordering — static file checks, no network)
@@ -56,6 +61,11 @@ import {
   isMetricProviderConfigured,
   verifyMetricOwnership,
 } from "../src/lib/metric-providers.ts";
+import {
+  resolveCashfreeEnvironment,
+  getCashfreeConfig,
+  CASHFREE_API_VERSION,
+} from "../src/lib/cashfree.ts";
 
 // ── Harness ────────────────────────────────────────────────────────────────
 
@@ -160,6 +170,16 @@ function sqlFilesUnder(dir: string): string[] {
     const rel = `${dir}/${entry.name}`;
     if (entry.isDirectory()) found.push(...sqlFilesUnder(rel));
     else if (entry.name.endsWith(".sql")) found.push(rel);
+  }
+  return found;
+}
+
+function filesUnder(dir: string, exts: string[]): string[] {
+  const found: string[] = [];
+  for (const entry of readdirSync(join(repoRoot, dir), { withFileTypes: true })) {
+    const rel = `${dir}/${entry.name}`;
+    if (entry.isDirectory()) found.push(...filesUnder(rel, exts));
+    else if (exts.some((e) => entry.name.endsWith(e))) found.push(rel);
   }
   return found;
 }
@@ -990,6 +1010,159 @@ async function main(): Promise<void> {
     assert.equal(results[0].metrics.views, 5);
     assert.equal(results[0].metrics.verificationStatus, "verified");
     assert.ok(results[0].postUrl.includes("instagram.com/reel/ZZZ/"));
+  });
+
+  // ── Cashfree production configuration (environment-driven, fail-closed) ──
+  await test("CASHFREE_ENVIRONMENT resolves explicitly; sandbox never implicit", () => {
+    assert.equal(resolveCashfreeEnvironment("production", "development"), "production");
+    assert.equal(resolveCashfreeEnvironment("  Production ", "development"), "production");
+    assert.equal(resolveCashfreeEnvironment("sandbox", "development"), "sandbox");
+    assert.equal(resolveCashfreeEnvironment(undefined, "development"), null, "unset must fail closed");
+    assert.equal(resolveCashfreeEnvironment("", "development"), null);
+    assert.equal(resolveCashfreeEnvironment("prod", "development"), null, "typos must fail closed");
+    assert.equal(
+      resolveCashfreeEnvironment("Sandbox", "production"),
+      null,
+      "sandbox must be rejected in production builds",
+    );
+    assert.equal(resolveCashfreeEnvironment("production", "production"), "production");
+    assert.equal(resolveCashfreeEnvironment(undefined, "production"), null, "unset in production fails closed");
+  });
+
+  await test("getCashfreeConfig: environment-driven base URL, fails closed on any gap", () => {
+    const full = { CASHFREE_APP_ID: "test-app-id", CASHFREE_SECRET_KEY: "test-secret" } as NodeJS.ProcessEnv;
+
+    const prod = getCashfreeConfig({ ...full, NODE_ENV: "production", CASHFREE_ENVIRONMENT: "production" });
+    assert.equal(prod?.baseUrl, "https://api.cashfree.com/pg");
+    assert.equal(prod?.environment, "production");
+
+    const dev = getCashfreeConfig({ ...full, NODE_ENV: "development", CASHFREE_ENVIRONMENT: "sandbox" });
+    assert.equal(dev?.baseUrl, "https://sandbox.cashfree.com/pg");
+    assert.equal(dev?.environment, "sandbox");
+
+    // Production build + explicit sandbox → null (never silent sandbox)
+    assert.equal(
+      getCashfreeConfig({ ...full, NODE_ENV: "production", CASHFREE_ENVIRONMENT: "sandbox" }),
+      null,
+    );
+    // Missing/invalid environment → null
+    assert.equal(getCashfreeConfig({ ...full, NODE_ENV: "production" }), null);
+    assert.equal(getCashfreeConfig({ ...full, NODE_ENV: "production", CASHFREE_ENVIRONMENT: "staging" }), null);
+    // Missing credentials → null
+    assert.equal(
+      getCashfreeConfig({ NODE_ENV: "production", CASHFREE_ENVIRONMENT: "production", CASHFREE_APP_ID: "i" }),
+      null,
+    );
+    assert.equal(
+      getCashfreeConfig({ NODE_ENV: "production", CASHFREE_ENVIRONMENT: "production" }),
+      null,
+    );
+    assert.equal(CASHFREE_API_VERSION, "2025-01-01", "API version must stay pinned");
+  });
+
+  await test("Cashfree routes are environment-driven (no hardcoded base URL)", () => {
+    const routes = [
+      "src/app/api/campaigns/payment/cashfree/create-order/route.ts",
+      "src/app/api/campaigns/payment/cashfree/webhook/route.ts",
+    ];
+    for (const f of routes) {
+      const src = readRepo(f);
+      assert.ok(!src.includes("sandbox.cashfree.com"), `${f}: must not hardcode sandbox URL`);
+      assert.ok(!src.includes("https://api.cashfree.com"), `${f}: base URL must come from lib/cashfree`);
+      assert.ok(src.includes("getCashfreeConfig()"), `${f}: must use env-driven config`);
+      assert.ok(src.includes("CASHFREE_API_VERSION"), `${f}: must pin API version`);
+    }
+  });
+
+  await test("sandbox.cashfree.com appears only in lib/cashfree.ts (src-wide)", () => {
+    const files = filesUnder("src", [".ts", ".tsx"]);
+    assert.ok(files.length > 20, `expected many src files, got ${files.length}`);
+    const offenders = files.filter((f) => readRepo(f).includes("sandbox.cashfree.com"));
+    assert.deepEqual(
+      offenders,
+      ["src/lib/cashfree.ts"],
+      `sandbox URL must only exist in the config module, found: ${offenders.join(", ")}`,
+    );
+  });
+
+  await test("create-order returns server-authoritative environment; frontend uses it", () => {
+    const createOrder = readRepo("src/app/api/campaigns/payment/cashfree/create-order/route.ts");
+    assert.ok(createOrder.includes("environment,"), "create-order must include environment in responses");
+    assert.ok(createOrder.includes("status: 503"), "create-order must fail closed with 503 when misconfigured");
+
+    const frontends = [
+      "src/components/LaunchPaymentModal.tsx",
+      "src/app/creator/campaigns/new/page.tsx",
+    ];
+    for (const f of frontends) {
+      const src = readRepo(f);
+      assert.ok(!src.includes('mode: "sandbox"'), `${f}: hardcoded sandbox mode must be gone`);
+      assert.ok(src.includes("data.environment"), `${f}: SDK mode must come from server response`);
+      assert.ok(
+        src.includes('mode !== "production" && mode !== "sandbox"'),
+        `${f}: invalid environment must fail closed`,
+      );
+    }
+  });
+
+  await test("webhook keeps authoritative verification and fails closed on bad config", () => {
+    const src = readRepo("src/app/api/campaigns/payment/cashfree/webhook/route.ts");
+    assert.ok(src.includes("getCashfreeConfig()"), "webhook must use env-driven config");
+    assert.ok(src.includes("Configuration error"), "webhook must reject when misconfigured");
+    assert.ok(src.includes("status: 500"), "misconfigured webhook must not process");
+    assert.ok(src.includes("x-webhook-signature"), "signature header verification");
+    assert.ok(src.includes("x-webhook-timestamp"), "timestamp header verification");
+    assert.ok(src.includes("timingSafeEqual"), "constant-time signature compare");
+    assert.ok(src.includes("isTimestampFresh"), "signature freshness window");
+    assert.ok(src.includes('order_status !== "PAID"'), "authoritative PAID check");
+    assert.ok(src.includes('payment_currency !== "INR"'), "INR currency check");
+    assert.ok(src.includes("verify_cashfree_webhook"), "atomic verification RPC");
+  });
+
+  await test("payment security controls unchanged (static regression)", () => {
+    const createOrder = readRepo("src/app/api/campaigns/payment/cashfree/create-order/route.ts");
+    assert.ok(createOrder.includes('campaign.status !== "draft"'), "orders only for draft campaigns");
+    assert.ok(createOrder.includes('profile.role !== "creator"'), "creator-only order creation");
+    assert.ok(createOrder.includes('.eq("created_by", user.id)'), "campaign ownership validation");
+    assert.ok(createOrder.includes("* 0.1"), "10% platform fee preserved");
+    assert.ok(createOrder.includes('order_currency: "INR"'), "INR currency");
+    assert.ok(createOrder.includes("x-idempotency-key"), "idempotency key preserved");
+    assert.ok(createOrder.includes("reserve_cashfree_payment_attempt"), "reservation RPC preserved");
+    assert.ok(createOrder.includes("release_cashfree_payment_reservation"), "reservation release preserved");
+    assert.ok(createOrder.includes("normalizeIndianPhone"), "phone validation preserved");
+  });
+
+  await test("auth audit: Supabase Google OAuth with PKCE, no hardcoded Google endpoints", () => {
+    const auth = readRepo("src/lib/auth.tsx");
+    assert.ok(auth.includes('provider: "google"'), "must use Supabase signInWithOAuth Google");
+    assert.ok(auth.includes("signInWithOAuth"), "must use Supabase Auth, not custom OAuth");
+    assert.ok(!auth.includes("accounts.google.com"), "no hardcoded Google OAuth endpoints");
+    const client = readRepo("src/lib/supabase/client.ts");
+    assert.ok(client.includes('flowType: "pkce"'), "PKCE flow required");
+    const callback = readRepo("src/app/auth/callback/route.ts");
+    assert.ok(callback.includes("intent"), "OAuth onboarding intent handoff preserved");
+  });
+
+  await test("social OAuth: env-driven callbacks, no retired host, prod fail-closed", () => {
+    const src = readRepo("src/lib/social-providers.ts");
+    assert.ok(!src.includes("cliptwo.vercel.app"), "no retired host reference");
+    assert.ok(src.includes("https://cliptwo.in"), "error guidance must point at production domain");
+    assert.ok(
+      src.includes('process.env.NODE_ENV === "production"'),
+      "must throw in production when NEXT_PUBLIC_APP_URL is unset (no localhost fallback)",
+    );
+    assert.ok(
+      src.includes("http://localhost:3000/api/social/oauth/callback/instagram"),
+      "localhost fallback must remain development-only",
+    );
+  });
+
+  await test("no mock/manual metric source is produced by app code (earnings integrity)", () => {
+    const files = filesUnder("src", [".ts", ".tsx"]);
+    const offenders = files.filter((f) =>
+      /source:\s*["'](mock|manual|admin_override)["']/.test(readRepo(f)),
+    );
+    assert.deepEqual(offenders, [], `non-platform metric source produced in: ${offenders.join(", ")}`);
   });
 
   // ── Production cron configuration (base_url regression) ──────────────────
