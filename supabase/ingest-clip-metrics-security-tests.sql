@@ -331,21 +331,56 @@ SELECT public._ingest_sec_assert(
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- L1: RLS still forbids direct verified-row insertion by a normal session.
--- Uses a SAVEPOINT (NOT a full ROLLBACK) so that:
---   * SET LOCAL ROLE/claims still apply for the DO block (RLS depends on the
---     actual session role, not on the claims GUC alone), while
---   * rolling back only L1's statements — a bare ROLLBACK would also undo the
---     _ingest_sec_assert / _ingest_sec_try_call definitions created earlier in
---     the same SQL Editor script transaction, breaking tests L2-L4.
-SAVEPOINT ingest_l1;
-SET LOCAL ROLE authenticated;
-SET LOCAL request.jwt.claims = '{"sub":"e92427b0-254e-44cc-b2df-be83792c8a94","role":"authenticated"}';
+-- NO transaction-control statements are used anywhere in this file because:
+--   * Supabase SQL Editor runs the script in autocommit mode — the 25P01 error
+--     ("... only be used in transaction blocks") rules out nested transaction
+--     control here, and
+--   * any transaction abort would destroy the _ingest_sec_assert /
+--     _ingest_sec_try_call definitions that tests L2-L4 depend on.
+-- Session-scoped switching only, explicitly restored after the DO block:
+--   SET ROLE authenticated                 (session role → RESET ROLE)
+--   set_config(..., is_local => false)     (session GUC → cleared below)
+-- RLS depends on the actual session role (not only on the claims GUC), so the
+-- role must really become "authenticated" for the duration of the INSERT test.
+--
+-- Point 6: if the role switch cannot take effect, L1 reports an explicit test
+-- failure — it is never silently skipped (precondition check + in-block guard).
+
+-- Precondition: report the failure BEFORE attempting the switch (the switch
+-- itself would raise a hard error in an environment lacking this role).
+-- Historical note: earlier revisions drove the RLS attempt with
+-- SET LOCAL ROLE authenticated inside an explicit transaction block; that is
+-- incompatible with SQL Editor autocommit mode (25P01, and a later abort would
+-- also drop the helper definitions), so L1 now uses session-scoped SET ROLE.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    RAISE WARNING 'FAIL: L1 precondition — role "authenticated" does not exist; SET ROLE cannot succeed in this environment (L1 is not silently skipped)';
+  END IF;
+END $$;
+
+SET ROLE authenticated;
+
+SELECT set_config(
+  'request.jwt.claims',
+  '{"sub":"e92427b0-254e-44cc-b2df-be83792c8a94","role":"authenticated"}',
+  false
+);
 
 DO $$
 DECLARE
   v_err text;
   v_ok boolean;
 BEGIN
+  -- Role guard: never emit PASS unless we are actually running as the
+  -- authenticated role (protects against runners that continue after a failed
+  -- SET ROLE, where the INSERT would otherwise hit the table as the script's
+  -- default role and produce a misleading constraint error).
+  IF current_user <> 'authenticated' THEN
+    RAISE WARNING 'FAIL: L1 ran as role "%" instead of "authenticated" — SET ROLE did not take effect, L1 not executed', current_user;
+    RETURN;
+  END IF;
+
   BEGIN
     INSERT INTO public.clip_metrics (clip_id, campaign_id, platform, views, likes, comments, shares, source, verification_status)
     VALUES (
@@ -365,10 +400,10 @@ BEGIN
   END IF;
 END $$;
 
-ROLLBACK TO SAVEPOINT ingest_l1;
--- Explicit state cleanup so L2-L4 run as the original session with no
--- residual role or claims GUC (rollback-to-savepoint already restores both).
+-- Session/role/GUC cleanup so L2-L4 run as the original session with no
+-- residual role or claims GUC.
 RESET ROLE;
+
 SELECT set_config('request.jwt.claims', '', false);
 
 -- L2: the insert policy is still admin-gated (service-role/RLS architecture intact)
