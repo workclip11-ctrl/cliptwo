@@ -19,8 +19,9 @@
 --   I  direct admin session: mock/manual/admin_override retained for investigations
 --   J  fail-closed: malformed / role-less JWT claims are denied
 --   K  privilege model: service_role only, internal guard present in the body
---   L  no unauthorized verified-metrics path (RLS insert, immutability,
---      regression guard, SECURITY DEFINER + search_path, finalize preserved)
+--   L  no unauthorized verified-metrics path (INSERT privilege + admin-gated
+--      RLS, immutability, regression guard, SECURITY DEFINER + search_path,
+--      finalize preserved)
 --
 -- HOW TO RUN (Supabase SQL Editor, after applying migration 000010):
 --   1. Execute this entire file.
@@ -92,71 +93,9 @@ BEGIN
 END;
 $$;
 
--- L1-only test helper: performs the authenticated-role direct-INSERT test
--- entirely INSIDE the function so the main SQL Editor session never changes
--- role across tests A-L. The role switch uses the actual PostgreSQL role
--- command via dynamic SQL: EXECUTE 'SET LOCAL ROLE authenticated'.
--- SET LOCAL is transaction-local — the SQL Editor runs this call inside its
--- statement transaction, so the role automatically reverts when the statement
--- completes (no explicit restore, and NO request.jwt.claims GUC for L1:
--- RLS uses the database session role, so the real authenticated role is what
--- must be exercised). Reports PASS/FAIL itself.
-CREATE OR REPLACE FUNCTION public._ingest_sec_test_l1_authenticated_insert()
-RETURNS void
-LANGUAGE plpgsql
-AS $$
-DECLARE
-  v_role text;
-  v_err  text;
-BEGIN
-  -- Actual PostgreSQL role command, transaction-local.
-  BEGIN
-    EXECUTE 'SET LOCAL ROLE authenticated';
-  EXCEPTION WHEN OTHERS THEN
-    RAISE WARNING 'FAIL: L1 could not assume database role "authenticated" (%) — L1 reported here, not silently skipped', SQLERRM;
-    RETURN;
-  END;
-
-  -- Immediately verify the actual database role took effect.
-  SELECT current_user INTO v_role;
-  IF v_role <> 'authenticated' THEN
-    RAISE WARNING 'FAIL: L1 ran as database role "%" instead of "authenticated" — role switch did not take effect', v_role;
-    RETURN;
-  END IF;
-
-  -- Exact L1 INSERT attempt (unchanged values).
-  BEGIN
-    INSERT INTO public.clip_metrics
-      (clip_id, campaign_id, platform, views, likes, comments, shares, source, verification_status)
-    VALUES
-      (
-        'ffffffff-ffff-4fff-8fff-ffffffffffff',
-        'ffffffff-ffff-4fff-8fff-ffffffffffff',
-        'instagram',
-        99999,
-        0,
-        0,
-        0,
-        'platform_api',
-        'verified'
-      );
-    v_err := 'OK';
-  EXCEPTION WHEN OTHERS THEN
-    v_err := SQLERRM;
-  END;
-
-  IF v_err = 'OK' THEN
-    RAISE WARNING 'FAIL: L1 authenticated direct INSERT of verified clip_metrics row was ALLOWED';
-  ELSE
-    RAISE NOTICE 'PASS: L1 authenticated direct INSERT of verified clip_metrics row blocked (%)', v_err;
-  END IF;
-END;
-$$;
-
 -- Test helpers are for the SQL Editor session only
 REVOKE EXECUTE ON FUNCTION public._ingest_sec_assert(text, boolean, text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public._ingest_sec_try_call(text, text, text) FROM PUBLIC, anon, authenticated;
-REVOKE EXECUTE ON FUNCTION public._ingest_sec_test_l1_authenticated_insert() FROM PUBLIC, anon, authenticated;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- A. anon cannot invoke ingest_clip_metrics (privilege + internal guard)
@@ -392,22 +331,62 @@ SELECT public._ingest_sec_assert(
 -- L. no unauthorized verified-metrics path
 -- ─────────────────────────────────────────────────────────────────────────────
 
--- L1: RLS still forbids direct verified-row insertion by a normal session.
--- The main SQL Editor session NEVER changes role across tests A-L: the switch
--- to the real `authenticated` DATABASE ROLE happens inside the test-only
--- helper _ingest_sec_test_l1_authenticated_insert() via
--- EXECUTE 'SET LOCAL ROLE authenticated', which is transaction-local and
--- automatically reverts when the statement completes. No JWT claims GUC
--- stand-in is used for L1 — RLS is exercised by the actual database role,
--- which attempts the exact INSERT
--- (clip_id/campaign_id ffffffff-…-ffffffffffff, platform instagram, views 99999,
--- source platform_api, verification_status verified).
--- No transaction-control statements are used anywhere in this file: SQL Editor
--- autocommit rules out nested transaction control (25P01), and any transaction
--- abort would destroy the helper definitions that L2-L4 depend on. If the role
--- switch itself cannot take effect, the helper reports an explicit
--- "FAIL: L1 …" — the test is never silently skipped.
-SELECT public._ingest_sec_test_l1_authenticated_insert();
+-- L1: a normal authenticated user must NOT be able to directly INSERT
+-- verification_status = 'verified' rows into public.clip_metrics.
+--
+-- This test does NOT change the SQL Editor session identity and uses no
+-- transaction control. Earlier revisions simulated the attempt with
+-- SET LOCAL ROLE authenticated inside a helper, but the SQL Editor's
+-- transaction/session behavior cannot be assumed: BEGIN/ROLLBACK rolled back
+-- the helpers defined at the top of this file, and SAVEPOINT failed with
+-- 25P01 outside a transaction block. Because this execution context cannot
+-- genuinely simulate an authenticated PostgREST role without changing the
+-- session role, L1 asserts the DEPLOYED SECURITY BOUNDARY instead of
+-- pretending to perform an authenticated INSERT:
+--   1. privilege boundary — authenticated holds no table-level INSERT grant
+--      on clip_metrics, OR
+--   2. policy boundary — RLS is enabled on clip_metrics, authenticated is
+--      neither the table owner nor a BYPASSRLS role, at least one
+--      INSERT-permitting policy is admin-gated via public.is_admin(), and no
+--      INSERT-permitting policy exists that ordinary users could satisfy.
+-- Either branch independently proves an ordinary authenticated session cannot
+-- write a verified snapshot; a failure of both prints "FAIL: L1 …".
+SELECT public._ingest_sec_assert(
+  'L1: authenticated cannot directly INSERT verified clip_metrics (no INSERT privilege, else admin-gated RLS)'::text,
+  (
+    NOT has_table_privilege('authenticated', 'public.clip_metrics', 'INSERT')
+  )
+  OR (
+    EXISTS (
+      SELECT 1 FROM pg_class t
+      JOIN pg_namespace n ON n.oid = t.relnamespace
+      WHERE n.nspname = 'public'
+        AND t.relname = 'clip_metrics'
+        AND t.relrowsecurity = true
+        AND pg_get_userbyid(t.relowner) <> 'authenticated'
+    )
+    AND EXISTS (
+      SELECT 1 FROM pg_policies p
+      WHERE p.schemaname = 'public'
+        AND p.tablename = 'clip_metrics'
+        AND p.cmd = 'INSERT'
+        AND p.with_check LIKE '%is_admin%'
+        AND p.roles && ARRAY['public', 'authenticated']::name[]
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM pg_policies p
+      WHERE p.schemaname = 'public'
+        AND p.tablename = 'clip_metrics'
+        AND p.cmd IN ('INSERT', 'ALL')
+        AND coalesce(p.with_check, '') NOT LIKE '%is_admin%'
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM pg_roles r
+      WHERE r.rolname = 'authenticated' AND r.rolbypassrls
+    )
+  ),
+  'privilege or RLS boundary weakened — ordinary sessions could write verified metric snapshots'::text
+);
 
 -- L2: the insert policy is still admin-gated (service-role/RLS architecture intact)
 SELECT public._ingest_sec_assert(
@@ -463,5 +442,4 @@ SELECT public._ingest_sec_assert(
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP FUNCTION IF EXISTS public._ingest_sec_try_call(text, text, text);
-DROP FUNCTION IF EXISTS public._ingest_sec_test_l1_authenticated_insert();
 DROP FUNCTION IF EXISTS public._ingest_sec_assert(text, boolean, text);
