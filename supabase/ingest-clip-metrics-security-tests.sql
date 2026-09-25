@@ -92,9 +92,88 @@ BEGIN
 END;
 $$;
 
+-- L1-only test helper: performs the authenticated-role direct-INSERT test
+-- entirely INSIDE the function so the main SQL Editor session never changes
+-- role across tests A-L. It switches to the REAL `authenticated` database
+-- role (not a JWT claims GUC — RLS must be exercised by the actual role),
+-- attempts the exact L1 INSERT, restores the original role on every path
+-- before returning, and reports PASS/FAIL itself.
+--   * transaction-local mode = set_config('role', ..., true) — the equivalent
+--     of SET LOCAL ROLE authenticated, used when a valid transaction context
+--     exists (auto-restores at transaction end as an extra safety net);
+--   * session-scoped mode    = set_config('role', ..., false), the safe
+--     fallback when no valid transaction context exists (SQL Editor
+--     autocommit), restored explicitly before this function returns.
+CREATE OR REPLACE FUNCTION public._ingest_sec_test_l1_authenticated_insert()
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_orig  text := current_user;
+  v_mode  text := 'session';
+  v_role  text;
+  v_err   text;
+BEGIN
+  -- Assume the real authenticated database role (preferred: transaction-local).
+  BEGIN
+    PERFORM set_config('role', 'authenticated', true);
+    v_mode := 'local';
+  EXCEPTION WHEN OTHERS THEN
+    -- Fallback: session-scoped switch (no valid transaction context).
+    BEGIN
+      PERFORM set_config('role', 'authenticated', false);
+      v_mode := 'session';
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'FAIL: L1 could not assume database role "authenticated" (%) — L1 reported here, not silently skipped', SQLERRM;
+      RETURN;
+    END;
+  END;
+
+  -- Verify the ACTUAL database role changed (point: real role, not claims GUC).
+  SELECT current_user INTO v_role;
+  IF v_role <> 'authenticated' THEN
+    IF v_mode = 'local' THEN
+      PERFORM set_config('role', v_orig, true);
+    ELSE
+      PERFORM set_config('role', v_orig, false);
+    END IF;
+    RAISE WARNING 'FAIL: L1 ran as database role "%" instead of "authenticated" — role switch did not take effect, L1 not executed', v_role;
+    RETURN;
+  END IF;
+
+  -- Exact L1 INSERT attempt (unchanged values).
+  BEGIN
+    INSERT INTO public.clip_metrics (clip_id, campaign_id, platform, views, likes, comments, shares, source, verification_status)
+    VALUES (
+      'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      'instagram', 99999, 0, 0, 0, 'platform_api', 'verified'
+    );
+    v_err := 'OK';
+  EXCEPTION WHEN OTHERS THEN
+    v_err := SQLERRM;
+  END;
+
+  -- Restore the original database role (mode-matched) BEFORE reporting, so the
+  -- session returns to L2-L4 in its original role no matter what happened.
+  IF v_mode = 'local' THEN
+    PERFORM set_config('role', v_orig, true);
+  ELSE
+    PERFORM set_config('role', v_orig, false);
+  END IF;
+
+  IF v_err = 'OK' THEN
+    RAISE WARNING 'FAIL: L1 authenticated direct INSERT of verified clip_metrics row was ALLOWED';
+  ELSE
+    RAISE NOTICE 'PASS: L1 authenticated direct INSERT of verified clip_metrics row blocked (%)', v_err;
+  END IF;
+END;
+$$;
+
 -- Test helpers are for the SQL Editor session only
 REVOKE EXECUTE ON FUNCTION public._ingest_sec_assert(text, boolean, text) FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public._ingest_sec_try_call(text, text, text) FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public._ingest_sec_test_l1_authenticated_insert() FROM PUBLIC, anon, authenticated;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- A. anon cannot invoke ingest_clip_metrics (privilege + internal guard)
@@ -331,80 +410,19 @@ SELECT public._ingest_sec_assert(
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- L1: RLS still forbids direct verified-row insertion by a normal session.
--- NO transaction-control statements are used anywhere in this file because:
---   * Supabase SQL Editor runs the script in autocommit mode — the 25P01 error
---     ("... only be used in transaction blocks") rules out nested transaction
---     control here, and
---   * any transaction abort would destroy the _ingest_sec_assert /
---     _ingest_sec_try_call definitions that tests L2-L4 depend on.
--- Session-scoped switching only, explicitly restored after the DO block:
---   SET ROLE authenticated                 (session role → RESET ROLE)
---   set_config(..., is_local => false)     (session GUC → cleared below)
--- RLS depends on the actual session role (not only on the claims GUC), so the
--- role must really become "authenticated" for the duration of the INSERT test.
---
--- Point 6: if the role switch cannot take effect, L1 reports an explicit test
--- failure — it is never silently skipped (precondition check + in-block guard).
-
--- Precondition: report the failure BEFORE attempting the switch (the switch
--- itself would raise a hard error in an environment lacking this role).
--- Historical note: earlier revisions drove the RLS attempt with
--- SET LOCAL ROLE authenticated inside an explicit transaction block; that is
--- incompatible with SQL Editor autocommit mode (25P01, and a later abort would
--- also drop the helper definitions), so L1 now uses session-scoped SET ROLE.
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
-    RAISE WARNING 'FAIL: L1 precondition — role "authenticated" does not exist; SET ROLE cannot succeed in this environment (L1 is not silently skipped)';
-  END IF;
-END $$;
-
-SET ROLE authenticated;
-
-SELECT set_config(
-  'request.jwt.claims',
-  '{"sub":"e92427b0-254e-44cc-b2df-be83792c8a94","role":"authenticated"}',
-  false
-);
-
-DO $$
-DECLARE
-  v_err text;
-  v_ok boolean;
-BEGIN
-  -- Role guard: never emit PASS unless we are actually running as the
-  -- authenticated role (protects against runners that continue after a failed
-  -- SET ROLE, where the INSERT would otherwise hit the table as the script's
-  -- default role and produce a misleading constraint error).
-  IF current_user <> 'authenticated' THEN
-    RAISE WARNING 'FAIL: L1 ran as role "%" instead of "authenticated" — SET ROLE did not take effect, L1 not executed', current_user;
-    RETURN;
-  END IF;
-
-  BEGIN
-    INSERT INTO public.clip_metrics (clip_id, campaign_id, platform, views, likes, comments, shares, source, verification_status)
-    VALUES (
-      'ffffffff-ffff-4fff-8fff-ffffffffffff',
-      'ffffffff-ffff-4fff-8fff-ffffffffffff',
-      'instagram', 99999, 0, 0, 0, 'platform_api', 'verified'
-    );
-    v_err := 'OK';
-  EXCEPTION WHEN OTHERS THEN
-    v_err := SQLERRM;
-  END;
-  v_ok := v_err <> 'OK';
-  IF v_ok THEN
-    RAISE NOTICE 'PASS: L1 authenticated direct INSERT of verified clip_metrics row blocked (%)', v_err;
-  ELSE
-    RAISE WARNING 'FAIL: L1 authenticated direct INSERT of verified clip_metrics row was ALLOWED';
-  END IF;
-END $$;
-
--- Session/role/GUC cleanup so L2-L4 run as the original session with no
--- residual role or claims GUC.
-RESET ROLE;
-
-SELECT set_config('request.jwt.claims', '', false);
+-- The main SQL Editor session NEVER changes role across tests A-L: the switch
+-- to the real `authenticated` DATABASE ROLE happens inside the test-only
+-- helper _ingest_sec_test_l1_authenticated_insert() and is restored before it
+-- returns. No JWT claims GUC stand-in is used for L1 — RLS is exercised by the
+-- actual database role, which attempts the exact INSERT
+-- (clip_id/campaign_id ffffffff-…-ffffffffffff, platform instagram, views 99999,
+-- source platform_api, verification_status verified).
+-- No transaction-control statements are used anywhere in this file: SQL Editor
+-- autocommit rules out nested transaction control (25P01), and any transaction
+-- abort would destroy the helper definitions that L2-L4 depend on. If the role
+-- switch itself cannot take effect, the helper reports an explicit
+-- "FAIL: L1 …" — the test is never silently skipped.
+SELECT public._ingest_sec_test_l1_authenticated_insert();
 
 -- L2: the insert policy is still admin-gated (service-role/RLS architecture intact)
 SELECT public._ingest_sec_assert(
@@ -460,4 +478,5 @@ SELECT public._ingest_sec_assert(
 -- ─────────────────────────────────────────────────────────────────────────────
 
 DROP FUNCTION IF EXISTS public._ingest_sec_try_call(text, text, text);
+DROP FUNCTION IF EXISTS public._ingest_sec_test_l1_authenticated_insert();
 DROP FUNCTION IF EXISTS public._ingest_sec_assert(text, boolean, text);
