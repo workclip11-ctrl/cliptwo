@@ -30,6 +30,11 @@
 --      (FK constraints) and no clip/campaign fixture rows are written — the
 --      data path is proven up to the "Clip not found" boundary.
 --
+-- TYPE RESOLUTION NOTE: every call to public._ingest_sec_assert(...) casts its
+-- string-literal arguments with ::text so the call always resolves to the one
+-- deterministic signature _ingest_sec_assert(text, boolean, text) — never to
+-- untyped (unknown, boolean, unknown) literals (PostgreSQL error 42883).
+--
 -- NOT EXECUTED AUTOMATICALLY AND NOT RUN AGAINST PRODUCTION.
 -- =============================================================================
 
@@ -96,15 +101,15 @@ REVOKE EXECUTE ON FUNCTION public._ingest_sec_try_call(text, text, text) FROM PU
 -- ─────────────────────────────────────────────────────────────────────────────
 
 SELECT public._ingest_sec_assert(
-  'A1: anon has no EXECUTE on ingest_clip_metrics',
+  'A1: anon has no EXECUTE on ingest_clip_metrics'::text,
   NOT has_function_privilege('anon', 'public.ingest_clip_metrics(uuid,integer,integer,integer,integer,text,text)', 'EXECUTE'),
-  'anon holds EXECUTE — the public RPC hole is re-opened (apply migration 000010)'
+  'anon holds EXECUTE — the public RPC hole is re-opened (apply migration 000010)'::text
 );
 
 SELECT public._ingest_sec_assert(
-  'A2: internal guard denies anon JWT (defense-in-depth)',
+  'A2: internal guard denies anon JWT (defense-in-depth)'::text,
   r like '%denied for JWT role "anon"%',
-  'internal guard must deny even if EXECUTE were re-granted; got: ' || r
+  ('internal guard must deny even if EXECUTE were re-granted; got: ' || r)::text
 )
 FROM (SELECT public._ingest_sec_try_call('{"role":"anon"}', 'platform_api', 'verified') AS r) s;
 
@@ -113,15 +118,15 @@ FROM (SELECT public._ingest_sec_try_call('{"role":"anon"}', 'platform_api', 'ver
 -- ─────────────────────────────────────────────────────────────────────────────
 
 SELECT public._ingest_sec_assert(
-  'B1: authenticated (Creator) has no EXECUTE on ingest_clip_metrics',
+  'B1: authenticated (Creator) has no EXECUTE on ingest_clip_metrics'::text,
   NOT has_function_privilege('authenticated', 'public.ingest_clip_metrics(uuid,integer,integer,integer,integer,text,text)', 'EXECUTE'),
-  'authenticated holds EXECUTE — any Creator could call the RPC directly'
+  'authenticated holds EXECUTE — any Creator could call the RPC directly'::text
 );
 
 SELECT public._ingest_sec_assert(
-  'B2: internal guard denies authenticated Creator JWT',
+  'B2: internal guard denies authenticated Creator JWT'::text,
   r like '%denied for JWT role "authenticated"%',
-  'Creator session must never reach the ingest body; got: ' || r
+  ('Creator session must never reach the ingest body; got: ' || r)::text
 )
 FROM (
   SELECT public._ingest_sec_try_call(
@@ -134,9 +139,9 @@ FROM (
 -- ─────────────────────────────────────────────────────────────────────────────
 
 SELECT public._ingest_sec_assert(
-  'C1: internal guard denies authenticated Clipper JWT',
+  'C1: internal guard denies authenticated Clipper JWT'::text,
   r like '%denied for JWT role "authenticated"%',
-  'Clipper session must never reach the ingest body; got: ' || r
+  ('Clipper session must never reach the ingest body; got: ' || r)::text
 )
 FROM (
   SELECT public._ingest_sec_try_call(
@@ -145,9 +150,9 @@ FROM (
 ) s;
 
 SELECT public._ingest_sec_assert(
-  'C2: Clipper has no EXECUTE on ingest_clip_metrics',
+  'C2: Clipper has no EXECUTE on ingest_clip_metrics'::text,
   NOT has_function_privilege('authenticated', 'public.ingest_clip_metrics(uuid,integer,integer,integer,integer,text,text)', 'EXECUTE'),
-  'same role as B1 — asserted per identity for the audit trail'
+  'same role as B1 — asserted per identity for the audit trail'::text
 );
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -155,23 +160,23 @@ SELECT public._ingest_sec_assert(
 -- ─────────────────────────────────────────────────────────────────────────────
 
 SELECT public._ingest_sec_assert(
-  'D1: authenticated + source "mock" denied',
+  'D1: authenticated + source "mock" denied'::text,
   r like '%denied for JWT role "authenticated"%',
-  'got: ' || r
+  ('got: ' || r)::text
 )
 FROM (SELECT public._ingest_sec_try_call('{"role":"authenticated"}', 'mock', 'verified') AS r) s;
 
 SELECT public._ingest_sec_assert(
-  'D2: authenticated + source "manual" denied',
+  'D2: authenticated + source "manual" denied'::text,
   r like '%denied for JWT role "authenticated"%',
-  'got: ' || r
+  ('got: ' || r)::text
 )
 FROM (SELECT public._ingest_sec_try_call('{"role":"authenticated"}', 'manual', 'verified') AS r) s;
 
 SELECT public._ingest_sec_assert(
-  'D3: authenticated + source "admin_override" denied',
+  'D3: authenticated + source "admin_override" denied'::text,
   r like '%denied for JWT role "authenticated"%',
-  'got: ' || r
+  ('got: ' || r)::text
 )
 FROM (SELECT public._ingest_sec_try_call('{"role":"authenticated"}', 'admin_override', 'verified') AS r) s;
 
@@ -180,16 +185,16 @@ FROM (SELECT public._ingest_sec_try_call('{"role":"authenticated"}', 'admin_over
 -- ─────────────────────────────────────────────────────────────────────────────
 
 SELECT public._ingest_sec_assert(
-  'E1: authenticated cannot ingest verification_status="verified"',
+  'E1: authenticated cannot ingest verification_status="verified"'::text,
   r like '%denied for JWT role "authenticated"%',
-  'verified metrics must be unreachable for ordinary sessions; got: ' || r
+  ('verified metrics must be unreachable for ordinary sessions; got: ' || r)::text
 )
 FROM (SELECT public._ingest_sec_try_call('{"role":"authenticated"}', 'platform_api', 'verified') AS r) s;
 
 SELECT public._ingest_sec_assert(
-  'E2: authenticated denied for "pending" too (no status reaches the body)',
+  'E2: authenticated denied for "pending" too (no status reaches the body)'::text,
   r like '%denied for JWT role "authenticated"%',
-  'got: ' || r
+  ('got: ' || r)::text
 )
 FROM (SELECT public._ingest_sec_try_call('{"role":"authenticated"}', 'platform_api', 'pending') AS r) s;
 
@@ -198,23 +203,23 @@ FROM (SELECT public._ingest_sec_try_call('{"role":"authenticated"}', 'platform_a
 -- ─────────────────────────────────────────────────────────────────────────────
 
 SELECT public._ingest_sec_assert(
-  'F1: service_role + source "mock" rejected (platform_api-only backend)',
+  'F1: service_role + source "mock" rejected (platform_api-only backend)'::text,
   r like '%backend path allows source "platform_api" only%',
-  'test-only source must be unreachable through server API workflows; got: ' || r
+  ('test-only source must be unreachable through server API workflows; got: ' || r)::text
 )
 FROM (SELECT public._ingest_sec_try_call('{"role":"service_role"}', 'mock', 'verified') AS r) s;
 
 SELECT public._ingest_sec_assert(
-  'F2: service_role + source "manual" rejected',
+  'F2: service_role + source "manual" rejected'::text,
   r like '%backend path allows source "platform_api" only%',
-  'got: ' || r
+  ('got: ' || r)::text
 )
 FROM (SELECT public._ingest_sec_try_call('{"role":"service_role"}', 'manual', 'verified') AS r) s;
 
 SELECT public._ingest_sec_assert(
-  'F3: service_role + source "admin_override" rejected',
+  'F3: service_role + source "admin_override" rejected'::text,
   r like '%backend path allows source "platform_api" only%',
-  'admin overrides must go through direct admin sessions, not the API path; got: ' || r
+  ('admin overrides must go through direct admin sessions, not the API path; got: ' || r)::text
 )
 FROM (SELECT public._ingest_sec_try_call('{"role":"service_role"}', 'admin_override', 'verified') AS r) s;
 
@@ -223,16 +228,16 @@ FROM (SELECT public._ingest_sec_try_call('{"role":"service_role"}', 'admin_overr
 -- ─────────────────────────────────────────────────────────────────────────────
 
 SELECT public._ingest_sec_assert(
-  'G1: service_role + platform_api + verified passes authorization',
+  'G1: service_role + platform_api + verified passes authorization'::text,
   r like 'Clip not found: %',
-  'expected data-boundary error (authz + source tier passed); got: ' || r
+  ('expected data-boundary error (authz + source tier passed); got: ' || r)::text
 )
 FROM (SELECT public._ingest_sec_try_call('{"role":"service_role"}', 'platform_api', 'verified') AS r) s;
 
 SELECT public._ingest_sec_assert(
-  'G2: service_role + platform_api + pending also passes authorization',
+  'G2: service_role + platform_api + pending also passes authorization'::text,
   r like 'Clip not found: %',
-  'got: ' || r
+  ('got: ' || r)::text
 )
 FROM (SELECT public._ingest_sec_try_call('{"role":"service_role"}', 'platform_api', 'pending') AS r) s;
 
@@ -241,9 +246,9 @@ FROM (SELECT public._ingest_sec_try_call('{"role":"service_role"}', 'platform_ap
 -- ─────────────────────────────────────────────────────────────────────────────
 
 SELECT public._ingest_sec_assert(
-  'H1: direct session + platform_api passes authorization',
+  'H1: direct session + platform_api passes authorization'::text,
   r like 'Clip not found: %',
-  'admin SQL-editor path must remain usable; got: ' || r
+  ('admin SQL-editor path must remain usable; got: ' || r)::text
 )
 FROM (SELECT public._ingest_sec_try_call('', 'platform_api', 'verified') AS r) s;
 
@@ -252,30 +257,30 @@ FROM (SELECT public._ingest_sec_try_call('', 'platform_api', 'verified') AS r) s
 -- ─────────────────────────────────────────────────────────────────────────────
 
 SELECT public._ingest_sec_assert(
-  'I1: direct session + "mock" passes authorization',
+  'I1: direct session + "mock" passes authorization'::text,
   r like 'Clip not found: %',
-  'mock retained for manual backfills/investigations only; got: ' || r
+  ('mock retained for manual backfills/investigations only; got: ' || r)::text
 )
 FROM (SELECT public._ingest_sec_try_call('', 'mock', 'verified') AS r) s;
 
 SELECT public._ingest_sec_assert(
-  'I2: direct session + "manual" passes authorization',
+  'I2: direct session + "manual" passes authorization'::text,
   r like 'Clip not found: %',
-  'got: ' || r
+  ('got: ' || r)::text
 )
 FROM (SELECT public._ingest_sec_try_call('', 'manual', 'pending') AS r) s;
 
 SELECT public._ingest_sec_assert(
-  'I3: direct session + "admin_override" passes authorization',
+  'I3: direct session + "admin_override" passes authorization'::text,
   r like 'Clip not found: %',
-  'got: ' || r
+  ('got: ' || r)::text
 )
 FROM (SELECT public._ingest_sec_try_call('', 'admin_override', 'verified') AS r) s;
 
 SELECT public._ingest_sec_assert(
-  'I4: direct session + unknown source still rejected',
+  'I4: direct session + unknown source still rejected'::text,
   r like 'Invalid source: %',
-  'input validation must survive on the direct path; got: ' || r
+  ('input validation must survive on the direct path; got: ' || r)::text
 )
 FROM (SELECT public._ingest_sec_try_call('', 'telemetry', 'verified') AS r) s;
 
@@ -284,16 +289,16 @@ FROM (SELECT public._ingest_sec_try_call('', 'telemetry', 'verified') AS r) s;
 -- ─────────────────────────────────────────────────────────────────────────────
 
 SELECT public._ingest_sec_assert(
-  'J1: malformed JWT claims are denied',
+  'J1: malformed JWT claims are denied'::text,
   r like '%malformed JWT claims%',
-  'fail-closed required; got: ' || r
+  ('fail-closed required; got: ' || r)::text
 )
 FROM (SELECT public._ingest_sec_try_call('not-json-at-all', 'platform_api', 'verified') AS r) s;
 
 SELECT public._ingest_sec_assert(
-  'J2: claims without a role are denied',
+  'J2: claims without a role are denied'::text,
   r like '%denied for JWT role ""%',
-  'role-less claims must not be treated as a direct session; got: ' || r
+  ('role-less claims must not be treated as a direct session; got: ' || r)::text
 )
 FROM (SELECT public._ingest_sec_try_call('{}', 'platform_api', 'verified') AS r) s;
 
@@ -302,13 +307,13 @@ FROM (SELECT public._ingest_sec_try_call('{}', 'platform_api', 'verified') AS r)
 -- ─────────────────────────────────────────────────────────────────────────────
 
 SELECT public._ingest_sec_assert(
-  'K1: service_role retains EXECUTE (trusted pipeline unchanged)',
+  'K1: service_role retains EXECUTE (trusted pipeline unchanged)'::text,
   has_function_privilege('service_role', 'public.ingest_clip_metrics(uuid,integer,integer,integer,integer,text,text)', 'EXECUTE'),
-  'service_role lost EXECUTE — sync/cron/admin-trigger routes would break'
+  'service_role lost EXECUTE — sync/cron/admin-trigger routes would break'::text
 );
 
 SELECT public._ingest_sec_assert(
-  'K2: PUBLIC/anon/authenticated hold no EXECUTE and guard is in the body',
+  'K2: PUBLIC/anon/authenticated hold no EXECUTE and guard is in the body'::text,
   NOT has_function_privilege('anon', 'public.ingest_clip_metrics(uuid,integer,integer,integer,integer,text,text)', 'EXECUTE')
     AND NOT has_function_privilege('authenticated', 'public.ingest_clip_metrics(uuid,integer,integer,integer,integer,text,text)', 'EXECUTE')
     AND EXISTS (
@@ -318,7 +323,7 @@ SELECT public._ingest_sec_assert(
         AND p.proname = 'ingest_clip_metrics'
         AND p.prosrc LIKE '%request.jwt.claims%'
     ),
-  'ACL or internal authorization guard missing — apply migration 000010'
+  'ACL or internal authorization guard missing — apply migration 000010'::text
 );
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -360,7 +365,7 @@ ROLLBACK;
 
 -- L2: the insert policy is still admin-gated (service-role/RLS architecture intact)
 SELECT public._ingest_sec_assert(
-  'L2: clip_metrics INSERT policy still requires public.is_admin()',
+  'L2: clip_metrics INSERT policy still requires public.is_admin()'::text,
   EXISTS (
     SELECT 1 FROM pg_policies
     WHERE schemaname = 'public'
@@ -368,12 +373,12 @@ SELECT public._ingest_sec_assert(
       AND policyname = 'clip_metrics_insert_service'
       AND with_check LIKE '%is_admin%'
   ),
-  'clip_metrics insert policy weakened — direct verified rows could be written'
+  'clip_metrics insert policy weakened — direct verified rows could be written'::text
 );
 
 -- L3: immutability policies (no UPDATE/DELETE on metric snapshots) unchanged
 SELECT public._ingest_sec_assert(
-  'L3: clip_metrics UPDATE/DELETE policies still deny (immutable snapshots)',
+  'L3: clip_metrics UPDATE/DELETE policies still deny (immutable snapshots)'::text,
   EXISTS (
     SELECT 1 FROM pg_policies
     WHERE schemaname = 'public' AND tablename = 'clip_metrics'
@@ -384,13 +389,13 @@ SELECT public._ingest_sec_assert(
     WHERE schemaname = 'public' AND tablename = 'clip_metrics'
       AND policyname = 'clip_metrics_no_delete' AND qual LIKE '%false%'
   ),
-  'metric snapshot immutability weakened'
+  'metric snapshot immutability weakened'::text
 );
 
 -- L4: function hardening traits retained — SECURITY DEFINER, pinned
 -- search_path, monotonic verified_views guard, auto-finalize, claims guard
 SELECT public._ingest_sec_assert(
-  'L4: SECURITY DEFINER + search_path + regression guard + finalize + claims guard retained',
+  'L4: SECURITY DEFINER + search_path + regression guard + finalize + claims guard retained'::text,
   EXISTS (
     SELECT 1 FROM pg_proc p
     JOIN pg_namespace n ON n.oid = p.pronamespace
@@ -403,7 +408,7 @@ SELECT public._ingest_sec_assert(
       AND p.prosrc LIKE '%request.jwt.claims%'
       AND p.prosrc LIKE '%verification_status not in%'
   ),
-  'one or more hardening traits missing from the deployed definition'
+  'one or more hardening traits missing from the deployed definition'::text
 );
 
 -- ─────────────────────────────────────────────────────────────────────────────
