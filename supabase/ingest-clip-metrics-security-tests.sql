@@ -23,13 +23,32 @@
 --      RLS, immutability, regression guard, SECURITY DEFINER + search_path,
 --      finalize preserved)
 --
--- HOW TO RUN (Supabase SQL Editor, after applying migration 000010):
---   1. Execute this entire file.
---   2. Every test must print "PASS: ...". Any "WARNING: FAIL: ..." is a breach.
---   3. Tests simulate JWT sessions via the authoritative request.jwt.claims
---      GUC (the same mechanism PostgREST uses); no fake users are created
---      (FK constraints) and no clip/campaign fixture rows are written — the
---      data path is proven up to the "Clip not found" boundary.
+-- REQUIRED RUN ORDER (Supabase SQL Editor, after applying migration 000010):
+--   1. Run supabase/ingest-clip-metrics-security-test-setup.sql
+--      (creates public._ingest_sec_assert(text, boolean, text) and
+--       public._ingest_sec_try_call(text, text, text))
+--   2. Run supabase/ingest-clip-metrics-security-tests.sql  (this file)
+--   3. Confirm every test prints PASS and there are zero FAIL warnings
+--   4. Run supabase/ingest-clip-metrics-security-test-cleanup.sql
+--      (contains exactly: DROP FUNCTION IF EXISTS public._ingest_sec_try_call(text, text, text);
+--                         DROP FUNCTION IF EXISTS public._ingest_sec_assert(text, boolean, text);)
+--
+-- This file contains ONLY test execution: it creates NO helper functions and
+-- executes NO DROP FUNCTION statements — helper creation and removal live in
+-- the setup/cleanup submissions. It therefore never relies on one SQL Editor
+-- submission creating a helper that a later statement in the same submission
+-- must resolve (the source of error 42883). Setup succeeding does NOT mean
+-- the tests passed — only step 3 does.
+--
+-- No transaction control and no session/role manipulation appear anywhere in
+-- this suite: no BEGIN/COMMIT/ROLLBACK/SAVEPOINT, no SET LOCAL ROLE
+-- authenticated, no SET ROLE/RESET ROLE, no session-scoped GUC changes.
+--
+-- Tests simulate JWT sessions through _ingest_sec_try_call, which applies
+-- set_config('request.jwt.claims', ...) transaction-locally — the same
+-- mechanism PostgREST uses; no fake users are created (FK constraints) and
+-- no clip/campaign fixture rows are written — the data path is proven up to
+-- the "Clip not found" boundary.
 --
 -- TYPE RESOLUTION NOTE: every call to public._ingest_sec_assert(...) casts its
 -- string-literal arguments with ::text so the call always resolves to the one
@@ -38,64 +57,6 @@
 --
 -- NOT EXECUTED AUTOMATICALLY AND NOT RUN AGAINST PRODUCTION.
 -- =============================================================================
-
--- ─────────────────────────────────────────────────────────────────────────────
--- Test infrastructure
--- ─────────────────────────────────────────────────────────────────────────────
-
-CREATE OR REPLACE FUNCTION public._ingest_sec_assert(
-  p_test_name text,
-  p_condition boolean,
-  p_detail text DEFAULT ''
-)
-RETURNS void
-LANGUAGE plpgsql
-AS $$
-BEGIN
-  IF p_condition THEN
-    RAISE NOTICE 'PASS: % %', p_test_name, p_detail;
-  ELSE
-    RAISE WARNING 'FAIL: % %', p_test_name, p_detail;
-  END IF;
-END;
-$$;
-
--- Attempts an ingest call under a simulated JWT claims payload and returns
--- 'OK' when the call succeeded, otherwise the exact SQLERRM. The clip id is
--- a well-known non-existent uuid, so an authorized call can never write —
--- it proves the authorization boundary by reaching 'Clip not found'.
-CREATE OR REPLACE FUNCTION public._ingest_sec_try_call(
-  p_claims text,
-  p_source text,
-  p_verification_status text
-)
-RETURNS text
-LANGUAGE plpgsql
-AS $$
-DECLARE
-  v_err text;
-BEGIN
-  PERFORM set_config('request.jwt.claims', coalesce(p_claims, ''), true);
-  BEGIN
-    PERFORM public.ingest_clip_metrics(
-      'ffffffff-ffff-4fff-8fff-ffffffffffff'::uuid,
-      1000, 1, 1, 1,
-      p_source,
-      p_verification_status
-    );
-    PERFORM set_config('request.jwt.claims', '', true);
-    RETURN 'OK';
-  EXCEPTION WHEN OTHERS THEN
-    v_err := SQLERRM;
-  END;
-  PERFORM set_config('request.jwt.claims', '', true);
-  RETURN v_err;
-END;
-$$;
-
--- Test helpers are for the SQL Editor session only
-REVOKE EXECUTE ON FUNCTION public._ingest_sec_assert(text, boolean, text) FROM PUBLIC, anon, authenticated;
-REVOKE EXECUTE ON FUNCTION public._ingest_sec_try_call(text, text, text) FROM PUBLIC, anon, authenticated;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- A. anon cannot invoke ingest_clip_metrics (privilege + internal guard)
@@ -435,11 +396,3 @@ SELECT public._ingest_sec_assert(
   ),
   'one or more hardening traits missing from the deployed definition'::text
 );
-
--- ─────────────────────────────────────────────────────────────────────────────
--- Cleanup of one-off helpers (safe: all assertions have already run).
--- Re-running this file recreates them first.
--- ─────────────────────────────────────────────────────────────────────────────
-
-DROP FUNCTION IF EXISTS public._ingest_sec_try_call(text, text, text);
-DROP FUNCTION IF EXISTS public._ingest_sec_assert(text, boolean, text);
