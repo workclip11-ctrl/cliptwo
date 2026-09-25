@@ -30,6 +30,7 @@ The following SQL files must be applied in order. Later files may override earli
 ### Metrics Sync
 
 - **migrations/20250101000009_production_cron_base_url.sql** — Sets `public.app_settings.base_url` to the production domain `https://cliptwo.in` (idempotent `INSERT ... ON CONFLICT (key) DO UPDATE`, touches only `base_url`; `cron_secret` untouched). The pg_cron `auto-metrics-sync` job reads `base_url` at runtime, so this single row is the authoritative cron target configuration. Run AFTER `auto-metrics-sync.sql`.
+- **migrations/20250101000010_harden_ingest_clip_metrics.sql** — Authoritative `ingest_clip_metrics` definition. Adds internal authorization (service_role JWT or direct admin session only — anon/authenticated JWTs denied even if EXECUTE is ever re-granted), makes the backend path `platform_api`-only (mock/manual/admin_override retained for direct admin sessions), and enforces the ACL in a numbered migration (`REVOKE` from PUBLIC/anon/authenticated, `GRANT` only to service_role — previously the REVOKEs existed only in loose manual files). Preserves SECURITY DEFINER, `search_path`, verified_views regression guard, and auto-finalize. Run AFTER step 9 and after `security-hardening-migration.sql`. Then run `supabase/ingest-clip-metrics-security-tests.sql`.
 
 ### One-Time Recovery
 
@@ -44,6 +45,7 @@ The following SQL files must be applied in order. Later files may override earli
 - `cashfree-security-tests.sql` — Cashfree security tests
 - `campaign-visibility-tests.sql` — Campaign visibility behavioral tests
 - `social-and-metrics-integration-tests.sql` — Social and metrics integration tests
+- `ingest-clip-metrics-security-tests.sql` — `ingest_clip_metrics` authorization tests A–L (privilege model, internal JWT guard for anon/Creator/Clipper, source tiers, service_role/direct-session functional boundaries, RLS insert path, immutability + regression guard)
 - `phase7a-security-tests.sql` — Phase 7a security tests
 - `campaign-security-regression-tests.sql` — Campaign security tests
 - `phone-api-security-tests.sql` — Phone API security tests
@@ -82,7 +84,7 @@ available = sum(processing records) - sum(pending/processing payout requests)
 ### Service-Only RPCs (REVOKE'd from authenticated)
 
 The following RPCs are ONLY callable by service_role:
-- `ingest_clip_metrics`
+- `ingest_clip_metrics` (also internally guarded: non-service JWTs and malformed claims are denied inside the function body; backend source tier is `platform_api`-only)
 - `finalize_clip_earning`
 - `acquire_sync_lock`
 - `release_sync_lock`
@@ -116,5 +118,5 @@ All mutations must go through SECURITY DEFINER RPCs.
 | `verify_campaign_launch_payment` | security-hardening-migration.sql | Admin + permission check |
 | `reject_campaign_launch_payment` | security-hardening-migration.sql | Admin + permission check |
 | `create_campaign` | campaign-state-machine-phase1.sql | Active creator check |
-| `ingest_clip_metrics` | security-hardening-migration.sql | With verified_views regression guard |
+| `ingest_clip_metrics` | migrations/20250101000010_harden_ingest_clip_metrics.sql | With verified_views regression guard, internal JWT authorization (service_role or direct admin session), and platform_api-only backend source tier. Supersedes the security-hardening-migration.sql definition. |
 | `enforce_social_connection_token_protection` | security-hardening-migration.sql | Trigger protecting OAuth token columns |

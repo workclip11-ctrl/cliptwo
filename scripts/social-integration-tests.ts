@@ -1271,6 +1271,109 @@ async function main(): Promise<void> {
     );
   });
 
+  // ── ingest_clip_metrics authorization hardening (migration 000010) ────────
+  await test("migration 000010 exists and locks ingest_clip_metrics ACL to service_role", () => {
+    const sql = readRepo("supabase/migrations/20250101000010_harden_ingest_clip_metrics.sql");
+    assert.ok(
+      sql.includes("create or replace function public.ingest_clip_metrics"),
+      "must ship the authoritative definition",
+    );
+    for (const role of ["public", "anon", "authenticated"]) {
+      assert.ok(
+        sql.includes(
+          `revoke execute on function public.ingest_clip_metrics(uuid, integer, integer, integer, integer, text, text) from ${role};`,
+        ),
+        `must REVOKE EXECUTE from ${role} in a numbered migration`,
+      );
+    }
+    assert.ok(
+      sql.includes(
+        "grant execute on function public.ingest_clip_metrics(uuid, integer, integer, integer, integer, text, text) to service_role;",
+      ),
+      "service_role must retain EXECUTE (trusted sync/cron/admin-trigger pipeline)",
+    );
+    assert.ok(
+      !/grant\s+execute\s+on\s+function\s+public\.ingest_clip_metrics[^;]*\bto\s+(anon|authenticated|public)\b/i.test(sql),
+      "must never grant ingest back to anon/authenticated/public",
+    );
+    assert.ok(
+      !sql.includes("CRON_SECRET") && !sql.includes("cron_secret") && !sql.includes("SERVICE_ROLE_KEY"),
+      "must not reference any secret material",
+    );
+  });
+
+  await test("ingest internal authorization: service_role-or-direct only, platform_api-only backend", () => {
+    const sql = readRepo("supabase/migrations/20250101000010_harden_ingest_clip_metrics.sql");
+    assert.ok(sql.includes("current_setting('request.jwt.claims'"), "must read the authoritative JWT claims GUC");
+    assert.ok(sql.includes("v_jwt_role = 'service_role'"), "only service_role JWTs pass the backend path");
+    assert.ok(sql.includes("denied for JWT role"), "anon/authenticated JWTs must be denied inside the body");
+    assert.ok(sql.includes("malformed JWT claims"), "malformed claims must fail closed");
+    assert.ok(
+      sql.includes('backend path allows source "platform_api" only'),
+      "server API workflows must be platform_api-only",
+    );
+    assert.ok(
+      sql.includes("p_source not in ('platform_api', 'manual', 'mock', 'admin_override')"),
+      "direct admin sessions retain the historical/admin source allowlist",
+    );
+    assert.ok(
+      !sql.includes("p_role") && !sql.includes("p_user_id") && !sql.includes("p_requested_by"),
+      "authorization must never rely on a client-supplied role or user id",
+    );
+    assert.ok(
+      sql.indexOf("denied for JWT role") < sql.indexOf("insert into public.clip_metrics"),
+      "authorization must run before any write",
+    );
+  });
+
+  await test("ingest hardening preserves fail-closed earnings invariants", () => {
+    const sql = readRepo("supabase/migrations/20250101000010_harden_ingest_clip_metrics.sql");
+    assert.ok(/security\s+definer/i.test(sql), "must stay SECURITY DEFINER");
+    assert.ok(/set\s+search_path\s*=\s*public/i.test(sql), "search_path must stay pinned to public");
+    assert.ok(
+      sql.includes("v_clip.verified_views is null then p_views"),
+      "verified_views monotonic regression guard must be preserved",
+    );
+    assert.ok(sql.includes("p_views > v_clip.verified_views"), "guard must only accept higher/equal views");
+    assert.ok(sql.includes("finalize_clip_earning"), "auto-finalize of approved clips must be preserved");
+    assert.ok(
+      sql.includes("p_verification_status not in ('pending', 'verified', 'failed', 'disputed')"),
+      "verification_status validation must remain fail-closed",
+    );
+    assert.ok(sql.includes("if p_views < 0 then"), "negative views must stay rejected");
+    assert.ok(sql.includes("insert into public.clip_metrics"), "immutable snapshot insert must remain");
+    assert.ok(
+      !sql.includes("verified_views = p_views"),
+      "regression guard must not be replaced by an unconditional overwrite",
+    );
+  });
+
+  await test("SQL suite covers ingest authorization tests A–L", () => {
+    const sql = readRepo("supabase/ingest-clip-metrics-security-tests.sql");
+    for (const label of [
+      "A1:", "A2:", "B1:", "B2:", "C1:", "D1:", "D3:", "E1:", "E2:",
+      "F1:", "F3:", "G1:", "H1:", "I1:", "I4:", "J1:", "J2:", "K1:", "K2:",
+      "L1", "L2:", "L3:", "L4:",
+    ]) {
+      assert.ok(sql.includes(label), `missing test label ${label}`);
+    }
+    assert.ok(sql.includes("has_function_privilege"), "privilege-model assertions required");
+    assert.ok(sql.includes("set_config('request.jwt.claims'"), "behavioral JWT simulation required");
+    assert.ok(sql.includes("SET LOCAL ROLE authenticated"), "RLS behavioral insert attempt required");
+    assert.ok(sql.includes('role":"service_role"'), "service-role functional boundary required");
+    assert.ok(sql.includes("DROP FUNCTION IF EXISTS public._ingest_sec_"), "test helpers must be cleaned up");
+  });
+
+  await test("README documents migration 000010 as authoritative ingest definition", () => {
+    const readme = readRepo("supabase/migrations/README.md");
+    assert.ok(readme.includes("20250101000010_harden_ingest_clip_metrics.sql"), "migration must be documented");
+    assert.ok(readme.includes("ingest-clip-metrics-security-tests.sql"), "test suite must be documented");
+    assert.ok(
+      readme.includes("| migrations/20250101000010_harden_ingest_clip_metrics.sql |"),
+      "function inventory must point at migration 000010 as authoritative",
+    );
+  });
+
   // ── Summary ──────────────────────────────────────────────────────────────
   out("");
   out(`${passed} passed, ${failures.length} failed`);
