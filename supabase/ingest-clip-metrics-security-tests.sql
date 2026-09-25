@@ -94,73 +94,56 @@ $$;
 
 -- L1-only test helper: performs the authenticated-role direct-INSERT test
 -- entirely INSIDE the function so the main SQL Editor session never changes
--- role across tests A-L. It switches to the REAL `authenticated` database
--- role (not a JWT claims GUC — RLS must be exercised by the actual role),
--- attempts the exact L1 INSERT, restores the original role on every path
--- before returning, and reports PASS/FAIL itself.
---   * transaction-local mode = set_config('role', ..., true) — the equivalent
---     of SET LOCAL ROLE authenticated, used when a valid transaction context
---     exists (auto-restores at transaction end as an extra safety net);
---   * session-scoped mode    = set_config('role', ..., false), the safe
---     fallback when no valid transaction context exists (SQL Editor
---     autocommit), restored explicitly before this function returns.
+-- role across tests A-L. The role switch uses the actual PostgreSQL role
+-- command via dynamic SQL: EXECUTE 'SET LOCAL ROLE authenticated'.
+-- SET LOCAL is transaction-local — the SQL Editor runs this call inside its
+-- statement transaction, so the role automatically reverts when the statement
+-- completes (no explicit restore, and NO request.jwt.claims GUC for L1:
+-- RLS uses the database session role, so the real authenticated role is what
+-- must be exercised). Reports PASS/FAIL itself.
 CREATE OR REPLACE FUNCTION public._ingest_sec_test_l1_authenticated_insert()
 RETURNS void
 LANGUAGE plpgsql
 AS $$
 DECLARE
-  v_orig  text := current_user;
-  v_mode  text := 'session';
-  v_role  text;
-  v_err   text;
+  v_role text;
+  v_err  text;
 BEGIN
-  -- Assume the real authenticated database role (preferred: transaction-local).
+  -- Actual PostgreSQL role command, transaction-local.
   BEGIN
-    PERFORM set_config('role', 'authenticated', true);
-    v_mode := 'local';
+    EXECUTE 'SET LOCAL ROLE authenticated';
   EXCEPTION WHEN OTHERS THEN
-    -- Fallback: session-scoped switch (no valid transaction context).
-    BEGIN
-      PERFORM set_config('role', 'authenticated', false);
-      v_mode := 'session';
-    EXCEPTION WHEN OTHERS THEN
-      RAISE WARNING 'FAIL: L1 could not assume database role "authenticated" (%) — L1 reported here, not silently skipped', SQLERRM;
-      RETURN;
-    END;
+    RAISE WARNING 'FAIL: L1 could not assume database role "authenticated" (%) — L1 reported here, not silently skipped', SQLERRM;
+    RETURN;
   END;
 
-  -- Verify the ACTUAL database role changed (point: real role, not claims GUC).
+  -- Immediately verify the actual database role took effect.
   SELECT current_user INTO v_role;
   IF v_role <> 'authenticated' THEN
-    IF v_mode = 'local' THEN
-      PERFORM set_config('role', v_orig, true);
-    ELSE
-      PERFORM set_config('role', v_orig, false);
-    END IF;
-    RAISE WARNING 'FAIL: L1 ran as database role "%" instead of "authenticated" — role switch did not take effect, L1 not executed', v_role;
+    RAISE WARNING 'FAIL: L1 ran as database role "%" instead of "authenticated" — role switch did not take effect', v_role;
     RETURN;
   END IF;
 
   -- Exact L1 INSERT attempt (unchanged values).
   BEGIN
-    INSERT INTO public.clip_metrics (clip_id, campaign_id, platform, views, likes, comments, shares, source, verification_status)
-    VALUES (
-      'ffffffff-ffff-4fff-8fff-ffffffffffff',
-      'ffffffff-ffff-4fff-8fff-ffffffffffff',
-      'instagram', 99999, 0, 0, 0, 'platform_api', 'verified'
-    );
+    INSERT INTO public.clip_metrics
+      (clip_id, campaign_id, platform, views, likes, comments, shares, source, verification_status)
+    VALUES
+      (
+        'ffffffff-ffff-4fff-8fff-ffffffffffff',
+        'ffffffff-ffff-4fff-8fff-ffffffffffff',
+        'instagram',
+        99999,
+        0,
+        0,
+        0,
+        'platform_api',
+        'verified'
+      );
     v_err := 'OK';
   EXCEPTION WHEN OTHERS THEN
     v_err := SQLERRM;
   END;
-
-  -- Restore the original database role (mode-matched) BEFORE reporting, so the
-  -- session returns to L2-L4 in its original role no matter what happened.
-  IF v_mode = 'local' THEN
-    PERFORM set_config('role', v_orig, true);
-  ELSE
-    PERFORM set_config('role', v_orig, false);
-  END IF;
 
   IF v_err = 'OK' THEN
     RAISE WARNING 'FAIL: L1 authenticated direct INSERT of verified clip_metrics row was ALLOWED';
@@ -412,9 +395,11 @@ SELECT public._ingest_sec_assert(
 -- L1: RLS still forbids direct verified-row insertion by a normal session.
 -- The main SQL Editor session NEVER changes role across tests A-L: the switch
 -- to the real `authenticated` DATABASE ROLE happens inside the test-only
--- helper _ingest_sec_test_l1_authenticated_insert() and is restored before it
--- returns. No JWT claims GUC stand-in is used for L1 — RLS is exercised by the
--- actual database role, which attempts the exact INSERT
+-- helper _ingest_sec_test_l1_authenticated_insert() via
+-- EXECUTE 'SET LOCAL ROLE authenticated', which is transaction-local and
+-- automatically reverts when the statement completes. No JWT claims GUC
+-- stand-in is used for L1 — RLS is exercised by the actual database role,
+-- which attempts the exact INSERT
 -- (clip_id/campaign_id ffffffff-…-ffffffffffff, platform instagram, views 99999,
 -- source platform_api, verification_status verified).
 -- No transaction-control statements are used anywhere in this file: SQL Editor
