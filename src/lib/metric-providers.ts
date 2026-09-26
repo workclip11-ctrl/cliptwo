@@ -100,6 +100,24 @@ class InstagramMetricProvider implements MetricProvider {
   private static readonly MAX_MEDIA_PAGES = 20;
   private static readonly MEDIA_PAGE_SIZE = 50;
 
+  /**
+   * Fetch a Graph API URL with the access token in the Authorization header
+   * instead of the query string. Meta's paging.next URLs embed an
+   * access_token — it is stripped here so a token never appears in a
+   * request URL (URLs leak into logs, proxies, and traces).
+   */
+  private igFetch(rawUrl: string, accessToken: string): Promise<Response> {
+    let url = rawUrl;
+    if (rawUrl.includes("access_token=")) {
+      const parsed = new URL(rawUrl);
+      parsed.searchParams.delete("access_token");
+      url = parsed.toString();
+    }
+    return fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+  }
+
   async fetchMetrics(
     postUrl: string,
     accessToken: string,
@@ -178,7 +196,8 @@ class InstagramMetricProvider implements MetricProvider {
 
     for (let tier = 0; tier < mediaFieldTiers.length; tier++) {
       const mediaRes = await fetch(
-        `${InstagramMetricProvider.API_BASE}/${mediaId}?fields=${mediaFieldTiers[tier]}&access_token=${accessToken}`,
+        `${InstagramMetricProvider.API_BASE}/${mediaId}?fields=${mediaFieldTiers[tier]}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
       );
       mediaHttpStatus = mediaRes.status;
 
@@ -240,7 +259,8 @@ class InstagramMetricProvider implements MetricProvider {
 
     try {
       const insightsRes = await fetch(
-        `${InstagramMetricProvider.API_BASE}/${mediaId}/insights?metric=views&access_token=${accessToken}`,
+        `${InstagramMetricProvider.API_BASE}/${mediaId}/insights?metric=views`,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
       );
 
       // DIAG LOG: After insights API request (compact — metric verification
@@ -349,13 +369,12 @@ class InstagramMetricProvider implements MetricProvider {
     let url: string | null =
       `${InstagramMetricProvider.API_BASE}/${accountIdentifier}/media` +
       `?fields=id,media_type,media_product_type,permalink,username` +
-      `&limit=${InstagramMetricProvider.MEDIA_PAGE_SIZE}` +
-      `&access_token=${accessToken}`;
+      `&limit=${InstagramMetricProvider.MEDIA_PAGE_SIZE}`;
 
     let pageCount = 0;
 
     while (url && pageCount < InstagramMetricProvider.MAX_MEDIA_PAGES) {
-      const res = await fetch(url);
+      const res = await this.igFetch(url, accessToken);
       if (!res.ok) break;
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -397,17 +416,15 @@ class InstagramMetricProvider implements MetricProvider {
     let url: string | null =
       `${InstagramMetricProvider.API_BASE}/${accountIdentifier}/media` +
       `?fields=id,shortcode,username,media_type` +
-      `&limit=${InstagramMetricProvider.MEDIA_PAGE_SIZE}` +
-      `&access_token=${accessToken}`;
+      `&limit=${InstagramMetricProvider.MEDIA_PAGE_SIZE}`;
 
     let pageCount = 0;
     let scanned = 0;
 
     while (url && pageCount < InstagramMetricProvider.MAX_MEDIA_PAGES) {
-      const res = await fetch(url);
+      const res = await this.igFetch(url, accessToken);
       if (!res.ok) {
-        // Fail closed, but leave a diagnosable trace (HTTP status only —
-        // the URL contains the access token and must never be logged).
+        // Fail closed, but leave a diagnosable trace (HTTP status only).
         console.warn(
           `[instagram] media library scan failed (HTTP ${res.status}) after ` +
           `${pageCount} page(s) / ${scanned} item(s), account: ${accountIdentifier.slice(0, 8)}`,

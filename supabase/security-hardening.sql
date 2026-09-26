@@ -155,6 +155,8 @@ DROP POLICY IF EXISTS "payout_requests_insert" ON public.payout_requests;
 -- Users should connect social accounts through server-side OAuth flow,
 -- not by inserting rows directly. Direct inserts could bypass OAuth
 -- verification and allow setting verified=true.
+-- RESOLVED IN CANONICAL SCHEMA: schema.sql and admin-schema.sql no longer
+-- create this policy — the DROP below is now an idempotent safety net.
 -- ────────────────────────────────────────────────────────────────────────────
 DROP POLICY IF EXISTS "social_accounts_insert" ON public.social_accounts;
 -- Users can still SELECT own, UPDATE own non-trusted fields, DELETE own.
@@ -165,6 +167,8 @@ DROP POLICY IF EXISTS "social_accounts_insert" ON public.social_accounts;
 -- Token data is server-only. Users should not INSERT or UPDATE
 -- connections directly. OAuth callback creates/updates them server-side.
 -- Users can disconnect (DELETE) their own connections.
+-- RESOLVED IN CANONICAL SCHEMA: schema.sql and admin-schema.sql no longer
+-- create these policies — the DROPs below are now an idempotent safety net.
 -- ────────────────────────────────────────────────────────────────────────────
 DROP POLICY IF EXISTS "social_connections_insert" ON public.social_connections;
 DROP POLICY IF EXISTS "social_connections_update" ON public.social_connections;
@@ -175,6 +179,8 @@ DROP POLICY IF EXISTS "social_connections_update" ON public.social_connections;
 -- OAuth states are temporary security records used by the callback.
 -- They should NOT be readable or writable by the browser.
 -- The OAuth callback uses service-role to access them.
+-- RESOLVED IN CANONICAL SCHEMA: schema.sql and admin-schema.sql no longer
+-- create these policies — the DROPs below are now an idempotent safety net.
 -- ────────────────────────────────────────────────────────────────────────────
 DROP POLICY IF EXISTS "social_oauth_states_insert" ON public.social_oauth_states;
 DROP POLICY IF EXISTS "social_oauth_states_delete" ON public.social_oauth_states;

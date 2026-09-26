@@ -854,20 +854,19 @@ END $$;
 SELECT 'TEST 4.1 PASSED' AS result;
 ROLLBACK;
 
--- TEST 4.2: Non-admin cannot set social_accounts.verified via direct UPDATE
+-- TEST 4.2: Browser cannot write social_accounts (no RLS INSERT policy) and
+-- a non-admin cannot set social_accounts.verified via direct UPDATE
 -- (enforce_social_account_fields trigger blocks it)
 BEGIN;
 DO $$
 DECLARE
   v_id uuid;
 BEGIN
-  -- Create a test social account as Creator A
-  SET LOCAL role = 'authenticated';
-  SET LOCAL request.jwt.claims = '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}';
-
-  -- Direct INSERT is blocked by RLS, so we need admin to create the row
-  PERFORM set_config('role', 'authenticated', true);
-  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
+  -- Fixture creation runs as service_role — the same path the OAuth callback
+  -- uses in production. RLS does not apply to service_role (BYPASSRLS) and
+  -- auth.uid() is NULL there, so the fixture write is trusted and the two
+  -- guards below stay meaningful for browser sessions.
+  PERFORM set_config('role', 'service_role', true);
 
   INSERT INTO public.social_accounts (
     user_id, platform, handle, provider_account_id, status
@@ -875,21 +874,35 @@ BEGIN
     'e92427b0-254e-44cc-b2df-be83792c8a94', 'YouTube', 'Test Channel', 'UC_test_123', 'connected'
   ) RETURNING id INTO v_id;
 
-  -- Switch back to Creator A and try to set verified
+  -- Switch to Creator A (browser session)
   PERFORM set_config('role', 'authenticated', true);
   PERFORM set_config('request.jwt.claims', '{"sub": "e92427b0-254e-44cc-b2df-be83792c8a94", "role": "authenticated"}', true);
 
+  -- 4.2a: authenticated users must not be able to attach a social account
+  -- directly (no INSERT policy — rows come only from the OAuth callback)
+  BEGIN
+    INSERT INTO public.social_accounts (
+      user_id, platform, handle, provider_account_id, status
+    ) VALUES (
+      'e92427b0-254e-44cc-b2df-be83792c8a94', 'Instagram', 'Injected Channel', 'UC_injected', 'connected'
+    );
+    ASSERT false, '4.2a: Creator must not be able to INSERT social_accounts directly';
+  EXCEPTION WHEN insufficient_privilege THEN
+    -- Expected: RLS denies the row (no INSERT policy for authenticated)
+    NULL;
+  END;
+
+  -- 4.2b: direct UPDATE of the trust field must be blocked by the trigger
   BEGIN
     UPDATE public.social_accounts SET verified = true WHERE id = v_id;
-    ASSERT false, '4.2: Creator must not be able to set verified directly';
+    ASSERT false, '4.2b: Creator must not be able to set verified directly';
   EXCEPTION WHEN OTHERS THEN
     -- Expected: trigger blocks non-admin verified changes
     NULL;
   END;
 
-  -- Cleanup (as admin)
-  PERFORM set_config('role', 'authenticated', true);
-  PERFORM set_config('request.jwt.claims', '{"sub": "f1d9d01c-c205-440c-9bde-8f7a6ea7d2fd", "role": "authenticated"}', true);
+  -- Cleanup (as service_role)
+  PERFORM set_config('role', 'service_role', true);
   DELETE FROM public.social_accounts WHERE id = v_id;
 END $$;
 SELECT 'TEST 4.2 PASSED' AS result;

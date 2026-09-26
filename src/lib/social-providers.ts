@@ -174,8 +174,11 @@ class InstagramProvider implements SocialProvider {
     const tokenData = await tokenRes.json();
 
     // 2. Exchange short-lived token for long-lived token (Instagram endpoint)
+    // SECURITY: the short-lived token is sent via the Authorization header —
+    // never in the request URL (URLs leak into logs and traces).
     const longTokenRes = await fetch(
-      `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${this.clientSecret}&access_token=${tokenData.access_token}`,
+      `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${this.clientSecret}`,
+      { headers: { Authorization: `Bearer ${tokenData.access_token}` } },
     );
 
     let accessToken = tokenData.access_token;
@@ -189,7 +192,8 @@ class InstagramProvider implements SocialProvider {
 
     // 3. Fetch user profile via Instagram API (graph.instagram.com)
     const profileRes = await fetch(
-      `https://graph.instagram.com/me?fields=id,username&access_token=${accessToken}`,
+      `https://graph.instagram.com/me?fields=id,username`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
     );
 
     if (!profileRes.ok) {
@@ -217,7 +221,8 @@ class InstagramProvider implements SocialProvider {
   ): Promise<OwnershipVerificationResult> {
     try {
       const res = await fetch(
-        `https://graph.instagram.com/me?fields=id,username&access_token=${accessToken}`,
+        `https://graph.instagram.com/me?fields=id,username`,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
       );
       if (!res.ok) {
         return {
@@ -254,8 +259,11 @@ class InstagramProvider implements SocialProvider {
     // Instagram doesn't use separate refresh tokens — the long-lived token itself
     // can be refreshed via the ig_refresh_token grant type.
     // Token must be at least 24 hours old but not expired.
+    // SECURITY: the long-lived token is sent via the Authorization header —
+    // never in the request URL (URLs leak into logs and traces).
     const res = await fetch(
-      `https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=${refreshToken}`,
+      `https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token`,
+      { headers: { Authorization: `Bearer ${refreshToken}` } },
     );
 
     if (!res.ok) {
@@ -288,7 +296,8 @@ class InstagramProvider implements SocialProvider {
     providerAccountId: string;
   }> {
     const res = await fetch(
-      `https://graph.instagram.com/me?fields=id,username&access_token=${accessToken}`,
+      `https://graph.instagram.com/me?fields=id,username`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
     );
     const profile = await res.json();
     return {
@@ -323,29 +332,18 @@ class YouTubeProvider implements SocialProvider {
     return `${base}/api/social/oauth/callback/youtube`;
   }
 
-  getAuthorizationUrl(userId: string, state: string): OAuthInitResult {
-    const codeVerifier = generateCodeVerifier();
-
-    const scopes = [
-      "https://www.googleapis.com/auth/youtube.readonly",
-    ];
-
-    const params = new URLSearchParams({
-      client_id: this.clientId,
-      redirect_uri: this.redirectUri,
-      scope: scopes.join(" "),
-      response_type: "code",
-      state,
-      code_challenge_method: "S256",
-      access_type: "offline",
-      prompt: "consent",
-    });
-
-    return {
-      authorizationUrl: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`,
-      state,
-      codeVerifier,
-    };
+  /**
+   * Fails closed on purpose. The S256 PKCE code_challenge can only be
+   * computed asynchronously (SHA-256 of the verifier), so this synchronous
+   * variant cannot produce a valid authorization URL: emitting one with
+   * `code_challenge_method=S256` but no `code_challenge` is rejected by
+   * Google. It is unreachable — the OAuth initiate route always prefers
+   * getAuthorizationUrlAsync for this provider.
+   */
+  getAuthorizationUrl(_userId: string, _state: string): OAuthInitResult {
+    throw new Error(
+      "[social-providers] YouTube authorization requires getAuthorizationUrlAsync (PKCE)",
+    );
   }
 
   /** Async helper to get the full authorization URL with PKCE code_challenge */

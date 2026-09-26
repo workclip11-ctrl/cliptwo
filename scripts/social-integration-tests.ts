@@ -439,7 +439,11 @@ async function main(): Promise<void> {
     assert.equal(res.accessToken, "new-long");
     assert.equal(res.refreshToken, null);
     assert.ok(fetchCalls[0].url.includes("grant_type=ig_refresh_token"));
-    assert.ok(fetchCalls[0].url.includes("access_token=old-long"));
+    // SECURITY: the token must travel in the Authorization header, never the
+    // request URL (URLs leak into logs, proxies, and traces).
+    assert.ok(!fetchCalls[0].url.includes("access_token="));
+    const refreshHeaders = (fetchCalls[0].init?.headers ?? {}) as Record<string, string>;
+    assert.equal(refreshHeaders.Authorization, "Bearer old-long");
     assert.ok(!fetchCalls[0].url.includes("client_secret"));
   });
 

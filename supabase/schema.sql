@@ -196,9 +196,10 @@ drop policy if exists "social_accounts_select" on public.social_accounts;
 create policy "social_accounts_select" on public.social_accounts
   for select using (auth.uid() = user_id);
 
+-- No INSERT policy: rows are created only by the server-side OAuth callback
+-- (service_role). A browser INSERT could bypass OAuth verification entirely.
+-- The DROP is kept so re-running this file removes any legacy policy.
 drop policy if exists "social_accounts_insert" on public.social_accounts;
-create policy "social_accounts_insert" on public.social_accounts
-  for insert with check (auth.uid() = user_id);
 
 drop policy if exists "social_accounts_update" on public.social_accounts;
 create policy "social_accounts_update" on public.social_accounts
@@ -207,6 +208,51 @@ create policy "social_accounts_update" on public.social_accounts
 drop policy if exists "social_accounts_delete" on public.social_accounts;
 create policy "social_accounts_delete" on public.social_accounts
   for delete using (auth.uid() = user_id);
+
+-- ---------------------------------------------------------------------------
+-- Trigger: enforce field-level permissions on social_accounts updates.
+-- Non-admins cannot change trust fields (verified, provider_account_id, etc.).
+-- Service-role (auth.uid() is NULL) skips the checks for the OAuth callback,
+-- verify, and disconnect routes; admins are unrestricted.
+-- ---------------------------------------------------------------------------
+create or replace function public.enforce_social_account_field_permissions()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  -- Service-role (auth.uid() is NULL) — trusted server operations, skip checks.
+  -- These are server-side only and never reachable from the browser.
+  if auth.uid() is null then
+    return NEW;
+  end if;
+
+  -- Admins can change anything (skip checks)
+  if public.is_admin() then
+    return NEW;
+  end if;
+
+  -- Non-admins: block changes to trust fields
+  if (OLD.verified IS DISTINCT FROM NEW.verified) then
+    raise exception 'Only admins can change verified status';
+  end if;
+  if (OLD.provider_account_id IS DISTINCT FROM NEW.provider_account_id) then
+    raise exception 'Only admins can change provider_account_id';
+  end if;
+  if (OLD.status IS DISTINCT FROM NEW.status) then
+    raise exception 'Only admins can change connection status';
+  end if;
+
+  return NEW;
+end;
+$$;
+
+drop trigger if exists enforce_social_account_fields on public.social_accounts;
+create trigger enforce_social_account_fields
+  before update on public.social_accounts
+  for each row
+  execute function public.enforce_social_account_field_permissions();
 
 -- ---------------------------------------------------------------------------
 -- social_connections — server-only encrypted token storage.
@@ -238,21 +284,73 @@ drop policy if exists "social_connections_no_browser_select" on public.social_co
 create policy "social_connections_no_browser_select" on public.social_connections
   for select using (false);
 
--- Backend (service_role) bypasses RLS, so it can read tokens for API calls
--- Users can insert their own connections
+-- NO INSERT policy: OAuth token rows are written exclusively by the server-side
+-- OAuth callback (service_role). A browser INSERT could store attacker-chosen
+-- tokens for a user_id it controls. DROPs are kept so re-running this file
+-- removes any legacy policy (see security-hardening.sql §9).
 drop policy if exists "social_connections_insert" on public.social_connections;
-create policy "social_connections_insert" on public.social_connections
-  for insert with check (auth.uid() = user_id);
 
--- Users can update non-token fields (but tokens are set by backend only)
+-- NO UPDATE policy: token columns are written only by the backend
+-- (service_role) during token refresh. DROPs are kept so re-running this file
+-- removes any legacy policy (see security-hardening.sql §9).
 drop policy if exists "social_connections_update" on public.social_connections;
-create policy "social_connections_update" on public.social_connections
-  for update using (auth.uid() = user_id);
 
 -- Users can delete their own connections
 drop policy if exists "social_connections_delete" on public.social_connections;
 create policy "social_connections_delete" on public.social_connections
   for delete using (auth.uid() = user_id);
+
+-- ---------------------------------------------------------------------------
+-- Trigger: second layer on top of RLS. Even if an UPDATE policy were ever
+-- re-created, authenticated non-admins cannot modify backend-managed token
+-- fields. Service-role (auth.uid() is NULL) and admins bypass the checks.
+-- ---------------------------------------------------------------------------
+create or replace function public.enforce_social_connection_token_protection()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  -- Service-role (auth.uid() is NULL) — trusted server operations, skip checks.
+  -- The OAuth callback, disconnect, and metrics routes use service-role for
+  -- trusted writes. These are server-side only and never reachable from the browser.
+  if auth.uid() is null then
+    return NEW;
+  end if;
+
+  -- Admins can change anything (skip checks)
+  if public.is_admin() then
+    return NEW;
+  end if;
+
+  -- Non-admins: block changes to backend-managed token fields.
+  -- These columns are written exclusively by the backend via service_role.
+  if (OLD.access_token_enc IS DISTINCT FROM NEW.access_token_enc) then
+    raise exception 'Cannot modify access_token_enc directly';
+  end if;
+  if (OLD.refresh_token_enc IS DISTINCT FROM NEW.refresh_token_enc) then
+    raise exception 'Cannot modify refresh_token_enc directly';
+  end if;
+  if (OLD.expires_at IS DISTINCT FROM NEW.expires_at) then
+    raise exception 'Cannot modify expires_at directly';
+  end if;
+  if (OLD.scope IS DISTINCT FROM NEW.scope) then
+    raise exception 'Cannot modify scope directly';
+  end if;
+  if (OLD.provider_meta IS DISTINCT FROM NEW.provider_meta) then
+    raise exception 'Cannot modify provider_meta directly';
+  end if;
+
+  return NEW;
+end;
+$$;
+
+drop trigger if exists enforce_social_connection_tokens on public.social_connections;
+create trigger enforce_social_connection_tokens
+  before update on public.social_connections
+  for each row
+  execute function public.enforce_social_connection_token_protection();
 
 -- ---------------------------------------------------------------------------
 -- social_oauth_states — temporary OAuth state parameters for CSRF protection.
@@ -269,16 +367,16 @@ create table public.social_oauth_states (
   expires_at timestamptz not null
 );
 
--- Only backend needs to read/write states
+-- Backend-only: NO policies at all. With RLS enabled and no policy, neither
+-- anon nor authenticated can read, insert, or delete OAuth state rows —
+-- the initiate/callback routes use service_role. This keeps the one-time-use
+-- CSRF state (and its PKCE code_verifier) out of browser reach.
+-- DROPs are kept so re-running this file removes any legacy policy.
 alter table public.social_oauth_states enable row level security;
 
 drop policy if exists "social_oauth_states_insert" on public.social_oauth_states;
-create policy "social_oauth_states_insert" on public.social_oauth_states
-  for insert with check (auth.uid() = user_id);
 
 drop policy if exists "social_oauth_states_delete" on public.social_oauth_states;
-create policy "social_oauth_states_delete" on public.social_oauth_states
-  for delete using (auth.uid() = user_id);
 
 alter table public.campaigns enable row level security;
 alter table public.clips enable row level security;

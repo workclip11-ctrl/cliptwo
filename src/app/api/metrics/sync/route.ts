@@ -208,6 +208,14 @@ export async function POST(request: Request) {
               .single();
 
             if (!connFull?.refresh_token_enc) {
+              // Actionable connection error: an expired token with no refresh
+              // token can never be recovered by sync — only a reconnect can.
+              await adminClient
+                .from("social_accounts")
+                .update({ status: "connection_error", error: "No refresh token stored — reconnect required" })
+                .eq("id", socialAccount.id)
+                .eq("user_id", clip.user_id);
+
               results.push({
                 clipId: cid,
                 status: "skipped",
