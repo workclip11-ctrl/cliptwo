@@ -316,12 +316,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else {
       clearOAuthIntent();
     }
-    const { error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: redirectUrl,
-      },
-    });
+    // A rejected promise (network/API failure) must not surface a raw
+    // exception message to the user — collapse it to the friendly copy.
+    const res = await supabase.auth
+      .signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: redirectUrl,
+        },
+      })
+      .catch(() => null);
+    if (!res) {
+      const msg = "Google sign-in failed. Please try again.";
+      setError(msg);
+      throw new Error(msg);
+    }
+    const oauthError = res.error;
     if (oauthError) {
       const msg =
         oauthError.message.includes("cancelled") ||

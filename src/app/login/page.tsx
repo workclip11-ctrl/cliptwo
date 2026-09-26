@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, type FormEvent } from "react";
+import { Suspense, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, ArrowLeft, Scissors, Film } from "lucide-react";
@@ -8,6 +8,28 @@ import { useAuth } from "@/lib/auth";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
 
 type Mode = "signin" | "signup";
+
+// Maps the fixed, allowlisted codes produced by /auth/callback and
+// /auth/complete (?error=…) to user-facing copy. Unknown codes fall back to a
+// generic message, so no upstream/provider text is ever rendered here.
+function oauthErrorMessage(code: string): string {
+  switch (code) {
+    case "cancelled":
+      return "Sign-in was cancelled.";
+    case "link_expired":
+      return "This sign-in link has expired. Please try again.";
+    case "account_exists":
+      return "This email already has a ClipTwo account. Log in with your password instead.";
+    case "email_unverified":
+      return "Your Google account email is not verified. Verify it with Google, then try again.";
+    case "signup_disabled":
+      return "New sign-ups are currently disabled.";
+    case "oauth_failed":
+      return "Google sign-in failed. Please try again.";
+    default:
+      return "We couldn't complete sign-in. Please try again.";
+  }
+}
 
 function AuthForm() {
   const router = useRouter();
@@ -34,6 +56,21 @@ function AuthForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+
+  // Surface OAuth failures reported by /auth/callback or /auth/complete
+  // (cancelled at Google, provider error, callback failure, session-exchange
+  // failure/timeout). Without this, ?error= was silently ignored and the user
+  // returned to a blank form with no explanation.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const code = url.searchParams.get("error");
+    if (!code) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setError(oauthErrorMessage(code));
+    // Strip only the error param so a refresh doesn't repeat it; mode/role survive.
+    url.searchParams.delete("error");
+    window.history.replaceState({}, "", url.toString());
+  }, []);
 
   async function handleGoogleSignIn() {
     setError("");
