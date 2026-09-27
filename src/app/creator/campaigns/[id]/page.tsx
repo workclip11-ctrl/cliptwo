@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   Pencil,
   Pause,
@@ -96,7 +96,49 @@ export default function CreatorCampaignDetailPage() {
   const [resolvedBrandAssets, setResolvedBrandAssets] = useState<CampaignSourceAsset[]>([]);
   const [resolvedThumbnails, setResolvedThumbnails] = useState<string[]>([]);
 
-  const camp = campaigns.find((c) => c.id === id);
+  const storeCamp = campaigns.find((c) => c.id === id);
+  // Payment polling only READS the backend row and overlays it here.
+  // launchPaymentStatus and status are protected fields: update_campaign()
+  // intentionally rejects them, so the polling path never writes them back.
+  const [paymentRefresh, setPaymentRefresh] = useState<
+    Partial<Pick<Campaign, "launchPaymentStatus" | "status">>
+  >({});
+  const camp = useMemo(
+    () => (storeCamp ? { ...storeCamp, ...paymentRefresh } : undefined),
+    [storeCamp, paymentRefresh],
+  );
+
+  // Apply a backend payment/campaign row read (source of truth). Identity is
+  // preserved when nothing changed so unrelated renders never restart effects.
+  const applyPaymentRow = useCallback(
+    (row: { launch_payment_status?: string | null; status?: string | null }) => {
+      const next: Partial<Pick<Campaign, "launchPaymentStatus" | "status">> = {};
+      if (row.launch_payment_status != null) {
+        next.launchPaymentStatus =
+          row.launch_payment_status as Campaign["launchPaymentStatus"];
+      }
+      if (row.status != null) next.status = row.status as Campaign["status"];
+      setPaymentRefresh((prev) =>
+        prev.launchPaymentStatus === next.launchPaymentStatus &&
+        prev.status === next.status
+          ? prev
+          : next,
+      );
+    },
+    [],
+  );
+
+  // Existing read path (same table select the store uses) — refreshes the
+  // displayed campaign from real backend data after payment verification.
+  const refreshPaymentState = useCallback(async () => {
+    if (!isSupabaseConfigured || !id) return;
+    const { data } = await supabase
+      .from("campaigns")
+      .select("launch_payment_status, status")
+      .eq("id", id)
+      .single();
+    if (data) applyPaymentRow(data);
+  }, [id, applyPaymentRow]);
 
   // Resolve private storage paths to signed URLs for authenticated access
   useEffect(() => {
@@ -131,7 +173,8 @@ export default function CreatorCampaignDetailPage() {
     // Clean URL params
     router.replace(`/creator/campaigns/${id}`, { scroll: false });
 
-    // Poll for payment status confirmation
+    // Poll for payment status confirmation (read-only: the backend remains
+    // the source of truth — nothing is written back through updateCampaign)
     let attempts = 0;
     let cancelled = false;
     const interval = setInterval(async () => {
@@ -144,11 +187,9 @@ export default function CreatorCampaignDetailPage() {
         .eq("id", id)
         .single();
       if (cancelled || !data) return;
-      // Update local campaign state via store
-      updateCampaign(id, {
-        launchPaymentStatus: data.launch_payment_status,
-        status: data.status,
-      } as Partial<Campaign>);
+      // Refresh the displayed campaign state from this backend read.
+      applyPaymentRow(data);
+      // The read status only decides when polling stops.
       if (
         data.launch_payment_status === "verified" ||
         data.launch_payment_status === "rejected" ||
@@ -159,7 +200,7 @@ export default function CreatorCampaignDetailPage() {
     }, PAYMENT_POLL_INTERVAL_MS);
 
     return () => { cancelled = true; clearInterval(interval); };
-  }, [searchParams, id, router, updateCampaign, camp]);
+  }, [searchParams, id, router, applyPaymentRow]);
 
   if (!camp) {
     return (
@@ -1105,7 +1146,11 @@ export default function CreatorCampaignDetailPage() {
         <LaunchPaymentModal
           campaign={camp}
           onClose={() => setShowPaymentModal(false)}
-          onPaymentSubmitted={() => setShowPaymentModal(false)}
+          onPaymentSubmitted={() => {
+            setShowPaymentModal(false);
+            // Payment verified server-side — refresh from the real backend row.
+            void refreshPaymentState();
+          }}
         />
       )}
     </div>

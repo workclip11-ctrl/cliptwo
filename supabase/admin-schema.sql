@@ -2660,8 +2660,30 @@ EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL; END $$;
 
 -- ---------------------------------------------------------------------------
 -- RPC: update_campaign — Secure server-side campaign update.
--- Enforces: authentication, ownership/admin, financial field lock,
--- and blocks immutable fields. Replaces direct client UPDATE.
+-- Enforces: authentication, ownership/admin, immutable fields, status lock,
+-- platform + date validation, a value-aware financial field lock, and an
+-- audit entry on every successful update.
+--
+-- NON-FINANCIAL DETAIL FIELDS stay editable after publish/open, including
+-- when submissions already exist: title, brief, category, objective,
+-- platforms, start/end date, timezone, what_to_make, hook, cta,
+-- recommended_duration, style, branding, source_link, source_assets,
+-- thumbnails, brand_assets, plus the other creative/detail fields already
+-- supported by the Campaign model (niche, caption_req, aspect_ratio,
+-- do_list, dont_list, example_clips, view_rules, approval, rights, rules,
+-- spend_cap, budget, verified, spent, days_left).
+--
+-- FINANCIAL FIELDS stay protected: payout (feeds clips.locked_cpm) and
+-- max_payout_per_clip (feeds clips.locked_max_payout) are blocked once the
+-- campaign has submissions. The lock is value-aware: the edit modal echoes
+-- the current values next to detail edits, so an unchanged echo is never a
+-- change — only an actual financial change is rejected (with the same error
+-- as before). Budget remains guarded by trg_enforce_campaign_budget_lock.
+--
+-- NOT changed here: ownership/authentication, RLS, state-machine RPCs
+-- (campaign_action / publish / pause / ...), payment verification, clip
+-- locked_cpm / locked_max_payout, and the update_campaign(uuid, jsonb)
+-- signature (the client keeps calling it unchanged).
 -- ---------------------------------------------------------------------------
 create or replace function public.update_campaign(
   p_campaign_id uuid,
@@ -2680,11 +2702,25 @@ declare
   v_result jsonb;
   v_set text;
   v_key text;
-  v_FINANCIAL_FIELDS text[] := array['payout', 'max_payout_per_clip'];
+  v_field text;
   v_IMMUTABLE_FIELDS text[] := array[
     'id', 'created_by', 'created_at', 'archived_by', 'archived_at'
   ];
-  v_field text;
+  -- Same vocabulary as campaigns_platform_check / clips_platform_check.
+  v_PLATFORM_VOCAB text[] := array['YouTube', 'Instagram', 'Kick'];
+  -- Platforms that may be newly selected (Kick is coming soon and stays
+  -- disabled in the campaign wizard and the edit modal).
+  v_PLATFORM_SELECTABLE text[] := array['YouTube', 'Instagram'];
+  v_platform_name text;
+  v_already_present boolean;
+  v_patch_num numeric;
+  v_start_date date;
+  v_end_date date;
+  v_raw_date text;
+  v_actor text;
+  v_changed jsonb;
+  v_note text;
+  v_audit jsonb;
   v_has_clips boolean;
 begin
   -- 1. Require authenticated user
@@ -2730,24 +2766,155 @@ begin
     raise exception 'Cannot change status through update. Use campaign_action RPC.';
   end if;
 
-  -- 8. Financial field lock: block payout/max_payout_per_clip if clips exist
-  for v_field in select unnest(v_FINANCIAL_FIELDS)
-  loop
-    if p_patch ? v_field then
-      -- Check if any clips exist for this campaign (database is authoritative)
+  -- 8. Platform validation (platforms are NOT a financial field, so they stay
+  --    editable after publication — but only with valid values):
+  --      * every value must come from the platform vocabulary used everywhere
+  --        else (campaigns_platform_check / clips_platform_check);
+  --      * Kick is coming soon: it may not be NEWLY selected (the creation
+  --        wizard and the edit modal both keep it disabled), while a Kick
+  --        value that is already on the campaign stays accepted so existing
+  --        rows remain editable and clip submission compatibility holds.
+  if p_patch ? 'platforms' then
+    if jsonb_typeof(p_patch->'platforms') is distinct from 'array' then
+      raise exception 'platforms must be a JSON array of platform names';
+    end if;
+
+    for v_platform_name in select jsonb_array_elements_text(p_patch->'platforms')
+    loop
+      if v_platform_name is null or v_platform_name = ''
+         or not (v_platform_name = any (v_PLATFORM_VOCAB)) then
+        raise exception 'Invalid platform: %. Allowed platforms: %',
+          coalesce(v_platform_name, 'null'),
+          array_to_string(v_PLATFORM_VOCAB, ', ');
+      end if;
+
+      v_already_present := false;
+      if v_campaign.platforms is not null
+         and jsonb_typeof(v_campaign.platforms) = 'array'
+         and v_campaign.platforms ? v_platform_name then
+        v_already_present := true;
+      end if;
+
+      if not (v_platform_name = any (v_PLATFORM_SELECTABLE))
+         and not v_already_present then
+        raise exception 'Platform % is coming soon and cannot be selected',
+          v_platform_name;
+      end if;
+    end loop;
+  end if;
+
+  if p_patch ? 'platform' then
+    v_platform_name := p_patch->>'platform';
+    if v_platform_name is null or v_platform_name = ''
+       or not (v_platform_name = any (v_PLATFORM_VOCAB)) then
+      raise exception 'Invalid platform: %', coalesce(v_platform_name, 'null');
+    end if;
+    if not (v_platform_name = any (v_PLATFORM_SELECTABLE))
+       and v_campaign.platform is distinct from v_platform_name then
+      raise exception 'Platform % is coming soon and cannot be selected',
+        v_platform_name;
+    end if;
+  end if;
+
+  -- 9. Date validation: strict ISO calendar dates (YYYY-MM-DD) plus an
+  --    effective-value range check. The cast alone is DateStyle dependent and
+  --    silently accepts ambiguous input such as '01/02/2026' on the server
+  --    default ('ISO, MDY'), so the format is checked BEFORE casting.
+  --    An empty string clears the date. Editing dates never touches status.
+  if p_patch ? 'startDate' then
+    if nullif(btrim(p_patch->>'startDate'), '') is null then
+      v_start_date := null;
+    else
+      v_raw_date := btrim(p_patch->>'startDate');
+      if v_raw_date !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' then
+        raise exception 'Invalid startDate: %', p_patch->>'startDate';
+      end if;
+      begin
+        v_start_date := v_raw_date::date;
+      exception when others then
+        raise exception 'Invalid startDate: %', p_patch->>'startDate';
+      end;
+    end if;
+  else
+    v_start_date := v_campaign.start_date;
+  end if;
+
+  if p_patch ? 'endDate' then
+    if nullif(btrim(p_patch->>'endDate'), '') is null then
+      v_end_date := null;
+    else
+      v_raw_date := btrim(p_patch->>'endDate');
+      if v_raw_date !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' then
+        raise exception 'Invalid endDate: %', p_patch->>'endDate';
+      end if;
+      begin
+        v_end_date := v_raw_date::date;
+      exception when others then
+        raise exception 'Invalid endDate: %', p_patch->>'endDate';
+      end;
+    end if;
+  else
+    v_end_date := v_campaign.end_date;
+  end if;
+
+  -- Effective values: the incoming side of the range when supplied, otherwise
+  -- the value already stored, so a patch carrying only one date is still
+  -- checked against the other side. Same-day ranges are allowed.
+  if v_start_date is not null and v_end_date is not null
+     and v_end_date < v_start_date then
+    raise exception 'Invalid date range: endDate (%) is before startDate (%)',
+      to_char(v_end_date, 'YYYY-MM-DD'), to_char(v_start_date, 'YYYY-MM-DD');
+  end if;
+
+  -- 10. Financial field lock (value-aware). payout -> clips.locked_cpm and
+  --     max_payout_per_clip -> clips.locked_max_payout, so both are locked
+  --     once any submission exists. The edit modal always echoes the current
+  --     values next to detail edits; only a value that actually differs from
+  --     the stored one is treated as a financial change and rejected.
+  if p_patch ? 'payout' then
+    begin
+      v_patch_num := (p_patch->>'payout')::numeric;
+    exception when others then
+      raise exception 'Invalid payout: %', p_patch->>'payout';
+    end;
+
+    if v_patch_num is null then
+      raise exception 'Invalid payout: %',
+        coalesce(p_patch->>'payout', 'null');
+    end if;
+
+    if v_patch_num is distinct from v_campaign.payout then
       select exists (
         select 1 from public.clips where campaign_id = p_campaign_id
       ) into v_has_clips;
 
       if v_has_clips then
-        raise exception 'Cannot change % on campaign with existing submissions. Create a new campaign with updated terms.', v_field;
+        raise exception 'Cannot change payout on campaign with existing submissions. Create a new campaign with updated terms.';
       end if;
     end if;
-  end loop;
+  end if;
 
-  -- 9. Build safe update object (only known editable columns, raw values)
-  --    Step 10 applies explicit type casts per column. Step 9 validates
-  --    that values exist and filters to the whitelist only.
+  if p_patch ? 'maxPayoutPerClip' then
+    begin
+      v_patch_num := (p_patch->>'maxPayoutPerClip')::numeric;
+    exception when others then
+      raise exception 'Invalid maxPayoutPerClip: %', p_patch->>'maxPayoutPerClip';
+    end;
+
+    if v_patch_num is distinct from v_campaign.max_payout_per_clip then
+      select exists (
+        select 1 from public.clips where campaign_id = p_campaign_id
+      ) into v_has_clips;
+
+      if v_has_clips then
+        raise exception 'Cannot change max_payout_per_clip on campaign with existing submissions. Create a new campaign with updated terms.';
+      end if;
+    end if;
+  end if;
+
+  -- 11. Build safe update object (only known editable columns, raw values)
+  --     Step 13 applies explicit type casts per column. Step 11 validates
+  --     that values exist and filters to the whitelist only.
   v_update := '{}'::jsonb;
   if p_patch ? 'title' then v_update := v_update || jsonb_build_object('title', p_patch->>'title'); end if;
   if p_patch ? 'brief' then v_update := v_update || jsonb_build_object('brief', p_patch->>'brief'); end if;
@@ -2763,8 +2930,10 @@ begin
   if p_patch ? 'platforms' then v_update := v_update || jsonb_build_object('platforms', p_patch->'platforms'); end if;
   if p_patch ? 'verified' then v_update := v_update || jsonb_build_object('verified', p_patch->>'verified'); end if;
   if p_patch ? 'objective' then v_update := v_update || jsonb_build_object('objective', p_patch->>'objective'); end if;
-  if p_patch ? 'startDate' then v_update := v_update || jsonb_build_object('start_date', p_patch->>'startDate'); end if;
-  if p_patch ? 'endDate' then v_update := v_update || jsonb_build_object('end_date', p_patch->>'endDate'); end if;
+  -- Dates: use the validated/normalized values from step 9 (empty string
+  -- clears the column instead of failing the cast).
+  if p_patch ? 'startDate' then v_update := v_update || jsonb_build_object('start_date', v_start_date); end if;
+  if p_patch ? 'endDate' then v_update := v_update || jsonb_build_object('end_date', v_end_date); end if;
   if p_patch ? 'maxPayoutPerClip' then v_update := v_update || jsonb_build_object('max_payout_per_clip', p_patch->>'maxPayoutPerClip'); end if;
   if p_patch ? 'recommendedDuration' then v_update := v_update || jsonb_build_object('recommended_duration', p_patch->>'recommendedDuration'); end if;
   if p_patch ? 'hook' then v_update := v_update || jsonb_build_object('hook', p_patch->>'hook'); end if;
@@ -2781,14 +2950,19 @@ begin
   if p_patch ? 'whatToMake' then v_update := v_update || jsonb_build_object('what_to_make', p_patch->>'whatToMake'); end if;
   if p_patch ? 'style' then v_update := v_update || jsonb_build_object('style', p_patch->>'style'); end if;
   if p_patch ? 'rights' then v_update := v_update || jsonb_build_object('rights', p_patch->'rights'); end if;
+  -- Creative/detail fields already supported by the Campaign model.
+  if p_patch ? 'sourceAssets' then v_update := v_update || jsonb_build_object('source_assets', p_patch->'sourceAssets'); end if;
+  if p_patch ? 'exampleClips' then v_update := v_update || jsonb_build_object('example_clips', p_patch->'exampleClips'); end if;
+  if p_patch ? 'doList' then v_update := v_update || jsonb_build_object('do_list', p_patch->'doList'); end if;
+  if p_patch ? 'dontList' then v_update := v_update || jsonb_build_object('dont_list', p_patch->'dontList'); end if;
 
   -- Nothing to update
   if v_update = '{}'::jsonb then
     raise exception 'No valid fields to update';
   end if;
 
-  -- 10. Build typed SET clause using explicit PostgreSQL casts.
-  --     $2->>'key' returns TEXT; $2->'key' returns JSONB.
+  -- 12. Build typed SET clause using explicit PostgreSQL casts.
+  --     $2->>'key' returns TEXT; $2'key' returns JSONB.
   --     Neither can be assigned directly to numeric/integer/boolean/date columns.
   --     We must cast explicitly: ($2->>'key')::numeric, etc.
   --     JSONB columns use $2->'key' to preserve structure.
@@ -2836,6 +3010,10 @@ begin
       WHEN 'thumbnails'          THEN 'thumbnails = $2->''thumbnails'''
       WHEN 'brand_assets'        THEN 'brand_assets = $2->''brand_assets'''
       WHEN 'rights'              THEN 'rights = $2->''rights'''
+      WHEN 'source_assets'       THEN 'source_assets = $2->''source_assets'''
+      WHEN 'example_clips'       THEN 'example_clips = $2->''example_clips'''
+      WHEN 'do_list'             THEN 'do_list = $2->''do_list'''
+      WHEN 'dont_list'           THEN 'dont_list = $2->''dont_list'''
       -- Unknown key — skip (should not happen due to whitelist above)
       ELSE NULL
     end;
@@ -2846,13 +3024,67 @@ begin
     raise exception 'No valid fields to update';
   end if;
 
-  -- 11. Perform the update with fully typed assignments
+  -- 13. Audit: every successful update is recorded on the campaign audit
+  --     trail (same entry shape the UI renders: action / by / at / note).
+  select coalesce(jsonb_agg(k order by k), '[]'::jsonb)
+  into v_changed
+  from jsonb_object_keys(v_update) k
+  where coalesce(v_update ->> k, '') is distinct from
+        coalesce(to_jsonb(v_campaign) ->> k, '');
+
+  v_actor := coalesce(
+    (select nullif(name, '') from public.profiles where id = v_user_id),
+    (select nullif(email, '') from public.profiles where id = v_user_id),
+    v_user_id::text
+  );
+
+  v_note := case
+    when jsonb_array_length(v_changed) = 0 then 'Edited campaign'
+    else 'Edited: ' || (
+      select string_agg(f, ', ' order by f)
+      from jsonb_array_elements_text(v_changed) f
+    )
+  end;
+
+  v_audit := coalesce(v_campaign.audit, '[]'::jsonb);
+  if jsonb_typeof(v_audit) is distinct from 'array' then
+    v_audit := '[]'::jsonb;
+  end if;
+  v_audit := v_audit || jsonb_build_object(
+    'action', 'edited',
+    'by', v_actor,
+    'at', (extract(epoch from now()) * 1000)::bigint,
+    'note', v_note
+  );
+
+  -- 14. Perform the update with fully typed assignments + audit trail append
   execute format(
-    'UPDATE public.campaigns SET %s WHERE id = $1 RETURNING to_jsonb(campaigns.*)',
+    'UPDATE public.campaigns SET %s, audit = $3 WHERE id = $1 RETURNING to_jsonb(campaigns.*)',
     v_set
   )
-  using p_campaign_id, v_update
-  into v_result;
+  into v_result
+  using p_campaign_id, v_update, v_audit;
+
+  -- 15. Global audit trail (same pattern as campaign_action / create_campaign)
+  insert into public.audit_logs (
+    id, actor_id, actor, action, entity_type, entity_id, entity_label,
+    before_state, after_state, metadata, idempotency_key
+  ) values (
+    'audit-' || extract(epoch from now())::bigint || '-' || upper(md5(random()::text)),
+    v_user_id,
+    v_actor,
+    'campaign_updated',
+    'campaign',
+    p_campaign_id::text,
+    v_result->>'title',
+    (select coalesce(jsonb_object_agg(f, to_jsonb(v_campaign) -> f), '{}'::jsonb)
+       from jsonb_array_elements_text(v_changed) f),
+    (select coalesce(jsonb_object_agg(f, v_result -> f), '{}'::jsonb)
+       from jsonb_array_elements_text(v_changed) f),
+    jsonb_build_object('fields', v_changed, 'source', 'update_campaign'),
+    'campaign_update_' || p_campaign_id::text || '-' || extract(epoch from now())::bigint
+      || '-' || upper(md5(random()::text))
+  );
 
   return v_result;
 end;
