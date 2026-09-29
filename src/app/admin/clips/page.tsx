@@ -47,7 +47,7 @@ const TABS: Array<{ key: string; label: string; statuses: ClipStatus[] }> = [
 ];
 
 export default function AdminClips() {
-  const { clips, campaigns, financeRecords, approveClip, rejectClip, holdClip } = useStore();
+  const { clips, campaigns, financeRecords, approveClip, verifyClipEarning, rejectClip, holdClip } = useStore();
   const { user } = useAuth();
   useAutoRefresh();
   const actor = user?.email ?? user?.name ?? "Admin";
@@ -69,6 +69,7 @@ export default function AdminClips() {
   const [holdingId, setHoldingId] = useState<string | null>(null);
   const [holdReason, setHoldReason] = useState("");
   const [auditId, setAuditId] = useState<string | null>(null);
+  const [verifyingId, setVerifyingId] = useState<string | null>(null);
 
   const pendingFin = financeOf(financeRecords, (r) => r.status === "pending");
   const processingFin = financeOf(financeRecords, (r) => r.status === "processing");
@@ -262,6 +263,17 @@ export default function AdminClips() {
               financeRecords={list.map((k) => financeRecords.find((r) => r.clipId === k.id)).filter(Boolean) as FinanceRecord[]}
               clips={list}
               campaigns={campaigns}
+              verifyingId={verifyingId}
+              onVerify={async (id) => {
+                setVerifyingId(id);
+                try {
+                  await verifyClipEarning(id, actor);
+                } catch {
+                  // Store surfaces the server error.
+                } finally {
+                  setVerifyingId(null);
+                }
+              }}
               auditId={auditId}
               onToggleAudit={(id) => setAuditId(auditId === id ? null : id)}
             />
@@ -548,6 +560,8 @@ function ApprovedClipsTable({
   campaigns: Campaign[];
   auditId: string | null;
   onToggleAudit: (id: string) => void;
+  verifyingId: string | null;
+  onVerify: (id: string) => Promise<void>;
 }) {
   return (
     <>
@@ -556,7 +570,7 @@ function ApprovedClipsTable({
         {financeRecords.map((r) => {
           const clip = clips.find((c) => c.id === r.clipId);
           const c = campaigns.find((x) => x.id === r.campaignId);
-          const paymentLabel = r.status === "paid" ? "Paid" : r.status === "processing" ? "Processing" : "Payable";
+          const paymentLabel = r.status === "paid" ? "Paid" : r.status === "processing" ? "Available" : "Pending verification";
           const paymentStyle = r.status === "paid" ? "bg-green/10 text-green" : r.status === "processing" ? "bg-amber/10 text-amber" : "bg-amber/10 text-amber";
           return (
             <div key={r.id} className="rounded-[10px] border border-border/40 bg-background p-4">
@@ -577,6 +591,11 @@ function ApprovedClipsTable({
                 <a href={clip.videoUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block text-[13px] text-foreground/60 hover:underline">View clip ↗</a>
               )}
               <div className="mt-3 flex items-center gap-2">
+                {r.status === "pending" && (
+                  <button onClick={() => onVerify(r.clipId)} disabled={verifyingId === r.clipId} className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-[8px] bg-foreground px-3 text-[13px] font-medium text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50">
+                    <Check size={14} /> {verifyingId === r.clipId ? "Verifying…" : "Verify earning"}
+                  </button>
+                )}
                 <button onClick={() => onToggleAudit(r.id)} className={`inline-flex h-9 cursor-pointer items-center gap-1 rounded-[8px] border border-border/60 px-3 text-[13px] font-medium transition-colors hover:bg-accent-soft ${auditId === r.id ? "bg-accent-soft" : ""}`}>
                   <History size={14} /> Audit
                 </button>
@@ -637,8 +656,8 @@ function ApprovedClipsTable({
 
           const paymentLabel =
             r.status === "paid" ? "Paid" :
-            r.status === "processing" ? "Processing" :
-            "Payable";
+            r.status === "processing" ? "Available" :
+            "Pending verification";
           const paymentStyle =
             r.status === "paid" ? "bg-green/10 text-green" :
             r.status === "processing" ? "bg-amber/10 text-amber" :
@@ -650,6 +669,15 @@ function ApprovedClipsTable({
               colSpan={11}
               extra={
                 <div className="flex flex-wrap items-center gap-1.5">
+                  {r.status === "pending" && (
+                    <button
+                      onClick={() => onVerify(r.clipId)}
+                      disabled={verifyingId === r.clipId}
+                      className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-[8px] bg-foreground px-3 text-[13px] font-medium text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Check size={14} /> {verifyingId === r.clipId ? "Verifying…" : "Verify earning"}
+                    </button>
+                  )}
                   <button
                     onClick={() => onToggleAudit(r.id)}
                     className={`inline-flex h-9 cursor-pointer items-center gap-1 rounded-[8px] border border-border/60 px-3 text-[13px] font-medium transition-colors hover:bg-accent-soft ${
