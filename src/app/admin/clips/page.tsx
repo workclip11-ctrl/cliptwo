@@ -134,19 +134,19 @@ export default function AdminClips() {
           <p className="text-[20px] font-mono font-bold tracking-tight">
             {rup(pendingFin.total / 100)}
           </p>
-          <p className="mt-0.5 text-[13px] text-muted">Pending approval</p>
+          <p className="mt-0.5 text-[13px] text-muted">Pending verification</p>
         </div>
         <div>
           <p className="text-[20px] font-mono font-bold tracking-tight">
             {rup(processingFin.total / 100)}
           </p>
-          <p className="mt-0.5 text-[13px] text-muted">In processing</p>
+          <p className="mt-0.5 text-[13px] text-muted">Available</p>
         </div>
         <div>
           <p className="text-[20px] font-mono font-bold tracking-tight">
             {rup(paidFin.total / 100)}
           </p>
-          <p className="mt-0.5 text-[13px] text-muted">Released to clippers</p>
+          <p className="mt-0.5 text-[13px] text-muted">Paid out</p>
         </div>
         <div>
           <p className="text-[20px] font-mono font-bold tracking-tight">
@@ -571,7 +571,7 @@ function ApprovedClipsTable({
           const clip = clips.find((c) => c.id === r.clipId);
           const c = campaigns.find((x) => x.id === r.campaignId);
           const paymentLabel = r.status === "paid" ? "Paid" : r.status === "processing" ? "Available" : "Pending verification";
-          const paymentStyle = r.status === "paid" ? "bg-green/10 text-green" : r.status === "processing" ? "bg-amber/10 text-amber" : "bg-amber/10 text-amber";
+          const paymentStyle = r.status === "paid" ? "bg-green/10 text-green" : r.status === "processing" ? "bg-green/10 text-green" : "bg-amber/10 text-amber";
           return (
             <div key={r.id} className="rounded-[10px] border border-border/40 bg-background p-4">
               <div className="flex items-start justify-between gap-3">
@@ -660,7 +660,7 @@ function ApprovedClipsTable({
             "Pending verification";
           const paymentStyle =
             r.status === "paid" ? "bg-green/10 text-green" :
-            r.status === "processing" ? "bg-amber/10 text-amber" :
+            r.status === "processing" ? "bg-green/10 text-green" :
             "bg-amber/10 text-amber";
 
           return (
