@@ -62,6 +62,7 @@ interface StoreActions {
   ) => Promise<string | null>;
   addClip: (k: Omit<Clip, "id" | "submittedAt" | "status" | "views">) => Promise<Clip | null>;
   approveClip: (id: string, actor?: string) => void;
+  verifyClipEarning: (id: string, actor?: string) => Promise<void>;
   rejectClip: (id: string, reason: string, details?: string, actor?: string) => void;
   holdClip: (id: string, reason: string, actor?: string) => void;
   requestPayout: () => void;
@@ -693,6 +694,38 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             }));
           }
           },
+
+       verifyClipEarning: async (id, actor) => {
+          const me = await getCurrentUser();
+          if (!await isUserAdmin(me?.id)) {
+            console.error(`Authorization: non-admin user cannot verify earning for clip ${id}`);
+            return;
+          }
+          if (!isSupabaseConfigured) return;
+          const previous = stateRef.current.financeRecords;
+          const { data, error } = await supabase.rpc("verify_clip_earning", {
+            p_clip_id: id,
+            p_actor: actor ?? null,
+          });
+          if (error) {
+            console.error("RPC verify_clip_earning failed:", error.message);
+            setState((s) => ({ ...s, lastError: `Verify earning failed: ${error.message}` }));
+            throw error;
+          }
+          const record = data as Record<string, unknown>;
+          if (record?.id) {
+            setState((s) => ({
+              ...s,
+              financeRecords: [
+                mapFinanceRecord(record),
+                ...s.financeRecords.filter((r) => r.clipId !== id),
+              ],
+              lastError: null,
+            }));
+          } else {
+            setState((s) => ({ ...s, financeRecords: previous }));
+          }
+       },
 
        rejectClip: async (id, reason, details, actor) => {
           const me = await getCurrentUser();
